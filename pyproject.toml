@@ -83,6 +83,33 @@ pyjolt-taskmanager = { workspace = true }
 requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
 
+[project.scripts]
+pyjolt = "pyjolt.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/MarkoSterk/PyJolt"
+Issues = "https://github.com/MarkoSterk/PyJolt/issues"
+
+[tool.pylint]
+# Global Pylint configuration
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-class-docstring",
+    "missing-function-docstring",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.mypy]
+disable_error_code = ["import-untyped"]
+exclude = [
+    "src/pyjolt/cli/templates",
+    "src/pyjolt/database/sql/migrate/env_template.py"
+    ]
+
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
