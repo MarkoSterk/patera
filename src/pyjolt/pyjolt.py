@@ -52,42 +52,11 @@ from .controller import Controller
 from .exceptions import ExceptionHandler
 from .base_extension import BaseExtension
 from .configuration_base import BaseConfig
-from .database.sql import SqlDatabase
-from .database.sql.declarative_base import DeclarativeBaseModel as BaseModelClass
 from .middleware import MiddlewareBase, AppCallableType
 from .cli import CLIController
 from .logging.logger_config_base import LoggerBase
 from .logging.inmemory_buffer import InMemoryLogBuffer
 
-# # ──────────────────────────────────────────────────────────────────────────────
-# # Monkey‐patch Uvicorn’s RequestResponseCycle.run_asgi so that, just before
-# # it invokes your ASGI app, it injects the real socket into the scope dict.
-# try:
-#     from uvicorn.protocols.http.h11_impl import RequestResponseCycle
-
-#     _orig_run_asgi = RequestResponseCycle.run_asgi
-
-#     async def _patched_run_asgi(self, application):
-#         # grab the raw socket from the transport and stash it into scope
-#         sock = None
-#         if hasattr(self, "transport") and self.transport is not None:
-#             sock = self.transport.get_extra_info("socket")
-#         if sock is not None:
-#             self.scope["socket"] = sock
-
-#         # now call the real ASGI loop
-#         return await _orig_run_asgi(self, application)
-
-#     RequestResponseCycle.run_asgi = _patched_run_asgi #type: ignore[method-assign]
-# # pylint: disable-next=W0718
-# except Exception as e:
-#     logger.debug(
-#         "Could not patch RequestResponseCycle.run_asgi; "
-#         "os.sendfile() zero-copy will fall back to aiofiles. "
-#         f"Patch error: {e}"
-#     )
-# # ──────────────────────────────────────────────────────────────────────────────
-# remove default Loguru sink
 logger.remove()
 
 PYJOLT_ASCIART: str = r"""
@@ -184,6 +153,15 @@ def validate_config(config_obj_or_type: Type[BaseConfig] | BaseConfig) -> BaseCo
     raise MissingAppConfigurations("Configs must be a subclass of pyjolt.BaseConfig.")
 
 
+def inherits_from(class_obj_or_instance, base_name: str) -> bool:
+    # Checks inheritance via string comparison
+    if inspect.isclass(class_obj_or_instance):
+        return any(base.__name__ == base_name for base in class_obj_or_instance.__mro__)
+    return any(
+        base.__name__ == base_name for base in class_obj_or_instance.__class__.__mro__
+    )
+
+
 class PyJolt:
     """PyJolt class implementation. Used to create a new application instance"""
 
@@ -254,7 +232,7 @@ class PyJolt:
         self._cli_controllers: dict[str, "CLIController"] = {}
         self._exception_handlers: dict[str, Callable] = {}
         self._json_spec: Optional[dict] = None
-        self._db_models: dict[str, list[Type[BaseModelClass]]] = {}
+        self._db_models: dict[str, list[Type]] = {}
         self._db_name_configs_map: dict[str, str] = {}
 
         self._extensions: dict = {}
@@ -331,7 +309,7 @@ class PyJolt:
                 self.logger.info(f"Registering exception handler: {obj.__name__}")
                 self.register_exception_handler(obj)
                 continue
-            if isinstance(obj, SqlDatabase):
+            if inherits_from(obj, "SqlDatabase"):
                 self.logger.info(
                     f"Initilizing database: {obj.__class__.__name__} ({obj.configs_name})"
                 )
@@ -344,11 +322,11 @@ class PyJolt:
                 )
                 obj.init_app(self)
                 continue
-            if inspect.isclass(obj) and issubclass(obj, BaseModelClass):
+            if inspect.isclass(obj) and inherits_from(obj, "BaseModelClass"):
                 self.logger.info(f"Loaded database model: {obj.__name__}")
                 if obj.db_name() not in self._db_models:
                     self._db_models[obj.db_name()] = []
-                self._db_models[obj.db_name()].append(cast(Type[BaseModelClass], obj))
+                self._db_models[obj.db_name()].append(obj)
                 continue
             if inspect.isclass(obj) and issubclass(obj, CLIController):
                 self.logger.info(f"Registering cli controller: {obj.__name__}")
