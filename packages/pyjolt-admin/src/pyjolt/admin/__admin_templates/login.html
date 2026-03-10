@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Login</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- HTMX -->
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(1200px 800px at 20% 10%, #1f2937 0%, #0f172a 60%),
+                  radial-gradient(1000px 700px at 80% 90%, #0b1220 0%, #111827 60%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #0f172a;
+    }
+    .card {
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+    .brand img {
+      width: 100px;
+      height: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card p-4" style="max-width: 380px; width: 100%;">
+    <div class="text-center mb-4">
+      <div class="brand mb-3">
+        {% if configs.LOGO_URL %}
+          <img src="{{ configs.LOGO_URL }}" alt="Logo" />
+        {% else %}
+          <img src="{{ url_for('AdminController.static', filename='pyjolt_logo.png') }}" alt="Logo" />
+        {% endif %}
+      </div>
+      <h5 class="fw-semibold mb-1">Dashboard</h5>
+      <p class="text-muted small mb-0">Sign in to continue</p>
+
+      <div class="m-2 alert alert-danger login-error" hidden>
+        Login failed. Please check credentials!
+      </div>
+
+    </div>
+
+    <form hx-post="{{ url_for(configs.URL_FOR_FOR_LOGIN) }}"
+          hx-trigger="submit"
+          hx-target="this"
+          hx-swap="none"
+          class="needs-validation" novalidate>
+
+      <div class="mb-3">
+        <label for="email" class="form-label">Email address</label>
+        <input id="email" name="email" type="email"
+               class="form-control"
+               placeholder="you@example.com"
+               autocomplete="email" required>
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input id="password" name="password" type="password"
+               class="form-control"
+               placeholder="••••••••"
+               autocomplete="current-password" required>
+      </div>
+
+      {% if configs.USE_REMEMBER_ME or configs.URL_FOR_FOR_PASSWORD_RESET %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          {% if configs.USE_REMEMBER_ME %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="remember" name="remember">
+              <label class="form-check-label" for="remember">Remember me</label>
+            </div>
+          {% endif %}
+          {% if configs.URL_FOR_FOR_PASSWORD_RESET %}
+            <a href="{{ url_for(configs.URL_FOR_FOR_PASSWORD_RESET) }}" class="text-primary small">Forgot password?</a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <button class="btn btn-primary w-100" type="submit">Login</button>
+    </form>
+  </main>
+
+  <script>
+    const loginError = document.querySelector(".login-error");
+    // HTMX: redirect on successful login
+    document.body.addEventListener('htmx:beforeRequest', function (event){
+      loginError.hidden = true;
+    })
+    document.body.addEventListener('htmx:afterRequest', function (event) {
+      if (event.detail.xhr.status === 200 && event.detail.target.tagName === 'FORM') {
+        window.location.href = '/admin/dashboard';
+        return;
+      }
+      loginError.hidden = false;
+    });
+  </script>
+</body>
+</html>

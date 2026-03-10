@@ -1,0 +1,91 @@
+[project]
+name = "pyjolt"
+version = "0.111.13"
+description = "A batteries included async-first python webframework"
+readme = "README.md"
+authors = [
+    { name = "MarkoSterk", email = "marko_sterk@hotmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiofiles>=25.1.0",
+    "anyio>=4.12.1",
+    "asgi-lifespan>=2.1.0",
+    "click>=8.3.1",
+    "granian>=2.7.2",
+    "greenlet>=3.3.2",
+    "h11>=0.16.0",
+    "httpcore>=1.0.9",
+    "idna>=3.11",
+    "jinja2>=3.1.6",
+    "loguru>=0.7.3",
+    "mako>=1.3.10",
+    "markupsafe>=3.0.3",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "pytest-cov>=7.0.0",
+    "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.22",
+    "websockets>=16.0",
+    "werkzeug>=3.1.6",
+]
+
+[project.optional-dependencies]
+admin = ["pyjolt-admin"]
+aiinterface = ["pyjolt-aiinterface"]
+auth = ["pyjolt-auth"]
+caching = ["pyjolt-caching"]
+caching-redis = ["pyjolt-caching[redis]"]
+caching-sqlite = ["pyjolt-caching[sqlite]"]
+database = ["pyjolt-database"]
+email = ["pyjolt-email"]
+frontend = ["pyjolt-frontendext", "pyjolt-frontend"]
+statemachine = ["pyjolt-statemachine"]
+taskmanager = ["pyjolt-taskmanager"]
+all = [
+    "pyjolt-database",
+    "pyjolt-email",
+    "pyjolt-admin",
+    "pyjolt-aiinterface",
+    "pyjolt-auth",
+    "pyjolt-caching",
+    "pyjolt-statemachine",
+    "pyjolt-taskmanager"
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/pyjolt-admin",
+    "packages/pyjolt-aiinterface",
+    "packages/pyjolt-auth",
+    "packages/pyjolt-caching",
+    "packages/pyjolt-database",
+    "packages/pyjolt-email",
+    "packages/pyjolt-frontend",
+    "packages/pyjolt-frontendext",
+    "packages/pyjolt-statemachine",
+    "packages/pyjolt-taskmanager"
+]
+
+[tool.uv.sources]
+pyjolt-admin = { workspace = true }
+pyjolt-aiinterface = { workspace = true }
+pyjolt-auth = { workspace = true }
+pyjolt-caching = { workspace = true }
+pyjolt-database = { workspace = true }
+pyjolt-email = { workspace = true }
+pyjolt-frontend = { workspace = true }
+pyjolt-frontendext = { workspace = true }
+pyjolt-statemachine = { workspace = true }
+pyjolt-taskmanager = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "ruff>=0.15.5",
+]

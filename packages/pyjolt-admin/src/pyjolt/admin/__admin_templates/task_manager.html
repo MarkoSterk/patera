@@ -1,0 +1,137 @@
+{% extends "/__admin_templates/base.html" %}
+
+{% block content %}
+<main class="container py-4" aria-label="Task managers">
+    <div class="row g-4">
+        {% for job_id, job in tasks.items() %}
+            <div class="col-12 col-sm-6 col-lg-5 task-card">
+                <div class="card metric-card">
+                    <div class="card-body d-flex align-items-start gap-3 p-3">
+
+                        <!-- LEFT: ICON -->
+                        <div class="metric-icon me-2">
+                            <i class="fa-solid fa-gear fa-5x"></i>
+                        </div>
+
+                        <!-- RIGHT SIDE (Name + BUTTONS) -->
+                        <div class="d-flex flex-column">
+                            <div class="fw-bold mb-2">
+                                {{job.name}}
+                            </div>
+
+                            <!-- BUTTONS -->
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-success run-job"
+                                data-url="{{ url_for('AdminTaskManagersController.run_task', manager_name=manager_name, task_id=job_id) }}" data-callback="runJob"
+                                data-question="Are you sure you wish to run this task?" title="Run job now">
+                                    <i class="fa-solid fa-play"></i>
+                                </button>
+
+
+                                <button type="button" {% if not job.next_run_time %} disabled {% endif %} class="btn btn-success pause-job"
+                                data-url="{{ url_for('AdminTaskManagersController.pause_task', manager_name=manager_name, task_id=job_id) }}" data-callback="pauseJob"
+                                data-question="Are you sure you wish to pause this task?" title="Pause job">
+                                    <i class="fa-solid fa-pause"></i>
+                                </button>
+
+                                <button type="button" class="btn btn-success resume-job" {% if job.next_run_time %} disabled {% endif %}
+                                data-url="{{ url_for('AdminTaskManagersController.resume_task', manager_name=manager_name, task_id=job_id) }}" data-callback="resumeJob"
+                                data-question="Are you sure you wish to resume this task?" title="Resume job">
+                                    <i class="fa-solid fa-arrow-rotate-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</main>
+<dialog class="confirm-dialog">
+    <p class="dialog-msg"></p>
+    <div>
+        <button type="button" class="btn btn-sm btn-danger m-1 confirm-action">Confirm</button>
+        <button type="button" class="btn btn-sm btn-primary m-1 close-dialog">Close</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+    function runJob(event, url){
+        const btn = document.querySelector(`button[data-url="${url}"]`);
+        btn.blur();
+    }
+
+    function pauseJob(event, url){
+        setTimeout(() => {location.reload()}, 500);
+    }
+
+    function resumeJob(event, btn){
+        setTimeout(() => {location.reload()}, 500);
+    }
+
+    const callbackFunctions = {
+        runJob,
+        pauseJob,
+        resumeJob
+    }
+
+    const dialog = document.querySelector(".confirm-dialog");
+    const dialogMsg = dialog.querySelector(".dialog-msg");
+    const confirmActionBtn = dialog.querySelector(".confirm-action");
+    const cancelActionBtn = dialog.querySelector(".close-dialog");
+
+    cancelActionBtn.addEventListener("click", (e) => {
+        dialogMsg.innerHTML = "";
+        confirmActionBtn.removeAttribute("data-url");
+        confirmActionBtn.removeAttribute("data-callback");
+        dialog.close();
+    })
+
+    confirmActionBtn.addEventListener("click", (e) => {
+        performActionConfirm(e, confirmActionBtn);
+    });
+
+    async function performAction(event, btn){
+        confirmActionBtn.setAttribute("data-url", btn.getAttribute("data-url"));
+        confirmActionBtn.setAttribute("data-callback", btn.getAttribute("data-callback"));
+        dialogMsg.innerHTML = btn.getAttribute("data-question");
+        dialog.showModal();
+    }
+
+    async function performActionConfirm(event, btn){
+        const url = btn.getAttribute("data-url");
+        const callback = btn.getAttribute("data-callback");
+        let response = await fetch(url);
+        const status = response.ok;
+        response = await response?.json() || {msg: "Something went wrong", status: "danger"}
+        if(!status){
+            setMessage(response.msg, response.status)
+            cancelActionBtn.click();
+            return;
+        }
+        btn.removeAttribute("data-url")
+        setMessage(response.message, response.status)
+        callbackFunctions[callback](event, url);
+        cancelActionBtn.click();
+    }
+
+    const runBtns = document.querySelectorAll(".run-job");
+    const pauseBtns = document.querySelectorAll(".pause-job");
+    const resumeBtns = document.querySelectorAll(".resume-job");
+
+    runBtns.forEach(btn => {
+        btn.addEventListener("click", (e) => performAction(e, btn));
+    });
+    pauseBtns.forEach(btn => {
+        btn.addEventListener("click", (e) => performAction(e, btn));
+    });
+    resumeBtns.forEach(btn => {
+        btn.addEventListener("click", (e) => performAction(e, btn));
+    });
+
+</script>
+{% endblock %}

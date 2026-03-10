@@ -1,0 +1,149 @@
+{% extends "/__admin_templates/base.html" %}
+
+{% block styles %}
+<style>
+    .metric-card {
+      border: 0;
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      height: 160px; /* Increased height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    }
+
+    .metric-icon {
+      width: 64px;  /* bigger icon container */
+      height: 64px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 1.75rem; /* bigger icon */
+      flex-shrink: 0;
+    }
+
+    .metric-value {
+      font-weight: 800;
+      font-size: 2rem; /* larger number */
+      line-height: 1;
+    }
+
+    .metric-label {
+      color: #6b7280;
+      font-size: 1.05rem;
+      margin-top: .3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="container py-4" aria-label="Databases">
+    <div class="mx-auto my-3 p-2 text-center rounded w-75"
+      style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25);">
+        <small style="color: var(--brand-600);">
+            <i class="fa-solid fa-circle-info me-1"></i>
+            Metrics include <strong>all databases and all models</strong>, not only registered models of databases.
+        </small>
+    </div>
+    <div class="row g-4">
+      <!-- Databases -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-solid fa-database"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ num_of_db }}</div>
+              <div class="metric-label">Databases</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schemas -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-brands fa-sketch"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ schemas_count }}</div>
+              <div class="metric-label">Schemas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Views -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-solid fa-eye"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ views_count }}</div>
+              <div class="metric-label">Views</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tables -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-solid fa-table"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ tables_count }}</div>
+              <div class="metric-label">Tables</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Records -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-solid fa-list-ol"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ rows_count }}</div>
+              <div class="metric-label">Rows</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columns -->
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card metric-card">
+          <div class="card-body d-flex align-items-center gap-4">
+            <span class="metric-icon">
+              <i class="fa-solid fa-chart-simple"></i>
+            </span>
+            <div>
+              <div class="metric-value">{{ columns_count }}</div>
+              <div class="metric-label">Columns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+</main>
+{% endblock %}

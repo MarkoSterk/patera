@@ -1,0 +1,213 @@
+{% extends "/__admin_templates/base.html" %}
+
+
+{% block content %}
+{% if caches %}
+<main class="card" aria-label="Cache interfaces">
+    <div class="card-header">
+        <div>
+            <h2 class="title mb-0">Cache interfaces</h2>
+            <p class="text-muted mb-0 small">Configured cache backends available to the application</p>
+        </div>
+        <div class="text-muted small">
+            {{ caches|length }} cache{{ '' if caches|length == 1 else 's' }} configured
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="row g-3 p-3">
+            {% for cfg_name, cache in caches.items() %}
+                <div class="col-12 col-sm-4 col-md-3 col-lg-2 cache-card">
+                    <div class="h-100 p-3 border rounded-3 bg-light">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <div class="fw-semibold">
+                                    {{ cache.nice_name or cfg_name }}
+                                </div>
+                                <div class="small text-muted">
+                                    Config: {{ cfg_name }}
+                                </div>
+                            </div>
+                            <span class="badge bg-success">
+                                Active
+                            </span>
+                            {% if cache_permissions.get(cfg_name) %}
+                                <button data-cache-name="{{ cfg_name }}" type="button"
+                                data-url="{{ url_for('AdminController.reset_cache', cache_name=cfg_name) }}"
+                                class="btn btn-sm reset-cache" title="Empty cache">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted">
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</main>
+{% endif %}
+
+<main class="card" aria-label="Recent log messages">
+    <div class="card-header">
+        <div>
+            <h2 class="title mb-0">Recent log messages</h2>
+            <p class="text-muted mb-0 small">Latest entries from the application logger</p>
+            <select class="form-select log-level-select" data-url="{{ url_for('AdminController.index') }}">
+                <option value="all">All</option>
+                <option value="severe">Severe</option>
+            </select>
+        </div>
+        <div class="text-muted small">
+            Showing {{ all_logs|length }} entries
+        </div>
+    </div>
+
+    <div class="card-body">
+        {% if all_logs %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0" id="logs-table">
+                    <thead style="background: var(--thead-bg);">
+                        <tr class="text-muted small">
+                            <th scope="col" class="text-nowrap">Time</th>
+                            <th scope="col">Level</th>
+                            <th scope="col">Logger</th>
+                            <th scope="col" class="text-nowrap">Location</th>
+                            <th scope="col">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in all_logs %}
+                            {% set level = (log.level or '')|upper %}
+                            <tr>
+                                <td class="text-nowrap align-middle">
+                                    {{ format_datetime(log.time) }}
+                                </td>
+                                <td class="align-middle">
+                                    {% if level == 'DEBUG' %}
+                                        {% set level_class = 'bg-secondary text-white' %}
+                                    {% elif level == 'INFO' %}
+                                        {% set level_class = 'bg-primary text-white' %}
+                                    {% elif level == 'WARNING' or level == 'WARN' %}
+                                        {% set level_class = 'bg-warning text-dark' %}
+                                    {% elif level == 'ERROR' %}
+                                        {% set level_class = 'bg-danger text-white' %}
+                                    {% elif level == 'CRITICAL' or level == 'FATAL' %}
+                                        {% set level_class = 'bg-dark text-white' %}
+                                    {% else %}
+                                        {% set level_class = 'bg-light text-dark' %}
+                                    {% endif %}
+
+                                    <span class="badge rounded-pill {{ level_class }}">
+                                        {{ level }}
+                                    </span>
+                                </td>
+                                <td class="align-middle small text-muted">
+                                    {{ log.logger_name or log.name }}
+                                </td>
+                                <td class="align-middle small text-muted text-nowrap">
+                                    <code>{{ log.file }}:{{ log.line }}</code><br>
+                                    <span class="fst-italic">{{ log.function }}</span>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="small">
+                                        {{ log.message[:300] }}
+                                        {% if log.message|length > 300 %}
+                                            <span class="text-muted">…</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-4 text-center text-muted">
+                No log messages to display.
+            </div>
+        {% endif %}
+    </div>
+</main>
+
+<dialog class="reset-dialog">
+    <p>Are you sure you wish to reset the cache?</p>
+    <div>
+        <button type="button" class="btn btn-sm btn-danger m-1 confirm-reset">Confirm</button>
+        <button type="button" class="btn btn-sm btn-primary m-1 close-reset">Close</button>
+    </div>
+</dialog>
+
+<script>
+
+    const resetDialog = document.querySelector(".reset-dialog");
+    const confirmResetBtn = resetDialog.querySelector(".confirm-reset");
+    const closeResetBtn = resetDialog.querySelector(".close-reset");
+
+    closeResetBtn.addEventListener("click", (e) => {
+        closeResetBtn.blur();
+        confirmResetBtn.removeAttribute("data-url");
+        resetDialog.close();
+    })
+
+    async function resetCache(url){
+        let response = await fetch(url)
+        const status = response.status;
+        if(!response.ok && status == 500){
+            setMessage("Something went wrong", "danger");
+            return;
+        }
+        response = await response.json();
+        setMessage(response.message, response.status)
+    }
+
+    confirmResetBtn.addEventListener("click", async (e) => {
+        const url = confirmResetBtn.getAttribute("data-url");
+        await resetCache(url);
+        closeResetBtn.click();
+    })
+
+    document.querySelectorAll(".reset-cache").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            const url = btn.getAttribute("data-url");
+            btn.blur();
+            confirmResetBtn.setAttribute("data-url", url);
+            resetDialog.showModal();
+        })
+    })
+
+  const tableElement = document.querySelector("#logs-table");
+  if (tableElement) {
+
+      let dataTable = new simpleDatatables.DataTable(tableElement, {
+          perPage: 25,
+          perPageSelect: [25, 50, 75, 100, 150, -1],
+          paging: true,
+      });
+
+      // Wait for the table to finish rendering
+      dataTable.on("datatable.init", () => {
+          // Locate the per-page dropdown
+          const selector = document.querySelector(".datatable-selector");
+
+          if (!selector) return;
+
+          // Find the option with the value -1 and rename it
+          const allOption = selector.querySelector('option[value="-1"]');
+          if (allOption) {
+              allOption.textContent = "All";
+          }
+      });
+  }
+
+  const levelSelect = document.querySelector(".log-level-select");
+  const url = new URL(location.href);
+  const level = url.searchParams.get("logs") || "all";
+  levelSelect.value = level;
+  const baseUrl = levelSelect.getAttribute("data-url")
+  levelSelect.addEventListener("change", (e) => {
+    location.href=`${baseUrl}?logs=${levelSelect.value}`;
+  })
+</script>
+{% endblock %}

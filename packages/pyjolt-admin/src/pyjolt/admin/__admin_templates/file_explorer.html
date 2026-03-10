@@ -1,0 +1,9 @@
+{% extends "/__admin_templates/base.html" %}
+
+
+{% block content %}
+<file-explorer data-current-folder="{{ folder }}" data-rename-url="{{ url_for('AdminFileController.rename') }}"
+data-base-files-url="/admin/dashboard/files/fetch" data-upload-url="{{ url_for('AdminFileController.upload') }}"
+data-base-single-file-url="/admin/dashboard/files/fetch/one" data-delete-url="{{ url_for('AdminFileController.delete') }}"
+data-zip-file-url="{{ url_for('AdminFileController.download_zip') }}" data-static-url="{{ url_for('static', filename='') }}"></file-explorer>
+{% endblock %}
