@@ -605,7 +605,7 @@ class PyJolt:
                 )
                 if not handler:
                     # pylint: disable-next=W0719
-                    raise Exception("Unhandled exception occured") from exc
+                    raise
                 res = await run_sync_or_async(handler, req, exc)
                 response_type = res.expected_body_type() or exc.__class__
                 return await self.send_response(res, send, response_type)

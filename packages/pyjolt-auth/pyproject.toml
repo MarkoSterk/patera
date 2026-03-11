@@ -5,6 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
   "bcrypt>=5.0.0",
   "cryptography>=46.0.5",
+  "jwt>=1.4.0",
   "pyjolt",
 ]
 

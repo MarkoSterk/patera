@@ -26,15 +26,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from pydantic import BaseModel, Field
 
-from ..exceptions import AuthenticationException, UnauthorizedException
-from ..utilities import run_sync_or_async
-from ..request import Request
-from ..middleware import AppCallableType, MiddlewareBase
-
 if TYPE_CHECKING:
-    from ..pyjolt import PyJolt
-    from ..response import Response
-from ..controller import Controller
+    from pyjolt import PyJolt, Response, Request
+
+from pyjolt.controller import Controller
+from pyjolt.utilities import run_sync_or_async
+from pyjolt.exceptions import AuthenticationException, UnauthorizedException
+from pyjolt.middleware import AppCallableType, MiddlewareBase
 
 REQUEST_ARGS_ERROR_MSG: str = (
     "Injected argument 'req' of route handler is not an instance "
@@ -224,7 +222,9 @@ class Authentication(MiddlewareBase, ABC):
             handler_method, "_authentication", None
         )
         controller_authentication_attributes: Optional[dict[str, Any]] = getattr(
-            handler_method.__self__, "_authentication", None
+            handler_method.__self__,
+            "_authentication",
+            None,  # type: ignore
         )  # type: ignore
         if (
             handler_authentication_attributes is None
