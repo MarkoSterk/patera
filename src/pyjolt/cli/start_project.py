@@ -206,6 +206,31 @@ def start(
     _port: int = int(os.environ.get("PORT", 3000))
     _loop = Loops(os.environ.get("PORT", "auto"))
 
+    DEFAULT_IGNORE_DIRS = [
+        "__dist__",
+        "__pycache__",
+        "logs",
+        "logging",
+        ".mypy_cache",
+        ".venv",
+        ".git",
+        ".idea",
+        ".vscode",
+        "dist",
+        "build",
+        "node_modules",
+    ]
+    DECLARED_IGNORE_DIRS = [
+        d for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",") if d
+    ]
+    DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
+
+    DEFAULT_IGNORE_PATTERNS = ["*.log", "*.sqlite", "*.db", "*.tmp", "*.swp"]
+    DECLARED_IGNORE_PATTERNS = [
+        p for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",") if p
+    ]
+    DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
+
     Granian(
         app_path,
         address=address,
@@ -214,7 +239,8 @@ def start(
         loop=_loop,
         factory=True,
         reload=debug,
-        reload_ignore_dirs=["__dist__"],
+        reload_ignore_dirs=DEFAULT_IGNORE_DIRS,
+        reload_ignore_patterns=DEFAULT_IGNORE_PATTERNS,
     ).serve()
 
 
