@@ -774,7 +774,7 @@ class PyJolt:
             title=self.app_name,
             version=self.version,
             openapi_version="3.0.3",
-            servers=["http://localhost:8080"],
+            servers=[f"http://localhost:{self.get_conf('PORT', 3000)}"],
         )
 
     def add_on_startup_method(self, func: Callable):
