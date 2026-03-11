@@ -6,12 +6,13 @@ import argparse
 from typing import Callable
 from pathlib import Path
 
-from .start_project import start_dev, start_prod, start_cli
+from .start_project import start_dev, start_prod, start_cli, start_testing
 
 methods: dict[str, Callable] = {
     "dev": start_dev,
     "prod": start_prod,
     "cli": start_cli,
+    "test": start_testing,
 }
 
 
@@ -61,6 +62,13 @@ def main():
         "command_args",
         nargs=argparse.REMAINDER,
         help="Arguments passed to the CLI command",
+    )
+
+    start_testing_parser = subparsers.add_parser("test")
+    start_testing_parser.add_argument(
+        "pytest_args",
+        nargs=argparse.REMAINDER,
+        help="Arguments passed to pytest",
     )
 
     args = parser.parse_args()

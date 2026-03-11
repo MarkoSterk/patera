@@ -297,3 +297,31 @@ def start_cli(
     app_instance: PyJolt = application(cli_mode=True)
     command_name = kwargs.pop("command_name", None)
     app_instance.run_cli(command_name, *args, **kwargs)
+
+
+def start_testing(
+    cwd: str,
+    command: str,
+    *args,
+    app: Optional[str] = None,
+    env_file: Optional[str] = None,
+    **kwargs,
+):
+    try:
+        import pytest  # type: ignore
+    except ImportError:
+        print(
+            "Failed to import Pytest. Please add dependency for running tests. Run: 'pip install pyjolt[testing]'"
+        )
+        return
+
+    loaded_env = load_env_file(cwd, env_file)
+    if loaded_env is not None:
+        print(f"Loaded environment from: {loaded_env}")
+
+    pytest_args = kwargs.pop("pytest_args", []) or []
+
+    if not pytest_args or len(pytest_args) == 0:
+        pytest_args = [cwd]
+
+    return pytest.main(pytest_args)  # type: ignore
