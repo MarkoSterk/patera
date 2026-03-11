@@ -107,7 +107,8 @@ def _rebuild_model(model: Optional[Type]) -> None:
     # Pydantic v1
     if hasattr(model, "update_forward_refs"):
         try:
-            model.update_forward_refs()
+            # model.update_forward_refs()
+            model.model_rebuild()
         except TypeError:
             pass
 
