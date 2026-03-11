@@ -39,6 +39,7 @@ frontend = ["pyjolt-frontendext", "pyjolt-frontend"]
 statemachine = ["pyjolt-statemachine"]
 taskmanager = ["pyjolt-taskmanager"]
 testing = ["httpx", "anyio", "pytest", "pytest-cov"]
+dev = ["granian[reload]"]
 all = [
     "pyjolt-database",
     "pyjolt-email",
@@ -97,8 +98,8 @@ disable = [
 ]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = ["app/tests"]
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]

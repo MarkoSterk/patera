@@ -259,7 +259,10 @@ def start(
 def start_dev(
     cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
 ):
-    start(cwd, True, app, env_file)
+    try:
+        start(cwd, True, app, env_file)
+    except Exception:
+        print("Faled to start Granian dev server. Install pyjolt[dev] if not already.")
 
 
 def start_prod(
