@@ -31,8 +31,9 @@ if TYPE_CHECKING:
 
 from pyjolt.controller import Controller
 from pyjolt.utilities import run_sync_or_async
-from pyjolt.exceptions import AuthenticationException, UnauthorizedException
 from pyjolt.middleware import AppCallableType, MiddlewareBase
+
+from .exceptions import AuthenticationException, AuthorizationException
 
 REQUEST_ARGS_ERROR_MSG: str = (
     "Injected argument 'req' of route handler is not an instance "
@@ -177,7 +178,7 @@ class AuthUtils:
             # Decode the token using the app's SECRET_KEY
             payload = jwt.decode(token, secret_key, algorithms=["HS256"])
             return payload
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        except:
             raise
 
 
@@ -259,7 +260,7 @@ class Authentication(MiddlewareBase, ABC):
         )
         if not authorized:
             # not authorized
-            raise UnauthorizedException(self.authorization_error, list(roles))
+            raise AuthorizationException(self.authorization_error, list(roles))
         # user is authenticated and authorized - calls next middleware in chain
         return await self.next(req)
 
