@@ -18,12 +18,12 @@ from typing import (
 from functools import wraps
 
 from .backends.async_nosql_backend_protocol import AsyncNoSqlBackendBase
-from ...base_extension import BaseExtension
-from ...utilities import run_sync_or_async
+from pyjolt.base_extension import BaseExtension
+from pyjolt.utilities import run_sync_or_async
 
 
 if TYPE_CHECKING:
-    from ...pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class _NoSqlDatabaseConfig(BaseModel):

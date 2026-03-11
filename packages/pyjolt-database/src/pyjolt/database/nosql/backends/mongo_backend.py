@@ -3,12 +3,16 @@ MongoDB backend
 """
 
 from typing import Optional, Callable, Any, Iterable, Mapping, TYPE_CHECKING, cast
-from motor.motor_asyncio import AsyncIOMotorClient
+
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+except Exception:
+    raise
 
 from .async_nosql_backend_protocol import AsyncNoSqlBackendBase
 
 if TYPE_CHECKING:
-    from ....pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class MongoBackend(AsyncNoSqlBackendBase):

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Callable, Any, Iterable, Mapping, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ....pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class AsyncNoSqlBackendBase(ABC):

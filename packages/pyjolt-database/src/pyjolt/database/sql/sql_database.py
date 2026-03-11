@@ -37,14 +37,14 @@ from .dialect_overview_extras import (
 )
 
 # pylint: disable-next=E0402
-from ...utilities import run_sync_or_async
+from pyjolt.utilities import run_sync_or_async
 
 # pylint: disable-next=E0402
-from ...base_extension import BaseExtension
+from pyjolt.base_extension import BaseExtension
 from .declarative_base import DeclarativeBaseModel
 
 if TYPE_CHECKING:
-    from ...pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class _SqlDatabaseConfig(BaseModel):

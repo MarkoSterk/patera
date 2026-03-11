@@ -2,7 +2,7 @@
 # pylint: disable=W0613
 
 from __future__ import annotations
-from typing import Any, Optional, Tuple, cast, Type, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Tuple, cast, Type, Protocol
 from pydantic import BaseModel
 
 from sqlalchemy import Column
@@ -11,10 +11,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
 from .sqlalchemy_async_query import AsyncQuery
 
-if TYPE_CHECKING:
-    from ...admin.input_fields import FormField
-
-from ...request import Request
+from pyjolt import Request
 
 
 class MetaProtocol(Protocol):
@@ -22,10 +19,10 @@ class MetaProtocol(Protocol):
     exclude_from_update_form: list[str]
     exclude_from_table: list[str]
 
-    add_to_form: dict[str, FormField]
+    add_to_form: dict[str, Type]
 
     custom_labels: dict[str, str]
-    custom_form_fields: list[FormField]
+    custom_form_fields: list[Type]
 
     form_fields_order: list[str]
 
@@ -48,10 +45,10 @@ class DeclarativeBaseModel(DeclarativeBase):
         exclude_from_update_form: list[str]
         exclude_from_table: list[str]
 
-        add_to_form: dict[str, FormField]
+        add_to_form: dict[str, Type]
 
         custom_labels: dict[str, str]
-        custom_form_fields: list[FormField]
+        custom_form_fields: list[Type]
 
         form_fields_order: list[str]
 
@@ -165,7 +162,7 @@ class DeclarativeBaseModel(DeclarativeBase):
         return cls.Meta.custom_labels
 
     @classmethod
-    def custom_form_fields(cls) -> dict[str, FormField]:
+    def custom_form_fields(cls) -> dict[str, Type]:
         """Returns custom form fields for the admin dashboard forms"""
         if not hasattr(cls.Meta, "custom_form_fields"):
             return {}
