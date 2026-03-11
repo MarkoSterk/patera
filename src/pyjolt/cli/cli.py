@@ -6,24 +6,18 @@ import argparse
 from typing import Callable
 from pathlib import Path
 
-from .new_project import new_project
-from .start_project import start_dev, start_prod
+from .start_project import start_dev, start_prod, start_cli
 
 methods: dict[str, Callable] = {
-    "new-project": new_project,
     "dev": start_dev,
     "prod": start_prod,
+    "cli": start_cli,
 }
 
 
 def main():
     parser = argparse.ArgumentParser(prog="pyjolt")
     subparsers = parser.add_subparsers(dest="command")
-
-    new_project_parser = subparsers.add_parser("new-project")
-    new_project_parser.add_argument(
-        "--name", type=str, required=True, help="Name of the new project"
-    )
 
     start_dev_parser = subparsers.add_parser("dev")
     start_dev_parser.add_argument(
@@ -38,7 +32,7 @@ def main():
         type=str,
         default=None,
         required=False,
-        help="Import string of App class implementation",
+        help="Environment file to load",
     )
 
     start_prod_parser = subparsers.add_parser("prod")
@@ -54,12 +48,28 @@ def main():
         type=str,
         default=None,
         required=False,
-        help="Import string of App class implementation",
+        help="Environment file to load",
+    )
+
+    start_cli_parser = subparsers.add_parser("cli")
+    start_cli_parser.add_argument(
+        "command_name",
+        type=str,
+        help="CLI command name to run",
+    )
+    start_cli_parser.add_argument(
+        "command_args",
+        nargs=argparse.REMAINDER,
+        help="Arguments passed to the CLI command",
     )
 
     args = parser.parse_args()
-    method = methods.get(args.command, None)
-    if method is not None:
-        args = vars(args)
-        del args["command"]
-        return method(Path.cwd(), **args)
+
+    method = methods.get(args.command)
+    if method is None:
+        parser.print_help()
+        return
+
+    args_dict = vars(args)
+
+    return method(Path.cwd(), **args_dict)

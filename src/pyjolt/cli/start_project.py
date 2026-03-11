@@ -11,6 +11,8 @@ from typing import Optional, Type
 
 from dotenv import load_dotenv
 
+from ..utilities import import_module
+
 
 def load_env_file(cwd: str, env_file: Optional[str] = None) -> Optional[Path]:
     """
@@ -254,9 +256,44 @@ def start(
     ).serve()
 
 
-def start_dev(cwd: str, app: Optional[str] = None, env_file: Optional[str] = None):
+def start_dev(
+    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
+):
     start(cwd, True, app, env_file)
 
 
-def start_prod(cwd: str, app: Optional[str] = None, env_file: Optional[str] = None):
+def start_prod(
+    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
+):
     start(cwd, False, app, env_file)
+
+
+def start_cli(
+    cwd: str,
+    command: str,
+    *args,
+    app: Optional[str] = None,
+    env_file: Optional[str] = None,
+    **kwargs,
+):
+
+    from ..pyjolt import PyJolt
+
+    loaded_env = load_env_file(cwd, env_file)
+    if loaded_env is not None:
+        print(f"Loaded environment from: {loaded_env}")
+
+    app_path = app
+    if app_path is None:
+        app_path = find_pyjolt_app_import(PyJolt, Path(cwd))
+
+    if app_path is None:
+        print(
+            "Failed to locate PyJolt implementation. Please specify a correct import string "
+            "(example: 'app:App')"
+        )
+        return
+    application: Type[PyJolt] = import_module(app_path)
+    app_instance: PyJolt = application(cli_mode=True)
+    command_name = kwargs.pop("command_name", None)
+    app_instance.run_cli(command_name, *args, **kwargs)

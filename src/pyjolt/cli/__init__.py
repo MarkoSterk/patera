@@ -3,6 +3,6 @@ Cli methods
 """
 
 from .cli import main
-from .cli_controller import CLIController, command, argument
+from .cli_controller import CLIController, command
 
-__all__ = ["main", "CLIController", "command", "argument"]
+__all__ = ["main", "CLIController", "command"]

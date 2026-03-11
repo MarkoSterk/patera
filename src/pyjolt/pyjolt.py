@@ -5,10 +5,8 @@ PyJolt application class
 # mypy: check-untyped-defs = True
 import os
 import inspect
-import argparse
 import json
 from collections.abc import AsyncIterator, Iterable
-import asyncio
 from enum import StrEnum
 from typing import (
     Any,
@@ -244,10 +242,6 @@ class PyJolt:
         self._get_startup_methods()
         self._get_shutdown_methods()
 
-        self.cli = argparse.ArgumentParser(description="PyJolt CLI")
-        self.subparsers = self.cli.add_subparsers(dest="command", help="CLI commands")
-        self.cli_commands: dict = {}
-
         models: Optional[list[str]] = self.get_conf("MODELS", None)
         controllers: Optional[list[str]] = self.get_conf("CONTROLLERS", None)
         cli_controllers: Optional[list[str]] = self.get_conf("CLI_CONTROLLERS", None)
@@ -330,8 +324,7 @@ class PyJolt:
                 continue
             if inspect.isclass(obj) and issubclass(obj, CLIController):
                 self.logger.info(f"Registering cli controller: {obj.__name__}")
-                commands = getattr(obj, "_cli_command", {})
-                cli_controller = obj(self, commands)
+                cli_controller = obj(self)
                 self._cli_controllers[obj.__name__] = cli_controller
                 continue
             if inspect.isclass(obj) and issubclass(obj, MiddlewareBase):
@@ -796,24 +789,28 @@ class PyJolt:
         """
         self._url_for_alias[alias] = endpoint
 
-    def run_cli(self):
+    def run_cli(self, command_name: str, *args, **kwargs) -> None:
         """
         Executes the registered CLI commands.
         """
-        args = self.cli.parse_args()
-        if hasattr(args, "func"):
-            # pylint: disable-next=W0212
-            func_args = args._get_args()
-            # pylint: disable-next=W0212
-            func_kwargs = {
-                name: value
-                for name, value in args._get_kwargs()
-                if name not in ["command", "func"]
-            }
-            asyncio.run(run_sync_or_async(args.func, *func_args, **func_kwargs))
-            # asyncio.run(args.func(*func_args, **func_kwargs))  # pass the parsed arguments object
-        else:
-            self.cli.print_help()
+        if command_name is None or ":" not in command_name:
+            print(
+                "Invalid command name. Command name must be of the format CLIController:Command"
+            )
+            return
+        ctrl_name, command = command_name.split(":", 1)
+        ctrl = cast(CLIController, self._cli_controllers.get(ctrl_name, None))
+        if ctrl is None:
+            print(f"CLI controller with name {ctrl_name} was not found")
+
+        method = ctrl.find_method(command)
+        if method is None:
+            print(
+                f"CLI method with name {command} in controller {ctrl_name} not found."
+            )
+            return
+        ctrl.run_command(method, *args, **kwargs)
+        return
 
     def add_template_path(self, path: str):
         """Adds a template path"""

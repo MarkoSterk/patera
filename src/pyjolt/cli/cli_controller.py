@@ -2,8 +2,9 @@
 CLI controller module for PyJolt.
 """
 
+import inspect
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, cast, Type
+from typing import TYPE_CHECKING, Any, Callable, cast
 from functools import wraps
 
 from ..utilities import run_sync_or_async
@@ -19,9 +20,10 @@ class CLIController:
     as CLI commands in the provided PyJolt app instance.
     """
 
-    def __init__(self, app: "PyJolt", cli_commands: dict):
+    def __init__(self, app: "PyJolt"):
         self._app: "PyJolt" = app
-        self._cli_commands: dict = cli_commands
+        self._cli_commands: dict[str, Callable] = {}
+        self._cli_commands_help: dict[str, str] = {}
         self._register_commands()
 
     def _register_commands(self):
@@ -33,37 +35,77 @@ class CLIController:
                     self._register_command(method, command)
 
     def _register_command(self, method: Callable, command: dict):
+        self._cli_commands[method.__name__] = method
+        self._cli_commands[cast(str, command.get("command_name"))] = method
+        self._cli_commands_help[method.__name__] = command.get("help", "")
 
-        cli_command = self._app.subparsers.add_parser(
-            cast(str, command.get("command_name")),
-            help="Initialize the Alembic migration environment.",
-        )
-        for arg_name, arg_info in command.get("arguments", {}).items():
-            if arg_name.startswith("--"):
-                cli_command.add_argument(arg_name, help=arg_info.get("description", ""))
-            else:
-                cli_command.add_argument(
-                    f"--{arg_name}", help=arg_info.get("description", "")
-                )
-        cli_command.set_defaults(
-            func=lambda *args, **kwargs: self.run_command(
-                method, command.get("arguments", {}), *args, **kwargs
+    def find_method(self, method: str) -> Callable | None:
+        return self._cli_commands.get(method, None)
+
+    def run_command(self, method: Callable, *args, **kwargs):
+        try:
+            converted_values = self.prepare_cli_args(
+                method, kwargs.get("command_args", [])
             )
-        )
+            return asyncio.run(run_sync_or_async(method, *converted_values))
+        except Exception as exc:
+            print(f"Failed to run method: {method.__name__}")
+            print(
+                "Help: ",
+                self._cli_commands_help.get(method.__name__, "No help string provided"),
+            )
+            print(exc)
 
-    def run_command(self, method: Callable, arg_info: dict[str, Any], *args, **kwargs):
-        for arg_name, info in arg_info.items():
-            if arg_name in kwargs and "arg_type" in info:
-                arg_type = info.get("arg_type", None)
-                if not arg_type:
+    def convert_value(self, value: str, annotation: type) -> Any:
+        """
+        Convert a CLI string value to the annotated type.
+        """
+        if annotation is inspect.Parameter.empty or annotation is str:
+            return value
+
+        if annotation is int:
+            return int(value)
+
+        if annotation is float:
+            return float(value)
+
+        if annotation is bool:
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "y", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "n", "off"}:
+                return False
+            raise ValueError(f"Cannot convert '{value}' to bool")
+
+        return annotation(value)
+
+    def prepare_cli_args(self, method, raw_args: list[str]) -> list[Any]:
+        """
+        Convert raw CLI args to properly typed args based on method annotations.
+        """
+        sig = inspect.signature(method)
+        params = list(sig.parameters.values())
+        converted = []
+        raw_index = 0
+
+        for param in params:
+            if param.name == "self":
+                continue
+
+            if raw_index >= len(raw_args):
+                if param.default is not inspect.Parameter.empty:
+                    converted.append(param.default)
                     continue
-                try:
-                    kwargs[arg_name] = arg_type(kwargs[arg_name])
-                except (ValueError, TypeError) as exc:
-                    raise ValueError(
-                        f"Invalid type for argument '{arg_name}'. Expected {arg_type.__name__}."
-                    ) from exc
-        return asyncio.run(run_sync_or_async(method, *args, **kwargs))
+                raise ValueError(f"Missing required argument: {param.name}")
+
+            raw_value = raw_args[raw_index]
+            converted.append(self.convert_value(raw_value, param.annotation))
+            raw_index += 1
+
+        if raw_index < len(raw_args):
+            raise ValueError(f"Too many arguments provided: {raw_args[raw_index:]}")
+
+        return converted
 
     @property
     def app(self) -> "PyJolt":
@@ -82,50 +124,6 @@ def command(command_name: str, help: str = ""):
         attr["is_cli_command"] = True
         attr["command_name"] = command_name
         attr["help"] = help
-        arguments = attr.get("arguments", {})
-        attr["arguments"] = arguments
-        setattr(wrapper, "cli_command", attr)
-        return wrapper
-
-    return decorator
-
-
-def argument(name: str, arg_type: Type[int | float | str], description: str = ""):
-    """
-    Argument decorator defines a command-line argument for a CLI command method.
-    To use the argument in the command method, ensure the argument name matches the parameter name. Leading "--" are optional (are automatically added).
-    The argument type can be int, float, or str. Input values are automatically converted to the specified type.
-    Example:
-    ```
-        @command("greet", help="Greet a user with a message.")
-        @argument("name", arg_type=str, description="The name of the user to greet.")
-        async def greet(self, name: str):
-            print(f"Hello, {name}!")
-
-        @command("add", help="Adds two numbers")
-        @argument("a", arg_type=int, description="First number")
-        @argument("b", arg_type=int, description="Second number")
-        async def add(self, a: int, b: int):
-            print(f"{a} + {b} = {a+b}")
-    ```
-    Example usage:
-        $ uv run app/cli.py greet --name Alice
-        Hello, Alice!
-
-        $ uv run app/cli.py add --a 2 --b 5
-        2 + 5 = 7
-
-    """
-
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(self: "CLIController", *args, **kwargs):
-            return await run_sync_or_async(func, self, *args, **kwargs)
-
-        attr = getattr(wrapper, "cli_command", {})
-        arguments = attr.get("arguments", {})
-        arguments[name] = {"description": description, "arg_type": arg_type}
-        attr["arguments"] = arguments
         setattr(wrapper, "cli_command", attr)
         return wrapper
 
