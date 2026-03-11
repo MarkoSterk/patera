@@ -204,7 +204,7 @@ def start(
     if address == "localhost":
         address = "127.0.0.1"
     _port: int = int(os.environ.get("PORT", 3000))
-    _loop = Loops(os.environ.get("PORT", "auto"))
+    _loop = Loops(os.environ.get("GRANIAN_LOOP", "auto"))
 
     DEFAULT_IGNORE_DIRS = [
         "__dist__",
@@ -221,13 +221,23 @@ def start(
         "node_modules",
     ]
     DECLARED_IGNORE_DIRS = [
-        d for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",") if d
+        d.strip()
+        for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",")
+        if d.strip()
     ]
     DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
 
-    DEFAULT_IGNORE_PATTERNS = ["*.log", "*.sqlite", "*.db", "*.tmp", "*.swp"]
+    DEFAULT_IGNORE_PATTERNS = [
+        r".*\.log$",
+        r".*\.sqlite$",
+        r".*\.db$",
+        r".*\.tmp$",
+        r".*\.swp$",
+    ]
     DECLARED_IGNORE_PATTERNS = [
-        p for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",") if p
+        p.strip()
+        for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",")
+        if p.strip()
     ]
     DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
 
