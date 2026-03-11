@@ -2,7 +2,7 @@
 Test client class
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient, ASGITransport
 
@@ -17,9 +17,9 @@ class PyJoltTestClient:
 
     def __init__(self, app: "PyJolt", base_url: str = "http://testserver"):
         self.app = app
-        self._lifespan: LifespanManager | None = None
-        self._transport: ASGITransport | None = None
-        self.client: AsyncClient | None = None
+        self._lifespan: LifespanManager = cast(LifespanManager, None)
+        self._transport: ASGITransport = cast(ASGITransport, None)
+        self.client: AsyncClient = cast(AsyncClient, None)
         self.base_url: str = base_url
 
     async def __aenter__(self):
@@ -40,9 +40,9 @@ class PyJoltTestClient:
         if self._lifespan is not None:
             await self._lifespan.__aexit__(exc_type, exc_val, exc_tb)
 
-        self.client = None
-        self._transport = None
-        self._lifespan = None
+        self.client = cast(AsyncClient, None)
+        self._transport = cast(ASGITransport, None)
+        self._lifespan = cast(LifespanManager, None)
 
     async def request(self, method: str, path: str, **kwargs):
         if self.client is None:
