@@ -6,6 +6,7 @@ from typing import (
     Callable,
     Tuple,
     Optional,
+    Type,
     cast,
     TYPE_CHECKING,
     Any,
@@ -15,17 +16,19 @@ from typing import (
 from functools import wraps
 
 from apscheduler.job import Job
+from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.base import JobLookupError
+from apscheduler.jobstores.base import JobLookupError, BaseJobStore
 from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.executors.base import BaseExecutor
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from pydantic import BaseModel, Field
 
-from ..utilities import run_sync_or_async, run_in_background
-from ..base_extension import BaseExtension
+from pyjolt.utilities import run_sync_or_async, run_in_background
+from pyjolt.base_extension import BaseExtension
 
 if TYPE_CHECKING:
-    from ..pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class _TaskManagerConfigs(BaseModel):
@@ -35,24 +38,25 @@ class _TaskManagerConfigs(BaseModel):
         "Task manager",
         description="Human readable name for the task manager for the admin dashboard",
     )
-    SCHEDULER: Optional[Callable] = Field(
+    SCHEDULER: Optional[Type[BaseScheduler]] = Field(
         default=AsyncIOScheduler,
-        description="Scheduler class to use, must be subclass of BaseScheduler",
+        description="Scheduler class to use, must be subclass of apscheduler.schedulers.BaseScheduler. Default AsyncIOScheduler",
     )
-    JOB_STORES: Optional[dict] = Field(
+    JOB_STORES: Optional[dict[str, BaseJobStore]] = Field(
         default={"default": MemoryJobStore()},
-        description="Job stores configuration dictionary",
+        description="Job stores configuration dictionary. Default MemoryJobStore",
     )
-    EXECUTORS: Optional[dict] = Field(
+    EXECUTORS: Optional[dict[str, BaseExecutor]] = Field(
         default={"default": AsyncIOExecutor()},
-        description="Executors configuration dictionary",
+        description="Executors configuration dictionary. Default AsyncIOExecutor",
     )
-    JOB_DEFAULTS: Optional[dict] = Field(
+    JOB_DEFAULTS: Optional[dict[str, bool | int]] = Field(
         default={"coalesce": False, "max_instances": 3},
         description="Default job settings dictionary",
     )
     DAEMON: Optional[bool] = Field(
-        default=True, description="Whether the scheduler should run as a daemon"
+        default=True,
+        description="Whether the scheduler should run as a daemon. Default True",
     )
 
 
@@ -60,10 +64,10 @@ class TaskManagerConfig(TypedDict):
     """TypedDict for TaskManager configuration."""
 
     NICE_NAME: NotRequired[str]
-    SCHEDULER: NotRequired[Callable]
-    JOB_STORES: NotRequired[dict]
-    EXECUTORS: NotRequired[dict]
-    JOB_DEFAULTS: NotRequired[dict]
+    SCHEDULER: NotRequired[Type[BaseScheduler]]
+    JOB_STORES: NotRequired[dict[str, BaseJobStore]]
+    EXECUTORS: NotRequired[dict[str, BaseExecutor]]
+    JOB_DEFAULTS: NotRequired[dict[str, bool | int]]
     DAEMON: NotRequired[bool]
 
 
@@ -88,7 +92,7 @@ class TaskManager(BaseExtension):
         """
         Initlizer for TaskManager with PyJolt app
         """
-        self._app = app
+        self._app = app  # type: ignore
         self._configs = app.get_conf(self._configs_name, {})
 
         self._configs = self.validate_configs(self._configs, _TaskManagerConfigs)
