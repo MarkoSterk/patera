@@ -22,10 +22,10 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 from pydantic import BaseModel, Field
 
-from ..pyjolt import PyJolt, Request, HttpStatus, Response
-from ..utilities import run_sync_or_async
-from ..exceptions import BaseHttpException
-from ..base_extension import BaseExtension
+from pyjolt import PyJolt, Request, HttpStatus, Response
+from pyjolt.utilities import run_sync_or_async
+from pyjolt.exceptions import BaseHttpException
+from pyjolt.base_extension import BaseExtension
 
 
 class ChatContextNotFound(BaseHttpException):
@@ -136,7 +136,7 @@ class AiInterface(BaseExtension, ABC):
         """
         Initilizer method for extension
         """
-        self._app = app
+        self._app = app  # type: ignore
         self._configs = cast(dict[str, Any], app.get_conf(self._configs_name, None))
         if self._configs is None:
             raise ValueError(
@@ -168,7 +168,9 @@ class AiInterface(BaseExtension, ABC):
     async def provider(
         self, messages: List[Dict[str, str]], **kwargs
     ) -> tuple[
-        str | None, list[ChatCompletionMessageToolCall] | None, ChatCompletion | None
+        str | None,
+        Any | list[ChatCompletionMessageToolCall] | None,
+        ChatCompletion | None,
     ]:
         """
         Default provider method. Uses AsyncOpenAI from the openai package

@@ -3,7 +3,13 @@ name = "pyjolt-aiinterface"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "pyjolt"
+  "docstring-parser>=0.17.0",
+  "numpy>=2.4.3",
+  "openai>=2.26.0",
+  "pgvector>=0.4.2",
+  "pyjolt",
+  "sentence-transformers>=5.2.3",
+  "torch>=2.10.0",
 ]
 
 [tool.uv.sources]
