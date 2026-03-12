@@ -310,11 +310,20 @@ class PyJolt:
                 obj.init_app(self)
                 self._db_name_configs_map[obj.db_name] = obj.configs_name
                 continue
-            if isinstance(obj, BaseExtension):
-                self.logger.info(
-                    f"Initilizing extension: {obj.__class__.__name__} ({obj.configs_name})"
-                )
-                obj.init_app(self)
+            if inherits_from(obj, "BaseExtension"):
+                ext_name = ""
+                conf_name = ""
+                if isinstance(obj, BaseExtension):
+                    obj.init_app(self)
+                    ext_name = obj.__class__.__name__
+                    conf_name = obj.configs_name
+                else:
+                    # if passed extension is not yet initilized
+                    obj_inst = obj()
+                    obj_inst.init_app(self)
+                    ext_name = obj_inst.__class__.__name__
+                    conf_name = obj_inst.configs_name
+                self.logger.info(f"Initilizing extension: {ext_name} ({conf_name})")
                 continue
             if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
                 self.logger.info(f"Loaded database model: {obj.__name__}")
@@ -339,7 +348,7 @@ class PyJolt:
                 print(f"Registering logger: {obj.__name__}")
                 continue
             raise WrongModuleLoadType(
-                f"Failed to load module {obj.__name__ or obj.__class__.__name__}. Extensions must be passed as instances, controllers, cli controllers, exception handlers and middleware as classes."
+                f"Failed to load module {obj.__name__ or obj.__class__.__name__}. Extensions can be passed as instances or classes (if custom config names are not used and instance is not used elsewhere). Controllers, cli controllers, exception handlers and middleware as classes."
             )
 
     def _get_startup_methods(self):
