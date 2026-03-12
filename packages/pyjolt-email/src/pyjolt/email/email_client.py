@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Optional, cast, TypedDict, NotRequired
 from pydantic import BaseModel, Field
 from jinja2 import Environment
 
-from ..base_extension import BaseExtension
-from ..utilities import run_sync_or_async
+from pyjolt.base_extension import BaseExtension
+from pyjolt.utilities import run_sync_or_async
 
 if TYPE_CHECKING:
-    from ..pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class _EmailConfigs(BaseModel):
