@@ -232,7 +232,9 @@ def start(
     DEFAULT_IGNORE_PATTERNS = [
         r".*\.log$",
         r".*\.sqlite$",
+        r".*\.sqlite-journal",
         r".*\.db$",
+        r".*\.db-journal",
         r".*\.tmp$",
         r".*\.swp$",
     ]
