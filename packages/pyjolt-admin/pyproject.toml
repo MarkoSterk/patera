@@ -16,8 +16,8 @@ dependencies = [
 pyjolt = { workspace = true }
 pyjolt-auth = { workspace = true }
 pyjolt-caching = { workspace = true }
-pyjolt-database = { workspace = true }
 pyjolt-email = { workspace = true }
+pyjolt-database = { workspace = true }
 pyjolt-taskmanager = { workspace = true }
 
 [tool.uv.build-backend]
