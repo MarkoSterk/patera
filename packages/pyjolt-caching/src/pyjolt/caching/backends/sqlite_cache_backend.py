@@ -23,7 +23,7 @@ import aiosqlite
 from .base_cache_backend import BaseCacheBackend
 
 if TYPE_CHECKING:
-    from ...pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class SQLiteCacheConfig(BaseModel):

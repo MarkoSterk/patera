@@ -15,15 +15,13 @@ from typing import (
 )
 from pydantic import BaseModel, Field
 
-from ..utilities import run_sync_or_async
-from ..base_extension import BaseExtension
+from pyjolt.utilities import run_sync_or_async
+from pyjolt.base_extension import BaseExtension
 
 from .backends.base_cache_backend import BaseCacheBackend
 
 if TYPE_CHECKING:
-    from ..pyjolt import PyJolt
-    from ..response import Response
-    from ..request import Request
+    from pyjolt import PyJolt, Response, Request
 
 
 class _CacheConfigs(BaseModel):

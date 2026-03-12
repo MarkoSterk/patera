@@ -3,7 +3,8 @@ name = "pyjolt-caching"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "pyjolt"
+  "cachetools>=7.0.5",
+  "pyjolt",
 ]
 
 [project.optional-dependencies]
