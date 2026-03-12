@@ -316,7 +316,7 @@ class PyJolt:
                 )
                 obj.init_app(self)
                 continue
-            if inspect.isclass(obj) and inherits_from(obj, "BaseModelClass"):
+            if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
                 self.logger.info(f"Loaded database model: {obj.__name__}")
                 if obj.db_name() not in self._db_models:
                     self._db_models[obj.db_name()] = []
