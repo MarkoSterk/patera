@@ -22,7 +22,7 @@ from apscheduler.jobstores.base import JobLookupError, BaseJobStore
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.base import BaseExecutor
 from apscheduler.executors.asyncio import AsyncIOExecutor
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from pyjolt.utilities import run_sync_or_async, run_in_background
 from pyjolt.base_extension import BaseExtension
@@ -33,6 +33,8 @@ if TYPE_CHECKING:
 
 class _TaskManagerConfigs(BaseModel):
     """Configuration model for TaskManager extension."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     NICE_NAME: Optional[str] = Field(
         "Task manager",
