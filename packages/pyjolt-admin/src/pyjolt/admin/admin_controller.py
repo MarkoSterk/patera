@@ -12,16 +12,13 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from werkzeug.security import safe_join
 
-from pyjolt.http_statuses import HttpStatus
-
-from ..controller import get
-from ..auth.authentication import login_required
-from ..exceptions.http_exceptions import StaticAssetNotFound
-from ..request import Request
-from ..response import Response
-from ..utilities import get_file, get_range_file
+from pyjolt.controller import get
+from pyjolt.auth import login_required
+from pyjolt.exceptions import StaticAssetNotFound
+from pyjolt import Request, Response, HttpStatus
+from pyjolt.utilities import get_file, get_range_file
 from .common_controller import CommonAdminController
-from ..caching import Cache
+from pyjolt.caching import Cache
 
 if TYPE_CHECKING:
     from .admin_dashboard import AdminDashboard

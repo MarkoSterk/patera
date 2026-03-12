@@ -2,13 +2,11 @@
 Schedulers related admin dashboard controller
 """
 
-from ..task_manager import TaskManager
-from ..request import Request
-from ..response import Response
-from ..http_statuses import HttpStatus
-from ..controller import get
+from pyjolt.taskmanager import TaskManager
+from pyjolt import Request, Response, HttpStatus
+from pyjolt.controller import get
 from .common_controller import CommonAdminController
-from ..utilities import run_in_background
+from pyjolt.utilities import run_in_background
 
 
 class AdminTaskManagersController(CommonAdminController):

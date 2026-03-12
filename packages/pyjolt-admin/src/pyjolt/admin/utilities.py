@@ -5,7 +5,7 @@ Helpers and constants for admin dashboard
 from typing import Optional, Type
 from enum import StrEnum
 from sqlalchemy.inspection import inspect
-from ..database.sql.declarative_base import DeclarativeBaseModel
+from pyjolt.database.sql.declarative_base import DeclarativeBaseModel
 
 
 class FormType(StrEnum):

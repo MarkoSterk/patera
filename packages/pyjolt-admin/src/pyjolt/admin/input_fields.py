@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from markupsafe import Markup
 from wtforms.widgets import html_params
 
-from ..utilities import to_kebab_case
+from pyjolt.utilities import to_kebab_case
 
 
 class FormFieldTypes(StrEnum):

@@ -12,14 +12,13 @@ from typing import TYPE_CHECKING, Any, Optional, Type, cast
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.inspection import inspect
 
-from ..auth.authentication import login_required
-from ..controller import delete, get, post, put
-from ..database.sql import AsyncQuery, AsyncSession, SqlDatabase
-from ..database.sql.declarative_base import DeclarativeBaseModel
-from ..exceptions.http_exceptions import BaseHttpException
-from ..http_statuses import HttpStatus
-from ..request import Request
-from ..response import Response
+from pyjolt.auth import login_required
+from pyjolt.controller import delete, get, post, put
+from pyjolt.database.sql import AsyncQuery, AsyncSession, SqlDatabase
+from pyjolt.database.sql.declarative_base import DeclarativeBaseModel
+from pyjolt.exceptions.http_exceptions import BaseHttpException
+from pyjolt import HttpStatus, Request, Response
+
 from .utilities import FormType, PermissionType, extract_table_columns
 from .common_controller import CommonAdminController
 

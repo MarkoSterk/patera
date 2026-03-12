@@ -6,25 +6,25 @@ import os
 from typing import TYPE_CHECKING, Optional, Type, Any, cast, TypedDict, NotRequired
 from pydantic import BaseModel, Field
 from wtforms_sqlalchemy.orm import model_form
-from ..exceptions.runtime_exceptions import CustomException
+from pyjolt.exceptions.runtime_exceptions import CustomException
 from .utilities import FormType
-from ..base_extension import BaseExtension
+from pyjolt.base_extension import BaseExtension
 from .admin_controller import AdminController
 from .database_controller import AdminDatabaseController
 from .email_clients_controller import AdminEmailClientsController
 from .task_managers_controller import AdminTaskManagersController
 from .file_controller import AdminFileController
-from ..database.sql.declarative_base import DeclarativeBaseModel
-from ..controller import path
-from ..request import Request
-from ..database.sql import SqlDatabase, AsyncSession
-from ..email.email_client import EmailClient
-from ..task_manager import TaskManager
-from ..utilities import to_kebab_case
-from ..caching import Cache
+from pyjolt.database.sql.declarative_base import DeclarativeBaseModel
+from pyjolt.database.sql import SqlDatabase, AsyncSession
+from pyjolt.controller import path
+from pyjolt import Request
+from pyjolt.email import EmailClient
+from pyjolt.taskmanager import TaskManager
+from pyjolt.utilities import to_kebab_case
+from pyjolt.caching import Cache
 
 if TYPE_CHECKING:
-    from ..pyjolt import PyJolt
+    from pyjolt import PyJolt
 
 
 class _AdminDashboardConfig(BaseModel):

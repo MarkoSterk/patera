@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from ..exceptions.http_exceptions import BaseHttpException
-from ..http_statuses import HttpStatus
-from ..request import Request
-from ..response import Response
-from ..controller import Controller
+from pyjolt.exceptions import BaseHttpException
+from pyjolt import HttpStatus, Request, Response
+from pyjolt.controller import Controller
 
 if TYPE_CHECKING:
     from .admin_dashboard import AdminDashboard

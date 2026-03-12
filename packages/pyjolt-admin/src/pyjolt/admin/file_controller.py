@@ -10,13 +10,12 @@ from typing import Any, Optional
 import mimetypes
 from pathlib import Path
 import shutil
-from ..http_statuses import HttpStatus
-from ..controller import get, post, delete
+from pyjolt import HttpStatus, Response, Request
+from pyjolt.controller import get, post, delete
+from pyjolt.auth import login_required
+from pyjolt.utilities import get_file, fs_safe_join
+
 from .common_controller import CommonAdminController
-from ..auth import login_required
-from ..request import Request
-from ..response import Response
-from ..utilities import get_file, fs_safe_join
 
 
 class AdminFileController(CommonAdminController):

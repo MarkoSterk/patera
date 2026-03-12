@@ -9,13 +9,11 @@ from typing import Optional, cast
 from pydantic import BaseModel, ValidationError, EmailStr
 
 from .common_controller import CommonAdminController
-from ..email.email_client import EmailClient
-from ..auth.authentication import login_required
-from ..controller import get, post
-from ..http_statuses import HttpStatus
-from ..request import Request
-from ..response import Response
-from ..utilities import base64_to_bytes, to_kebab_case
+from pyjolt.email import EmailClient
+from pyjolt.auth import login_required
+from pyjolt.controller import get, post
+from pyjolt import HttpStatus, Request, Response
+from pyjolt.utilities import base64_to_bytes, to_kebab_case
 
 
 class EmailQueryParam(BaseModel):
