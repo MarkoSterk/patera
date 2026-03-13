@@ -8,17 +8,17 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "pyjolt",
-    "pyjolt-admin",
-    "pyjolt-aiinterface",
-    "pyjolt-auth",
-    "pyjolt-caching",
-    "pyjolt-database",
-    "pyjolt-email",
-    "pyjolt-frontend",
-    "pyjolt-frontendext",
-    "pyjolt-statemachine",
-    "pyjolt-taskmanager",
+    "patera",
+    "patera-admin",
+    "patera-aiinterface",
+    "patera-auth",
+    "patera-caching",
+    "patera-database",
+    "patera-email",
+    "patera-frontend",
+    "patera-frontendext",
+    "patera-statemachine",
+    "patera-taskmanager",
 ]
 
 [[package]]
@@ -1484,7 +1484,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pyjolt"
+name = "patera"
 version = "0.111.13"
 source = { editable = "." }
 dependencies = [
@@ -1508,51 +1508,51 @@ dependencies = [
 
 [package.optional-dependencies]
 admin = [
-    { name = "pyjolt-admin" },
+    { name = "patera-admin" },
 ]
 aiinterface = [
-    { name = "pyjolt-aiinterface" },
+    { name = "patera-aiinterface" },
 ]
 all = [
-    { name = "pyjolt-admin" },
-    { name = "pyjolt-aiinterface" },
-    { name = "pyjolt-auth" },
-    { name = "pyjolt-caching" },
-    { name = "pyjolt-database" },
-    { name = "pyjolt-email" },
-    { name = "pyjolt-statemachine" },
-    { name = "pyjolt-taskmanager" },
+    { name = "patera-admin" },
+    { name = "patera-aiinterface" },
+    { name = "patera-auth" },
+    { name = "patera-caching" },
+    { name = "patera-database" },
+    { name = "patera-email" },
+    { name = "patera-statemachine" },
+    { name = "patera-taskmanager" },
 ]
 auth = [
-    { name = "pyjolt-auth" },
+    { name = "patera-auth" },
 ]
 caching = [
-    { name = "pyjolt-caching" },
+    { name = "patera-caching" },
 ]
 caching-redis = [
-    { name = "pyjolt-caching", extra = ["redis"] },
+    { name = "patera-caching", extra = ["redis"] },
 ]
 caching-sqlite = [
-    { name = "pyjolt-caching", extra = ["sqlite"] },
+    { name = "patera-caching", extra = ["sqlite"] },
 ]
 database = [
-    { name = "pyjolt-database" },
+    { name = "patera-database" },
 ]
 dev = [
     { name = "granian", extra = ["reload"] },
 ]
 email = [
-    { name = "pyjolt-email" },
+    { name = "patera-email" },
 ]
 frontend = [
-    { name = "pyjolt-frontend" },
-    { name = "pyjolt-frontendext" },
+    { name = "patera-frontend" },
+    { name = "patera-frontendext" },
 ]
 statemachine = [
-    { name = "pyjolt-statemachine" },
+    { name = "patera-statemachine" },
 ]
 taskmanager = [
-    { name = "pyjolt-taskmanager" },
+    { name = "patera-taskmanager" },
 ]
 testing = [
     { name = "anyio" },
@@ -1585,26 +1585,26 @@ requires-dist = [
     { name = "markupsafe", specifier = ">=3.0.3" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
-    { name = "pyjolt-admin", marker = "extra == 'admin'", editable = "packages/pyjolt-admin" },
-    { name = "pyjolt-admin", marker = "extra == 'all'", editable = "packages/pyjolt-admin" },
-    { name = "pyjolt-aiinterface", marker = "extra == 'aiinterface'", editable = "packages/pyjolt-aiinterface" },
-    { name = "pyjolt-aiinterface", marker = "extra == 'all'", editable = "packages/pyjolt-aiinterface" },
-    { name = "pyjolt-auth", marker = "extra == 'all'", editable = "packages/pyjolt-auth" },
-    { name = "pyjolt-auth", marker = "extra == 'auth'", editable = "packages/pyjolt-auth" },
-    { name = "pyjolt-caching", marker = "extra == 'all'", editable = "packages/pyjolt-caching" },
-    { name = "pyjolt-caching", marker = "extra == 'caching'", editable = "packages/pyjolt-caching" },
-    { name = "pyjolt-caching", extras = ["redis"], marker = "extra == 'caching-redis'", editable = "packages/pyjolt-caching" },
-    { name = "pyjolt-caching", extras = ["sqlite"], marker = "extra == 'caching-sqlite'", editable = "packages/pyjolt-caching" },
-    { name = "pyjolt-database", marker = "extra == 'all'", editable = "packages/pyjolt-database" },
-    { name = "pyjolt-database", marker = "extra == 'database'", editable = "packages/pyjolt-database" },
-    { name = "pyjolt-email", marker = "extra == 'all'", editable = "packages/pyjolt-email" },
-    { name = "pyjolt-email", marker = "extra == 'email'", editable = "packages/pyjolt-email" },
-    { name = "pyjolt-frontend", marker = "extra == 'frontend'", editable = "packages/pyjolt-frontend" },
-    { name = "pyjolt-frontendext", marker = "extra == 'frontend'", editable = "packages/pyjolt-frontendext" },
-    { name = "pyjolt-statemachine", marker = "extra == 'all'", editable = "packages/pyjolt-statemachine" },
-    { name = "pyjolt-statemachine", marker = "extra == 'statemachine'", editable = "packages/pyjolt-statemachine" },
-    { name = "pyjolt-taskmanager", marker = "extra == 'all'", editable = "packages/pyjolt-taskmanager" },
-    { name = "pyjolt-taskmanager", marker = "extra == 'taskmanager'", editable = "packages/pyjolt-taskmanager" },
+    { name = "patera-admin", marker = "extra == 'admin'", editable = "packages/patera-admin" },
+    { name = "patera-admin", marker = "extra == 'all'", editable = "packages/patera-admin" },
+    { name = "patera-aiinterface", marker = "extra == 'aiinterface'", editable = "packages/patera-aiinterface" },
+    { name = "patera-aiinterface", marker = "extra == 'all'", editable = "packages/patera-aiinterface" },
+    { name = "patera-auth", marker = "extra == 'all'", editable = "packages/patera-auth" },
+    { name = "patera-auth", marker = "extra == 'auth'", editable = "packages/patera-auth" },
+    { name = "patera-caching", marker = "extra == 'all'", editable = "packages/patera-caching" },
+    { name = "patera-caching", marker = "extra == 'caching'", editable = "packages/patera-caching" },
+    { name = "patera-caching", extras = ["redis"], marker = "extra == 'caching-redis'", editable = "packages/patera-caching" },
+    { name = "patera-caching", extras = ["sqlite"], marker = "extra == 'caching-sqlite'", editable = "packages/patera-caching" },
+    { name = "patera-database", marker = "extra == 'all'", editable = "packages/patera-database" },
+    { name = "patera-database", marker = "extra == 'database'", editable = "packages/patera-database" },
+    { name = "patera-email", marker = "extra == 'all'", editable = "packages/patera-email" },
+    { name = "patera-email", marker = "extra == 'email'", editable = "packages/patera-email" },
+    { name = "patera-frontend", marker = "extra == 'frontend'", editable = "packages/patera-frontend" },
+    { name = "patera-frontendext", marker = "extra == 'frontend'", editable = "packages/patera-frontendext" },
+    { name = "patera-statemachine", marker = "extra == 'all'", editable = "packages/patera-statemachine" },
+    { name = "patera-statemachine", marker = "extra == 'statemachine'", editable = "packages/patera-statemachine" },
+    { name = "patera-taskmanager", marker = "extra == 'all'", editable = "packages/patera-taskmanager" },
+    { name = "patera-taskmanager", marker = "extra == 'taskmanager'", editable = "packages/patera-taskmanager" },
     { name = "pytest", marker = "extra == 'testing'" },
     { name = "pytest-cov", marker = "extra == 'testing'" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
@@ -1622,40 +1622,40 @@ dev = [
 ]
 
 [[package]]
-name = "pyjolt-admin"
+name = "patera-admin"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-admin" }
+source = { editable = "packages/patera-admin" }
 dependencies = [
-    { name = "pyjolt" },
-    { name = "pyjolt-auth" },
-    { name = "pyjolt-caching" },
-    { name = "pyjolt-database" },
-    { name = "pyjolt-email" },
-    { name = "pyjolt-taskmanager" },
+    { name = "patera" },
+    { name = "patera-auth" },
+    { name = "patera-caching" },
+    { name = "patera-database" },
+    { name = "patera-email" },
+    { name = "patera-taskmanager" },
     { name = "wtforms-sqlalchemy" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "pyjolt", editable = "." },
-    { name = "pyjolt-auth", editable = "packages/pyjolt-auth" },
-    { name = "pyjolt-caching", editable = "packages/pyjolt-caching" },
-    { name = "pyjolt-database", editable = "packages/pyjolt-database" },
-    { name = "pyjolt-email", editable = "packages/pyjolt-email" },
-    { name = "pyjolt-taskmanager", editable = "packages/pyjolt-taskmanager" },
+    { name = "patera", editable = "." },
+    { name = "patera-auth", editable = "packages/patera-auth" },
+    { name = "patera-caching", editable = "packages/patera-caching" },
+    { name = "patera-database", editable = "packages/patera-database" },
+    { name = "patera-email", editable = "packages/patera-email" },
+    { name = "patera-taskmanager", editable = "packages/patera-taskmanager" },
     { name = "wtforms-sqlalchemy", specifier = ">=0.4.2" },
 ]
 
 [[package]]
-name = "pyjolt-aiinterface"
+name = "patera-aiinterface"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-aiinterface" }
+source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "docstring-parser" },
     { name = "numpy" },
     { name = "openai" },
     { name = "pgvector" },
-    { name = "pyjolt" },
+    { name = "patera" },
     { name = "sentence-transformers" },
     { name = "torch" },
 ]
@@ -1666,20 +1666,20 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.4.3" },
     { name = "openai", specifier = ">=2.26.0" },
     { name = "pgvector", specifier = ">=0.4.2" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
     { name = "sentence-transformers", specifier = ">=5.2.3" },
     { name = "torch", specifier = ">=2.10.0" },
 ]
 
 [[package]]
-name = "pyjolt-auth"
+name = "patera-auth"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-auth" }
+source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
     { name = "cryptography" },
     { name = "jwt" },
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.metadata]
@@ -1687,16 +1687,16 @@ requires-dist = [
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "cryptography", specifier = ">=46.0.5" },
     { name = "jwt", specifier = ">=1.4.0" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
 ]
 
 [[package]]
-name = "pyjolt-caching"
+name = "patera-caching"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-caching" }
+source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.optional-dependencies]
@@ -1716,61 +1716,61 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.20" },
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.20" },
     { name = "cachetools", specifier = ">=7.0.5" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
     { name = "redis", marker = "extra == 'all'", specifier = ">=5.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0" },
 ]
 provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
-name = "pyjolt-database"
+name = "patera-database"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-database" }
+source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
-    { name = "pyjolt" },
+    { name = "patera" },
     { name = "sqlalchemy" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
     { name = "sqlalchemy" },
 ]
 
 [[package]]
-name = "pyjolt-email"
+name = "patera-email"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-email" }
+source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiosmtplib", specifier = ">=5.1.0" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
 ]
 
 [[package]]
-name = "pyjolt-frontend"
+name = "patera-frontend"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-frontend" }
+source = { editable = "packages/patera-frontend" }
 dependencies = [
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyjolt", editable = "." }]
+requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
-name = "pyjolt-frontendext"
+name = "patera-frontendext"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-frontendext" }
+source = { editable = "packages/patera-frontendext" }
 dependencies = [
-    { name = "pyjolt" },
+    { name = "patera" },
     { name = "pyodide-py", version = "0.27.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "pyodide-py", version = "0.29.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "pyscript" },
@@ -1778,35 +1778,35 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
     { name = "pyodide-py", specifier = ">=0.27.7" },
     { name = "pyscript", specifier = ">=0.3.3" },
 ]
 
 [[package]]
-name = "pyjolt-statemachine"
+name = "patera-statemachine"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-statemachine" }
+source = { editable = "packages/patera-statemachine" }
 dependencies = [
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyjolt", editable = "." }]
+requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
-name = "pyjolt-taskmanager"
+name = "patera-taskmanager"
 version = "0.1.0"
-source = { editable = "packages/pyjolt-taskmanager" }
+source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
-    { name = "pyjolt" },
+    { name = "patera" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.11.2" },
-    { name = "pyjolt", editable = "." },
+    { name = "patera", editable = "." },
 ]
 
 [[package]]

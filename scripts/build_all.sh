@@ -2,7 +2,7 @@
 set -e
 
 echo "Building core package..."
-uv build --package pyjolt
+uv build --package patera
 
 for dir in packages/*; do
   pkg=$(basename "$dir")

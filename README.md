@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MarkoSterk/PyJolt/refs/heads/main/src/pyjolt/graphics/pyjolt_logo.png" alt="PyJolt Logo" width="200">
+  <img src="https://raw.githubusercontent.com/MarkoSterk/Patera/refs/heads/main/src/patera/graphics/pyjolt_logo.png" alt="Patera Logo" width="200">
 </p>
 
-# PyJolt - async first python web framework
+# Patera - async first python web framework
 
 This framework is in its alpha stage and will probably see some major changes/improvements until it reaches
 the beta stage for testing. Any eager tinkerers are invited to test the framework in its alpha stage and provide feedback.
@@ -14,45 +14,45 @@ the beta stage for testing. Any eager tinkerers are invited to test the framewor
 In your project folder
 ```
 uv init
-uv add pyjolt
+uv add patera
 ```
 or with pip
 ```
-pip install pyjolt
+pip install patera
 ```
 We strongly recommend using uv for dependency management.
 
-The above command will install pyjolt with basic dependencies. For some subpackages you will need additional dependencies. Options are:
+The above command will install patera with basic dependencies. For some subpackages you will need additional dependencies. Options are:
 
 **Caching**
 ```
-uv add "pyjolt[cache]"
+uv add "patera[cache]"
 ```
 
 **Scheduler**
 ```
-uv add "pyjolt[scheduler]"
+uv add "patera[scheduler]"
 ```
 
 **AI interface** (experimental)
 ```
-uv add "pyjolt[ai_interface]"
+uv add "patera[ai_interface]"
 ```
 
 **Full install**
 ```
-uv add "pyjolt[full]"
+uv add "patera[full]"
 ```
 
 ##Getting started with project template
 
 ```
-uv run pyjolt new-project
+uv run patera new-project
 ```
 
 or with pip (don't forget to activate the virtual environment)
 ```
-pipx pyjolt new-project
+pipx patera new-project
 ```
 
 This will create a template project structure which you can use to get started.
@@ -67,10 +67,10 @@ A minimum app example would be:
 #app/__init__.py <-- in the app folder
 
 from app.configs import Config
-from pyjolt import PyJolt, app, on_shutdown, on_startup
+from patera import Patera, app, on_shutdown, on_startup
 
 @app(__name__, configs = Config)
-class Application(PyJolt):
+class Application(Patera):
     pass
 ```
 
@@ -80,7 +80,7 @@ and the configuration object is:
 #app/configs.py <-- in the app folder
 
 import os
-from pyjolt import BaseConfig
+from patera import BaseConfig
 
 class Config(BaseConfig): #must inherit from BaseConfig
     """Config class"""
@@ -98,8 +98,8 @@ APP_NAME: str = Field(description="Human-readable name of the app")
 VERSION: str = Field(description="Application version")
 BASE_PATH: str #base path of app. os.path.dirname(__file__) in the configs.py file is the usual value
 
-REQUEST_CLASS: Type[Request] = Field(Request, description="Request class used for handling application requests. Must be a subclass of pyjolt.request.Request")
-RESPONSE_CLASS: Type[Response] = Field(Response, description="Response class used for returning application responses. Must be a subclass of pyjolt.response.Response")
+REQUEST_CLASS: Type[Request] = Field(Request, description="Request class used for handling application requests. Must be a subclass of patera.request.Request")
+RESPONSE_CLASS: Type[Response] = Field(Response, description="Response class used for returning application responses. Must be a subclass of patera.response.Response")
 
 # required for Authentication extension
 SECRET_KEY: Optional[str]
@@ -176,11 +176,11 @@ To add such methods, we can add them to the application class implementation lik
 
 ```
 from app.configs import Config
-from pyjolt import PyJolt, app, on_shutdown, on_startup
+from patera import Patera, app, on_shutdown, on_startup
 
 
 @app(__name__, configs = Config)
-class Application(PyJolt):
+class Application(Patera):
 
     @on_startup
     async def first_startup_method(self):
@@ -254,7 +254,7 @@ def logger(self):
 
 ## Logging
 
-PyJolt uses Loguru for logging. It is available through the application object (***app.logger: Logger***) in every controller endpoint through the ***self*** keyword in endpoint methods. A default logger is configured for the application. You can modify its behaviour through application configurations. Configurations with defaults are:
+Patera uses Loguru for logging. It is available through the application object (***app.logger: Logger***) in every controller endpoint through the ***self*** keyword in endpoint methods. A default logger is configured for the application. You can modify its behaviour through application configurations. Configurations with defaults are:
 
 ```
 LEVEL: Optional[LogLevel] = LogLevel.TRACE
@@ -267,7 +267,7 @@ COLORIZE: Optional[bool] = True
 To change the configurations you have to create a new dictionary with the name **DEFAULT_LOGGER** in the app configurations and provide the above configuration options. Example:
 
 ```
-#from pyjolt import LogLevel
+#from patera import LogLevel
 
 DEFAULT_LOGGER: dict[str, Any] = {
     "LEVEL": LogLevel.DEBUG,
@@ -282,12 +282,12 @@ DEFAULT_LOGGER: dict[str, Any] = {
 
 ### Adding custom logger sinks
 
-PyJolt uses the same global Logger instance everywhere. However, you can configure different sinks and configure filters, output formats etc.
+Patera uses the same global Logger instance everywhere. However, you can configure different sinks and configure filters, output formats etc.
 To add a custom logger you have to create a class which inherits from the LoggerBase class
 
 ```
 #app/loggers/file_logger.py
-from pyjolt.logging import LoggerBase
+from patera.logging import LoggerBase
 
 class FileLogger(LoggerBase):
     """File logger example"""
@@ -307,7 +307,7 @@ upper-snake-case (FileLogger -> FILE_LOGGER):
 ```
 #configs.py
 import os
-from pyjolt import LogLevel
+from patera import LogLevel
 
 FILE_LOGGER: dict[str, Any] = {
     SINK: Optional[str|Path] = os.path.join(BASE_PATH, "logging", "file.log"),
@@ -373,8 +373,8 @@ Controllers are created as classes with **async** methods that handle specific r
 ```
 #app/api/users/user_api.py
 
-from pyjolt import Request, Response, HttpStatus, MediaType
-from pyjolt.controller import Controller, path, get, produces, post, consumes
+from patera import Request, Response, HttpStatus, MediaType
+from patera.controller import Controller, path, get, produces, post, consumes
 from pydantic import BaseModel
 
 class UserData(BaseModel):
@@ -405,7 +405,7 @@ class UsersApi(Controller):
         return req.response.json(user_data).status(HttpStatus.CREATED)
 
 ```
-Each endpoint method has access to the application object and its configurations and methods via the self argument (self.app: PyJolt).
+Each endpoint method has access to the application object and its configurations and methods via the self argument (self.app: Patera).
 The controller must be registered with the application in the configurations:
 
 ```
@@ -565,7 +565,7 @@ We can to this by adding and decorating controller methods:
 
 ```
 #at the top of the controller file:
-from pyjolt.controller import (Controller, path, get, produces, before_request, after_request)
+from patera.controller import (Controller, path, get, produces, before_request, after_request)
 ####
 @path("/api/v1/users", tags=["Users"])
 class UsersApi(Controller):
@@ -631,7 +631,7 @@ extension section.
 
 ## CORS
 
-PyJolt has built-in CORS support. There are several configurations which you can set to in the Config class to configure CORS.
+Patera has built-in CORS support. There are several configurations which you can set to in the Config class to configure CORS.
 Configuration options with default values are:
 
 ```
@@ -651,7 +651,7 @@ To disable cors on an endpoint:
 
 ```
 #imports
-from pyjolt.controller import no_cors
+from patera.controller import no_cors
 
 #inside a controller
 
@@ -667,7 +667,7 @@ If you wish you can set a different set of CORS rules for an endpoint using the 
 
 ```
 #imports
-from pyjolt.controller import cors
+from patera.controller import cors
 
 #inside a controller
 
@@ -694,7 +694,7 @@ If the request does not comply with CORS policy error responses are automaticall
 
 ## Routing
 
-PyJolt uses the same router as Flask under the hood (Werkzeug). This means that all the same patterns apply.
+Patera uses the same router as Flask under the hood (Werkzeug). This means that all the same patterns apply.
 
 Examples:
 ```
@@ -707,7 +707,7 @@ Route parameters marked with "<int:>" will be injected into the handler as integ
 
 ### Route not found
 
-If a route is not found (wrong url or http method) a NotFound (from pyjolt.exception import NotFound) error is raised. You can handle the exception in the ExceptionHandler class. If not handled, a generic JSON response is returned.
+If a route is not found (wrong url or http method) a NotFound (from patera.exception import NotFound) error is raised. You can handle the exception in the ExceptionHandler class. If not handled, a generic JSON response is returned.
 
 ## Exception handling
 
@@ -718,8 +718,8 @@ Exception handling can be achived by creating an exception handler class (or mor
 
 from typing import Any
 from pydantic import BaseModel, ValidationError
-from pyjolt.exceptions import ExceptionHandler, handles
-from pyjolt import Request, Response, HttpStatus
+from patera.exceptions import ExceptionHandler, handles
+from patera import Request, Response, HttpStatus
 
 from .custom_exceptions import EntityNotFound
 
@@ -779,10 +779,10 @@ the current request object and the raised exception.
 
 ### Custom exceptions
 
-Custom exceptions can be made by defining a class which inherits from the pyjolt.exceptions.BaseHttpException, from the pyjolt.Exceptions.CustomException or simply by inheriting from pythons Exception class.
+Custom exceptions can be made by defining a class which inherits from the patera.exceptions.BaseHttpException, from the patera.Exceptions.CustomException or simply by inheriting from pythons Exception class.
 
 ```
-from pyjolt.exception import BaseHttpException, CustomException
+from patera.exception import BaseHttpException, CustomException
 
 class MyCustomException(Exception):
     """implementation"""
@@ -798,11 +798,11 @@ The exceptions can then be registered with your exception handler to provide req
 
 ### Quick aborts
 
-Sometimes, you just wish to quickly abort a request (when data is not found, something else goes wrong.). Since PyJolt advocates for the
+Sometimes, you just wish to quickly abort a request (when data is not found, something else goes wrong.). Since Patera advocates for the
 fail-fast pattern, it provides two convinience methods for quickly aborting requests. These methods are:
 
 ```
-from pyjolt import abort, html_abort
+from patera import abort, html_abort
 abort(msg: str, status_code: HttpStatus = HttpStatus.BAD_REQUEST, status: str = "error", data: Any = None)
 html_abort(template: str, status_code: HttpStatus = HttpStatus.BAD_REQUEST, data: Any = None)
 ```
@@ -810,7 +810,7 @@ html_abort(template: str, status_code: HttpStatus = HttpStatus.BAD_REQUEST, data
 These methods raise a AborterException and HtmlAborterException, respectively. An example of the abort method use;
 
 ```
-from pyjolt import abort, html_abort
+from patera import abort, html_abort
 
 @get("/api/v1/users/<int:user_id>)
 async def get_user(self, req: Request, user_id: int) -> Response:
@@ -892,7 +892,7 @@ from the templates folder, the .html method of the response object is async and 
 
 The name/location of the templates folder can be configured via application configurations.
 
-PyJolt uses Jinja2 as the templating engine, the synatx is thus the same as in any framework which uses the same engine.
+Patera uses Jinja2 as the templating engine, the synatx is thus the same as in any framework which uses the same engine.
 
 ## OpenAPI specifications
 
@@ -901,19 +901,19 @@ To make sure the endpoint descriptions, return types and request specification a
 endpoints.
 
 ## Extensions
-PyJolt has a few built-in extensions that can be used ad configured for database connection/management, task scheduling, authentication and
+Patera has a few built-in extensions that can be used ad configured for database connection/management, task scheduling, authentication and
 interfacing with LLMs.
 
 ### Database connectivity and management
 
 #### SQL
 
-To add SQL database connectivity to your PyJolt app you can use the database.sql module.
+To add SQL database connectivity to your Patera app you can use the database.sql module.
 
 ```
 #extensions.py
-from pyjolt.database.sql import SqlDatabase
-from pyjolt.database.sql.migrate import Migrate
+from patera.database.sql import SqlDatabase
+from patera.database.sql.migrate import Migrate
 
 db: SqlDatabase = SqlDatabase(db_name="db", configs_name="SQL_DATABASE") #"db" and "SQL_DATABASE" is the default so they can be omitted
 migrate: Migrate = Migrate(db, command_prefix: str = "")
@@ -1043,7 +1043,7 @@ To store/fetch data from the database you can use model classes. An example clas
 from sqlalchemy import Integer, String, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
-from pyjolt.database import create_declerative_base
+from patera.database import create_declerative_base
 
 Base = create_declerative_base("db") #passed argument must be the same as the database name you wish to
                                     #use the model with. Default is "db" so it can be omitted.
@@ -1164,13 +1164,13 @@ communicates a clear intent (reading data).
 
 #### NoSQL
 
-Besides SQL databases another popular solution are NoSQL databases like MongoDB. PyJolt supports them out of the box. To setup a NoSQL database you must provide the following configurations:
+Besides SQL databases another popular solution are NoSQL databases like MongoDB. Patera supports them out of the box. To setup a NoSQL database you must provide the following configurations:
 
 ```
 #configs.py
 
 NOSQL_DATABASE = {
-    "BACKEND": type #class of the selected NoSQL backend implementation. Example for MongoDB: from pyjolt.database.nosql.backends import MongoBackend
+    "BACKEND": type #class of the selected NoSQL backend implementation. Example for MongoDB: from patera.database.nosql.backends import MongoBackend
     "DATABASE_URI": str #connection string. Example: mongodb+srv://<db_username>:<db_password>@cluster0.273gshd.mongodb.net
     "DATABASE": Optional[str]
     "DB_INJECT_NAME": str = "db" #name of the injected variable for managed sessions
@@ -1183,7 +1183,7 @@ To use the NoSQL extension simply add it to the extension like this:
 ```
 #extensions.py
 #other extensions
-from pyjolt.database.nosql import NoSqlDatabase
+from patera.database.nosql import NoSqlDatabase
 
 nosqldb: NoSqlDatabase = NoSqlDatabase()
 ```
@@ -1287,7 +1287,7 @@ Keep in mind that some aspects, like the ***execute_raw*** method are backend sp
 
 ##### Custom backend implementations
 
-To create a custom backend implementation create a class which extends and implements the ***AsyncNoSqlBackendBase*** abstract class. The abstract class can be imported as ***from pyjolt.database.nosql.backends import AsyncNoSqlBackendBase***. After that, simply implement all required methods. The required methods are:
+To create a custom backend implementation create a class which extends and implements the ***AsyncNoSqlBackendBase*** abstract class. The abstract class can be imported as ***from patera.database.nosql.backends import AsyncNoSqlBackendBase***. After that, simply implement all required methods. The required methods are:
 
 ```
 class AsyncNoSqlBackendBase(ABC):
@@ -1297,7 +1297,7 @@ class AsyncNoSqlBackendBase(ABC):
 
     @classmethod
     @abstractmethod
-    def configure_from_app(cls, app: "PyJolt", variable_prefix: str) -> "AsyncNoSqlBackendBase":
+    def configure_from_app(cls, app: "Patera", variable_prefix: str) -> "AsyncNoSqlBackendBase":
         """
         Classmethod to configure backend from app config.
         Called during NoSqlDatabase.init_app().
@@ -1383,7 +1383,7 @@ class AsyncNoSqlBackendBase(ABC):
         ...
 ```
 
-The specific implementation for each database backend type will differ. Have a look at the ***pyjolt.database.nosql.backend.mongo_backend*** for MongoDB.
+The specific implementation for each database backend type will differ. Have a look at the ***patera.database.nosql.backend.mongo_backend*** for MongoDB.
 
 ##### MongoDB
 To use MongoDB as the backend you will have to install the following dependencies:
@@ -1402,8 +1402,8 @@ To setup user authentication and protection of controller endpoints use the auth
 
 from enum import StrEnum
 from typing import Optional
-from pyjolt import Request
-from pyjolt.auth import Authentication
+from patera import Request
+from patera.auth import Authentication
 
 from app.extensions import db
 from app.api.models import User
@@ -1439,7 +1439,7 @@ class Auth(Authentication):
 auth: Auth = Auth()
 ```
 
-The Auth class inherits from the PyJolt Authentication class. The user must implement the user_loader and role_check (optional) methods.
+The Auth class inherits from the Patera Authentication class. The user must implement the user_loader and role_check (optional) methods.
 These methods provide logic for loading a user when a protected endpoint is requested and checking if the user has permissions.
 Above is an example which loads the user from a cookie. If the user is not found an AuthenticationException is raised which can be handled
 in the CustomExceptionHandler. If the user doesn't have required roles (role_check -> False) an UnauthorizedException exception is raised
@@ -1522,7 +1522,7 @@ The task_manager extensions allows for easy management of tasks that should run 
 To use the extension you have to install the neccessary dependencies with:
 
 ```
-uv add "pyjolt[scheduler]"
+uv add "patera[scheduler]"
 ```
 
 The extension can be setup like this:
@@ -1530,7 +1530,7 @@ The extension can be setup like this:
 ```
 #scheduler.py <- next to __init__.py
 
-from pyjolt.task_manager import TaskManager, schedule_job
+from patera.task_manager import TaskManager, schedule_job
 
 class Scheduler(TaskManager):
 
@@ -1616,7 +1616,7 @@ After this, you can add the extension to your app with:
 ```
 #extensions.py <-next to __init__.py
 
-from pyjolt.caching import Cache
+from patera.caching import Cache
 
 #other extensions
 cache: Cache = Cache() #can also add a variable prefix to specify a configs namespace for using multiple caching instances.
@@ -1690,7 +1690,7 @@ To create a custom caching backend you have to create a class which inherits and
 Simply inherit from this class and implement the following methods:
 
 ```
-#pyjolt.caching
+#patera.caching
 
 class BaseCacheBackend(ABC):
     """
@@ -1704,7 +1704,7 @@ class BaseCacheBackend(ABC):
 
     @classmethod
     @abstractmethod
-    def configure_from_app(cls, app: "PyJolt", variable_prefix: str) -> "BaseCacheBackend":
+    def configure_from_app(cls, app: "Patera", variable_prefix: str) -> "BaseCacheBackend":
         """Create a configured backend instance using app config."""
 
     @abstractmethod
@@ -1732,14 +1732,14 @@ class BaseCacheBackend(ABC):
         """Clear the entire cache namespace."""
 ```
 
-Once you implement the class according to specifications (from pyjolt.caching import BaseCacheBackend), simply pass it as the config parameter ("CACHE_BACKEND") and use it.
+Once you implement the class according to specifications (from patera.caching import BaseCacheBackend), simply pass it as the config parameter ("CACHE_BACKEND") and use it.
 
 ## AI Interface (Experimental!)
 
 The AI Interface extension helps the user integrate a chat interface to popular vendors with ChatGPT compatible api's seemlesly. You must first install the needed dependencies with:
 
 ```
-uv add "pyjolt[ai_interface]"
+uv add "patera[ai_interface]"
 ```
 
 This will install OpenAi, Torch, Numpy, Sentence-transformers and pgvector libraries. These are neccessary for all required funcionality. With this, you will be able to connect to any ChatGPT compatible api like Groq, xAI, Perplexity (Sonar), Google Gemini and locally hosten Ollama, LM Studio or VLLM.
@@ -1772,9 +1772,9 @@ from typing import Optional
 from app.api.models.chat_session import ChatSession
 from app.extensions import db
 
-from pyjolt.database import AsyncSession
-from pyjolt.ai_interface import AiInterface
-from pyjolt.request import Request
+from patera.database import AsyncSession
+from patera.ai_interface import AiInterface
+from patera.request import Request
 
 
 class Interface(AiInterface):
@@ -1805,7 +1805,7 @@ EXTENSIONS: list[str] = [
 ```
 
 When implementing the interface you have to provide the ***chat_context_loader*** method which at minimum accepts the ***self*** argument pointing at the extension (has access to the application via ***self.app***) and the current request. The above example
-also adds the ***@db.managed_session*** decorator for automatic injection and handling of database sessions. The implemented method must return None (when the chat context was not found) or the chat context object (database model). If the method returns None, the extension raises a ChatContextNotFound exception (from pyjolt.ai_interface import ChatContextNotFound). This error can simply be handled in the ExceptionHandler implementation (see above).
+also adds the ***@db.managed_session*** decorator for automatic injection and handling of database sessions. The implemented method must return None (when the chat context was not found) or the chat context object (database model). If the method returns None, the extension raises a ChatContextNotFound exception (from patera.ai_interface import ChatContextNotFound). This error can simply be handled in the ExceptionHandler implementation (see above).
 
 If the method returns a valid object (not None), the object is injected into the endpoint handler method with the configured chat context name (default: "chat_context"). This helps with loading existing chat contexts and keeps the endpoint handlers lean.
 
@@ -1814,7 +1814,7 @@ If the method returns a valid object (not None), the object is injected into the
 You can also expose certain functions to the AI interface which can be called directly by the AI. This is useful to run methods like getting the current weather in a location. The exposed methods must be declared inside the interface class (next to the chat_context_loader) and decorated with the ***@tool*** decorator. Example:
 
 ```
-from pyjolt.ai_interface import tool
+from patera.ai_interface import tool
 
 class Interface(AiInterface):
 
@@ -1837,7 +1837,7 @@ The email client extension can be used for sending emails using the ***aiosmtpli
 
 ```
 #app/extensions.py
-from pyjolt.email import EmailClient
+from patera.email import EmailClient
 
 email_client: EmailClient = EmailClient(configs_name = "EMAIL_CLIENT") #configs_name="EMAIL_CLIENT" is the default and can be omitted
 ```
@@ -1888,7 +1888,7 @@ If you wish you can create command line interface utility methods to help with a
 ```
 #app/cli/cli_controller.py
 
-from pyjolt.cli import CLIController, command, argument
+from patera.cli import CLIController, command, argument
 
 class UtilityCLIController(CLIController):
     """A simple CLI utility controller."""
@@ -1908,14 +1908,14 @@ class UtilityCLIController(CLIController):
         print(f"The sum of {a} and {b} is {result}.")
 ```
 
-In this controller you can add as many cli method as you wish with the use of the @command and @argument decorators. The ***self*** keyword points at the controller instance which has access to the application instance (***self.app: PyJolt***).
+In this controller you can add as many cli method as you wish with the use of the @command and @argument decorators. The ***self*** keyword points at the controller instance which has access to the application instance (***self.app: Patera***).
 Each command method requires the @command decorator, but the @argument decorator(s) are optional depending on if the method needs input from the user or not.
 
 ### @command
 The @command decorator requires a coommand_name: str argument under which the command will be accessible. You can also provide a ***help*** argument detailing the purpose of the method and options.
 
 ### @argument
-You can add as many @argument decorators as you wish to a method. This decorator tells the parser what arguments (name) to except and in what data type these arguments are going to be. PyJolt automatically casts arguments
+You can add as many @argument decorators as you wish to a method. This decorator tells the parser what arguments (name) to except and in what data type these arguments are going to be. Patera automatically casts arguments
 into the provided type. Allowed types are ***int***, ***float*** and ***str***.
 
 After you have created the CLI controller you have to register it with the application. To do so you have to add it in the application configurations
@@ -1928,15 +1928,15 @@ CLI_CONTROLLERS: List[str] = [
 
 ## Middleware
 
-Middleware can be useful for anything from logging to measuring performance or modifying requests/responses. To use middleware in your PyJolt app you have to create a middleware class
+Middleware can be useful for anything from logging to measuring performance or modifying requests/responses. To use middleware in your Patera app you have to create a middleware class
 
 ```
 #app/middleware/timing_mw.py
 
 import time
-from pyjolt.middleware import MiddlewareBase
-from pyjolt.request import Request
-from pyjolt.response import Response
+from patera.middleware import MiddlewareBase
+from patera.request import Request
+from patera.response import Response
 
 class TimingMW(MiddlewareBase):
     async def middleware(self, req: Request) -> Response:
@@ -1969,7 +1969,7 @@ Middleware is useful when you wish to run some functionality for every request. 
 
 ## Testing
 
-PyJolt uses Pytest for running tests. For creating tests use the PyJoltTestClient object from ***pyjolt.testing***.
+Patera uses Pytest for running tests. For creating tests use the PyJoltTestClient object from ***patera.testing***.
 We recommend creating a ***tests*** folder inside your ***app*** directory (next to templates and static folders). You may organize tests differently as long as you follow Pytest’s discovery rules.
 
 ### Configuring test client
@@ -1980,7 +1980,7 @@ Inside the ***tests*** folder create a **conftest.py** file with the following c
 # tests/conftest.py
 
 import pytest
-from pyjolt.testing import PyJoltTestClient
+from patera.testing import PyJoltTestClient
 from app import Application
 
 @pytest.fixture
@@ -2034,7 +2034,7 @@ asyncio_default_fixture_loop_scope = "function"
 A simple test using Apache Bench, hitting the endpoint (example app) ***/api/v1/users*** shows the following results:
 
 ```
-(PyJolt) marko@Markos-MacBook-Air PyJolt % ab -k -c 200 -n 2000 http://localhost:8080/api/v1/users
+(Patera) marko@Markos-MacBook-Air Patera % ab -k -c 200 -n 2000 http://localhost:8080/api/v1/users
 This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
 Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
 Licensed to The Apache Software Foundation, http://www.apache.org/

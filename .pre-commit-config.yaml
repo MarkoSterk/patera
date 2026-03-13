@@ -4,16 +4,16 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        exclude: ^packages/pyjolt-frontendext/src/pyjolt/frontendext/_static/_main\.py$
+        exclude: ^packages/patera-frontendext/src/patera/frontendext/_static/_main\.py$
       - id: ruff-format
-        exclude: ^packages/pyjolt-frontendext/src/pyjolt/frontendext/_static/_main\.py$
+        exclude: ^packages/patera-frontendext/src/patera/frontendext/_static/_main\.py$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^packages/pyjolt-frontendext/src/pyjolt/frontendext/_static/_main\.py$
+        exclude: ^packages/patera-frontendext/src/patera/frontendext/_static/_main\.py$
       - id: end-of-file-fixer
-        exclude: ^packages/pyjolt-frontendext/src/pyjolt/frontendext/_static/_main\.py$
+        exclude: ^packages/patera-frontendext/src/patera/frontendext/_static/_main\.py$
       - id: check-yaml
       - id: check-toml

@@ -11,20 +11,20 @@ if (Test-Path ".env") {
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Publishing pyjolt..."
-uv publish dist/pyjolt-*
+Write-Host "Publishing patera..."
+uv publish dist/patera-*
 
 $extensions = @(
-    "pyjolt_admin",
-    "pyjolt_aiinterface",
-    "pyjolt_auth",
-    "pyjolt_caching",
-    "pyjolt_database",
-    "pyjolt_email",
-    "pyjolt_frontend",
-    "pyjolt_frontendext",
-    "pyjolt_statemachine",
-    "pyjolt_taskmanager"
+    "patera_admin",
+    "patera_aiinterface",
+    "patera_auth",
+    "patera_caching",
+    "patera_database",
+    "patera_email",
+    "patera_frontend",
+    "patera_frontendext",
+    "patera_statemachine",
+    "patera_taskmanager"
 )
 
 foreach ($pkg in $extensions) {

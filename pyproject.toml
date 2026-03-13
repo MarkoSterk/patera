@@ -1,5 +1,5 @@
 [project]
-name = "pyjolt"
+name = "patera"
 version = "0.111.13"
 description = "A batteries included async-first python webframework"
 readme = "README.md"
@@ -27,66 +27,66 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-admin = ["pyjolt-admin"]
-aiinterface = ["pyjolt-aiinterface"]
-auth = ["pyjolt-auth"]
-caching = ["pyjolt-caching"]
-caching-redis = ["pyjolt-caching[redis]"]
-caching-sqlite = ["pyjolt-caching[sqlite]"]
-database = ["pyjolt-database"]
-email = ["pyjolt-email"]
-frontend = ["pyjolt-frontendext", "pyjolt-frontend"]
-statemachine = ["pyjolt-statemachine"]
-taskmanager = ["pyjolt-taskmanager"]
+admin = ["patera-admin"]
+aiinterface = ["patera-aiinterface"]
+auth = ["patera-auth"]
+caching = ["patera-caching"]
+caching-redis = ["patera-caching[redis]"]
+caching-sqlite = ["patera-caching[sqlite]"]
+database = ["patera-database"]
+email = ["patera-email"]
+frontend = ["patera-frontendext", "patera-frontend"]
+statemachine = ["patera-statemachine"]
+taskmanager = ["patera-taskmanager"]
 testing = ["httpx", "anyio", "pytest", "pytest-cov"]
 dev = ["granian[reload]"]
 all = [
-    "pyjolt-database",
-    "pyjolt-email",
-    "pyjolt-admin",
-    "pyjolt-aiinterface",
-    "pyjolt-auth",
-    "pyjolt-caching",
-    "pyjolt-statemachine",
-    "pyjolt-taskmanager"
+    "patera-database",
+    "patera-email",
+    "patera-admin",
+    "patera-aiinterface",
+    "patera-auth",
+    "patera-caching",
+    "patera-statemachine",
+    "patera-taskmanager"
 ]
 
 [tool.uv.workspace]
 members = [
-    "packages/pyjolt-admin",
-    "packages/pyjolt-aiinterface",
-    "packages/pyjolt-auth",
-    "packages/pyjolt-caching",
-    "packages/pyjolt-database",
-    "packages/pyjolt-email",
-    "packages/pyjolt-frontend",
-    "packages/pyjolt-frontendext",
-    "packages/pyjolt-statemachine",
-    "packages/pyjolt-taskmanager"
+    "packages/patera-admin",
+    "packages/patera-aiinterface",
+    "packages/patera-auth",
+    "packages/patera-caching",
+    "packages/patera-database",
+    "packages/patera-email",
+    "packages/patera-frontend",
+    "packages/patera-frontendext",
+    "packages/patera-statemachine",
+    "packages/patera-taskmanager"
 ]
 
 [tool.uv.sources]
-pyjolt-admin = { workspace = true }
-pyjolt-aiinterface = { workspace = true }
-pyjolt-auth = { workspace = true }
-pyjolt-caching = { workspace = true }
-pyjolt-database = { workspace = true }
-pyjolt-email = { workspace = true }
-pyjolt-frontend = { workspace = true }
-pyjolt-frontendext = { workspace = true }
-pyjolt-statemachine = { workspace = true }
-pyjolt-taskmanager = { workspace = true }
+patera-admin = { workspace = true }
+patera-aiinterface = { workspace = true }
+patera-auth = { workspace = true }
+patera-caching = { workspace = true }
+patera-database = { workspace = true }
+patera-email = { workspace = true }
+patera-frontend = { workspace = true }
+patera-frontendext = { workspace = true }
+patera-statemachine = { workspace = true }
+patera-taskmanager = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
 
 [project.scripts]
-pyjolt = "pyjolt.cli:main"
+patera = "patera.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/MarkoSterk/PyJolt"
-Issues = "https://github.com/MarkoSterk/PyJolt/issues"
+Homepage = "https://github.com/MarkoSterk/Patera"
+Issues = "https://github.com/MarkoSterk/Patera/issues"
 
 [tool.pylint]
 # Global Pylint configuration
@@ -104,8 +104,8 @@ testpaths = ["app/tests"]
 [tool.mypy]
 disable_error_code = ["import-untyped"]
 exclude = [
-    "src/pyjolt/cli/templates",
-    "src/pyjolt/database/sql/migrate/env_template.py"
+    "src/patera/cli/templates",
+    "src/patera/database/sql/migrate/env_template.py"
     ]
 
 [dependency-groups]

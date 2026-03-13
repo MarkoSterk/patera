@@ -32,20 +32,20 @@ publish_package() {
 }
 
 # Publish core first
-publish_package "pyjolt"
+publish_package "patera"
 
 # Publish extensions
 packages=(
-  pyjolt_admin
-  pyjolt_aiinterface
-  pyjolt_auth
-  pyjolt_caching
-  pyjolt_database
-  pyjolt_email
-  pyjolt_frontend
-  pyjolt_frontendext
-  pyjolt_statemachine
-  pyjolt_taskmanager
+  patera_admin
+  patera_aiinterface
+  patera_auth
+  patera_caching
+  patera_database
+  patera_email
+  patera_frontend
+  patera_frontendext
+  patera_statemachine
+  patera_taskmanager
 )
 
 for pkg in "${packages[@]}"; do

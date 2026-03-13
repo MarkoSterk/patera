@@ -1,0 +1,17 @@
+[project]
+name = "patera-statemachine"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "patera"
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.statemachine"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"

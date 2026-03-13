@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "Building core package: pyjolt"
-uv build --package pyjolt
+Write-Host "Building core package: patera"
+uv build --package patera
 
 $packagesDir = "packages"
 

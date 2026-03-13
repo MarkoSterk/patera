@@ -1,0 +1,23 @@
+[project]
+name = "patera-aiinterface"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "docstring-parser>=0.17.0",
+  "numpy>=2.4.3",
+  "openai>=2.26.0",
+  "pgvector>=0.4.2",
+  "patera",
+  "sentence-transformers>=5.2.3",
+  "torch>=2.10.0",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.aiinterface"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"

@@ -1,0 +1,28 @@
+[project]
+name = "patera-admin"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "patera",
+  "patera-auth",
+  "patera-caching",
+  "patera-database",
+  "patera-email",
+  "patera-taskmanager",
+  "wtforms-sqlalchemy>=0.4.2",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+patera-auth = { workspace = true }
+patera-caching = { workspace = true }
+patera-email = { workspace = true }
+patera-database = { workspace = true }
+patera-taskmanager = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.admin"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"

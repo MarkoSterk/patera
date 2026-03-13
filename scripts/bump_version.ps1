@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$packages = @("pyjolt")
+$packages = @("patera")
 
 Get-ChildItem "packages" -Directory | ForEach-Object {
     if (Test-Path "$($_.FullName)\pyproject.toml") {

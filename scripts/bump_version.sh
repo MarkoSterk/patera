@@ -8,8 +8,8 @@ if [[ "$part" != "major" && "$part" != "minor" && "$part" != "patch" ]]; then
   exit 1
 fi
 
-echo "Bumping pyjolt ($part)..."
-uv version --package pyjolt --bump "$part"
+echo "Bumping patera ($part)..."
+uv version --package patera --bump "$part"
 
 for dir in packages/*; do
   if [[ -f "$dir/pyproject.toml" ]]; then
