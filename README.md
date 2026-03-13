@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MarkoSterk/Patera/refs/heads/main/src/patera/graphics/pyjolt_logo.png" alt="Patera Logo" width="200">
+  <img src="https://raw.githubusercontent.com/MarkoSterk/Patera/refs/heads/main/src/patera/graphics/patera_logo.png" alt="Patera Logo" width="200">
 </p>
 
 # Patera - async first python web framework
