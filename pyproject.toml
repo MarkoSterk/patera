@@ -58,6 +58,7 @@ members = [
     "packages/patera-auth",
     "packages/patera-caching",
     "packages/patera-database",
+    "packages/patera-pyway",
     "packages/patera-email",
     "packages/patera-frontend",
     "packages/patera-frontendext",
@@ -71,6 +72,7 @@ patera-aiinterface = { workspace = true }
 patera-auth = { workspace = true }
 patera-caching = { workspace = true }
 patera-database = { workspace = true }
+patera-pyway = { workspace = true }
 patera-email = { workspace = true }
 patera-frontend = { workspace = true }
 patera-frontendext = { workspace = true }

@@ -17,6 +17,7 @@ members = [
     "patera-email",
     "patera-frontend",
     "patera-frontendext",
+    "patera-pyway",
     "patera-statemachine",
     "patera-taskmanager",
 ]
@@ -1070,6 +1071,30 @@ wheels = [
 ]
 
 [[package]]
+name = "mysql-connector-python"
+version = "9.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/6e/c89babc7de3df01467d159854414659c885152579903a8220c8db02a3835/mysql_connector_python-9.6.0.tar.gz", hash = "sha256:c453bb55347174d87504b534246fb10c589daf5d057515bf615627198a3c7ef1", size = 12254999, upload-time = "2026-02-10T12:04:52.63Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/d9/2a4b4d90b52f4241f0f71618cd4bd8779dd6d18db8058b0a4dd83ec0541c/mysql_connector_python-9.6.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9664e217c72dd6fb700f4c8512af90261f72d2f5d7c00c4e13e4c1e09bfa3d5e", size = 17585672, upload-time = "2026-02-10T12:03:52.955Z" },
+    { url = "https://files.pythonhosted.org/packages/33/91/2495835733a054e716a17dc28404748b33f2dc1da1ae4396fb45574adf40/mysql_connector_python-9.6.0-cp312-cp312-macosx_14_0_x86_64.whl", hash = "sha256:1ed4b5c4761e5333035293e746683890e4ef2e818e515d14023fd80293bc31fa", size = 18452624, upload-time = "2026-02-10T12:03:56.153Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/69/e83abbbbf7f8eed855b5a5ff7285bc0afb1199418ac036c7691edf41e154/mysql_connector_python-9.6.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:5095758dcb89a6bce2379f349da336c268c407129002b595c5dba82ce387e2a5", size = 34169154, upload-time = "2026-02-10T12:03:58.831Z" },
+    { url = "https://files.pythonhosted.org/packages/82/44/67bb61c71f398fbc739d07e8dcadad94e2f655874cb32ae851454066bea0/mysql_connector_python-9.6.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4ae4e7780fad950a4f267dea5851048d160f5b71314a342cdbf30b154f1c74f7", size = 34542947, upload-time = "2026-02-10T12:04:02.408Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/39/994c4f7e9c59d3ca534a831d18442ac4c529865db20aeaa4fd94e2af5efd/mysql_connector_python-9.6.0-cp312-cp312-win_amd64.whl", hash = "sha256:c180e0b4100d7402e03993bfac5c97d18e01d7ca9d198d742fffc245077f8ffe", size = 16515709, upload-time = "2026-02-10T12:04:04.924Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/58/9521aa678708ec6cebfd40524c14c3d151e4f29e3774e6086aa0a30d203b/mysql_connector_python-9.6.0-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:e86e45a7b540ca09af8a18ecfa761e0cdeccfdb62818331614ec030ae44bfd26", size = 17585837, upload-time = "2026-02-10T12:04:07.004Z" },
+    { url = "https://files.pythonhosted.org/packages/39/8d/b108f9bcce9780f6a1f91decb2af54defdaf845e237ddc42f2b4578f1cd7/mysql_connector_python-9.6.0-cp313-cp313-macosx_14_0_x86_64.whl", hash = "sha256:8d3e9252384e1b7f95b07020664f2673d9c29c5e95eeda2e048b3331e190b9d4", size = 18452844, upload-time = "2026-02-10T12:04:09.418Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/28/735cd93d16e76dc2feb4abb3f1229a1d9475af34d80c26712fec6abe1d70/mysql_connector_python-9.6.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:0fa18ead33cb699ea92005695077cef09aa494eebf51164ee30c891c3eaea90c", size = 34169374, upload-time = "2026-02-10T12:04:12.13Z" },
+    { url = "https://files.pythonhosted.org/packages/42/07/069983799cf4050c68f61a494f94b06f095fee6026ab0dd863a14de30867/mysql_connector_python-9.6.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:a26490cb029bf7b18a1d2093101105b3526a1036b51ad01553d30138f5beb8d2", size = 34543019, upload-time = "2026-02-10T12:04:15.065Z" },
+    { url = "https://files.pythonhosted.org/packages/32/00/fbeb7d666ab8153f719e620bac5abfbc74640e8ec511612493110a75fe66/mysql_connector_python-9.6.0-cp313-cp313-win_amd64.whl", hash = "sha256:3460ed976e1b88b7284335d9397a3c519dff56d71580ca1f76ff1c0c7714c813", size = 16515701, upload-time = "2026-02-10T12:04:19.26Z" },
+    { url = "https://files.pythonhosted.org/packages/70/51/13cc90b2a703784cd9a0aa0a6fce07946cf6a2abe7c8fd0b585562e250fc/mysql_connector_python-9.6.0-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:e2cc13cd3dcdb845d636e52c4e7a9509b63da09bec6ce1b3696be53a79847e2d", size = 17585800, upload-time = "2026-02-10T12:04:21.6Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/6b/ce7ab998fbdd17f35a1b54624365d039045cbb2d42bbc7b03f50d7597c7b/mysql_connector_python-9.6.0-cp314-cp314-macosx_14_0_x86_64.whl", hash = "sha256:a08c2149d4b52a010c4353f18c84716d18114a4ecd00b466ea34138de2c640f2", size = 18452823, upload-time = "2026-02-10T12:04:23.995Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/bf/8157ed61d17878c33511dcb97c68ecaaaf6220bea5a2944ea4eba73cc63a/mysql_connector_python-9.6.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:b00228b985edd208b20f45c5e684c54e08e31e01bc1d8c3c18a36641c3be5bf7", size = 34171594, upload-time = "2026-02-10T12:04:27.401Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/06/5efdd28819afdb9f1487a62842fda4277febe128a3cd6e9090dbe0a6524e/mysql_connector_python-9.6.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:4617ef5216da7ca32dd46afda61a1552807762434127413bba46fbe4379f59d4", size = 34542851, upload-time = "2026-02-10T12:04:31.021Z" },
+    { url = "https://files.pythonhosted.org/packages/40/6a/26e08a4a79f159cd8e5b64eb10bd056e7735b65d4464d98641f59eb9ca3a/mysql_connector_python-9.6.0-cp314-cp314-win_amd64.whl", hash = "sha256:bc782f64ca00b6b933d4c6a35568f1349d115cc4434c849b5b9edc015bee3e62", size = 17002947, upload-time = "2026-02-10T12:04:34.386Z" },
+    { url = "https://files.pythonhosted.org/packages/15/dd/b3250826c29cee7816de4409a2fe5e469a68b9a89f6bfaa5eed74f05532c/mysql_connector_python-9.6.0-py2.py3-none-any.whl", hash = "sha256:44b0fb57207ebc6ae05b5b21b7968a9ed33b29187fe87b38951bad2a334d75d5", size = 480527, upload-time = "2026-02-10T12:04:36.176Z" },
+]
+
+[[package]]
 name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1311,6 +1336,349 @@ wheels = [
 ]
 
 [[package]]
+name = "patera"
+version = "0.111.13"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "asgi-lifespan" },
+    { name = "granian" },
+    { name = "h11" },
+    { name = "httpcore" },
+    { name = "idna" },
+    { name = "jinja2" },
+    { name = "loguru" },
+    { name = "mako" },
+    { name = "markupsafe" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "websockets" },
+    { name = "werkzeug" },
+]
+
+[package.optional-dependencies]
+admin = [
+    { name = "patera-admin" },
+]
+aiinterface = [
+    { name = "patera-aiinterface" },
+]
+all = [
+    { name = "patera-admin" },
+    { name = "patera-aiinterface" },
+    { name = "patera-auth" },
+    { name = "patera-caching" },
+    { name = "patera-database" },
+    { name = "patera-email" },
+    { name = "patera-statemachine" },
+    { name = "patera-taskmanager" },
+]
+auth = [
+    { name = "patera-auth" },
+]
+caching = [
+    { name = "patera-caching" },
+]
+caching-redis = [
+    { name = "patera-caching", extra = ["redis"] },
+]
+caching-sqlite = [
+    { name = "patera-caching", extra = ["sqlite"] },
+]
+database = [
+    { name = "patera-database" },
+]
+dev = [
+    { name = "granian", extra = ["reload"] },
+]
+email = [
+    { name = "patera-email" },
+]
+frontend = [
+    { name = "patera-frontend" },
+    { name = "patera-frontendext" },
+]
+statemachine = [
+    { name = "patera-statemachine" },
+]
+taskmanager = [
+    { name = "patera-taskmanager" },
+]
+testing = [
+    { name = "anyio" },
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=25.1.0" },
+    { name = "anyio", marker = "extra == 'testing'" },
+    { name = "asgi-lifespan", specifier = ">=2.1.0" },
+    { name = "granian", specifier = ">=2.7.2" },
+    { name = "granian", extras = ["reload"], marker = "extra == 'dev'" },
+    { name = "h11", specifier = ">=0.16.0" },
+    { name = "httpcore", specifier = ">=1.0.9" },
+    { name = "httpx", marker = "extra == 'testing'" },
+    { name = "idna", specifier = ">=3.11" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "mako", specifier = ">=1.3.10" },
+    { name = "markupsafe", specifier = ">=3.0.3" },
+    { name = "patera-admin", marker = "extra == 'admin'", editable = "packages/patera-admin" },
+    { name = "patera-admin", marker = "extra == 'all'", editable = "packages/patera-admin" },
+    { name = "patera-aiinterface", marker = "extra == 'aiinterface'", editable = "packages/patera-aiinterface" },
+    { name = "patera-aiinterface", marker = "extra == 'all'", editable = "packages/patera-aiinterface" },
+    { name = "patera-auth", marker = "extra == 'all'", editable = "packages/patera-auth" },
+    { name = "patera-auth", marker = "extra == 'auth'", editable = "packages/patera-auth" },
+    { name = "patera-caching", marker = "extra == 'all'", editable = "packages/patera-caching" },
+    { name = "patera-caching", marker = "extra == 'caching'", editable = "packages/patera-caching" },
+    { name = "patera-caching", extras = ["redis"], marker = "extra == 'caching-redis'", editable = "packages/patera-caching" },
+    { name = "patera-caching", extras = ["sqlite"], marker = "extra == 'caching-sqlite'", editable = "packages/patera-caching" },
+    { name = "patera-database", marker = "extra == 'all'", editable = "packages/patera-database" },
+    { name = "patera-database", marker = "extra == 'database'", editable = "packages/patera-database" },
+    { name = "patera-email", marker = "extra == 'all'", editable = "packages/patera-email" },
+    { name = "patera-email", marker = "extra == 'email'", editable = "packages/patera-email" },
+    { name = "patera-frontend", marker = "extra == 'frontend'", editable = "packages/patera-frontend" },
+    { name = "patera-frontendext", marker = "extra == 'frontend'", editable = "packages/patera-frontendext" },
+    { name = "patera-statemachine", marker = "extra == 'all'", editable = "packages/patera-statemachine" },
+    { name = "patera-statemachine", marker = "extra == 'statemachine'", editable = "packages/patera-statemachine" },
+    { name = "patera-taskmanager", marker = "extra == 'all'", editable = "packages/patera-taskmanager" },
+    { name = "patera-taskmanager", marker = "extra == 'taskmanager'", editable = "packages/patera-taskmanager" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "pytest", marker = "extra == 'testing'" },
+    { name = "pytest-cov", marker = "extra == 'testing'" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "python-multipart", specifier = ">=0.0.22" },
+    { name = "websockets", specifier = ">=16.0" },
+    { name = "werkzeug", specifier = ">=3.1.6" },
+]
+provides-extras = ["admin", "aiinterface", "auth", "caching", "caching-redis", "caching-sqlite", "database", "email", "frontend", "statemachine", "taskmanager", "testing", "dev", "all"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "ruff", specifier = ">=0.15.5" },
+]
+
+[[package]]
+name = "patera-admin"
+version = "0.1.0"
+source = { editable = "packages/patera-admin" }
+dependencies = [
+    { name = "patera" },
+    { name = "patera-auth" },
+    { name = "patera-caching" },
+    { name = "patera-database" },
+    { name = "patera-email" },
+    { name = "patera-taskmanager" },
+    { name = "wtforms-sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "patera", editable = "." },
+    { name = "patera-auth", editable = "packages/patera-auth" },
+    { name = "patera-caching", editable = "packages/patera-caching" },
+    { name = "patera-database", editable = "packages/patera-database" },
+    { name = "patera-email", editable = "packages/patera-email" },
+    { name = "patera-taskmanager", editable = "packages/patera-taskmanager" },
+    { name = "wtforms-sqlalchemy", specifier = ">=0.4.2" },
+]
+
+[[package]]
+name = "patera-aiinterface"
+version = "0.1.0"
+source = { editable = "packages/patera-aiinterface" }
+dependencies = [
+    { name = "docstring-parser" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "patera" },
+    { name = "pgvector" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "docstring-parser", specifier = ">=0.17.0" },
+    { name = "numpy", specifier = ">=2.4.3" },
+    { name = "openai", specifier = ">=2.26.0" },
+    { name = "patera", editable = "." },
+    { name = "pgvector", specifier = ">=0.4.2" },
+    { name = "sentence-transformers", specifier = ">=5.2.3" },
+    { name = "torch", specifier = ">=2.10.0" },
+]
+
+[[package]]
+name = "patera-auth"
+version = "0.1.0"
+source = { editable = "packages/patera-auth" }
+dependencies = [
+    { name = "bcrypt" },
+    { name = "cryptography" },
+    { name = "jwt" },
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bcrypt", specifier = ">=5.0.0" },
+    { name = "cryptography", specifier = ">=46.0.5" },
+    { name = "jwt", specifier = ">=1.4.0" },
+    { name = "patera", editable = "." },
+]
+
+[[package]]
+name = "patera-caching"
+version = "0.1.0"
+source = { editable = "packages/patera-caching" }
+dependencies = [
+    { name = "cachetools" },
+    { name = "patera" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "aiosqlite" },
+    { name = "redis" },
+]
+redis = [
+    { name = "redis" },
+]
+sqlite = [
+    { name = "aiosqlite" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.20" },
+    { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.20" },
+    { name = "cachetools", specifier = ">=7.0.5" },
+    { name = "patera", editable = "." },
+    { name = "redis", marker = "extra == 'all'", specifier = ">=5.0" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0" },
+]
+provides-extras = ["redis", "sqlite", "all"]
+
+[[package]]
+name = "patera-database"
+version = "0.1.0"
+source = { editable = "packages/patera-database" }
+dependencies = [
+    { name = "aiosqlite" },
+    { name = "patera" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite" },
+    { name = "patera", editable = "." },
+    { name = "sqlalchemy" },
+]
+
+[[package]]
+name = "patera-email"
+version = "0.1.0"
+source = { editable = "packages/patera-email" }
+dependencies = [
+    { name = "aiosmtplib" },
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosmtplib", specifier = ">=5.1.0" },
+    { name = "patera", editable = "." },
+]
+
+[[package]]
+name = "patera-frontend"
+version = "0.1.0"
+source = { editable = "packages/patera-frontend" }
+dependencies = [
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "patera", editable = "." }]
+
+[[package]]
+name = "patera-frontendext"
+version = "0.1.0"
+source = { editable = "packages/patera-frontendext" }
+dependencies = [
+    { name = "patera" },
+    { name = "pyodide-py", version = "0.27.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
+    { name = "pyodide-py", version = "0.29.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
+    { name = "pyscript" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "patera", editable = "." },
+    { name = "pyodide-py", specifier = ">=0.27.7" },
+    { name = "pyscript", specifier = ">=0.3.3" },
+]
+
+[[package]]
+name = "patera-pyway"
+version = "0.1.0"
+source = { editable = "packages/patera-pyway" }
+dependencies = [
+    { name = "patera" },
+    { name = "patera-database" },
+    { name = "pyway" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "patera", editable = "." },
+    { name = "patera-database", editable = "packages/patera-database" },
+    { name = "pyway", specifier = ">=0.3.32" },
+]
+
+[[package]]
+name = "patera-statemachine"
+version = "0.1.0"
+source = { editable = "packages/patera-statemachine" }
+dependencies = [
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "patera", editable = "." }]
+
+[[package]]
+name = "patera-taskmanager"
+version = "0.1.0"
+source = { editable = "packages/patera-taskmanager" }
+dependencies = [
+    { name = "apscheduler" },
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "apscheduler", specifier = ">=3.11.2" },
+    { name = "patera", editable = "." },
+]
+
+[[package]]
 name = "pathspec"
 version = "1.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1363,6 +1731,47 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/40/f1/6d86a29246dfd2e9b6237f0b5823717f60cad94d47ddc26afa916d21f525/pre_commit-4.5.1.tar.gz", hash = "sha256:eb545fcff725875197837263e977ea257a402056661f09dae08e4b149b030a61", size = 198232, upload-time = "2025-12-16T21:14:33.552Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5d/19/fd3ef348460c80af7bb4669ea7926651d1f95c23ff2df18b9d24bab4f3fa/pre_commit-4.5.1-py2.py3-none-any.whl", hash = "sha256:3b3afd891e97337708c1674210f8eba659b52a38ea5f822ff142d10786221f77", size = 226437, upload-time = "2025-12-16T21:14:32.409Z" },
+]
+
+[[package]]
+name = "psycopg2-binary"
+version = "2.9.11"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/6c/8767aaa597ba424643dc87348c6f1754dd9f48e80fdc1b9f7ca5c3a7c213/psycopg2-binary-2.9.11.tar.gz", hash = "sha256:b6aed9e096bf63f9e75edf2581aa9a7e7186d97ab5c177aa6c87797cd591236c", size = 379620, upload-time = "2025-10-10T11:14:48.041Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/91/f870a02f51be4a65987b45a7de4c2e1897dd0d01051e2b559a38fa634e3e/psycopg2_binary-2.9.11-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:be9b840ac0525a283a96b556616f5b4820e0526addb8dcf6525a0fa162730be4", size = 3756603, upload-time = "2025-10-10T11:11:52.213Z" },
+    { url = "https://files.pythonhosted.org/packages/27/fa/cae40e06849b6c9a95eb5c04d419942f00d9eaac8d81626107461e268821/psycopg2_binary-2.9.11-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f090b7ddd13ca842ebfe301cd587a76a4cf0913b1e429eb92c1be5dbeb1a19bc", size = 3864509, upload-time = "2025-10-10T11:11:56.452Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/75/364847b879eb630b3ac8293798e380e441a957c53657995053c5ec39a316/psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ab8905b5dcb05bf3fb22e0cf90e10f469563486ffb6a96569e51f897c750a76a", size = 4411159, upload-time = "2025-10-10T11:12:00.49Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/a0/567f7ea38b6e1c62aafd58375665a547c00c608a471620c0edc364733e13/psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:bf940cd7e7fec19181fdbc29d76911741153d51cab52e5c21165f3262125685e", size = 4468234, upload-time = "2025-10-10T11:12:04.892Z" },
+    { url = "https://files.pythonhosted.org/packages/30/da/4e42788fb811bbbfd7b7f045570c062f49e350e1d1f3df056c3fb5763353/psycopg2_binary-2.9.11-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:fa0f693d3c68ae925966f0b14b8edda71696608039f4ed61b1fe9ffa468d16db", size = 4166236, upload-time = "2025-10-10T11:12:11.674Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/94/c1777c355bc560992af848d98216148be5f1be001af06e06fc49cbded578/psycopg2_binary-2.9.11-cp312-cp312-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:a1cf393f1cdaf6a9b57c0a719a1068ba1069f022a59b8b1fe44b006745b59757", size = 3983083, upload-time = "2025-10-30T02:55:15.73Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/42/c9a21edf0e3daa7825ed04a4a8588686c6c14904344344a039556d78aa58/psycopg2_binary-2.9.11-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:ef7a6beb4beaa62f88592ccc65df20328029d721db309cb3250b0aae0fa146c3", size = 3652281, upload-time = "2025-10-10T11:12:17.713Z" },
+    { url = "https://files.pythonhosted.org/packages/12/22/dedfbcfa97917982301496b6b5e5e6c5531d1f35dd2b488b08d1ebc52482/psycopg2_binary-2.9.11-cp312-cp312-musllinux_1_2_ppc64le.whl", hash = "sha256:31b32c457a6025e74d233957cc9736742ac5a6cb196c6b68499f6bb51390bd6a", size = 3298010, upload-time = "2025-10-10T11:12:22.671Z" },
+    { url = "https://files.pythonhosted.org/packages/66/ea/d3390e6696276078bd01b2ece417deac954dfdd552d2edc3d03204416c0c/psycopg2_binary-2.9.11-cp312-cp312-musllinux_1_2_riscv64.whl", hash = "sha256:edcb3aeb11cb4bf13a2af3c53a15b3d612edeb6409047ea0b5d6a21a9d744b34", size = 3044641, upload-time = "2025-10-30T02:55:19.929Z" },
+    { url = "https://files.pythonhosted.org/packages/12/9a/0402ded6cbd321da0c0ba7d34dc12b29b14f5764c2fc10750daa38e825fc/psycopg2_binary-2.9.11-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:62b6d93d7c0b61a1dd6197d208ab613eb7dcfdcca0a49c42ceb082257991de9d", size = 3347940, upload-time = "2025-10-10T11:12:26.529Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/d2/99b55e85832ccde77b211738ff3925a5d73ad183c0b37bcbbe5a8ff04978/psycopg2_binary-2.9.11-cp312-cp312-win_amd64.whl", hash = "sha256:b33fabeb1fde21180479b2d4667e994de7bbf0eec22832ba5d9b5e4cf65b6c6d", size = 2714147, upload-time = "2025-10-10T11:12:29.535Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/a8/a2709681b3ac11b0b1786def10006b8995125ba268c9a54bea6f5ae8bd3e/psycopg2_binary-2.9.11-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:b8fb3db325435d34235b044b199e56cdf9ff41223a4b9752e8576465170bb38c", size = 3756572, upload-time = "2025-10-10T11:12:32.873Z" },
+    { url = "https://files.pythonhosted.org/packages/62/e1/c2b38d256d0dafd32713e9f31982a5b028f4a3651f446be70785f484f472/psycopg2_binary-2.9.11-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:366df99e710a2acd90efed3764bb1e28df6c675d33a7fb40df9b7281694432ee", size = 3864529, upload-time = "2025-10-10T11:12:36.791Z" },
+    { url = "https://files.pythonhosted.org/packages/11/32/b2ffe8f3853c181e88f0a157c5fb4e383102238d73c52ac6d93a5c8bffe6/psycopg2_binary-2.9.11-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:8c55b385daa2f92cb64b12ec4536c66954ac53654c7f15a203578da4e78105c0", size = 4411242, upload-time = "2025-10-10T11:12:42.388Z" },
+    { url = "https://files.pythonhosted.org/packages/10/04/6ca7477e6160ae258dc96f67c371157776564679aefd247b66f4661501a2/psycopg2_binary-2.9.11-cp313-cp313-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:c0377174bf1dd416993d16edc15357f6eb17ac998244cca19bc67cdc0e2e5766", size = 4468258, upload-time = "2025-10-10T11:12:48.654Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/7e/6a1a38f86412df101435809f225d57c1a021307dd0689f7a5e7fe83588b1/psycopg2_binary-2.9.11-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5c6ff3335ce08c75afaed19e08699e8aacf95d4a260b495a4a8545244fe2ceb3", size = 4166295, upload-time = "2025-10-10T11:12:52.525Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/7d/c07374c501b45f3579a9eb761cbf2604ddef3d96ad48679112c2c5aa9c25/psycopg2_binary-2.9.11-cp313-cp313-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:84011ba3109e06ac412f95399b704d3d6950e386b7994475b231cf61eec2fc1f", size = 3983133, upload-time = "2025-10-30T02:55:24.329Z" },
+    { url = "https://files.pythonhosted.org/packages/82/56/993b7104cb8345ad7d4516538ccf8f0d0ac640b1ebd8c754a7b024e76878/psycopg2_binary-2.9.11-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:ba34475ceb08cccbdd98f6b46916917ae6eeb92b5ae111df10b544c3a4621dc4", size = 3652383, upload-time = "2025-10-10T11:12:56.387Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/ac/eaeb6029362fd8d454a27374d84c6866c82c33bfc24587b4face5a8e43ef/psycopg2_binary-2.9.11-cp313-cp313-musllinux_1_2_ppc64le.whl", hash = "sha256:b31e90fdd0f968c2de3b26ab014314fe814225b6c324f770952f7d38abf17e3c", size = 3298168, upload-time = "2025-10-10T11:13:00.403Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/39/50c3facc66bded9ada5cbc0de867499a703dc6bca6be03070b4e3b65da6c/psycopg2_binary-2.9.11-cp313-cp313-musllinux_1_2_riscv64.whl", hash = "sha256:d526864e0f67f74937a8fce859bd56c979f5e2ec57ca7c627f5f1071ef7fee60", size = 3044712, upload-time = "2025-10-30T02:55:27.975Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/8e/b7de019a1f562f72ada81081a12823d3c1590bedc48d7d2559410a2763fe/psycopg2_binary-2.9.11-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:04195548662fa544626c8ea0f06561eb6203f1984ba5b4562764fbeb4c3d14b1", size = 3347549, upload-time = "2025-10-10T11:13:03.971Z" },
+    { url = "https://files.pythonhosted.org/packages/80/2d/1bb683f64737bbb1f86c82b7359db1eb2be4e2c0c13b947f80efefa7d3e5/psycopg2_binary-2.9.11-cp313-cp313-win_amd64.whl", hash = "sha256:efff12b432179443f54e230fdf60de1f6cc726b6c832db8701227d089310e8aa", size = 2714215, upload-time = "2025-10-10T11:13:07.14Z" },
+    { url = "https://files.pythonhosted.org/packages/64/12/93ef0098590cf51d9732b4f139533732565704f45bdc1ffa741b7c95fb54/psycopg2_binary-2.9.11-cp314-cp314-macosx_10_13_x86_64.whl", hash = "sha256:92e3b669236327083a2e33ccfa0d320dd01b9803b3e14dd986a4fc54aa00f4e1", size = 3756567, upload-time = "2025-10-10T11:13:11.885Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/a9/9d55c614a891288f15ca4b5209b09f0f01e3124056924e17b81b9fa054cc/psycopg2_binary-2.9.11-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:e0deeb03da539fa3577fcb0b3f2554a97f7e5477c246098dbb18091a4a01c16f", size = 3864755, upload-time = "2025-10-10T11:13:17.727Z" },
+    { url = "https://files.pythonhosted.org/packages/13/1e/98874ce72fd29cbde93209977b196a2edae03f8490d1bd8158e7f1daf3a0/psycopg2_binary-2.9.11-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b52a3f9bb540a3e4ec0f6ba6d31339727b2950c9772850d6545b7eae0b9d7c5", size = 4411646, upload-time = "2025-10-10T11:13:24.432Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/bd/a335ce6645334fb8d758cc358810defca14a1d19ffbc8a10bd38a2328565/psycopg2_binary-2.9.11-cp314-cp314-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:db4fd476874ccfdbb630a54426964959e58da4c61c9feba73e6094d51303d7d8", size = 4468701, upload-time = "2025-10-10T11:13:29.266Z" },
+    { url = "https://files.pythonhosted.org/packages/44/d6/c8b4f53f34e295e45709b7568bf9b9407a612ea30387d35eb9fa84f269b4/psycopg2_binary-2.9.11-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:47f212c1d3be608a12937cc131bd85502954398aaa1320cb4c14421a0ffccf4c", size = 4166293, upload-time = "2025-10-10T11:13:33.336Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/e0/f8cc36eadd1b716ab36bb290618a3292e009867e5c97ce4aba908cb99644/psycopg2_binary-2.9.11-cp314-cp314-manylinux_2_38_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:e35b7abae2b0adab776add56111df1735ccc71406e56203515e228a8dc07089f", size = 3983184, upload-time = "2025-10-30T02:55:32.483Z" },
+    { url = "https://files.pythonhosted.org/packages/53/3e/2a8fe18a4e61cfb3417da67b6318e12691772c0696d79434184a511906dc/psycopg2_binary-2.9.11-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:fcf21be3ce5f5659daefd2b3b3b6e4727b028221ddc94e6c1523425579664747", size = 3652650, upload-time = "2025-10-10T11:13:38.181Z" },
+    { url = "https://files.pythonhosted.org/packages/76/36/03801461b31b29fe58d228c24388f999fe814dfc302856e0d17f97d7c54d/psycopg2_binary-2.9.11-cp314-cp314-musllinux_1_2_ppc64le.whl", hash = "sha256:9bd81e64e8de111237737b29d68039b9c813bdf520156af36d26819c9a979e5f", size = 3298663, upload-time = "2025-10-10T11:13:44.878Z" },
+    { url = "https://files.pythonhosted.org/packages/97/77/21b0ea2e1a73aa5fa9222b2a6b8ba325c43c3a8d54272839c991f2345656/psycopg2_binary-2.9.11-cp314-cp314-musllinux_1_2_riscv64.whl", hash = "sha256:32770a4d666fbdafab017086655bcddab791d7cb260a16679cc5a7338b64343b", size = 3044737, upload-time = "2025-10-30T02:55:35.69Z" },
+    { url = "https://files.pythonhosted.org/packages/67/69/f36abe5f118c1dca6d3726ceae164b9356985805480731ac6712a63f24f0/psycopg2_binary-2.9.11-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:c3cb3a676873d7506825221045bd70e0427c905b9c8ee8d6acd70cfcbd6e576d", size = 3347643, upload-time = "2025-10-10T11:13:53.499Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/36/9c0c326fe3a4227953dfb29f5d0c8ae3b8eb8c1cd2967aa569f50cb3c61f/psycopg2_binary-2.9.11-cp314-cp314-win_amd64.whl", hash = "sha256:4012c9c954dfaccd28f94e84ab9f94e12df76b4afb22331b1f0d3154893a6316", size = 2803913, upload-time = "2025-10-10T11:13:57.058Z" },
 ]
 
 [[package]]
@@ -1484,332 +1893,6 @@ wheels = [
 ]
 
 [[package]]
-name = "patera"
-version = "0.111.13"
-source = { editable = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "asgi-lifespan" },
-    { name = "granian" },
-    { name = "h11" },
-    { name = "httpcore" },
-    { name = "idna" },
-    { name = "jinja2" },
-    { name = "loguru" },
-    { name = "mako" },
-    { name = "markupsafe" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "websockets" },
-    { name = "werkzeug" },
-]
-
-[package.optional-dependencies]
-admin = [
-    { name = "patera-admin" },
-]
-aiinterface = [
-    { name = "patera-aiinterface" },
-]
-all = [
-    { name = "patera-admin" },
-    { name = "patera-aiinterface" },
-    { name = "patera-auth" },
-    { name = "patera-caching" },
-    { name = "patera-database" },
-    { name = "patera-email" },
-    { name = "patera-statemachine" },
-    { name = "patera-taskmanager" },
-]
-auth = [
-    { name = "patera-auth" },
-]
-caching = [
-    { name = "patera-caching" },
-]
-caching-redis = [
-    { name = "patera-caching", extra = ["redis"] },
-]
-caching-sqlite = [
-    { name = "patera-caching", extra = ["sqlite"] },
-]
-database = [
-    { name = "patera-database" },
-]
-dev = [
-    { name = "granian", extra = ["reload"] },
-]
-email = [
-    { name = "patera-email" },
-]
-frontend = [
-    { name = "patera-frontend" },
-    { name = "patera-frontendext" },
-]
-statemachine = [
-    { name = "patera-statemachine" },
-]
-taskmanager = [
-    { name = "patera-taskmanager" },
-]
-testing = [
-    { name = "anyio" },
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=25.1.0" },
-    { name = "anyio", marker = "extra == 'testing'" },
-    { name = "asgi-lifespan", specifier = ">=2.1.0" },
-    { name = "granian", specifier = ">=2.7.2" },
-    { name = "granian", extras = ["reload"], marker = "extra == 'dev'" },
-    { name = "h11", specifier = ">=0.16.0" },
-    { name = "httpcore", specifier = ">=1.0.9" },
-    { name = "httpx", marker = "extra == 'testing'" },
-    { name = "idna", specifier = ">=3.11" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "mako", specifier = ">=1.3.10" },
-    { name = "markupsafe", specifier = ">=3.0.3" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-settings", specifier = ">=2.13.1" },
-    { name = "patera-admin", marker = "extra == 'admin'", editable = "packages/patera-admin" },
-    { name = "patera-admin", marker = "extra == 'all'", editable = "packages/patera-admin" },
-    { name = "patera-aiinterface", marker = "extra == 'aiinterface'", editable = "packages/patera-aiinterface" },
-    { name = "patera-aiinterface", marker = "extra == 'all'", editable = "packages/patera-aiinterface" },
-    { name = "patera-auth", marker = "extra == 'all'", editable = "packages/patera-auth" },
-    { name = "patera-auth", marker = "extra == 'auth'", editable = "packages/patera-auth" },
-    { name = "patera-caching", marker = "extra == 'all'", editable = "packages/patera-caching" },
-    { name = "patera-caching", marker = "extra == 'caching'", editable = "packages/patera-caching" },
-    { name = "patera-caching", extras = ["redis"], marker = "extra == 'caching-redis'", editable = "packages/patera-caching" },
-    { name = "patera-caching", extras = ["sqlite"], marker = "extra == 'caching-sqlite'", editable = "packages/patera-caching" },
-    { name = "patera-database", marker = "extra == 'all'", editable = "packages/patera-database" },
-    { name = "patera-database", marker = "extra == 'database'", editable = "packages/patera-database" },
-    { name = "patera-email", marker = "extra == 'all'", editable = "packages/patera-email" },
-    { name = "patera-email", marker = "extra == 'email'", editable = "packages/patera-email" },
-    { name = "patera-frontend", marker = "extra == 'frontend'", editable = "packages/patera-frontend" },
-    { name = "patera-frontendext", marker = "extra == 'frontend'", editable = "packages/patera-frontendext" },
-    { name = "patera-statemachine", marker = "extra == 'all'", editable = "packages/patera-statemachine" },
-    { name = "patera-statemachine", marker = "extra == 'statemachine'", editable = "packages/patera-statemachine" },
-    { name = "patera-taskmanager", marker = "extra == 'all'", editable = "packages/patera-taskmanager" },
-    { name = "patera-taskmanager", marker = "extra == 'taskmanager'", editable = "packages/patera-taskmanager" },
-    { name = "pytest", marker = "extra == 'testing'" },
-    { name = "pytest-cov", marker = "extra == 'testing'" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "python-multipart", specifier = ">=0.0.22" },
-    { name = "websockets", specifier = ">=16.0" },
-    { name = "werkzeug", specifier = ">=3.1.6" },
-]
-provides-extras = ["admin", "aiinterface", "auth", "caching", "caching-redis", "caching-sqlite", "database", "email", "frontend", "statemachine", "taskmanager", "testing", "dev", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "ruff", specifier = ">=0.15.5" },
-]
-
-[[package]]
-name = "patera-admin"
-version = "0.1.0"
-source = { editable = "packages/patera-admin" }
-dependencies = [
-    { name = "patera" },
-    { name = "patera-auth" },
-    { name = "patera-caching" },
-    { name = "patera-database" },
-    { name = "patera-email" },
-    { name = "patera-taskmanager" },
-    { name = "wtforms-sqlalchemy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "patera", editable = "." },
-    { name = "patera-auth", editable = "packages/patera-auth" },
-    { name = "patera-caching", editable = "packages/patera-caching" },
-    { name = "patera-database", editable = "packages/patera-database" },
-    { name = "patera-email", editable = "packages/patera-email" },
-    { name = "patera-taskmanager", editable = "packages/patera-taskmanager" },
-    { name = "wtforms-sqlalchemy", specifier = ">=0.4.2" },
-]
-
-[[package]]
-name = "patera-aiinterface"
-version = "0.1.0"
-source = { editable = "packages/patera-aiinterface" }
-dependencies = [
-    { name = "docstring-parser" },
-    { name = "numpy" },
-    { name = "openai" },
-    { name = "pgvector" },
-    { name = "patera" },
-    { name = "sentence-transformers" },
-    { name = "torch" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "docstring-parser", specifier = ">=0.17.0" },
-    { name = "numpy", specifier = ">=2.4.3" },
-    { name = "openai", specifier = ">=2.26.0" },
-    { name = "pgvector", specifier = ">=0.4.2" },
-    { name = "patera", editable = "." },
-    { name = "sentence-transformers", specifier = ">=5.2.3" },
-    { name = "torch", specifier = ">=2.10.0" },
-]
-
-[[package]]
-name = "patera-auth"
-version = "0.1.0"
-source = { editable = "packages/patera-auth" }
-dependencies = [
-    { name = "bcrypt" },
-    { name = "cryptography" },
-    { name = "jwt" },
-    { name = "patera" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "bcrypt", specifier = ">=5.0.0" },
-    { name = "cryptography", specifier = ">=46.0.5" },
-    { name = "jwt", specifier = ">=1.4.0" },
-    { name = "patera", editable = "." },
-]
-
-[[package]]
-name = "patera-caching"
-version = "0.1.0"
-source = { editable = "packages/patera-caching" }
-dependencies = [
-    { name = "cachetools" },
-    { name = "patera" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "aiosqlite" },
-    { name = "redis" },
-]
-redis = [
-    { name = "redis" },
-]
-sqlite = [
-    { name = "aiosqlite" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.20" },
-    { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.20" },
-    { name = "cachetools", specifier = ">=7.0.5" },
-    { name = "patera", editable = "." },
-    { name = "redis", marker = "extra == 'all'", specifier = ">=5.0" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0" },
-]
-provides-extras = ["redis", "sqlite", "all"]
-
-[[package]]
-name = "patera-database"
-version = "0.1.0"
-source = { editable = "packages/patera-database" }
-dependencies = [
-    { name = "aiosqlite" },
-    { name = "patera" },
-    { name = "sqlalchemy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite" },
-    { name = "patera", editable = "." },
-    { name = "sqlalchemy" },
-]
-
-[[package]]
-name = "patera-email"
-version = "0.1.0"
-source = { editable = "packages/patera-email" }
-dependencies = [
-    { name = "aiosmtplib" },
-    { name = "patera" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosmtplib", specifier = ">=5.1.0" },
-    { name = "patera", editable = "." },
-]
-
-[[package]]
-name = "patera-frontend"
-version = "0.1.0"
-source = { editable = "packages/patera-frontend" }
-dependencies = [
-    { name = "patera" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "patera", editable = "." }]
-
-[[package]]
-name = "patera-frontendext"
-version = "0.1.0"
-source = { editable = "packages/patera-frontendext" }
-dependencies = [
-    { name = "patera" },
-    { name = "pyodide-py", version = "0.27.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
-    { name = "pyodide-py", version = "0.29.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
-    { name = "pyscript" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "patera", editable = "." },
-    { name = "pyodide-py", specifier = ">=0.27.7" },
-    { name = "pyscript", specifier = ">=0.3.3" },
-]
-
-[[package]]
-name = "patera-statemachine"
-version = "0.1.0"
-source = { editable = "packages/patera-statemachine" }
-dependencies = [
-    { name = "patera" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "patera", editable = "." }]
-
-[[package]]
-name = "patera-taskmanager"
-version = "0.1.0"
-source = { editable = "packages/patera-taskmanager" }
-dependencies = [
-    { name = "apscheduler" },
-    { name = "patera" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "apscheduler", specifier = ">=3.11.2" },
-    { name = "patera", editable = "." },
-]
-
-[[package]]
 name = "pyodide-py"
 version = "0.27.7"
 source = { registry = "https://pypi.org/simple" }
@@ -1897,6 +1980,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/01/979e98d542a70714b0cb2b6728ed0b7c46792b695e3eaec3e20711271ca3/python_multipart-0.0.22.tar.gz", hash = "sha256:7340bef99a7e0032613f56dc36027b959fd3b30a787ed62d310e951f7c3a3a58", size = 37612, upload-time = "2026-01-25T10:15:56.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/d0/397f9626e711ff749a95d96b7af99b9c566a9bb5129b8e4c10fc4d100304/python_multipart-0.0.22-py3-none-any.whl", hash = "sha256:2b2cd894c83d21bf49d702499531c7bafd057d730c201782048f7945d82de155", size = 24579, upload-time = "2026-01-25T10:15:54.811Z" },
+]
+
+[[package]]
+name = "pyway"
+version = "0.3.32"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mysql-connector-python" },
+    { name = "psycopg2-binary" },
+    { name = "pyyaml" },
+    { name = "strip-ansi" },
+    { name = "tabulate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/e9/f5c6c4627789773e3109a9a5dc8e360bccc8440a4282eb70a76507ca0ae9/pyway-0.3.32.tar.gz", hash = "sha256:749485c7d08844103de0a75f02dda7d2063bc01fd992f83cbf43bdcf534dfeb4", size = 33471, upload-time = "2024-10-20T04:16:40.006Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/9e/71711e5f0991a83218da1fa883e4b814a1608c075f99d60b56c18a29b5de/pyway-0.3.32-py3-none-any.whl", hash = "sha256:de202559599e844a7de5b71296e7058287780ac099d62c22e366bc7ea7db0949", size = 31957, upload-time = "2024-10-20T04:16:38.943Z" },
 ]
 
 [[package]]
@@ -2306,6 +2405,15 @@ wheels = [
 ]
 
 [[package]]
+name = "strip-ansi"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/bd/273a435b7f9fd111b22f740b2661b6b734938c93d86531f9689747323c43/strip-ansi-0.1.1.tar.gz", hash = "sha256:5d60f239cc8a37fdd52b43c3e66e893d45ba0423115db59eca0d2eef83b07729", size = 1733, upload-time = "2020-06-20T22:24:49.349Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/a1/077deda41f949b3412434fda858396ee9927a3260a43537c2ae333bd688c/strip_ansi-0.1.1-py3-none-any.whl", hash = "sha256:9f55280e1b0ba84dac49d4f18aa6b51b90ff766b22e4918ffc01cc87b394ecd1", size = 1815, upload-time = "2020-06-20T22:24:50.453Z" },
+]
+
+[[package]]
 name = "sympy"
 version = "1.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2315,6 +2423,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5", size = 6299353, upload-time = "2025-04-27T18:04:59.103Z" },
+]
+
+[[package]]
+name = "tabulate"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/fe/802052aecb21e3797b8f7902564ab6ea0d60ff8ca23952079064155d1ae1/tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c", size = 81090, upload-time = "2022-10-06T17:21:48.54Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/44/4a5f08c96eb108af5cb50b41f76142f0afa346dfa99d5296fe7202a11854/tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f", size = 35252, upload-time = "2022-10-06T17:21:44.262Z" },
 ]
 
 [[package]]

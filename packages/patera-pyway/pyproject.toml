@@ -1,0 +1,20 @@
+[project]
+name = "patera-pyway"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "patera",
+  "patera-database",
+  "pyway>=0.3.32",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+patera-database = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.pyway"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"

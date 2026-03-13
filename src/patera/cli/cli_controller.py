@@ -24,6 +24,7 @@ class CLIController:
         self._app: "Patera" = app
         self._cli_commands: dict[str, Callable] = {}
         self._cli_commands_help: dict[str, str] = {}
+        self._ctrl_name: str = self.__class__.__name__
         self._register_commands()
 
     def _register_commands(self):
@@ -111,6 +112,13 @@ class CLIController:
     def app(self) -> "Patera":
         """Returns the Patera app instance."""
         return self._app
+
+    @property
+    def ctrl_name(self) -> str:
+        return self._ctrl_name
+
+    def set_ctrl_name(self, name: str) -> None:
+        self._ctrl_name = name
 
 
 def command(command_name: str, help: str = ""):

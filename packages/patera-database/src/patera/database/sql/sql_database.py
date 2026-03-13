@@ -287,6 +287,10 @@ class SqlDatabase(BaseExtension):
         return name
 
     @property
+    def database_uri(self) -> str:
+        return cast(str, self._configs.get("DATABASE_URI"))
+
+    @property
     def models_list(self) -> list[Type[DeclarativeBaseModel]]:
         """List fo all models"""
         return [model for model in self._models.values()]

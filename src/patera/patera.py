@@ -331,10 +331,10 @@ class Patera:
                     self._db_models[obj.db_name()] = []
                 self._db_models[obj.db_name()].append(obj)
                 continue
-            if inspect.isclass(obj) and issubclass(obj, CLIController):
-                self.logger.info(f"Registering cli controller: {obj.__name__}")
+            if inherits_from(obj, "CLIController"):
                 cli_controller = obj(self)
-                self._cli_controllers[obj.__name__] = cli_controller
+                self.register_cli_controller(cli_controller)
+                self.logger.info(f"Registering cli controller: {obj.__name__}")
                 continue
             if inspect.isclass(obj) and issubclass(obj, MiddlewareBase):
                 self.logger.info(f"Registering middleware: {obj.__name__}")
@@ -734,6 +734,9 @@ class Patera:
                         cast(Callable, cast(dict, method)["method"]),
                         endpoint_name,
                     )
+
+    def register_cli_controller(self, ctrl: CLIController) -> None:
+        self._cli_controllers[ctrl.ctrl_name] = ctrl
 
     def register_exception_handler(self, *handlers: "type[ExceptionHandler]"):
         """Registers exception controller with application"""
