@@ -3,7 +3,7 @@
 from .admin_dashboard import AdminDashboard, AdminConfig
 from .common_controller import AdminEnterError
 from .database_controller import AdminPermissionError, UnknownModelError
-from .utilities import register_model, PermissionType
+from .utilities import PermissionType
 
 __all__ = [
     "AdminDashboard",
@@ -12,5 +12,4 @@ __all__ = [
     "AdminPermissionError",
     "UnknownModelError",
     "AdminEnterError",
-    "register_model",
 ]
