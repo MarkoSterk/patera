@@ -2,6 +2,7 @@
 Pyway implementation for Patera
 """
 
+import os
 from urllib.parse import urlparse
 from typing import Dict, Optional, cast
 from patera import Patera
@@ -10,8 +11,9 @@ from patera.base_extension import BaseExtension
 from patera.database.sql import SqlDatabase
 
 from pathlib import Path
-
 from pydantic import BaseModel, Field, ConfigDict
+
+import pyway
 
 
 class _PateraPywayConfigs(BaseModel):
@@ -33,9 +35,15 @@ class PywayCLIController(CLIController):
         super().__init__(app)
         self._ext = extension
 
+    @command("validate", help="Perform database migration")
+    def validate(self) -> None:
+        os.environ["PYWAY_CONFIG_FILE"] = str(self._ext._configs_path)
+        pyway.validate()
+
     @command("migrate", help="Perform database migration")
-    def migrate(self, *args, **kwargs) -> None:
-        print("Migrating....", args, kwargs)
+    def migrate(self) -> None:
+        os.environ["PYWAY_CONFIG_FILE"] = str(self._ext._configs_path)
+        pyway.migrate()
 
 
 class PateraPyway(BaseExtension):

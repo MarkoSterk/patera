@@ -17,7 +17,7 @@ members = [
     "patera-email",
     "patera-frontend",
     "patera-frontendext",
-    "patera-pyway",
+    "patera-migrate",
     "patera-statemachine",
     "patera-taskmanager",
 ]
@@ -1372,6 +1372,7 @@ all = [
     { name = "patera-caching" },
     { name = "patera-database" },
     { name = "patera-email" },
+    { name = "patera-migrate" },
     { name = "patera-statemachine" },
     { name = "patera-taskmanager" },
 ]
@@ -1451,6 +1452,7 @@ requires-dist = [
     { name = "patera-email", marker = "extra == 'email'", editable = "packages/patera-email" },
     { name = "patera-frontend", marker = "extra == 'frontend'", editable = "packages/patera-frontend" },
     { name = "patera-frontendext", marker = "extra == 'frontend'", editable = "packages/patera-frontendext" },
+    { name = "patera-migrate", marker = "extra == 'all'", editable = "packages/patera-migrate" },
     { name = "patera-statemachine", marker = "extra == 'all'", editable = "packages/patera-statemachine" },
     { name = "patera-statemachine", marker = "extra == 'statemachine'", editable = "packages/patera-statemachine" },
     { name = "patera-taskmanager", marker = "extra == 'all'", editable = "packages/patera-taskmanager" },
@@ -1636,9 +1638,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "patera-pyway"
+name = "patera-migrate"
 version = "0.1.0"
-source = { editable = "packages/patera-pyway" }
+source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
     { name = "patera-database" },
