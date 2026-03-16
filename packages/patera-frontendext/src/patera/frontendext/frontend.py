@@ -39,7 +39,6 @@ class FrontendController(Controller):
 
         if file_path is None:
             return req.res.no_content().status(HttpStatus.NOT_FOUND)
-        print("SENDING FILE: ", file_path)
         # checks/guesses mimetype
         guessed, _ = mimetypes.guess_type(file_path)
         content_type = guessed or "application/octet-stream"

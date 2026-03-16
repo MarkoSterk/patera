@@ -1,3 +1,3 @@
-from .pyway_tool import PateraPyway
+from .migrate import Migrate
 
-__all__ = ["PateraPyway"]
+__all__ = ["Migrate"]

@@ -6,6 +6,7 @@ dependencies = [
   "patera",
   "pyodide-py>=0.27.7",
   "pyscript>=0.3.3",
+  "patera-frontend"
 ]
 
 [tool.uv.sources]
