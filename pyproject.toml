@@ -1,6 +1,6 @@
 [project]
 name = "patera"
-version = "0.111.13"
+version = "0.112.0"
 description = "A batteries included async-first python webframework"
 readme = "README.md"
 authors = [
@@ -13,6 +13,7 @@ dependencies = [
     "granian>=2.7.2",
     "h11>=0.16.0",
     "httpcore>=1.0.9",
+    "httpx>=0.28.1",
     "idna>=3.11",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",

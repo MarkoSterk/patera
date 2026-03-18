@@ -1337,7 +1337,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.111.13"
+version = "0.112.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1345,6 +1345,7 @@ dependencies = [
     { name = "granian" },
     { name = "h11" },
     { name = "httpcore" },
+    { name = "httpx" },
     { name = "idna" },
     { name = "jinja2" },
     { name = "loguru" },
@@ -1430,6 +1431,7 @@ requires-dist = [
     { name = "granian", extras = ["reload"], marker = "extra == 'dev'" },
     { name = "h11", specifier = ">=0.16.0" },
     { name = "httpcore", specifier = ">=1.0.9" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'testing'" },
     { name = "idna", specifier = ">=3.11" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -1477,7 +1479,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "patera" },
@@ -1502,7 +1504,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "docstring-parser" },
@@ -1527,7 +1529,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-auth"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -1546,7 +1548,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -1578,7 +1580,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1595,7 +1597,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -1610,7 +1612,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-frontend"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-frontend" }
 dependencies = [
     { name = "patera" },
@@ -1621,10 +1623,11 @@ requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-frontendext"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-frontendext" }
 dependencies = [
     { name = "patera" },
+    { name = "patera-frontend" },
     { name = "pyodide-py", version = "0.27.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "pyodide-py", version = "0.29.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "pyscript" },
@@ -1633,13 +1636,14 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "patera", editable = "." },
+    { name = "patera-frontend", editable = "packages/patera-frontend" },
     { name = "pyodide-py", specifier = ">=0.27.7" },
     { name = "pyscript", specifier = ">=0.3.3" },
 ]
 
 [[package]]
 name = "patera-migrate"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -1656,7 +1660,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-statemachine"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-statemachine" }
 dependencies = [
     { name = "patera" },
@@ -1667,7 +1671,7 @@ requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
