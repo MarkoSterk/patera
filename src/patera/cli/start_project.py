@@ -186,6 +186,7 @@ def start(
     """
     from granian import Granian
     from granian.constants import Interfaces, Loops
+    from granian.log import LogLevels
     from ..patera import Patera
 
     loaded_env = load_env_file(cwd, env_file)
@@ -255,6 +256,7 @@ def start(
         reload=debug,
         reload_ignore_dirs=DEFAULT_IGNORE_DIRS,
         reload_ignore_patterns=DEFAULT_IGNORE_PATTERNS,
+        log_level=LogLevels.debug if debug else LogLevels.info,
     ).serve()
 
 

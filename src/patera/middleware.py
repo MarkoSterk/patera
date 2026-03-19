@@ -29,7 +29,7 @@ class MiddlewareBase(ABC):
     Base class for middleware
     """
 
-    configs_name: str
+    _configs_name: str | None = None
 
     def __init__(self, app: "Patera", next_app: AppCallableType):
         """
@@ -60,6 +60,14 @@ class MiddlewareBase(ABC):
         Middleware call method
         """
         return await run_sync_or_async(self.middleware, req)
+
+    @property
+    def configs_name(self) -> str:
+        return (
+            self._configs_name
+            if self._configs_name
+            else self.__class__.__name__.capitalize()
+        )
 
     @property
     def app(self) -> "Patera":

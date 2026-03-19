@@ -11,7 +11,6 @@ from typing import (
     Any,
     TYPE_CHECKING,
     Type,
-    cast,
     TypedDict,
     NotRequired,
 )
@@ -196,7 +195,7 @@ class Authentication(MiddlewareBase, ABC):
         - role_required: to mark route handlers/controllers that require specific roles
     """
 
-    configs_name: str = cast(str, None)
+    _configs_name = None
 
     def __init__(self, app: "Patera", next_app: AppCallableType) -> None:
         """
@@ -223,7 +222,7 @@ class Authentication(MiddlewareBase, ABC):
             handler_method, "_authentication", None
         )
         controller_authentication_attributes: Optional[dict[str, Any]] = getattr(
-            handler_method.__self__,
+            handler_method.__self__,  # type: ignore
             "_authentication",
             None,  # type: ignore
         )  # type: ignore

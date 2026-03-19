@@ -374,7 +374,7 @@ class Patera:
         Returns app configuration with provided config_name.
         Raises error if configuration is not found.
         """
-        if "." in config_name:
+        if config_name and "." in config_name:
             return self._get_nested_config(config_name, default)
         return self.configs.get(config_name, default)
 
