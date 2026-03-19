@@ -57,10 +57,11 @@ def method(http_method: HttpMethod) -> Callable[[F], F]:
     return decorator
 
 
-def resource(url: str) -> Callable[[F], F]:
+def resource(url: str, follow_redirects: bool = True) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
         api_int["target"] = url
+        api_int["follow_redirects"] = follow_redirects
         setattr(func, "__api_interface__", api_int)
         return func
 
@@ -168,6 +169,7 @@ class ApiInterface(BaseExtension):
         async with httpx.AsyncClient() as client:
             url: str = cast(str, self._service_url) + cast(str, configs.get("target"))
             url = self._format_url(req, url)
+            follow_redirects = cast(bool, configs.get("follow_redirects"))
             method = configs.get("method", HttpMethod.GET)
             timeout = configs.get("timeout", 10)
             headers: Dict[str, str] = self._construct_headers(configs)
@@ -180,7 +182,12 @@ class ApiInterface(BaseExtension):
             res: Response
             if method == HttpMethod.GET:
                 res = await client.request(
-                    method, url, headers=headers, timeout=timeout
+                    method,
+                    url,
+                    headers=headers,
+                    timeout=timeout,
+                    params=req.query_params,
+                    follow_redirects=follow_redirects,
                 )
             else:
                 if data is None:
@@ -196,6 +203,8 @@ class ApiInterface(BaseExtension):
                         headers=headers,
                         timeout=timeout,
                         json=cast(BaseModel, data).model_dump(),
+                        params=req.query_params,
+                        follow_redirects=follow_redirects,
                     )
                 else:
                     if isinstance(data, BaseModel):
@@ -210,6 +219,8 @@ class ApiInterface(BaseExtension):
                         timeout=timeout,
                         data=form,
                         files=files,
+                        params=req.query_params,
+                        follow_redirects=follow_redirects,
                     )
 
             res = self._get_response_body(
