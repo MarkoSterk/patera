@@ -134,8 +134,7 @@ class MissingApiInterfaceConfigurations(Exception):
 
 
 class ApiInterface(BaseExtension):
-    def __init__(self, configs_name: str = "API_INTERFACE") -> None:
-        self._configs_name = configs_name
+    def __init__(self) -> None:
         self._app: Optional[Patera] = None
         self._service_url = None
 

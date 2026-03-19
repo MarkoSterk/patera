@@ -374,7 +374,20 @@ class Patera:
         Returns app configuration with provided config_name.
         Raises error if configuration is not found.
         """
+        if "." in config_name:
+            return self._get_nested_config(config_name, default)
         return self.configs.get(config_name, default)
+
+    def _get_nested_config(self, config_name: str, default: Any = None) -> Any:
+        names: list[str] = config_name.split(",")  # names/paths of entire config tree
+        first_name = names.pop(0)  # start of nested config
+        last_name = names.pop()  # name of final level config
+        config = self.get_conf(first_name)  # top level/start
+        if config is None:
+            return default
+        for name in names:
+            config = config.get(name, {})
+        return config.get(last_name, default)
 
     def add_global_context_method(self, func: Callable):
         """
