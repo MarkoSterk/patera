@@ -35,10 +35,6 @@ class AuthType(StrEnum):
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def supress():
-    raise NotImplementedError()
-
-
 def service(service_url: str) -> "Callable":
     def decorator(cls: "Type[ApiInterface]") -> "Type[ApiInterface]":
         setattr(cls, "__service_url__", service_url)

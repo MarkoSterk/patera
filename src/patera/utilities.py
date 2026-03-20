@@ -20,6 +20,10 @@ import aiofiles
 from .exceptions import StaticAssetNotFound
 
 
+def supress():
+    raise NotImplementedError()
+
+
 def to_kebab_case(text: str) -> str:
     """Convert a string into lower-kebab-case."""
     # replace non-alphanumeric with spaces, trim, replace whitespace with dash
