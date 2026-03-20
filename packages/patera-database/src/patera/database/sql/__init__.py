@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .sql_database import SqlDatabase, SqlDatabaseConfig
 from .sqlalchemy_async_query import AsyncQuery
 from .declarative_base import DeclarativeBaseModel
+from .repository import Repository, query
 
 __all__ = [
     "SqlDatabase",
@@ -19,4 +20,6 @@ __all__ = [
     "AsyncQuery",
     "DeclarativeBaseModel",
     "SqlDatabaseConfig",
+    "Repository",
+    "query",
 ]
