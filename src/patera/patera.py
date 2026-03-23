@@ -317,12 +317,14 @@ class Patera:
                     obj.init_app(self)
                     ext_name = obj.__class__.__name__
                     conf_name = obj.configs_name
+                    self._extensions[ext_name] = obj
                 else:
                     # if passed extension is not yet initilized
                     obj_inst = obj()
                     obj_inst.init_app(self)
                     ext_name = obj_inst.__class__.__name__
                     conf_name = obj_inst.configs_name
+                    self._extensions[ext_name] = obj
                 self.logger.info(f"Initilizing extension: {ext_name} ({conf_name})")
                 continue
             if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):

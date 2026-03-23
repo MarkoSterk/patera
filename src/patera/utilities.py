@@ -2,6 +2,8 @@
 Utility methods for Patera
 """
 
+from __future__ import annotations
+from typing import TypeVar, Generic, TYPE_CHECKING, Any, Callable, Optional
 import asyncio
 import importlib
 import importlib.util
@@ -13,11 +15,48 @@ import sys
 from pathlib import Path
 from base64 import b64decode
 from asyncio import Future, Task
-from typing import Any, Callable, Optional
 
 import aiofiles
 
 from .exceptions import StaticAssetNotFound
+
+if TYPE_CHECKING:
+    from .base_extension import BaseExtension
+    from .api_interface import ApiInterface
+    from .controller import Controller
+    from .exceptions import ExceptionHandler
+    from .patera import Patera
+
+T = TypeVar("T", bound="BaseExtension | ApiInterface")
+
+
+class Autowire(Generic[T]):
+    def __init__(self, autowirable: type[T]) -> None:
+        self._autowirable = autowirable
+        self._ext_name = autowirable.__name__
+
+    def __get__(
+        self,
+        obj: Patera
+        | Controller
+        | ExceptionHandler
+        | ApiInterface
+        | BaseExtension
+        | None,
+        objtype: type | None = None,
+    ) -> T | Autowire[T]:
+        if obj is None:
+            return self
+
+        ext = obj.app._extensions.get(self._ext_name)
+        if ext is None:
+            ext_obj = self._autowirable()
+            if issubclass(self._autowirable, BaseExtension):
+                ext_obj.init_app(obj.app)
+            obj.app._extensions[self._ext_name] = ext_obj
+            return ext_obj
+
+        return ext
 
 
 def supress():
