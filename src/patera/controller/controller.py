@@ -1,11 +1,12 @@
 """Controller class for endpoint groups"""
 
 from __future__ import annotations
-from typing import Callable, TYPE_CHECKING, Optional, Type, TypeVar
+from typing import Any, Callable, TYPE_CHECKING, Optional, Type, TypeVar
 
 from pydantic import BaseModel
 from ..media_types import MediaType
 from ..http_statuses import HttpStatus
+from ..injectable import Injectable
 
 if TYPE_CHECKING:
     from ..patera import Patera
@@ -25,7 +26,7 @@ def path(
     return decorator
 
 
-class Controller:
+class Controller(Injectable):
     # _controller_decorator_methods: list[Callable]
 
     def __init__(
@@ -46,6 +47,19 @@ class Controller:
         )
         self.get_before_request_methods()
         self.get_after_request_methods()
+        self._resolve_autowires()
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        key = f"{target_type.__module__}.{target_type.__qualname__}"
+        value = self.app._extensions.get(key)
+
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self.app)
+            self.app._extensions[key] = value
+
+        return value
 
     def get_endpoint_methods(self) -> dict[str, dict[str, str | Callable]]:
         """Returns a dictionery with all endpoint methods"""

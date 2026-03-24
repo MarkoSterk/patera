@@ -2,17 +2,35 @@
 Base extension class
 """
 
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional, cast
 from abc import abstractmethod, ABC
 from pydantic import BaseModel, ValidationError
+
+from .injectable import Injectable
 
 if TYPE_CHECKING:
     from .patera import Patera
 
 
-class BaseExtension(ABC):
+class BaseExtension(Injectable, ABC):
     _app: "Optional[Patera]"
     _configs: dict[str, Any]
+
+    def __init__(self) -> None:
+        self._resolve_autowires()
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        key = f"{target_type.__module__}.{target_type.__qualname__}"
+        value = self.app._extensions.get(key)
+
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self.app)
+            self.app._extensions[key] = value
+
+        return value
 
     @abstractmethod
     def init_app(self, app: "Patera") -> None: ...

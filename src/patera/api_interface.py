@@ -2,6 +2,7 @@
 Interface for API integration
 """
 
+from __future__ import annotations
 import base64
 from typing import (
     Callable,
@@ -13,17 +14,21 @@ from typing import (
     cast,
     get_type_hints,
     TypeVar,
+    TYPE_CHECKING,
 )
 import httpx
 from httpx import Response
 from functools import wraps
 from enum import StrEnum
 from pydantic import BaseModel
-from patera.patera import Patera
+
 from .http_methods import HttpMethod
 from .media_types import MediaType
 from .base_extension import BaseExtension
 from .request import UploadedFile, Request
+
+if TYPE_CHECKING:
+    from .patera import Patera
 
 
 class AuthType(StrEnum):
@@ -132,6 +137,7 @@ class MissingApiInterfaceConfigurations(Exception):
 
 class ApiInterface(BaseExtension):
     def __init__(self) -> None:
+        super().__init__()
         self._app: Optional[Patera] = None
         self._service_url = None
 

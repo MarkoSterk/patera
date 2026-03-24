@@ -7,13 +7,14 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Callable, cast
 from functools import wraps
 
+from ..injectable import Injectable
 from ..utilities import run_sync_or_async
 
 if TYPE_CHECKING:
     from ..patera import Patera
 
 
-class CLIController:
+class CLIController(Injectable):
     """
     Base class for CLI controllers.
     This class automatically registers methods decorated with @command and @argument
@@ -26,6 +27,19 @@ class CLIController:
         self._cli_commands_help: dict[str, str] = {}
         self._ctrl_name: str = self.__class__.__name__
         self._register_commands()
+        self._resolve_autowires()
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        key = f"{target_type.__module__}.{target_type.__qualname__}"
+        value = self.app._extensions.get(key)
+
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self.app)
+            self.app._extensions[key] = value
+
+        return value
 
     def _register_commands(self):
         for attr_name in dir(self):

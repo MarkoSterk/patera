@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     NotRequired,
 )
+from inspect import signature, Parameter
 from functools import wraps
 from sqlalchemy import MetaData, Table, select, func
 from sqlalchemy.inspection import inspect
@@ -38,6 +39,7 @@ from .dialect_overview_extras import (
 
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
+from patera.ctx import bind_session
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
@@ -96,6 +98,7 @@ class SqlDatabase(BaseExtension):
     __db_name__: str
 
     def __init__(self) -> None:
+        super().__init__()
         self._app: "Optional[Patera]" = None
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
@@ -288,96 +291,108 @@ class SqlDatabase(BaseExtension):
         """List fo all models"""
         return [model for model in self._models.values()]
 
-    @property
-    def managed_session(self) -> Callable:
-        """
-        Returns a decorator that:
-        - Creates a new AsyncSession per request.
-        - Injects it into the kwargs of the request with the key "session" or custom session name.
-        - Commits if no error occurs.
-        - Rolls back if an unhandled error occurs.
-        - Closes the session automatically afterward.
-        """
 
-        def decorator(handler: Callable) -> Callable:
-            @wraps(handler)
-            async def wrapper(*args, **kwargs):
-                if not self._session_factory:
-                    raise RuntimeError(
-                        "Database is not connected. "
-                        "Connection should be established automatically."
-                        "Please check network connection and configurations."
-                    )
+def readonly_session(cls: Type[SqlDatabase]) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs) -> Any:
+            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+                cls.__name__, None
+            )
+            if db_extension is None:
+                raise ValueError(
+                    f"Database extension with name {cls.__name__} is not registered"
+                )
+            if not db_extension._session_factory:
+                raise RuntimeError(
+                    "Database is not connected. "
+                    "Connection should be established automatically. "
+                    "Please check network connection and configurations."
+                )
+
+            async with db_extension._session_factory() as session:
+                session_name = db_extension.session_name
+                sig = signature(func)
+
+                if (
+                    session_name in sig.parameters
+                    and sig.parameters[session_name].kind
+                    in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+                    and session_name not in kwargs
+                ):
+                    kwargs[session_name] = session
+
+                with bind_session(session_name, session):
+                    return await run_sync_or_async(func, self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def managed_session(cls: Type[SqlDatabase]) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs) -> Any:
+            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+                cls.__name__, None
+            )
+
+            if db_extension is None:
+                raise ValueError(
+                    f"Database extension with name {cls.__name__} is not registered"
+                )
+
+            if not db_extension._session_factory:
+                raise RuntimeError(
+                    "Database is not connected. "
+                    "Connection should be established automatically. "
+                    "Please check network connection and configurations."
+                )
+            async with db_extension._session_factory() as session:
+                async with session.begin():
+                    session_name = db_extension.session_name
+                    sig = signature(func)
+
+                    if (
+                        session_name in sig.parameters
+                        and sig.parameters[session_name].kind
+                        in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+                        and session_name not in kwargs
+                    ):
+                        kwargs[session_name] = session
+                    with bind_session(db_extension.session_name, session):
+                        return await run_sync_or_async(func, self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def managed_session_for_cli(cls: Type[SqlDatabase]) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs) -> Any:
+            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+                cls.__name__, None
+            )
+            if db_extension is None:
+                raise ValueError(
+                    f"Database extension with name {cls.__name__} is not registered"
+                )
+            await db_extension.connect()  # connects to db
+            assert db_extension._session_factory is not None
+            async with (
+                db_extension._session_factory() as session
+            ):  # Ensures session closure
                 async with (
-                    self._session_factory() as session
-                ):  # Ensures session closure
-                    async with (
-                        session.begin()
-                    ):  # Ensures transaction handling (auto commit/rollback)
-                        kwargs[self.session_name] = session
-                        return await run_sync_or_async(handler, *args, **kwargs)
+                    session.begin()
+                ):  # Ensures transaction handling (auto commit/rollback)
+                    kwargs[db_extension.session_name] = session
+                    result = await run_sync_or_async(func, self, *args, **kwargs)
+            await db_extension.disconnect()  # disconnects from db
+            return result
 
-            return wrapper
+        return wrapper
 
-        return decorator
-
-    @property
-    def managed_session_for_cli(self) -> Callable:
-        """
-        A managed session for CLI commands which first connects to the DB
-        and handles session injection and connection closing
-        - Creates a new AsyncSession per request.
-        - Injects it into the kwargs of the request with the key "session" or custom session name.
-        - Commits if no error occurs.
-        - Rolls back if an unhandled error occurs.
-        - Closes the session automatically afterward.
-        """
-
-        def decorator(handler: Callable) -> Callable:
-            @wraps(handler)
-            async def wrapper(*args, **kwargs):
-                await self.connect()  # connects to db
-                assert self._session_factory is not None
-                async with (
-                    self._session_factory() as session
-                ):  # Ensures session closure
-                    async with (
-                        session.begin()
-                    ):  # Ensures transaction handling (auto commit/rollback)
-                        kwargs[self.session_name] = session
-                        result = await run_sync_or_async(handler, *args, **kwargs)
-                await self.disconnect()  # disconnects from db
-                return result
-
-            return wrapper
-
-        return decorator
-
-    @property
-    def readonly_session(self) -> Callable:
-        """
-        Returns a decorator that:
-        - Creates a new AsyncSession per request.
-        - Injects it into the kwargs of the request with the key "session" or custom session name.
-        - Closes the session automatically afterward.
-        - Does not commit or rollback, for read-only operations.
-        """
-
-        def decorator(handler: Callable) -> Callable:
-            @wraps(handler)
-            async def wrapper(*args, **kwargs):
-                if not self._session_factory:
-                    raise RuntimeError(
-                        "Database is not connected. "
-                        "Connection should be established automatically."
-                        "Please check network connection and configurations."
-                    )
-                async with (
-                    self._session_factory() as session
-                ):  # Ensures session closure
-                    kwargs[self.session_name] = session
-                    return await run_sync_or_async(handler, *args, **kwargs)
-
-            return wrapper
-
-        return decorator
+    return decorator

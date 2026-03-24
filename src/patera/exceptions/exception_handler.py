@@ -3,11 +3,12 @@ Exception controller implementation
 """
 
 from functools import wraps
-from typing import Callable, TYPE_CHECKING, Type
+from typing import Any, Callable, TYPE_CHECKING, Type
 
 from ..controller.decorators import AsyncMethod, P, R
 from ..controller.utilities import _extract_response_type
 from ..utilities import run_sync_or_async
+from ..injectable import Injectable
 
 if TYPE_CHECKING:
     from ..patera import Patera
@@ -15,10 +16,23 @@ if TYPE_CHECKING:
     from ..request import Request
 
 
-class ExceptionHandler:
+class ExceptionHandler(Injectable):
     def __init__(self, app: "Patera"):
         self._exception_mapping: dict[str, Callable] = {}
         self._app = app
+        self._resolve_autowires()
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        key = f"{target_type.__module__}.{target_type.__qualname__}"
+        value = self.app._extensions.get(key)
+
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self.app)
+            self.app._extensions[key] = value
+
+        return value
 
     def get_exception_mapping(self) -> dict[str, Callable]:
         """Produces exception mapping"""

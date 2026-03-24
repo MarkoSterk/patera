@@ -45,7 +45,7 @@ from .static import Static
 from .open_api import OpenAPIController
 from .controller import path
 from .logger import DefaultLogger
-
+from .ctx import request_context
 from .controller import Controller
 from .exceptions import ExceptionHandler
 from .base_extension import BaseExtension
@@ -54,6 +54,7 @@ from .middleware import MiddlewareBase, AppCallableType
 from .cli import CLIController
 from .logging.logger_config_base import LoggerBase
 from .logging.inmemory_buffer import InMemoryLogBuffer
+from .injectable import Injectable
 
 logger.remove()
 
@@ -160,7 +161,7 @@ def inherits_from(class_obj_or_instance, base_name: str) -> bool:
     )
 
 
-class Patera:
+class Patera(Injectable):
     """Patera class implementation. Used to create a new application instance"""
 
     def __init__(self, cli_mode: bool = False):
@@ -254,6 +255,9 @@ class Patera:
         # if NOT in CLI mode (cli_mode = False)
         # all extensions, models, controllers, exception handlers and middleware
         # is registered and configured with the app.
+
+        self._resolve_autowires()
+
         if not cli_mode:
             self._enable_cors()  # enables CORS middleware if configured
             self._load_modules(loggers)
@@ -271,6 +275,18 @@ class Patera:
             self._load_modules(cli_controllers)
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        key = f"{target_type.__module__}.{target_type.__qualname__}"
+        value = self._extensions.get(key)
+
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self)
+            self._extensions[key] = value
+
+        return value
 
     def _enable_cors(self):
         cors_enabled: bool = self.get_conf("CORS_ENABLED", True)
@@ -608,31 +624,37 @@ class Patera:
             return await self.abort_route_not_found(send, req, path_kwargs)
 
         try:
-            try:
-                res: Response = await self._app(req)
-                if not isinstance(res, Response):
-                    # pylint: disable-next=W0719
-                    raise Exception(
-                        "Return object of request handlers must be an instance of Response"
+            with request_context(
+                app=self, request=req, controller=route_handler.__self__
+            ):  # type: ignore
+                try:
+                    res: Response = await self._app(req)
+                    if not isinstance(res, Response):
+                        # pylint: disable-next=W0719
+                        raise Exception(
+                            "Return object of request handlers must be an instance of Response"
+                        )
+                    response_type: Optional[Type[Any]] = (
+                        req.response.expected_body_type()
                     )
-                response_type: Optional[Type[Any]] = req.response.expected_body_type()
-                return await self.send_response(res, send, response_type)
-            except HtmlAborterException as exc:
-                res = (await req.res.html(exc.template, context=exc.data)).status(
-                    exc.status_code
-                )
-                return await self.send_response(res, send, None)
-            # pylint: disable-next=W0718
-            except Exception as exc:
-                handler = (
-                    self._exception_handlers.get(exc.__class__.__name__, None) or None
-                )
-                if not handler:
-                    # pylint: disable-next=W0719
-                    raise
-                res = await run_sync_or_async(handler, req, exc)
-                response_type = res.expected_body_type() or exc.__class__
-                return await self.send_response(res, send, response_type)
+                    return await self.send_response(res, send, response_type)
+                except HtmlAborterException as exc:
+                    res = (await req.res.html(exc.template, context=exc.data)).status(
+                        exc.status_code
+                    )
+                    return await self.send_response(res, send, None)
+                # pylint: disable-next=W0718
+                except Exception as exc:
+                    handler = (
+                        self._exception_handlers.get(exc.__class__.__name__, None)
+                        or None
+                    )
+                    if not handler:
+                        # pylint: disable-next=W0719
+                        raise
+                    res = await run_sync_or_async(handler, req, exc)
+                    response_type = res.expected_body_type() or exc.__class__
+                    return await self.send_response(res, send, response_type)
         # pylint: disable-next=W0718
         except Exception as exc:
             # Catches every error and returns internal server error message
@@ -946,7 +968,10 @@ class Patera:
         req = Request(scope, receive, self, path_kwargs, cast(Callable, route_handler))
         req.set_send(send)
         try:
-            await run_sync_or_async(route_handler, req, **path_kwargs)
+            with request_context(
+                app=self, request=req, controller=route_handler.__self__
+            ):  # type: ignore
+                await run_sync_or_async(route_handler, req, **path_kwargs)
         # pylint: disable-next=W0718
         except Exception as exc:
             await send(

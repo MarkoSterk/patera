@@ -61,6 +61,7 @@ class NoSqlDatabase(BaseExtension):
     __db_name__: str
 
     def __init__(self) -> None:
+        super().__init__()
         self._app: Optional["Patera"] = None
         self._configs: dict[str, Any] = {}
 
