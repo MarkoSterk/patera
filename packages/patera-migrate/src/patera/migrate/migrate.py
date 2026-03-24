@@ -54,6 +54,11 @@ class PywayCLIController(CLIController):
         os.environ.pop("PYWAY_DATABASE_MIGRATION_DIR", None)
         os.environ.pop("PYWAY_CONFIG_FILE", None)
 
+    @command("init", help="Initilizes Patera migration extension for database")
+    def init(self) -> None:
+        """Initilizes pyway configs"""
+        self._ext.create_pyway_config()
+
     @command("info", help="Provides information about current migrations and db status")
     def info(self) -> None:
         pyway_configs = self._get_configs_from_file()
@@ -117,7 +122,8 @@ class Migrate(BaseExtension):
         self._configs_path: Path = self._migrations_path / cast(
             str, self._configs.get("MIGRATE_CONFIG_FILE")
         )
-        self.create_pyway_config()
+        # configs need to be initilized manually
+        # self.create_pyway_config()
 
     def create_pyway_config(self) -> None:
         if self._configs_path.exists():

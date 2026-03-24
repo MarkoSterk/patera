@@ -65,6 +65,25 @@ class BaseConfig(BaseSettings):
             "it's possible to disable that."
         ),
     )
+    USE_AUTO_MODULE_LOADER: Optional[bool] = Field(
+        True, description="If auto module loader should be used."
+    )
+    AUTO_MODULE_LOADER_PATHS: Optional[list[str]] = Field(
+        [
+            "controllers",
+            "api.controllers",
+            "exceptions",
+            "exceptions.handlers",
+            "cli",
+            "cli.controllers",
+        ],
+        description="Application searches these paths and auto loads controllers, CLI controllers, exception handlers",
+    )
+
+    APPEND_AUTO_MODULE_LOADER_PATHS: Optional[list[str]] = Field(
+        None, description="Paths to append to the AUTO_MODULE_LOADER_PATHS list"
+    )
+
     STATIC_DIR: Optional[str] = Field(
         "/static", description="Relative static dir from root"
     )
@@ -143,13 +162,32 @@ class BaseConfig(BaseSettings):
     )
 
     # controllers, cli_controllers, extensions, models, exception handlers and middleware to load
-    CONTROLLERS: Optional[Sequence[str]] = None
-    CLI_CONTROLLERS: Optional[Sequence[str]] = None
-    EXTENSIONS: Optional[Sequence[str]] = None
-    MODELS: Optional[Sequence[str]] = None
-    EXCEPTION_HANDLERS: Optional[Sequence[str]] = None
-    MIDDLEWARE: Optional[Sequence[str]] = None
-    LOGGERS: Optional[Sequence[str]] = None
+    CONTROLLERS: Optional[Sequence[str]] = Field(
+        None,
+        description="Controllers to be registered with the app. These are added in addition to all auto-registered controllers.",
+    )
+    CLI_CONTROLLERS: Optional[Sequence[str]] = Field(
+        None,
+        description="CLI Controllers to be registered with the app. These are added in addition to all auto-registered controllers.",
+    )
+    EXTENSIONS: Optional[Sequence[str]] = Field(
+        None,
+        description="Extensions to be registered with the app. These are added in addition to all auto-registered controllers.",
+    )
+    MODELS: Optional[Sequence[str]] = Field(
+        None,
+        description="Models to be registered with the app. These are added in addition to all auto-registered controllers.",
+    )
+    EXCEPTION_HANDLERS: Optional[Sequence[str]] = Field(
+        None,
+        description="Exception handlers to be registered with the app. These are added in addition to all auto-registered handlers.",
+    )
+    MIDDLEWARE: Optional[Sequence[str]] = Field(
+        None, description="Middleware to be registered with the app"
+    )
+    LOGGERS: Optional[Sequence[str]] = Field(
+        None, description="Loggers to be registered with the app."
+    )
 
     @field_validator(
         "CONTROLLERS",
