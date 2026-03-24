@@ -58,13 +58,11 @@ class NoSqlDatabase(BaseExtension):
     A simple async NoSQL Database interface with pluggable backends.
     """
 
-    def __init__(
-        self, db_name: str = "nosql", configs_name: str = "NOSQL_DATABASE"
-    ) -> None:
+    __db_name__: str
+
+    def __init__(self) -> None:
         self._app: Optional["Patera"] = None
-        self._configs_name = configs_name
         self._configs: dict[str, Any] = {}
-        self.__db_name__ = db_name
 
         # Effective config
         self.backend_name: Optional[str] = None
@@ -90,9 +88,9 @@ class NoSqlDatabase(BaseExtension):
             - SESSION_NAME (default "session")
         """
         self._app = app
-        self._configs = app.get_conf(self._configs_name, None)
+        self._configs = app.get_conf(self.configs_name, None)
         if self._configs is None:
-            raise ValueError(f"Missing {self._configs_name} configuration.")
+            raise ValueError(f"Missing {self.configs_name} configuration.")
         self._configs = self.validate_configs(self._configs, _NoSqlDatabaseConfig)
 
         self.backend_cls = self._configs.get("BACKEND")
@@ -135,7 +133,7 @@ class NoSqlDatabase(BaseExtension):
 
     @property
     def db_name(self) -> str:
-        return self.__db_name__
+        return self.__db_name__ or self.__class__.__name__.lower()
 
     @property
     def backend(self) -> AsyncNoSqlBackendBase:

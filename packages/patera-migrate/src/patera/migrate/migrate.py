@@ -8,7 +8,6 @@ from typing import Dict, Optional, cast
 from patera import Patera
 from patera.cli import CLIController, command
 from patera.base_extension import BaseExtension
-from patera.database.sql import SqlDatabase
 
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -99,16 +98,14 @@ class PywayCLIController(CLIController):
 
 
 class Migrate(BaseExtension):
-    def __init__(self, db: SqlDatabase, configs_name: Optional[str] = None):
+    __db_name__: str
+
+    def __init__(self):
         self._app = cast(Patera, None)
-        self._db = db
-        self._configs_name = (
-            configs_name if configs_name is not None else db.configs_name
-        )
 
     def init_app(self, app: Patera) -> None:
         self._app = app
-        self._configs = self._app.get_conf(self._configs_name, {})
+        self._configs = self._app.get_conf(self.configs_name, {})
         self._configs = self.validate_configs(self._configs, _PateraPywayConfigs)
         self._cli_controller = PywayCLIController(app, self)
         self._cli_controller.set_ctrl_name(
@@ -170,4 +167,9 @@ class Migrate(BaseExtension):
 
     @property
     def database_uri(self) -> str:
-        return self._db.database_uri
+        db = self.app._extensions.get(self.__db_name__)
+        if db is None:
+            raise ValueError(
+                f"Database extension with name {self.__db_name__} does not exist"
+            )
+        return cast(str, db.db_uri)

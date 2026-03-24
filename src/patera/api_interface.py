@@ -134,7 +134,6 @@ class ApiInterface(BaseExtension):
     def __init__(self) -> None:
         self._app: Optional[Patera] = None
         self._service_url = None
-        self._configs_name: str = cast(str, None)
 
     def init_app(self, app: Patera) -> None:
         self._app = app

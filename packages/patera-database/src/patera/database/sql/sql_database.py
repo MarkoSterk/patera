@@ -93,18 +93,14 @@ class SqlDatabase(BaseExtension):
     A simple async Database interface using SQLAlchemy.
     """
 
-    def __init__(
-        self, db_name: Optional[str] = None, configs_name: str = "SQL_DATABASE"
-    ) -> None:
+    __db_name__: str
+
+    def __init__(self) -> None:
         self._app: "Optional[Patera]" = None
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
-        self._configs_name: str = cast(str, configs_name)
         self._configs: dict[str, str] = {}
-        if db_name is None:
-            db_name = configs_name.lower()
-        self.__db_name__ = db_name
         self._session_name: str
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
@@ -117,10 +113,10 @@ class SqlDatabase(BaseExtension):
         or "sqlite+aiosqlite:///./patera.db"
         """
         self._app = app
-        self._configs = app.get_conf(self._configs_name, None)
+        self._configs = app.get_conf(self.configs_name, None)
         if self._configs is None:
             raise ValueError(
-                f"Configurations for {self._configs_name} not found in app configurations."
+                f"Configurations for {self.configs_name} not found in app configurations."
             )
         self._configs = self.validate_configs(self._configs, _SqlDatabaseConfig)
         self._db_uri = self._configs["DATABASE_URI"]
@@ -277,14 +273,11 @@ class SqlDatabase(BaseExtension):
 
     @property
     def db_name(self) -> str:
-        return self.__db_name__
+        return self.__db_name__ or self.__class__.__name__.lower()
 
     @property
     def nice_name(self) -> str:
-        name: str = cast(str, self._configs.get("NICE_NAME"))
-        if name is None:
-            return self.db_name
-        return name
+        return self._configs.get("NICE_NAME", self.db_name)
 
     @property
     def database_uri(self) -> str:

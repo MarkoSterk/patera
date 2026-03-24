@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 
 class BaseExtension(ABC):
-    _configs_name: str
     _app: "Optional[Patera]"
     _configs: dict[str, Any]
 
@@ -25,7 +24,7 @@ class BaseExtension(ABC):
             return model.model_validate(configs).model_dump()
         except ValidationError as e:
             raise ValueError(
-                f"Invalid configuration for {self._configs_name or self.__class__.__name__}: {e}"
+                f"Invalid configuration for {self.configs_name}: {e}"
             ) from e
 
     @property
@@ -34,7 +33,7 @@ class BaseExtension(ABC):
         Return the config name used in app configurations
         for this extension.
         """
-        return self._configs_name
+        return self.__class__.__name__
 
     @property
     def app(self) -> "Patera":
