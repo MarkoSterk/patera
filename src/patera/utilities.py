@@ -3,7 +3,17 @@ Utility methods for Patera
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, TYPE_CHECKING, Any, Callable, Optional
+from typing import (
+    TypeVar,
+    Generic,
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Optional,
+    get_type_hints,
+    overload,
+    cast,
+)
 import asyncio
 import importlib
 import importlib.util
@@ -31,9 +41,44 @@ T = TypeVar("T", bound="BaseExtension | ApiInterface")
 
 
 class Autowire(Generic[T]):
-    def __init__(self, autowirable: type[T]) -> None:
+    def __init__(self, autowirable: type[T] | None = None) -> None:
         self._autowirable = autowirable
-        self._ext_name = autowirable.__name__
+        self._resolved_type: type[T] | None = autowirable
+        self._attr_name: str | None = None
+        self._owner: type | None = None
+        self._ext_key: str | None = None
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._owner = owner
+        self._attr_name = name
+
+        if self._resolved_type is None:
+            hints = get_type_hints(owner)
+            hinted_type = hints.get(name)
+
+            if hinted_type is None:
+                raise ValueError(
+                    f"Missing autowirable type or type hint for {owner.__name__}.{name}"
+                )
+
+            if not isinstance(hinted_type, type):
+                raise TypeError(
+                    f"{owner.__name__}.{name} must be annotated with a concrete class type"
+                )
+
+            self._resolved_type = cast(type[T], hinted_type)
+
+        self._ext_key = self._resolved_type.__name__
+
+    @overload
+    def __get__(self, obj: None, objtype: type | None = None) -> Autowire[T]: ...
+
+    @overload
+    def __get__(
+        self,
+        obj: Patera | Controller | ExceptionHandler | ApiInterface | BaseExtension,
+        objtype: type | None = None,
+    ) -> T: ...
 
     def __get__(
         self,
@@ -48,13 +93,15 @@ class Autowire(Generic[T]):
         if obj is None:
             return self
 
-        ext = obj.app._extensions.get(self._ext_name)
+        if self._resolved_type is None or self._ext_key is None:
+            raise RuntimeError("Autowire descriptor not initialized correctly")
+
+        ext = cast(T | None, obj.app._extensions.get(self._ext_key))
         if ext is None:
-            ext_obj = self._autowirable()
-            if issubclass(self._autowirable, BaseExtension):
-                ext_obj.init_app(obj.app)
-            obj.app._extensions[self._ext_name] = ext_obj
-            return ext_obj
+            ext = cast(T, self._resolved_type())
+            if hasattr(ext, "init_app"):
+                ext.init_app(obj.app)
+            obj.app._extensions[self._ext_key] = ext
 
         return ext
 
