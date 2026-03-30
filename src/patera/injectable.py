@@ -9,6 +9,7 @@ from typing import (
     get_origin,
     get_args,
     Annotated,
+    TypeAlias,
 )
 
 T = TypeVar("T")
@@ -17,6 +18,9 @@ T = TypeVar("T")
 class Autowire(Generic[T]):
     def __init__(self, target: type[T] | None = None) -> None:
         self.target = target
+
+
+Inject: TypeAlias = Annotated[T, Autowire()]
 
 
 @dataclass(slots=True)

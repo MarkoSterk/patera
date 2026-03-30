@@ -277,14 +277,13 @@ class Patera(Injectable):
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        key = f"{target_type.__module__}.{target_type.__qualname__}"
-        value = self._extensions.get(key)
-
+        value = self._extensions.get(target_type.__name__, None)
         if value is None:
             value = target_type()
             if hasattr(value, "init_app"):
                 value.init_app(self)
-            self._extensions[key] = value
+            self._extensions[value.configs_name] = value
+            self._extensions[target_type.__name__] = value
 
         return value
 
@@ -716,8 +715,10 @@ class Patera(Injectable):
         """
         Adds extension to extension map
         """
-        ext_name = extension.configs_name
-        self._extensions[ext_name] = extension
+        if self._extensions.get(extension.__class__.__name__, None) is not None:
+            return
+        self._extensions[extension.configs_name] = extension
+        self._extensions[extension.__class__.__name__] = extension
 
     def activate_extension(self, extension: "Type[BaseExtension]"):
         extension_instance = extension()

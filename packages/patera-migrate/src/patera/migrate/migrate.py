@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from typing import Dict, Optional, cast
 from patera import Patera
 from patera.cli import CLIController, command
-from patera.base_extension import BaseExtension
+from patera.database.sql import SqlDatabase
 
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -61,58 +61,62 @@ class PywayCLIController(CLIController):
     @command("info", help="Provides information about current migrations and db status")
     def info(self) -> None:
         pyway_configs = self._get_configs_from_file()
-        pyway_info = PywayInfo(pyway_configs)
-        print(pyway_info.run())
-        self._clear_env_vars()
+        try:
+            pyway_info = PywayInfo(pyway_configs)
+            print(pyway_info.run())
+        finally:
+            self._clear_env_vars()
 
-    @command("validate", help="Perform validation of migration script")
+    @command(
+        "validate",
+        help="Validate helps you verify that the migrations applied to the database match the ones available locally.",
+    )
     def validate(self) -> None:
         pyway_configs = self._get_configs_from_file()
-        pyway_validate = PywayValidate(pyway_configs)
-        print(pyway_validate.run())
-        self._clear_env_vars()
+        try:
+            pyway_validate = PywayValidate(pyway_configs)
+            print(pyway_validate.run())
+        finally:
+            self._clear_env_vars()
 
     @command("migrate", help="Perform database migration")
     def migrate(self) -> None:
         pyway_configs = self._get_configs_from_file()
-        pyway_migrate = PywayMigrate(pyway_configs)
-        print(pyway_migrate.run())
-        self._clear_env_vars()
+        try:
+            pyway_migrate = PywayMigrate(pyway_configs)
+            print(pyway_migrate.run())
+        finally:
+            self._clear_env_vars()
 
-    @command("run", help="Performs validation and migration")
-    def run(self) -> None:
-        pyway_configs = self._get_configs_from_file()
-        pyway_validate = PywayValidate(pyway_configs)
-        print(pyway_validate.run())
-        pyway_migrate = PywayMigrate(pyway_configs)
-        print(pyway_migrate.run())
-        self._clear_env_vars()
-
-    @command("checksum")
+    @command(
+        "checksum",
+        help="Updates a checksum in the database. This is for advanced use only, as it could put the pyway database out of sync with reality. ",
+    )
     def checksum(self, checksum_file: str) -> None:
         pyway_configs = self._get_configs_from_file()
         pyway_configs.checksum_file = checksum_file  # type: ignore
-        pyway_checksum = PywayChecksum(pyway_configs)
-        print(pyway_checksum.run())
-        self._clear_env_vars()
+        try:
+            pyway_checksum = PywayChecksum(pyway_configs)
+            print(pyway_checksum.run())
+        finally:
+            self._clear_env_vars()
 
 
-class Migrate(BaseExtension):
+class Migrate:
     __db_name__: str
 
-    def __init__(self):
-        self._app = cast(Patera, None)
-
-    def init_app(self, app: Patera) -> None:
+    def __init__(self, app: Patera, db: SqlDatabase):
         self._app = app
+        self._db = db
+        self.__db_name__ = db.__db_name__
         self._configs = self._app.get_conf(self.configs_name, {})
-        self._configs = self.validate_configs(self._configs, _PateraPywayConfigs)
-        self._cli_controller = PywayCLIController(app, self)
+        self._configs = self._db.validate_configs(self._configs, _PateraPywayConfigs)
+        self._cli_controller = PywayCLIController(self._app, self)
         self._cli_controller.set_ctrl_name(
             cast(str, self._configs.get("MIGRATE_CLI_NAME"))
         )
         self._app.register_cli_controller(self._cli_controller)
-        self._migrations_path: Path = Path(self.app.root_path) / cast(
+        self._migrations_path: Path = Path(self._app.root_path) / cast(
             str, self._configs.get("MIGRATE_DATABASE_MIGRATION_DIR")
         )
         self._migrations_path.mkdir(exist_ok=True)
@@ -167,9 +171,8 @@ class Migrate(BaseExtension):
 
     @property
     def database_uri(self) -> str:
-        db = self.app._extensions.get(self.__db_name__)
-        if db is None:
-            raise ValueError(
-                f"Database extension with name {self.__db_name__} does not exist"
-            )
-        return cast(str, db.db_uri)
+        return self._db.db_uri
+
+    @property
+    def configs_name(self) -> str:
+        return self.__class__.__name__

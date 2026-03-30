@@ -41,6 +41,22 @@ def to_upper_snake_case(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
 
 
+def pascal_to_upper_snake(name: str) -> str:
+    """
+    Convert PascalCase (or CamelCase) to UPPER_SNAKE_CASE.
+    Examples:
+        PascalCase -> PASCAL_CASE
+        HTTPServer -> HTTP_SERVER
+        MyXMLParser -> MY_XML_PARSER
+    """
+    if not name:
+        return name
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+
+    return s2.upper()
+
+
 def import_module(import_string: str):
     module_path, obj_name = import_string.split(":")
     try:

@@ -62,14 +62,14 @@ class CurrentContextProxy:
     def app(self):
         value = self._ctx().app
         if value is None:
-            raise RuntimeError("No current app.")
+            raise RuntimeError("No app.")
         return value
 
     @property
     def request(self):
         value = self._ctx().request
         if value is None:
-            raise RuntimeError("No current request.")
+            raise RuntimeError("No request.")
         return value
 
     @property
@@ -101,7 +101,7 @@ class CurrentContextProxy:
         self._ctx().extras[key] = value
 
 
-current = CurrentContextProxy()
+current_request = CurrentContextProxy()
 
 
 def has_request_context() -> bool:

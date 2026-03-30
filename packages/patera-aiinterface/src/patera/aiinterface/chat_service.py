@@ -1,0 +1,190 @@
+"""
+AI interface for Patera app
+Makes connecting to LLM's easy
+"""
+
+from functools import wraps
+from typing import (
+    Any,
+    Awaitable,
+    Optional,
+    Callable,
+    ParamSpec,
+    Type,
+    TypedDict,
+    NotRequired,
+    TypeVar,
+    Generic,
+)
+from collections.abc import AsyncIterator
+from pydantic import BaseModel, Field
+from patera import Patera, Request
+from patera.base_extension import BaseExtension
+
+from .augmentation import BaseAugmentationProvider
+from .history import BaseHistoryProvider
+from .service import BaseServiceProvider, ChatResponse
+
+
+class _AiInterfaceConfigs(BaseModel):
+    """
+    AI interface configuration model
+    """
+
+    API_KEY: Optional[str] = Field(None, description="API key for the AI provider")
+    BASE_URL: str = Field(description="Base URL for the AI provider API")
+    ORGANIZATION_ID: Optional[str] = Field(
+        None, description="Organization ID for the AI provider"
+    )
+    PROJECT_ID: Optional[str] = Field(
+        None, description="Project ID for the AI provider"
+    )
+    TIMEOUT: Optional[int] = Field(
+        60, description="Timeout for AI provider requests in seconds. Default 60 s"
+    )
+    MODEL: str = Field(description="Model name to use for AI requests")
+    TEMPERATURE: Optional[float] = Field(
+        0.0, description="Temperature for AI model responses"
+    )
+    RESPONSE_FORMAT: Optional[dict[str, str]] = Field(
+        {"type": "json_object"}, description="Desired response format from the AI model"
+    )
+    TOOL_CHOICE: Optional[bool] = Field(
+        False, description="Whether to enable tool choice for the AI model"
+    )
+    MAX_RETRIES: Optional[int] = Field(
+        0, description="Maximum number of retries for AI provider requests"
+    )
+    STREAM: Optional[bool] = Field(
+        False, description="If the answer should be streamed."
+    )
+
+
+class AiConfig(TypedDict):
+    """AI configurations typed dictionary"""
+
+    API_KEY: NotRequired[str]
+    BASE_URL: NotRequired[str]
+    ORGANIZATION_ID: NotRequired[str]
+    PROJECT_ID: NotRequired[str]
+    TIMEOUT: NotRequired[int]
+    MODEL: str
+    TEMPERATURE: NotRequired[float]
+    RESPONSE_FORMAT: NotRequired[dict[str, str]]
+    TOOL_CHOICE: NotRequired[bool]
+    MAX_RETRIES: NotRequired[int]
+    STREAM: NotRequired[bool]
+
+
+ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
+HistoryT = TypeVar("HistoryT", bound=BaseHistoryProvider)
+AugmentationT = TypeVar("AugmentationT", bound=BaseAugmentationProvider)
+
+
+class ChatService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
+    """
+    Main AI interface
+    """
+
+    service_provider: ServiceT
+    history_provider: Optional[HistoryT]
+    augmentation_provider: Optional[AugmentationT]
+
+    def __init__(self) -> None:
+        """
+        Extension init method
+        """
+        self._app: Patera
+        self._configs: dict[str, str | bool | float]
+
+    def init_app(self, app: Patera):
+        """
+        Initilizer method for extension
+        """
+        self._app = app  # type: ignore
+        self._configs = app.get_conf(self.configs_name, None)
+        if self._configs is None:
+            raise ValueError(
+                f"Configurations for {self.configs_name} not found in app configurations."
+            )
+        self._configs = self.validate_configs(self._configs, _AiInterfaceConfigs)
+        self._app.add_extension(self)
+
+    async def chat(self, req: Request, msg: str) -> ChatResponse:
+        return await self.service_provider.chat(req, msg, self)
+
+    async def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
+        return self.service_provider.stream(req, msg, self)
+
+    @property
+    def configs(self) -> dict[str, Any]:
+        return self._configs
+
+
+ChatServiceT = TypeVar("ChatServiceT", bound=ChatService)
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def memory_id(
+    name: str,
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        """
+        Decorator for setting memory id of a tool method
+        """
+
+        @wraps(func)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            req: Request = args[0]  # type: ignore
+            if req is None or not isinstance(req, Request):
+                raise ValueError(
+                    "First argument of the method must be a Request object"
+                )
+            memory_id_value = req._route_parameters.get(name, None)
+            if memory_id_value is None:
+                raise ValueError(
+                    f"Memory ID not found in route parameters with name '{name}'"
+                )
+            req._route_parameters["memory_id"] = memory_id_value  # type: ignore
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def system_prompt(prompt: str) -> Callable[[Type[ChatServiceT]], Type[ChatServiceT]]:
+    """
+    Decorator for setting system prompt of chat service
+    """
+
+    def decorator(cls: Type[ChatServiceT]) -> Type[ChatServiceT]:
+        """
+        Sets system prompt for the chat service
+        """
+        setattr(cls, "__system_prompt__", prompt)
+        return cls
+
+    return decorator
+
+
+def tool(name: Optional[str] = None, description: Optional[str] = None) -> Callable:
+    """
+    Decorator for adding a method as a tool to the Ai interface
+    """
+
+    def decorator(func: Callable) -> Callable:
+        """
+        Marks method to as ai interface tool
+        """
+        setattr(
+            func,
+            "__ai_tool__",
+            {"name": name or func.__name__, "description": description or func.__doc__},
+        )
+        return func
+
+    return decorator

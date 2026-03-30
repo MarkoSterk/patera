@@ -2,18 +2,18 @@
 Ai interface module
 """
 
-from .ai_interface import (
-    AiInterface,
-    ChatContextNotFound,
+from .chat_service import (
+    ChatService,
+    ChatResponse,
     tool,
-    FailedToRunAiToolMethod,
+    system_prompt,
     AiConfig,
 )
 
 __all__ = [
-    "AiInterface",
-    "ChatContextNotFound",
+    "ChatService",
+    "ChatResponse",
     "tool",
-    "FailedToRunAiToolMethod",
     "AiConfig",
+    "system_prompt",
 ]

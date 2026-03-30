@@ -8,6 +8,7 @@ from abc import abstractmethod, ABC
 from pydantic import BaseModel, ValidationError
 
 from .injectable import Injectable
+from .utilities import pascal_to_upper_snake
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -21,15 +22,13 @@ class BaseExtension(Injectable, ABC):
         self._resolve_autowires()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        key = f"{target_type.__module__}.{target_type.__qualname__}"
-        value = self.app._extensions.get(key)
-
+        value = self.app._extensions.get(target_type.__name__, None)
         if value is None:
             value = target_type()
             if hasattr(value, "init_app"):
                 value.init_app(self.app)
-            self.app._extensions[key] = value
-
+            self.app._extensions[value.configs_name] = value
+            self.app._extensions[target_type.__name__] = value
         return value
 
     @abstractmethod
@@ -51,7 +50,7 @@ class BaseExtension(Injectable, ABC):
         Return the config name used in app configurations
         for this extension.
         """
-        return self.__class__.__name__
+        return pascal_to_upper_snake(self.__class__.__name__)
 
     @property
     def app(self) -> "Patera":

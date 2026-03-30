@@ -130,6 +130,12 @@ class SqlDatabase(BaseExtension):
         for model in self._app._db_models.get(self.__db_name__, []):
             self._models[model.__name__] = model
 
+        # If the SqlDatabase class inherits from patera.migrate.Migrate class
+        if "migrate" in [cl.__name__.lower() for cl in self.__class__.mro()]:
+            from patera.migrate import Migrate  # type: ignore
+
+            self._migrate = Migrate(app, self)
+
     async def connect(self) -> None:
         """
         Creates the async engine and session factory.
