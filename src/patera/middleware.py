@@ -3,6 +3,7 @@ Middleware base class
 """
 
 from abc import abstractmethod, ABC
+from patera.injectable import Injectable
 from typing import Callable, TYPE_CHECKING, Awaitable, Any, Protocol
 
 from pydantic import BaseModel, ValidationError
@@ -24,7 +25,7 @@ class AppCallableType(Protocol):
 MiddlewareFactory = Callable[["Patera", AppCallableType], AppCallableType]
 
 
-class MiddlewareBase(ABC):
+class MiddlewareBase(Injectable, ABC):
     """
     Base class for middleware
     """
@@ -37,6 +38,17 @@ class MiddlewareBase(ABC):
         """
         self._app = app
         self._next = next_app
+        self._resolve_autowires()
+
+    def _resolve_dependency(self, target_type: type[Any]) -> Any:
+        value = self.app._extensions.get(target_type.__name__, None)
+        if value is None:
+            value = target_type()
+            if hasattr(value, "init_app"):
+                value.init_app(self.app)
+            self.app._extensions[value.configs_name] = value
+            self.app._extensions[target_type.__name__] = value
+        return value
 
     def validate_configs(
         self, configs: dict[str, Any], model: type[BaseModel]

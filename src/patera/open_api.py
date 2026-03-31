@@ -11,7 +11,7 @@ from .media_types import MediaType
 from .response import Response
 from .request import Request
 from .controller import Controller, get, produces
-from .controller.utilities import _extract_response_type
+from .utilities import _extract_response_type
 
 _WERKZEUG_PARAM_RE = re.compile(r"<(?:(int|string|path):)?([a-zA-Z_][a-zA-Z0-9_]*)>")
 

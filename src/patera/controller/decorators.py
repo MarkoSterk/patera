@@ -11,14 +11,13 @@ from typing import (
     Protocol,
     Type,
     cast,
+    get_type_hints,
 )
 from functools import wraps
 import inspect
 
 from .controller import Controller, Descriptor
 from .utilities import (
-    _extract_response_type,
-    get_type_hints,
     _unwrap_annotated,
     _is_pydantic_model,
     _content_type_matches,
@@ -71,20 +70,8 @@ def get(
                 raise MethodNotControllerMethod(
                     f"Method {func.__name__} is not part of a valid controller class"
                 )
-
-            # pre-hooks
-            req: "Request" = args[0]  # type: ignore[index]
-            for m in reversed(getattr(self, "_controller_decorator_methods", []) or []):
-                await run_sync_or_async(m, req)
-            for m in getattr(self, "_before_request_methods", []) or []:
-                await run_sync_or_async(m, req)
-
             # call the original (sync or async)
             response: "Response" = await run_sync_or_async(func, self, *args, **kwargs)
-
-            # post-hooks
-            for m in getattr(self, "_after_request_methods", []) or []:
-                await run_sync_or_async(m, response)
             return response
 
         merged = {
@@ -118,41 +105,20 @@ def endpoint_decorator_factory(http_method: HttpMethod) -> EndpointDecoratorFn:
                     raise MethodNotControllerMethod(
                         f"Method {func.__name__} is not part of a valid controller class"
                     )
-
-                # Optionally infer/record expected response type for endpoint
-                req: "Request" = args[0]  # type: ignore[index]
-                if req.response.expected_body_type is None:
-                    expected = _extract_response_type(func)
-                    # pylint: disable=protected-access
-                    req.response._set_expected_body_type(expected)
-
-                # pre-hooks
-                for m in reversed(
-                    getattr(self, "_controller_decorator_methods", []) or []
-                ):
-                    await run_sync_or_async(m, req)
-                for m in getattr(self, "_before_request_methods", []) or []:
-                    await run_sync_or_async(m, req)
-
-                # call the original (sync or async)
                 response: "Response" = await run_sync_or_async(
                     func, self, *args, **kwargs
                 )
-
-                # post-hooks
-                for m in getattr(self, "_after_request_methods", []) or []:
-                    await run_sync_or_async(m, response)
                 return response
 
-            # attach metadata
-            # pylint: disable=protected-access
-            wrapper._handler = {  # type: ignore[attr-defined]
+            merged = {
                 **(getattr(func, "_handler", {}) or {}),
                 "http_method": http_method.value,
                 "path": url_path,
                 "open_api_spec": open_api_spec,
                 "tags": tags if tags is not None else [],
             }
+            # pylint: disable=protected-access
+            wrapper._handler = merged  # type: ignore[attr-defined]
             return wrapper
 
         return cast(_EndpointDecorator, decorator)
@@ -262,7 +228,6 @@ def produces(
     """
 
     def decorator(func: Callable[..., Any]) -> AsyncMethod:
-        expected_body = _extract_response_type(func)
 
         @wraps(func)
         async def wrapper(self: Controller, *args: Any, **kwargs: Any) -> "Response":
@@ -271,10 +236,6 @@ def produces(
                 raise RuntimeError(
                     "Request must be auto-injected as the first argument after self."
                 )
-            req: "Request" = args[0]  # type: ignore[index]
-            # pylint: disable=protected-access
-            req.response._set_expected_body_type(expected_body)
-
             res: "Response" = await run_sync_or_async(func, self, *args, **kwargs)
             res.set_header("content-type", media_type.value)
             if status_code != HttpStatus.OK:

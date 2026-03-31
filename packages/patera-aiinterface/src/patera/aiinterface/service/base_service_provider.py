@@ -4,7 +4,7 @@ Chat service provider
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from patera import Request
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -58,8 +58,6 @@ class ChatResponse:
     request_id: str | None = None
     created_at: str | None = None
 
-    raw: dict[str, Any] = field(default_factory=dict)
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "provider": self.provider,
@@ -69,7 +67,6 @@ class ChatResponse:
             "usage": self.usage.to_dict() if self.usage else None,
             "request_id": self.request_id,
             "created_at": self.created_at,
-            "raw": self.raw,
         }
 
     @classmethod
@@ -82,7 +79,6 @@ class ChatResponse:
             usage=UsageStats.from_dict(data["usage"]) if data.get("usage") else None,
             request_id=data.get("request_id"),
             created_at=data.get("created_at"),
-            raw=data.get("raw", {}),
         )
 
 

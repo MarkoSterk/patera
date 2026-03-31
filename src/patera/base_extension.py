@@ -8,7 +8,6 @@ from abc import abstractmethod, ABC
 from pydantic import BaseModel, ValidationError
 
 from .injectable import Injectable
-from .utilities import pascal_to_upper_snake
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -43,14 +42,6 @@ class BaseExtension(Injectable, ABC):
             raise ValueError(
                 f"Invalid configuration for {self.configs_name}: {e}"
             ) from e
-
-    @property
-    def configs_name(self) -> str:
-        """
-        Return the config name used in app configurations
-        for this extension.
-        """
-        return pascal_to_upper_snake(self.__class__.__name__)
 
     @property
     def app(self) -> "Patera":

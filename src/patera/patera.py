@@ -39,7 +39,12 @@ from .http_statuses import HttpStatus
 from .http_methods import HttpMethod
 from .request import Request
 from .response import Response
-from .utilities import get_app_root_path, run_sync_or_async, import_module
+from .utilities import (
+    get_app_root_path,
+    run_sync_or_async,
+    import_module,
+    _extract_response_type,
+)
 from .router import Router
 from .static import Static
 from .open_api import OpenAPIController
@@ -234,7 +239,7 @@ class Patera(Injectable):
         self._db_models: dict[str, list[Type]] = {}
         self._db_name_configs_map: dict[str, str] = {}
 
-        self._extensions: dict = {}
+        self._extensions: dict[str, Injectable] = {}
         self.global_context_methods: list[Callable] = []
 
         self._on_startup_methods: list[Callable] = []
@@ -318,30 +323,6 @@ class Patera(Injectable):
                 self.logger.info(f"Registering exception handler: {obj.__name__}")
                 self.register_exception_handler(obj)
                 continue
-            if inherits_from(obj, "SqlDatabase"):
-                self.logger.info(
-                    f"Initilizing database: {obj.__class__.__name__} ({obj.configs_name})"
-                )
-                obj.init_app(self)
-                self._db_name_configs_map[obj.db_name] = obj.configs_name
-                continue
-            if inherits_from(obj, "BaseExtension"):
-                ext_name = ""
-                conf_name = ""
-                if isinstance(obj, BaseExtension):
-                    obj.init_app(self)
-                    ext_name = obj.__class__.__name__
-                    conf_name = obj.configs_name
-                    self._extensions[ext_name] = obj
-                else:
-                    # if passed extension is not yet initilized
-                    obj_inst = obj()
-                    obj_inst.init_app(self)
-                    ext_name = obj_inst.__class__.__name__
-                    conf_name = obj_inst.configs_name
-                    self._extensions[ext_name] = obj
-                self.logger.info(f"Initilizing extension: {ext_name} ({conf_name})")
-                continue
             if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
                 self.logger.info(f"Loaded database model: {obj.__name__}")
                 if obj.db_name() not in self._db_models:
@@ -417,9 +398,15 @@ class Patera(Injectable):
         The bare-bones application without any middleware.
         Calls the route handler directly.
         """
-        res: Response = await run_sync_or_async(
-            req.route_handler, req, **req.route_parameters
-        )
+        # res: Response = await run_sync_or_async(
+        #     req.route_handler, req, **req.route_parameters
+        # )
+        # return res
+        if req.response.expected_body_type is None:
+            expected = _extract_response_type(req.route_handler)
+            # pylint: disable=protected-access
+            req.response._set_expected_body_type(expected)
+        res: Response = await req.route_handler.__self__(req.route_handler, req)  # type: ignore
         return res
 
     async def abort_route_not_found(
@@ -624,7 +611,9 @@ class Patera(Injectable):
 
         try:
             with request_context(
-                app=self, request=req, controller=route_handler.__self__
+                app=self,
+                request=req,
+                controller=route_handler.__self__,  # type: ignore
             ):  # type: ignore
                 try:
                     res: Response = await self._app(req)
@@ -711,7 +700,7 @@ class Patera(Injectable):
         self._app = built_app
         self._is_built = True
 
-    def add_extension(self, extension):
+    def add_extension(self, extension: Injectable):
         """
         Adds extension to extension map
         """

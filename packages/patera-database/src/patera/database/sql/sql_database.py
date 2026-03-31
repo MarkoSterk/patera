@@ -16,7 +16,6 @@ from typing import (
     TYPE_CHECKING,
     NotRequired,
 )
-from inspect import signature, Parameter
 from functools import wraps
 from sqlalchemy import MetaData, Table, select, func
 from sqlalchemy.inspection import inspect
@@ -129,6 +128,9 @@ class SqlDatabase(BaseExtension):
         self._app.add_on_shutdown_method(self.disconnect)
         for model in self._app._db_models.get(self.__db_name__, []):
             self._models[model.__name__] = model
+        # the SqlDatabase instance is stored in app._extensions with key as db_name for later retrieval in session decorators and elsewhere
+        # in addition to the standard classname and config name storage
+        self.app._extensions[self.db_name] = self
 
         # If the SqlDatabase class inherits from patera.migrate.Migrate class
         if "migrate" in [cl.__name__.lower() for cl in self.__class__.mro()]:
@@ -317,18 +319,16 @@ def readonly_session(cls: Type[SqlDatabase]) -> Callable:
                 )
 
             async with db_extension._session_factory() as session:
-                session_name = db_extension.session_name
-                sig = signature(func)
-
-                if (
-                    session_name in sig.parameters
-                    and sig.parameters[session_name].kind
-                    in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-                    and session_name not in kwargs
-                ):
-                    kwargs[session_name] = session
-
-                with bind_session(session_name, session):
+                # session_name = db_extension.session_name
+                # sig = signature(func)
+                # if (
+                #     session_name in sig.parameters
+                #     and sig.parameters[session_name].kind
+                #     in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+                #     and session_name not in kwargs
+                # ):
+                #     kwargs[session_name] = session
+                with bind_session(db_extension.session_name, session):
                     return await run_sync_or_async(func, self, *args, **kwargs)
 
         return wrapper
@@ -357,16 +357,15 @@ def managed_session(cls: Type[SqlDatabase]) -> Callable:
                 )
             async with db_extension._session_factory() as session:
                 async with session.begin():
-                    session_name = db_extension.session_name
-                    sig = signature(func)
-
-                    if (
-                        session_name in sig.parameters
-                        and sig.parameters[session_name].kind
-                        in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-                        and session_name not in kwargs
-                    ):
-                        kwargs[session_name] = session
+                    # session_name = db_extension.session_name
+                    # sig = signature(func)
+                    # if (
+                    #     session_name in sig.parameters
+                    #     and sig.parameters[session_name].kind
+                    #     in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+                    #     and session_name not in kwargs
+                    # ):
+                    #     kwargs[session_name] = session
                     with bind_session(db_extension.session_name, session):
                         return await run_sync_or_async(func, self, *args, **kwargs)
 
@@ -394,8 +393,9 @@ def managed_session_for_cli(cls: Type[SqlDatabase]) -> Callable:
                 async with (
                     session.begin()
                 ):  # Ensures transaction handling (auto commit/rollback)
-                    kwargs[db_extension.session_name] = session
-                    result = await run_sync_or_async(func, self, *args, **kwargs)
+                    # kwargs[db_extension.session_name] = session
+                    with bind_session(db_extension.session_name, session):
+                        result = await run_sync_or_async(func, self, *args, **kwargs)
             await db_extension.disconnect()  # disconnects from db
             return result
 

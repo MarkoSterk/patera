@@ -6,17 +6,14 @@ from typing import (
     Any,
     Annotated,
     Type,
-    Optional,
     get_origin,
     get_args,
     Mapping,
-    get_type_hints,
 )
 import inspect
 from pydantic import BaseModel
 
 from ..request import Request
-from ..response import Response
 from ..media_types import MediaType
 
 
@@ -91,21 +88,3 @@ async def _read_payload_for_consumes(
         return await req.form_and_files()
     # extend with additional types if needed.
     return {}
-
-
-def _extract_response_type(func) -> Optional[Type[Any]]:
-    """
-    If the function is annotated as -> Response[T], return T; else None.
-    """
-    hints = get_type_hints(func, include_extras=True)
-    ret = hints.get("return")
-    if ret is None:
-        return None
-    if get_origin(ret) is Response:
-        args = get_args(ret)
-        if args:
-            t = args[0]
-            if get_origin(t) is Annotated:  # peel Annotated[T, ...]
-                t = get_args(t)[0]
-            return t
-    return None

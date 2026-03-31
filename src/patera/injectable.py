@@ -12,6 +12,8 @@ from typing import (
     TypeAlias,
 )
 
+from .utilities import pascal_to_upper_snake
+
 T = TypeVar("T")
 
 
@@ -95,3 +97,11 @@ class Injectable:
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         raise NotImplementedError
+
+    @property
+    def configs_name(self) -> str:
+        """
+        Return the config name used in app configurations
+        for this extension.
+        """
+        return pascal_to_upper_snake(self.__class__.__name__)

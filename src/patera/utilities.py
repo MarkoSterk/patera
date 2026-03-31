@@ -7,6 +7,11 @@ from typing import (
     Any,
     Callable,
     Optional,
+    Type,
+    get_origin,
+    get_type_hints,
+    get_args,
+    Annotated,
 )
 import asyncio
 import importlib
@@ -55,6 +60,26 @@ def pascal_to_upper_snake(name: str) -> str:
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
 
     return s2.upper()
+
+
+def _extract_response_type(func) -> Optional[Type[Any]]:
+    """
+    If the function is annotated as -> Response[T], return T; else None.
+    """
+    from .response import Response  # avoid circular import
+
+    hints = get_type_hints(func, include_extras=True)
+    ret = hints.get("return")
+    if ret is None:
+        return None
+    if get_origin(ret) is Response:
+        args = get_args(ret)
+        if args:
+            t = args[0]
+            if get_origin(t) is Annotated:  # peel Annotated[T, ...]
+                t = get_args(t)[0]
+            return t
+    return None
 
 
 def import_module(import_string: str):

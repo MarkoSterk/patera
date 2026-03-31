@@ -33,7 +33,6 @@ class BaseHistoryProvider(Generic[ModelT]):
     async def _get_history(self, session_id: str | int | UUID) -> list[ModelT]:
         if session_id is None:
             raise ValueError("Missing session id for chat history loader.")
-        print("Loading chat history via model: ", self.model.__name__, self.model)
         database: SqlDatabase = current_request.app.extensions.get(
             self.model.db_name(), None
         )

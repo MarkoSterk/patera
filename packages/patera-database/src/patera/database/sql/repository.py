@@ -24,9 +24,13 @@ from sqlalchemy.engine import Row, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
+from .sql_database import SqlDatabase
 from .sqlalchemy_async_query import AsyncQuery, Page
 from .declarative_base import DeclarativeBaseModel
 
+from patera.ctx import current_request
+from patera import Patera
+from patera.base_extension import BaseExtension
 
 T = TypeVar("T", bound=DeclarativeBaseModel)
 M = TypeVar("M", bound=DeclarativeBaseModel)
@@ -41,7 +45,7 @@ def query(sql_query: str) -> Callable[[F], F]:
     return decorator
 
 
-class Repository(Generic[T]):
+class Repository(BaseExtension, Generic[T]):
     model: type[T]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -57,8 +61,34 @@ class Repository(Generic[T]):
             if callable(value) and hasattr(value, "__custom_query__"):
                 setattr(cls, name, cls._wrap_method(value))
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+    def __init__(self) -> None:
+        super().__init__()
+        self._database: SqlDatabase | None = None
+
+    def init_app(self, app: Patera) -> None:
+        self._app = app
+
+    def get_database(self) -> SqlDatabase:
+        if self._database is not None:
+            self._database
+        database = cast(
+            SqlDatabase,
+            cast(Patera, self._app).extensions.get(self.model.db_name(), None),
+        )
+        if database is None:
+            raise ValueError(f"No database found for model {self.model.__name__}")
+        self._database = database
+        return self._database
+
+    @property
+    def session(self) -> AsyncSession:
+        database = self.get_database()
+        session: AsyncSession = current_request.session(database.session_name)
+        return session
+
+    @property
+    def db_name(self) -> str:
+        return self.model.db_name()
 
     @classmethod
     def _wrap_method(cls, func: F) -> F:

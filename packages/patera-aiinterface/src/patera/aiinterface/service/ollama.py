@@ -43,7 +43,6 @@ def from_ollama(data: dict[str, Any]) -> ChatResponse:
                 else None
             ),
         ),
-        raw=data,
     )
 
 

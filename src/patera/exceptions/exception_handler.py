@@ -6,8 +6,7 @@ from functools import wraps
 from typing import Any, Callable, TYPE_CHECKING, Type
 
 from ..controller.decorators import AsyncMethod, P, R
-from ..controller.utilities import _extract_response_type
-from ..utilities import run_sync_or_async
+from ..utilities import run_sync_or_async, _extract_response_type
 from ..injectable import Injectable
 
 if TYPE_CHECKING:

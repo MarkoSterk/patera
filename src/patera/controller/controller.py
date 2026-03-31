@@ -1,15 +1,17 @@
 """Controller class for endpoint groups"""
 
 from __future__ import annotations
+import inspect
 from typing import Any, Callable, TYPE_CHECKING, Optional, Type, TypeVar
 
 from pydantic import BaseModel
 from ..media_types import MediaType
 from ..http_statuses import HttpStatus
 from ..injectable import Injectable
+from ..utilities import run_sync_or_async
 
 if TYPE_CHECKING:
-    from ..patera import Patera
+    from ..patera import Patera, Request, Response
 
 T = TypeVar("T", bound="Controller")
 
@@ -50,15 +52,13 @@ class Controller(Injectable):
         self._resolve_autowires()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        key = f"{target_type.__module__}.{target_type.__qualname__}"
-        value = self.app._extensions.get(key)
-
+        value = self.app._extensions.get(target_type.__name__, None)
         if value is None:
             value = target_type()
             if hasattr(value, "init_app"):
                 value.init_app(self.app)
-            self.app._extensions[key] = value
-
+            self.app._extensions[value.configs_name] = value
+            self.app._extensions[target_type.__name__] = value
         return value
 
     def get_endpoint_methods(self) -> dict[str, dict[str, str | Callable]]:
@@ -140,6 +140,22 @@ class Controller(Injectable):
     def app(self) -> "Patera":
         """App object"""
         return self._app
+
+    async def __call__(self, method: Callable, req: "Request") -> "Response":
+        """
+        Handles request method call with before and after methods.
+        """
+        sig = inspect.signature(method)
+        kwargs: dict[str, Any] = {}
+        for name, _ in sig.parameters.items():
+            if name in req.route_parameters:
+                kwargs[name] = req.route_parameters[name]
+        for br_method in self._before_request_methods:
+            await run_sync_or_async(br_method, req)
+        res: "Response" = await run_sync_or_async(method, req, **kwargs)
+        for ar_method in self._after_request_methods:
+            await run_sync_or_async(ar_method, res)
+        return res
 
 
 class Descriptor:
