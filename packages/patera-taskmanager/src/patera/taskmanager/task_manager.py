@@ -78,8 +78,7 @@ class TaskManager(BaseExtension):
     Task manager class for scheduling and managing backgroudn tasks.
     """
 
-    def __init__(self, configs_name: str = "TASK_MANAGER") -> None:
-        self._configs_name: str = cast(str, configs_name)
+    def __init__(self) -> None:
         self._configs: dict[str, Any] = {}
         self._app: "Patera"
         self._job_stores: dict
@@ -95,7 +94,7 @@ class TaskManager(BaseExtension):
         Initlizer for TaskManager with Patera app
         """
         self._app = app  # type: ignore
-        self._configs = app.get_conf(self._configs_name, {})
+        self._configs = self.load_configs() or {}
 
         self._configs = self.validate_configs(self._configs, _TaskManagerConfigs)
         self._job_stores = self._configs["JOB_STORES"]
@@ -110,7 +109,7 @@ class TaskManager(BaseExtension):
             job_defaults=self._job_defaults,
             daemon=self._daemon,
         )  # type: ignore
-        self._app.add_extension(self)
+        # self._app.add_extension(self)
         self._get_defined_jobs()
         self._app.add_on_startup_method(self._start_scheduler)
         self._app.add_on_shutdown_method(self._stop_scheduler)
@@ -190,7 +189,7 @@ class TaskManager(BaseExtension):
         :param job: job id (str) or the Job instance returned by the scheduler.add_job method
         """
         if isinstance(job, Job):
-            job = job.id
+            job = job.id  # type: ignore
         return self._remove_job(cast(str, job), job_store)
 
     def pause_job(self, job: str | Job):
@@ -198,7 +197,7 @@ class TaskManager(BaseExtension):
         Pauses the job
         """
         if isinstance(job, Job):
-            return job.pause()
+            return job.pause()  # type: ignore
         active_job: Optional[Job] = self._active_jobs.get(job, None)
         if job is None:
             raise JobLookupError(job)
@@ -210,7 +209,7 @@ class TaskManager(BaseExtension):
         :param paused_job: id or Job instance
         """
         if isinstance(job, Job):
-            return job.resume()
+            return job.resume()  # type: ignore
         paused_job: Optional[Job] = self._active_jobs.get(job, None)
         if paused_job is None:
             raise JobLookupError(paused_job)
