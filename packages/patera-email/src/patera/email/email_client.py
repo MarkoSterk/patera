@@ -48,16 +48,15 @@ class EmailClient(BaseExtension):
     Email client extension class
     """
 
-    def __init__(self, configs_name: str = "EMAIL_CLIENT"):
+    def __init__(self) -> None:
         self._app: "Optional[Patera]" = None
-        self._configs_name = configs_name
         self._configs: dict[str, str | int | bool] = {}
         self.render_engine: Environment = None  # type: ignore
 
     def init_app(self, app: "Patera") -> None:
         """Initilizes the extension with the Patera app"""
         self._app = app
-        self._configs = app.get_conf(self._configs_name, {})
+        self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, _EmailConfigs)
 
         self._app.add_extension(self)
@@ -68,6 +67,7 @@ class EmailClient(BaseExtension):
         return smtplib.SMTP(
             hostname=cast(str, self._configs.get("SMTP_SERVER")),
             port=cast(int, self._configs.get("SMTP_PORT")),
+            start_tls=False,
         )
 
     async def send_email_with_template(
