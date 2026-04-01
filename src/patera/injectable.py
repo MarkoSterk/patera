@@ -10,9 +10,13 @@ from typing import (
     get_args,
     Annotated,
     TypeAlias,
+    TYPE_CHECKING,
 )
 
 from .utilities import pascal_to_upper_snake
+
+if TYPE_CHECKING:
+    pass
 
 T = TypeVar("T")
 

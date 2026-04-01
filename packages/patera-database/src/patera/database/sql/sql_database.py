@@ -3,7 +3,7 @@ sql_database.py
 Module for sql database connection/integration
 """
 
-# import asyncio
+import inspect as py_inspect
 from typing import (
     Any,
     Dict,
@@ -70,6 +70,13 @@ class _SqlDatabaseConfig(BaseModel):
         None,
         description="Name of the database for admin dashboard view. Defaults to db_name variable.",
     )
+    EXPIRE_ON_COMMIT: Optional[bool] = Field(
+        False,
+        description="Wether session should expire upon commit or not. Defaults to False.",
+    )
+    AUTOFUSH: Optional[bool] = Field(
+        False, description="Wether session should autoflush or not. Defaults to False."
+    )
 
 
 class SqlDatabaseConfig(TypedDict):
@@ -77,6 +84,8 @@ class SqlDatabaseConfig(TypedDict):
     DATABASE_SESSION_NAME: NotRequired[str]
     SHOW_SQL: NotRequired[bool]
     NICE_NAME: NotRequired[str]
+    EXPIRE_ON_COMMIT: NotRequired[bool]
+    AUTOFUSH: NotRequired[bool]
 
 
 _DIALECT_EXTRAS: Dict[str, Callable] = {
@@ -102,7 +111,7 @@ class SqlDatabase(BaseExtension):
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
-        self._configs: dict[str, str] = {}
+        self._configs: dict[str, str | bool] = {}
         self._session_name: str
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
@@ -115,14 +124,16 @@ class SqlDatabase(BaseExtension):
         or "sqlite+aiosqlite:///./patera.db"
         """
         self._app = app
-        self._configs = app.get_conf(self.configs_name, None)
+        self._configs = cast(
+            dict[str, str | bool], self.load_configs()
+        )  # app.get_conf(self.configs_name, None)
         if self._configs is None:
             raise ValueError(
                 f"Configurations for {self.configs_name} not found in app configurations."
             )
         self._configs = self.validate_configs(self._configs, _SqlDatabaseConfig)
-        self._db_uri = self._configs["DATABASE_URI"]
-        self._session_name = self._configs["DATABASE_SESSION_NAME"]
+        self._db_uri = self._configs["DATABASE_URI"]  # type: ignore
+        self._session_name = self._configs["DATABASE_SESSION_NAME"]  # type: ignore
         self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
@@ -152,7 +163,9 @@ class SqlDatabase(BaseExtension):
             )
 
         self._session_factory = async_sessionmaker(
-            bind=self._engine, expire_on_commit=False, autoflush=False
+            bind=self._engine,
+            expire_on_commit=self._configs["EXPIRE_ON_COMMIT"],
+            autoflush=self._configs["AUTOFUSH"],  # type: ignore
         )
 
     async def disconnect(self) -> None:
@@ -173,7 +186,11 @@ class SqlDatabase(BaseExtension):
         if self._session_factory is not None:
             return cast(AsyncSession, self._session_factory())
         # pylint: disable-next=W0719
-        raise Exception("Session factory is None")
+        raise RuntimeError(
+            "Database is not connected. "
+            "Connection should be established automatically. "
+            "Please check network connection and configurations."
+        )
 
     async def execute_raw(
         self, statement, *, as_transaction: bool = False
@@ -288,7 +305,7 @@ class SqlDatabase(BaseExtension):
 
     @property
     def nice_name(self) -> str:
-        return self._configs.get("NICE_NAME", self.db_name)
+        return self._configs.get("NICE_NAME", self.db_name)  # type: ignore
 
     @property
     def database_uri(self) -> str:
@@ -301,104 +318,125 @@ class SqlDatabase(BaseExtension):
 
 
 def readonly_session(cls: Type[SqlDatabase]) -> Callable:
-    def decorator(func: Callable) -> Callable:
+    def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
                 cls.__name__, None
             )
             if db_extension is None:
                 raise ValueError(
                     f"Database extension with name {cls.__name__} is not registered"
                 )
-            if not db_extension._session_factory:
-                raise RuntimeError(
-                    "Database is not connected. "
-                    "Connection should be established automatically. "
-                    "Please check network connection and configurations."
-                )
-
-            async with db_extension._session_factory() as session:
-                # session_name = db_extension.session_name
-                # sig = signature(func)
-                # if (
-                #     session_name in sig.parameters
-                #     and sig.parameters[session_name].kind
-                #     in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-                #     and session_name not in kwargs
-                # ):
-                #     kwargs[session_name] = session
+            async with db_extension.create_session() as session:
                 with bind_session(db_extension.session_name, session):
                     return await run_sync_or_async(func, self, *args, **kwargs)
+            wrapper.__managed_session_wrapped__ = True  # type: ignore
 
         return wrapper
+
+    def decorator(target: Any) -> Any:
+        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
+            return wrap_handler(target)
+        if py_inspect.isclass(target) and "Controller" in [
+            c.__name__ for c in target.mro()
+        ]:
+            for name, attr in vars(target).items():
+                if not py_inspect.isfunction(attr):
+                    continue
+                if getattr(attr, "_handler", False):
+                    if not getattr(attr, "__managed_session_wrapped__", False):
+                        setattr(target, name, wrap_handler(attr))
+            return target
+        raise TypeError(
+            "@readonly_session can only be applied to a function or a controller class"
+        )
 
     return decorator
 
 
-def managed_session(cls: Type[SqlDatabase]) -> Callable:
-    def decorator(func: Callable) -> Callable:
+def managed_session(cls: Type["SqlDatabase"]) -> Callable:
+
+    def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
                 cls.__name__, None
             )
-
             if db_extension is None:
                 raise ValueError(
                     f"Database extension with name {cls.__name__} is not registered"
                 )
-
-            if not db_extension._session_factory:
-                raise RuntimeError(
-                    "Database is not connected. "
-                    "Connection should be established automatically. "
-                    "Please check network connection and configurations."
-                )
-            async with db_extension._session_factory() as session:
+            async with db_extension.create_session() as session:
                 async with session.begin():
-                    # session_name = db_extension.session_name
-                    # sig = signature(func)
-                    # if (
-                    #     session_name in sig.parameters
-                    #     and sig.parameters[session_name].kind
-                    #     in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-                    #     and session_name not in kwargs
-                    # ):
-                    #     kwargs[session_name] = session
                     with bind_session(db_extension.session_name, session):
                         return await run_sync_or_async(func, self, *args, **kwargs)
+            wrapper.__managed_session_wrapped__ = True  # type: ignore
 
         return wrapper
+
+    def decorator(target: Any) -> Any:
+        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
+            return wrap_handler(target)
+        if py_inspect.isclass(target) and "Controller" in [
+            c.__name__ for c in target.mro()
+        ]:
+            for name, attr in vars(target).items():
+                if not py_inspect.isfunction(attr):
+                    continue
+                if getattr(attr, "_handler", False):
+                    if not getattr(attr, "__managed_session_wrapped__", False):
+                        setattr(target, name, wrap_handler(attr))
+            return target
+        raise TypeError(
+            "@managed_session can only be applied to a function or a controller class"
+        )
 
     return decorator
 
 
-def managed_session_for_cli(cls: Type[SqlDatabase]) -> Callable:
-    def decorator(func: Callable) -> Callable:
+def managed_cli_session(cls: Type["SqlDatabase"]) -> Callable:
+
+    def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional[SqlDatabase] = self.app._extensions.get(
+            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
                 cls.__name__, None
             )
             if db_extension is None:
                 raise ValueError(
                     f"Database extension with name {cls.__name__} is not registered"
                 )
+
             await db_extension.connect()  # connects to db
             assert db_extension._session_factory is not None
-            async with (
-                db_extension._session_factory() as session
-            ):  # Ensures session closure
-                async with (
-                    session.begin()
-                ):  # Ensures transaction handling (auto commit/rollback)
-                    # kwargs[db_extension.session_name] = session
+
+            async with db_extension.create_session() as session:
+                async with session.begin():
                     with bind_session(db_extension.session_name, session):
                         result = await run_sync_or_async(func, self, *args, **kwargs)
+
             await db_extension.disconnect()  # disconnects from db
+            wrapper.__managed_cli_session_wrapped__ = True  # type: ignore
             return result
 
         return wrapper
+
+    def decorator(target: Any) -> Any:
+        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
+            return wrap_handler(target)
+        if py_inspect.isclass(target) and "CLIController" in [
+            c.__name__ for c in target.mro()
+        ]:
+            for name, attr in vars(target).items():
+                if not py_inspect.isfunction(attr):
+                    continue
+                if getattr(attr, "_handler", False):
+                    if not getattr(attr, "__managed_cli_session_wrapped__", False):
+                        setattr(target, name, wrap_handler(attr))
+            return target
+        raise TypeError(
+            "@managed_cli_session can only be applied to a function or a cli controller class"
+        )
 
     return decorator

@@ -40,7 +40,7 @@ class BaseExtension(Injectable, ABC):
             return model.model_validate(configs).model_dump()
         except ValidationError as e:
             raise ValueError(
-                f"Invalid configuration for {self.configs_name}: {e}"
+                f"Invalid configuration for {self.configs_name}/{self.__class__.__name__}: {e}"
             ) from e
 
     @property
@@ -58,3 +58,9 @@ class BaseExtension(Injectable, ABC):
     def nice_name(self) -> str | None:
         """Returns nice name of the extension or None"""
         return self._configs.get("NICE_NAME", None)
+
+    def load_configs(self) -> Optional[dict[str, Any]]:
+        configs = self.app.get_conf(
+            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
+        )
+        return configs

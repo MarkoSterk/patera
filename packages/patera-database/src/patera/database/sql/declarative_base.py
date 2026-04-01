@@ -11,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import DeclarativeBase
 
-from patera import Request
+from patera import Request, Patera
+from patera.ctx import current_request
 
 if TYPE_CHECKING:
     from .sqlalchemy_async_query import AsyncQuery
+    from .sql_database import SqlDatabase
 
 
 class MetaProtocol(Protocol):
@@ -98,13 +100,26 @@ class DeclarativeBaseModel(DeclarativeBase):
         session.add(self)
 
     @classmethod
-    def query(cls: type[ModelT], session: AsyncSession) -> AsyncQuery[ModelT]:
+    def query(
+        cls: type[ModelT], session: AsyncSession | None = None
+    ) -> AsyncQuery[ModelT]:
         from .sqlalchemy_async_query import AsyncQuery
 
+        if session is None:
+            database: SqlDatabase = cls.get_database()
+            session = current_request.session(database.session_name)
         return AsyncQuery(
             session=session,
             model=cls,
         )
+
+    @classmethod
+    def get_database(cls) -> SqlDatabase:
+        app: Patera = current_request.app
+        database = app._extensions.get(cls.db_name(), None)
+        if database is None:
+            raise ValueError(f"Failed to find database {cls.db_name()}")
+        return database  # type: ignore
 
     @classmethod
     def db_name(cls) -> str:

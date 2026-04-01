@@ -33,7 +33,7 @@ from jinja2 import (
 )
 
 from patera.media_types import MediaType
-
+from .ctx import current_request, CurrentContextProxy
 from .exceptions.http_exceptions import HtmlAborterException
 from .http_statuses import HttpStatus
 from .http_methods import HttpMethod
@@ -248,13 +248,13 @@ class Patera(Injectable):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
-        models: Optional[list[str]] = self.get_conf("MODELS", None)
+        # models: Optional[list[str]] = self.get_conf("MODELS", None)
         controllers: Optional[list[str]] = self.get_conf("CONTROLLERS", None)
         cli_controllers: Optional[list[str]] = self.get_conf("CLI_CONTROLLERS", None)
         exception_handlers: Optional[list[str]] = self.get_conf(
             "EXCEPTION_HANDLERS", None
         )
-        extensions: Optional[list[str]] = self.get_conf("EXTENSIONS", None)
+        # extensions: Optional[list[str]] = self.get_conf("EXTENSIONS", None)
         middleware: Optional[list[str]] = self.get_conf("MIDDLEWARE", None)
         loggers: Optional[list[str]] = self.get_conf("LOGGERS", None)
         # if NOT in CLI mode (cli_mode = False)
@@ -266,8 +266,8 @@ class Patera(Injectable):
         if not cli_mode:
             self._enable_cors()  # enables CORS middleware if configured
             self._load_modules(loggers)
-            self._load_modules(models)
-            self._load_modules(extensions)
+            # self._load_modules(models)
+            # self._load_modules(extensions)
             self._load_modules(controllers)
             self._load_modules(cli_controllers)
             self._load_modules(exception_handlers)
@@ -275,8 +275,8 @@ class Patera(Injectable):
         # if in CLI mode only models and extension are registered
         # and configured with the app
         else:
-            self._load_modules(models)
-            self._load_modules(extensions)
+            # self._load_modules(models)
+            # self._load_modules(extensions)
             self._load_modules(cli_controllers)
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
@@ -323,12 +323,12 @@ class Patera(Injectable):
                 self.logger.info(f"Registering exception handler: {obj.__name__}")
                 self.register_exception_handler(obj)
                 continue
-            if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
-                self.logger.info(f"Loaded database model: {obj.__name__}")
-                if obj.db_name() not in self._db_models:
-                    self._db_models[obj.db_name()] = []
-                self._db_models[obj.db_name()].append(obj)
-                continue
+            # if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
+            #     self.logger.info(f"Loaded database model: {obj.__name__}")
+            #     if obj.db_name() not in self._db_models:
+            #         self._db_models[obj.db_name()] = []
+            #     self._db_models[obj.db_name()].append(obj)
+            #     continue
             if inherits_from(obj, "CLIController"):
                 cli_controller = obj(self)
                 self.register_cli_controller(cli_controller)
@@ -925,9 +925,13 @@ class Patera(Injectable):
         return self.get_conf("RESPONSE_CLASS", Response)
 
     @property
-    def extensions(self) -> "dict[str, BaseExtension]":
+    def extensions(self) -> "dict[str, Injectable]":
         """Returns dictionary with all registered extensions"""
         return self._extensions
+
+    @property
+    def current_request(self) -> CurrentContextProxy:
+        return current_request
 
     async def __call__(self, scope, receive, send):
         """

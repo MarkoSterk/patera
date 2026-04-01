@@ -11,7 +11,7 @@ from .sql_database import (
     SqlDatabase,
     SqlDatabaseConfig,
     managed_session,
-    managed_session_for_cli,
+    managed_cli_session,
     readonly_session,
 )
 from .sqlalchemy_async_query import AsyncQuery
@@ -29,6 +29,6 @@ __all__ = [
     "Repository",
     "query",
     "managed_session",
-    "managed_session_for_cli",
+    "managed_cli_session",
     "readonly_session",
 ]

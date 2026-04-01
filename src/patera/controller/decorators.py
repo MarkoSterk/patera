@@ -80,6 +80,7 @@ def get(
             "path": url_path,
             "open_api_spec": open_api_spec,
             "tags": tags if tags is not None else [],
+            "http_handler": True,
         }
         if merged.get("consumes", False):
             raise UnexpectedDecorator("GET endpoints can't consume request bodies.")
@@ -116,6 +117,7 @@ def endpoint_decorator_factory(http_method: HttpMethod) -> EndpointDecoratorFn:
                 "path": url_path,
                 "open_api_spec": open_api_spec,
                 "tags": tags if tags is not None else [],
+                "http_handler": True,
             }
             # pylint: disable=protected-access
             wrapper._handler = merged  # type: ignore[attr-defined]
@@ -150,10 +152,11 @@ def socket(url_path: str) -> _EndpointDecorator:
             "path": url_path,
             "open_api_spec": False,
             "tags": None,
+            "http_handler": False,
         }
         # pylint: disable=protected-access
         wrapper._handler = merged  # type: ignore[attr-defined]
-        return wrapper
+        return wrapper  # type: ignore
 
     return cast(_EndpointDecorator, decorator)
 
