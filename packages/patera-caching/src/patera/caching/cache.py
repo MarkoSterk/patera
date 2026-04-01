@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from patera import Patera, Response, Request
 
 
-class _CacheConfigs(BaseModel):
-    """Configuration model for Cache extension."""
+class _CachingConfigs(BaseModel):
+    """Configuration model for Caching extension."""
 
     BACKEND: Optional[Type[BaseCacheBackend]] = Field(
         default=None,
@@ -36,14 +36,14 @@ class _CacheConfigs(BaseModel):
     )
 
 
-class CacheConfig(TypedDict):
+class CachingConfig(TypedDict):
     """Cache configurations"""
 
     BACKEND: NotRequired[Type[BaseCacheBackend]]
     DURATION: NotRequired[int]
 
 
-class Cache(BaseExtension):
+class Caching(BaseExtension):
     """
     Caching system for route handlers with **pluggable backend class**.
 
@@ -54,17 +54,16 @@ class Cache(BaseExtension):
     Default cache duration is set with `DURATION` config (seconds)
     """
 
-    def __init__(self, configs_name: Optional[str] = "CACHE"):
+    def __init__(self) -> None:
         self._app: "Optional[Patera]" = None
         self._duration: int = 300
         self._backend: Optional[BaseCacheBackend] = None
-        self._configs_name = cast(str, configs_name)
         self._configs: dict[str, Any] = {}
 
     def init_app(self, app: "Patera") -> None:
         self._app = app
-        self._configs = app.get_conf(self._configs_name, {})
-        self._configs = self.validate_configs(self._configs, _CacheConfigs)
+        self._configs = self.load_configs() or {}
+        self._configs = self.validate_configs(self._configs, _CachingConfigs)
 
         self._duration = self._configs["DURATION"]
         backend_cls = self._configs.get("BACKEND", None)
@@ -83,7 +82,7 @@ class Cache(BaseExtension):
             app, self._configs
         )
 
-        self._app.add_extension(self)
+        # self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
 
@@ -103,9 +102,9 @@ class Cache(BaseExtension):
             "headers": value.headers,
             "body": value.body,
         }
-        await cast(BaseCacheBackend, self._backend).set(
-            key, cached_value, duration or self._duration
-        )
+        if duration is None:
+            duration = self._duration
+        await cast(BaseCacheBackend, self._backend).set(key, cached_value, duration)
 
     async def get(self, key: str, req: "Request") -> "Optional[Response]":
         payload = await cast(BaseCacheBackend, self._backend).get(key)
@@ -127,27 +126,32 @@ class Cache(BaseExtension):
         req.res.headers = cached_data["headers"]
         return req.res
 
-    def cache(self, duration: Optional[int] = None) -> Callable:
-        """Decorator for caching route handler results."""
-        cache = self
 
-        def decorator(handler: Callable) -> Callable:
-            @wraps(handler)
-            async def wrapper(self, *args, **kwargs) -> "Response":  # type: ignore[override]
-                req: Request = args[0]
-                method: str = req.method
-                path: str = req.path
-                query_params = sorted(req.query_params.items())
-                cache_key = f"{handler.__name__}:{method}:{path}:{hash(frozenset(query_params))}"
+def cache(cls: Type[Caching], duration: Optional[int] = None) -> Callable:
+    """Decorator for caching route handler results using the Caching extension."""
 
-                cached_value = await cache.get(cache_key, req)
-                if cached_value is not None:
-                    return cached_value
+    def decorator(handler: Callable) -> Callable:
+        @wraps(handler)
+        async def wrapper(self, *args, **kwargs) -> "Response":
+            cache_extension: Caching = self.app._extensions.get(cls.__name__, None)  # type: ignore
+            if cache_extension is None:
+                raise RuntimeError("Caching extension not found in the app.")
+            req: Request = args[0]
+            method: str = req.method
+            path: str = req.path
+            query_params = sorted(req.query_params.items())
+            cache_key = (
+                f"{handler.__name__}:{method}:{path}:{hash(frozenset(query_params))}"
+            )
 
-                res: Response = await run_sync_or_async(handler, self, *args, **kwargs)
-                await cache.set(cache_key, res, duration)
-                return res
+            cached_value: Optional[Response] = await cache_extension.get(cache_key, req)
+            if cached_value is not None:
+                return cached_value
 
-            return wrapper
+            res: Response = await run_sync_or_async(handler, self, *args, **kwargs)
+            await cache_extension.set(cache_key, res, duration)
+            return res
 
-        return decorator
+        return wrapper
+
+    return decorator

@@ -164,7 +164,7 @@ class SqlDatabase(BaseExtension):
 
         self._session_factory = async_sessionmaker(
             bind=self._engine,
-            expire_on_commit=self._configs["EXPIRE_ON_COMMIT"],
+            expire_on_commit=self._configs["EXPIRE_ON_COMMIT"],  # type: ignore
             autoflush=self._configs["AUTOFUSH"],  # type: ignore
         )
 
