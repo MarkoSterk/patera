@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "MarkoSterk", email = "marko_sterk@hotmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "aiofiles>=25.1.0",
     "asgi-lifespan>=2.1.0",

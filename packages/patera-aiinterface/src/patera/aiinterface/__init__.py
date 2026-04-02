@@ -3,17 +3,19 @@ Ai interface module
 """
 
 from .chat_service import (
-    ChatService,
+    AiService,
     ChatResponse,
     tool,
     system_prompt,
-    AiConfig,
+    session_id,
+    AiServiceConfig,
 )
 
 __all__ = [
-    "ChatService",
+    "AiService",
     "ChatResponse",
     "tool",
-    "AiConfig",
+    "AiServiceConfig",
     "system_prompt",
+    "session_id",
 ]

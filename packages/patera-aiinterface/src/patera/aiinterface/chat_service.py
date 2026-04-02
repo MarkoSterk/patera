@@ -21,14 +21,12 @@ from pydantic import BaseModel, Field
 from patera import Patera, Request
 from patera.base_extension import BaseExtension
 
-from .augmentation import BaseAugmentationProvider
-from .history import BaseHistoryProvider
-from .service import BaseServiceProvider, ChatResponse
+from .provider import BaseServiceProvider, ChatResponse
 
 
-class _AiInterfaceConfigs(BaseModel):
+class _AiServiceConfigs(BaseModel):
     """
-    AI interface configuration model
+    AI service configuration model
     """
 
     API_KEY: Optional[str] = Field(None, description="API key for the AI provider")
@@ -60,7 +58,7 @@ class _AiInterfaceConfigs(BaseModel):
     )
 
 
-class AiConfig(TypedDict):
+class AiServiceConfig(TypedDict):
     """AI configurations typed dictionary"""
 
     API_KEY: NotRequired[str]
@@ -77,13 +75,13 @@ class AiConfig(TypedDict):
 
 
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
-HistoryT = TypeVar("HistoryT", bound=BaseHistoryProvider)
-AugmentationT = TypeVar("AugmentationT", bound=BaseAugmentationProvider)
+HistoryT = TypeVar("HistoryT", default=None)
+AugmentationT = TypeVar("AugmentationT", default=None)
 
 
-class ChatService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
+class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
     """
-    Main AI interface
+    Main AI service class for handling chat requests and connecting to the AI provider
     """
 
     service_provider: ServiceT
@@ -107,7 +105,7 @@ class ChatService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
             raise ValueError(
                 f"Configurations for {self.configs_name} not found in app configurations."
             )
-        self._configs = self.validate_configs(self._configs, _AiInterfaceConfigs)
+        self._configs = self.validate_configs(self._configs, _AiServiceConfigs)
         self._app.add_extension(self)
 
     async def chat(self, req: Request, msg: str) -> ChatResponse:
@@ -121,13 +119,13 @@ class ChatService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
         return self._configs
 
 
-ChatServiceT = TypeVar("ChatServiceT", bound=ChatService)
+AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any])
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def memory_id(
+def session_id(
     name: str,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
 
@@ -143,12 +141,12 @@ def memory_id(
                 raise ValueError(
                     "First argument of the method must be a Request object"
                 )
-            memory_id_value = req._route_parameters.get(name, None)
-            if memory_id_value is None:
+            session_id_value = req._route_parameters.get(name, None)
+            if session_id_value is None:
                 raise ValueError(
-                    f"Memory ID not found in route parameters with name '{name}'"
+                    f"Session ID not found in route parameters with name '{name}'"
                 )
-            req._route_parameters["memory_id"] = memory_id_value  # type: ignore
+            req._route_parameters["session_id"] = session_id_value  # type: ignore
             return await func(*args, **kwargs)
 
         return wrapper
@@ -156,14 +154,14 @@ def memory_id(
     return decorator
 
 
-def system_prompt(prompt: str) -> Callable[[Type[ChatServiceT]], Type[ChatServiceT]]:
+def system_prompt(prompt: str) -> Callable[[Type[AiServiceT]], Type[AiServiceT]]:
     """
-    Decorator for setting system prompt of chat service
+    Decorator for setting system prompt of AI service
     """
 
-    def decorator(cls: Type[ChatServiceT]) -> Type[ChatServiceT]:
+    def decorator(cls: Type[AiServiceT]) -> Type[AiServiceT]:
         """
-        Sets system prompt for the chat service
+        Sets system prompt for the AI service
         """
         setattr(cls, "__system_prompt__", prompt)
         return cls

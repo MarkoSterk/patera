@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
-    from ..chat_service import ChatService
+    from ..chat_service import AiService
 
 Role = Literal["system", "user", "assistant", "tool"]
 
@@ -84,9 +84,9 @@ class ChatResponse:
 
 class BaseServiceProvider(ABC):
     @abstractmethod
-    async def chat(self, req: Request, msg: str, ext: ChatService) -> ChatResponse: ...
+    async def chat(self, req: Request, msg: str, ext: AiService) -> ChatResponse: ...
 
     def stream(
-        self, req: Request, msg: str, ext: ChatService
+        self, req: Request, msg: str, ext: AiService
     ) -> AsyncIterator[ChatResponse]:
         raise NotImplementedError("If you wish to use streaming implement this method")

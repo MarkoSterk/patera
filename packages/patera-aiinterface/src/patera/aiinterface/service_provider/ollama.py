@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 import httpx
 
 if TYPE_CHECKING:
-    from ..chat_service import ChatService
+    from ..chat_service import AiService
 
 from patera import Request
 
@@ -47,7 +47,7 @@ def from_ollama(data: dict[str, Any]) -> ChatResponse:
 
 
 class OllamaServiceProvider(BaseServiceProvider):
-    async def chat(self, req: Request, msg: str, ext: ChatService) -> ChatResponse:
+    async def chat(self, req: Request, msg: str, ext: AiService) -> ChatResponse:
         """
         Builds and sends chat prompt with chat service configs
         """
@@ -55,16 +55,15 @@ class OllamaServiceProvider(BaseServiceProvider):
         url = ext.configs.get("BASE_URL")
         if not url:
             raise ValueError(
-                "BASE_URL is required in AiConfig for OllamaServiceProvider."
+                "BASE_URL is required in AiServiceConfig for OllamaServiceProvider."
             )
 
         url = url.rstrip("/") + "/api/chat"
 
-        messages = []
-        memory_id = req.route_parameters.get("memory_id")
+        messages: list[dict[str, str]] = []
+        session_id = req.route_parameters.get("session_id")
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            messages = await ext.history_provider._get_history(memory_id)  # type: ignore
-            messages.extend([{"role": m.role, "content": m.content} for m in messages])
+            messages = await ext.history_provider._get_history_messages(session_id)  # type: ignore
 
         headers = {
             "Content-Type": "application/json",
@@ -82,7 +81,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             sys_message = {"role": "system", "content": sys_prompt}
             messages.append(sys_message)
             if hasattr(ext, "history_provider") and ext.history_provider is not None:
-                ext.history_provider._save_message(sys_message, memory_id, 0)  # type: ignore
+                ext.history_provider._save_message(sys_message, session_id, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -108,23 +107,23 @@ class OllamaServiceProvider(BaseServiceProvider):
 
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
             ext.history_provider._save_message(
-                messages[len(messages) - 1], memory_id, len(messages) - 1
+                messages[len(messages) - 1], session_id, len(messages) - 1
             )  # type: ignore
 
         ollama_response = from_ollama(json_response)
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
             ext.history_provider._save_message(
-                ollama_response.message.to_dict(), memory_id, len(messages)
+                ollama_response.message.to_dict(), session_id, len(messages)
             )  # type: ignore
         return ollama_response
 
     async def stream(
-        self, req: Request, msg: str, ext: ChatService
+        self, req: Request, msg: str, ext: AiService
     ) -> AsyncIterator[ChatResponse]:
         """
         Builds and sends chat prompt with chat service configs and streaming response
         """
-        messages = []
+        messages: list[Any] = []
         if ext.history_provider is not None:
             session_id = req.route_parameters.get("session_id")
             messages = await ext.history_provider._get_history(session_id)  # type: ignore
