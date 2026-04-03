@@ -40,6 +40,7 @@ class RequestContextData:
     request: Optional["Request"] = None
     sessions: Optional[ActiveSessions] = None
     controller: Optional[Any] = None
+    user: Optional[Any] = None
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -93,6 +94,14 @@ class CurrentContextProxy:
     @property
     def controller(self):
         return self._ctx().controller
+
+    @property
+    def user(self):
+        return self._ctx().user
+
+    @user.setter
+    def user(self, value):
+        self._ctx().user = value
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._ctx().extras.get(key, default)

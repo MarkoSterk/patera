@@ -65,6 +65,16 @@ class OllamaServiceProvider(BaseServiceProvider):
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
             messages = await ext.history_provider._get_history_messages(session_id)  # type: ignore
 
+        if (
+            hasattr(ext, "augmentation_provider")
+            and ext.augmentation_provider is not None
+        ):
+            augmented_messages = await ext.augmentation_provider._augment_prompt(
+                req, msg
+            )  # type: ignore
+            messages = augmented_messages + messages
+            msg = msg + "Additional Information:\n\n" + "\n\n".join(augmented_messages)
+
         headers = {
             "Content-Type": "application/json",
         }

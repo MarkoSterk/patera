@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from patera import Patera, Response, Request
 
+from patera.ctx import current_request
 from patera.controller import Controller
 from patera.utilities import run_sync_or_async
 from patera.middleware import AppCallableType, MiddlewareBase
@@ -240,6 +241,7 @@ class Authentication(MiddlewareBase, ABC):
                 # not Authenticated
                 raise AuthenticationException(self.authentication_error)
             req.set_user(user)
+            current_request.user = user
         controller_roles: list[Any] = (
             controller_authentication_attributes.get("roles", [])
             if controller_authentication_attributes

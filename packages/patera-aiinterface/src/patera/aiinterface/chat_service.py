@@ -56,6 +56,12 @@ class _AiServiceConfigs(BaseModel):
     STREAM: Optional[bool] = Field(
         False, description="If the answer should be streamed."
     )
+    EMBEDDING_MODEL: Optional[str] = Field(
+        None, description="Model name to use for embedding generation"
+    )
+    EMBEDDING_DIMENSIONS: Optional[int] = Field(
+        None, description="Dimensions for the generated embeddings"
+    )
 
 
 class AiServiceConfig(TypedDict):
@@ -72,6 +78,8 @@ class AiServiceConfig(TypedDict):
     TOOL_CHOICE: NotRequired[bool]
     MAX_RETRIES: NotRequired[int]
     STREAM: NotRequired[bool]
+    EMBEDDING_MODEL: NotRequired[str]
+    EMBEDDING_DIMENSIONS: NotRequired[int]
 
 
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)

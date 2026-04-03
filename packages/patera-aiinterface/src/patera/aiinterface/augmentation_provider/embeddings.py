@@ -3,16 +3,12 @@ Helpers for creating embeddings
 """
 
 import numpy as np
-from torch import Tensor
-from sentence_transformers import SentenceTransformer
 from pgvector.sqlalchemy import Vector as VectorColumn
 
 __all__ = [
     "l2_distance",
     "cosine_similarity",
     "cosine_distance",
-    "create_embedding",
-    "chunkify_text",
     "VectorColumn",
 ]
 
@@ -64,44 +60,3 @@ def cosine_distance(
     """
     similarity: float = cosine_similarity(vec1, vec2)
     return 1 - similarity  # Cosine distance is 1 - cosine similarity
-
-
-def create_embedding(
-    text: str,
-    transformer: str = "infgrad/stella-base-en-v2",
-    trust_remote_code: bool = True,
-    **kwargs,
-) -> Tensor:
-    """
-    Creates embedding for provided text with specified transformer
-
-    :param text: text for which the embedding is created.
-    :param transformer: sentence transfor that is used.
-    :param trust_remote_code: if you allow code from the Hugging Face Hun repo to be executed locally
-    :param kwargs: any keyword arguments that are accepted by the SentenceTransformer class
-    """
-    embedding_model = SentenceTransformer(
-        transformer, trust_remote_code=trust_remote_code, **kwargs
-    )
-    return embedding_model.encode(text)
-
-
-def chunkify_text(text: str, chunk_size: int) -> list[str]:
-    """
-    Takes a text and creates a list of chunks with words <= chunk_size
-
-    :param text: the text to be chunkified.
-    :param chunk_size: max number of words in chunk
-    """
-    words: list[str] = text.split()
-    chunks: list[str] = []
-    current_chunk: list[str] = []
-
-    for word in words:
-        current_chunk.append(word)
-        if len(current_chunk) == chunk_size:
-            chunks.append(" ".join(current_chunk))
-            current_chunk = []
-    if len(current_chunk) > 0:
-        chunks.append(" ".join(current_chunk))
-    return chunks
