@@ -2,7 +2,7 @@
 Ai interface module
 """
 
-from .chat_service import (
+from .ai_service import (
     AiService,
     ChatResponse,
     tool,

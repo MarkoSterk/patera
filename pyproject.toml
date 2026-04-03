@@ -40,7 +40,7 @@ frontend = ["patera-frontendext", "patera-frontend"]
 statemachine = ["patera-statemachine"]
 taskmanager = ["patera-taskmanager"]
 testing = ["httpx", "anyio", "pytest", "pytest-cov"]
-dev = ["granian[reload]"]
+dev = ["uvicorn"]
 all = [
     "patera-database",
     "patera-migrate",
@@ -117,4 +117,5 @@ dev = [
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
     "ruff>=0.15.5",
+    "uvicorn>=0.42.0",
 ]

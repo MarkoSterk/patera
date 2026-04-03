@@ -8,7 +8,7 @@ from patera import Request
 from .base_service_provider import BaseServiceProvider, ChatResponse
 
 if TYPE_CHECKING:
-    from ..chat_service import AiService
+    from ..ai_service import AiService
 
 
 class OpenAiServiceProvider(BaseServiceProvider):

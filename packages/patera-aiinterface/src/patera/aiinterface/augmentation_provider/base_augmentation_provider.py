@@ -2,12 +2,24 @@
 RAG interface
 """
 
-from typing import Generic, Type, TypeVar, Optional, TypedDict, NotRequired, cast
+from typing import (
+    Generic,
+    Type,
+    TypeVar,
+    Optional,
+    TypedDict,
+    NotRequired,
+    cast,
+    TYPE_CHECKING,
+)
 from sentence_transformers import SentenceTransformer
 from patera import Request
 from patera.database.sql import DeclarativeBaseModel
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    pass
 
 
 ModelT = TypeVar("ModelT", bound=DeclarativeBaseModel)
@@ -19,8 +31,8 @@ class _AugmentationConfig(BaseModel):
     Check sentence_transformers.SentenceTransformer for more details on the parameters
     """
 
-    MODEL_NAME_OR_PATH: str = Field(
-        ..., description="Model name or path for the embedding model"
+    MODEL_NAME_OR_PATH: Optional[str] = Field(
+        "all-MiniLM-L6-v2", description="Model name or path for the embedding model"
     )
     MODULES: Optional[list[str]] = Field(
         None, description="List of modules to use for augmentation"
@@ -38,7 +50,7 @@ class _AugmentationConfig(BaseModel):
 
 
 class AugmentationConfig(TypedDict):
-    MODEL_NAME_OR_PATH: str
+    MODEL_NAME_OR_PATH: NotRequired[str]
     MODULES: NotRequired[list[str]]
     DEVICE: NotRequired[str]
     CACHE_FOLDER: NotRequired[str]
@@ -50,6 +62,7 @@ class BaseAugmentationProvider(Generic[ModelT]):
 
     def __init__(
         self,
+        *,
         vector_column: str = "vector",
         text_column: str = "text",
         retriever_limit: int = 5,
@@ -59,20 +72,15 @@ class BaseAugmentationProvider(Generic[ModelT]):
         self._vector_column = vector_column
         self._text_column = text_column
         self._retriever_limit = retriever_limit
+        self._initilized: bool = False
 
-    def _init_embedding_model(self, configs: Optional[dict] = None) -> None:
+    def _init_embedding_model(self, configs: dict) -> None:
         """
         Initialize embedding model
         """
-        if configs is None:
-            configs = {}
-        self._configs = {
-            key.lower(): value
-            for key, value in _AugmentationConfig.model_validate(configs)
-            .model_dump()
-            .items()
-        }
+        self._configs = {key.lower(): value for key, value in configs.items()}
         self._embedding_model = SentenceTransformer(**self._configs)
+        self._initilized = True
 
     async def _augment_prompt(self, req: Request, prompt: str) -> list[str]:
         """

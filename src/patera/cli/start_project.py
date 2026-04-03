@@ -178,7 +178,52 @@ def find_pyjolt_app_import(
     return None
 
 
-def start(
+def _get_ignore_dirs():
+    DEFAULT_IGNORE_DIRS = [
+        "__dist__",
+        "__pycache__",
+        "logs",
+        "logging",
+        ".mypy_cache",
+        ".venv",
+        ".git",
+        ".idea",
+        ".vscode",
+        "dist",
+        "build",
+        "node_modules",
+    ]
+    DECLARED_IGNORE_DIRS = [
+        d.strip()
+        for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",")
+        if d.strip()
+    ]
+    DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
+
+    return DEFAULT_IGNORE_DIRS
+
+
+def _get_ignore_patterns():
+    DEFAULT_IGNORE_PATTERNS = [
+        r".*\.log$",
+        r".*\.sqlite$",
+        r".*\.sqlite-journal",
+        r".*\.db$",
+        r".*\.db-journal",
+        r".*\.tmp$",
+        r".*\.swp$",
+    ]
+    DECLARED_IGNORE_PATTERNS = [
+        p.strip()
+        for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",")
+        if p.strip()
+    ]
+    DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
+
+    return DEFAULT_IGNORE_PATTERNS
+
+
+def _start_prod(
     cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
 ):
     """
@@ -209,42 +254,8 @@ def start(
     _port: int = int(os.environ.get("PORT", 3000))
     _loop = Loops(os.environ.get("GRANIAN_LOOP", "auto"))
 
-    DEFAULT_IGNORE_DIRS = [
-        "__dist__",
-        "__pycache__",
-        "logs",
-        "logging",
-        ".mypy_cache",
-        ".venv",
-        ".git",
-        ".idea",
-        ".vscode",
-        "dist",
-        "build",
-        "node_modules",
-    ]
-    DECLARED_IGNORE_DIRS = [
-        d.strip()
-        for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",")
-        if d.strip()
-    ]
-    DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
-
-    DEFAULT_IGNORE_PATTERNS = [
-        r".*\.log$",
-        r".*\.sqlite$",
-        r".*\.sqlite-journal",
-        r".*\.db$",
-        r".*\.db-journal",
-        r".*\.tmp$",
-        r".*\.swp$",
-    ]
-    DECLARED_IGNORE_PATTERNS = [
-        p.strip()
-        for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",")
-        if p.strip()
-    ]
-    DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
+    DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
+    DEFAULT_IGNORE_PATTERNS = _get_ignore_patterns()
 
     Granian(
         app_path,
@@ -260,11 +271,56 @@ def start(
     ).serve()
 
 
+def _start_dev(
+    cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
+):
+    import uvicorn
+    from ..patera import Patera
+
+    loaded_env = load_env_file(cwd, env_file)
+    if loaded_env is not None:
+        print(f"Loaded environment from: {loaded_env}")
+
+    app_path = app
+    if app_path is None:
+        app_path = find_pyjolt_app_import(Patera, Path(cwd))
+
+    if app_path is None:
+        print(
+            "Failed to locate Patera implementation. Please specify a correct import string "
+            "(example: 'app:App')"
+        )
+        return
+    address: str = os.environ.get("HOST", "127.0.0.1")
+    if address == "localhost":
+        address = "127.0.0.1"
+    _port: int = int(os.environ.get("PORT", 3000))
+    _loop = os.environ.get("GRANIAN_LOOP", "auto")
+    if _loop not in ["auto", "asyncio", "uvloop"]:
+        raise ValueError(
+            "Loop configuration for development server must be one of: 'asyncio', 'auto', 'uvloop'"
+        )
+
+    DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
+
+    uvicorn.run(
+        app_path,
+        host=address,
+        port=_port,
+        loop=_loop,
+        lifespan="on",
+        reload=debug,
+        factory=True,
+        reload_excludes=DEFAULT_IGNORE_DIRS,
+        log_level="debug",
+    )
+
+
 def start_dev(
     cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
 ):
     try:
-        start(cwd, True, app, env_file)
+        _start_dev(cwd, True, app, env_file)
     except Exception:
         print("Faled to start Granian dev server. Install patera[dev] if not already.")
 
@@ -272,7 +328,7 @@ def start_dev(
 def start_prod(
     cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
 ):
-    start(cwd, False, app, env_file)
+    _start_prod(cwd, False, app, env_file)
 
 
 def start_cli(

@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
-    from ..chat_service import AiService
+    from ..ai_service import AiService
 
 Role = Literal["system", "user", "assistant", "tool"]
 

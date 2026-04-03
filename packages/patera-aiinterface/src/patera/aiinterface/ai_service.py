@@ -21,7 +21,12 @@ from pydantic import BaseModel, Field
 from patera import Patera, Request
 from patera.base_extension import BaseExtension
 
-from .provider import BaseServiceProvider, ChatResponse
+from .service_provider import BaseServiceProvider, ChatResponse
+
+from .augmentation_provider.base_augmentation_provider import (
+    AugmentationConfig,
+    _AugmentationConfig,
+)
 
 
 class _AiServiceConfigs(BaseModel):
@@ -56,11 +61,8 @@ class _AiServiceConfigs(BaseModel):
     STREAM: Optional[bool] = Field(
         False, description="If the answer should be streamed."
     )
-    EMBEDDING_MODEL: Optional[str] = Field(
-        None, description="Model name to use for embedding generation"
-    )
-    EMBEDDING_DIMENSIONS: Optional[int] = Field(
-        None, description="Dimensions for the generated embeddings"
+    AUGMENTATION: Optional[_AugmentationConfig] = Field(
+        None, description="Configuration for prompt augmentation provider."
     )
 
 
@@ -78,8 +80,7 @@ class AiServiceConfig(TypedDict):
     TOOL_CHOICE: NotRequired[bool]
     MAX_RETRIES: NotRequired[int]
     STREAM: NotRequired[bool]
-    EMBEDDING_MODEL: NotRequired[str]
-    EMBEDDING_DIMENSIONS: NotRequired[int]
+    AUGMENTATION: NotRequired[AugmentationConfig]
 
 
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
@@ -115,12 +116,19 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
             )
         self._configs = self.validate_configs(self._configs, _AiServiceConfigs)
         self._app.add_extension(self)
+        if (
+            hasattr(self, "augmentation_provider")
+            and self.augmentation_provider is not None
+        ):
+            self.augmentation_provider._init_embedding_model(
+                self._configs["AUGMENTATION"]
+            )  # type: ignore
 
     async def chat(self, req: Request, msg: str) -> ChatResponse:
-        return await self.service_provider.chat(req, msg, self)
+        return await self.service_provider.chat(req, msg, self)  # type: ignore
 
     async def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
-        return self.service_provider.stream(req, msg, self)
+        return self.service_provider.stream(req, msg, self)  # type: ignore
 
     @property
     def configs(self) -> dict[str, Any]:

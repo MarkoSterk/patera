@@ -4,6 +4,7 @@ Chat history provider
 
 from uuid import UUID
 from typing import Any, Type, Generic, TypeVar
+from patera import Request
 from patera.database.sql import SqlDatabase, DeclarativeBaseModel
 from patera.ctx import current_request
 
@@ -63,9 +64,10 @@ class BaseHistoryProvider(Generic[ModelT]):
         history: list[ModelT] = await history_query.all()
         return self.order_by(history)
 
-    async def _get_history_messages(
-        self, session_id: str | int | UUID
-    ) -> list[dict[str, str]]:
+    async def _get_history_messages(self, req: Request) -> list[dict[str, str]]:
+        session_id = req.route_parameters.get("session_id", None)
+        if session_id is None:
+            raise ValueError("Missing session id for chat history loader.")
         history = await self._get_history(session_id)
         return [
             {

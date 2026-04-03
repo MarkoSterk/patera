@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 import httpx
 
 if TYPE_CHECKING:
-    from ..chat_service import AiService
+    from ..ai_service import AiService
 
 from patera import Request
 
@@ -51,7 +51,6 @@ class OllamaServiceProvider(BaseServiceProvider):
         """
         Builds and sends chat prompt with chat service configs
         """
-
         url = ext.configs.get("BASE_URL")
         if not url:
             raise ValueError(
@@ -61,19 +60,16 @@ class OllamaServiceProvider(BaseServiceProvider):
         url = url.rstrip("/") + "/api/chat"
 
         messages: list[dict[str, str]] = []
-        session_id = req.route_parameters.get("session_id")
+        session_id = req.route_parameters.get("session_id", None)
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            messages = await ext.history_provider._get_history_messages(session_id)  # type: ignore
+            messages = await ext.history_provider._get_history_messages(req)  # type: ignore
 
         if (
             hasattr(ext, "augmentation_provider")
             and ext.augmentation_provider is not None
         ):
-            augmented_messages = await ext.augmentation_provider._augment_prompt(
-                req, msg
-            )  # type: ignore
-            messages = augmented_messages + messages
-            msg = msg + "Additional Information:\n\n" + "\n\n".join(augmented_messages)
+            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)
+            msg = msg + "Additional Information:\n\n" + "\n\n".join(augmenting_info)
 
         headers = {
             "Content-Type": "application/json",
