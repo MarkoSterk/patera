@@ -36,11 +36,9 @@ caching-redis = ["patera-caching[redis]"]
 caching-sqlite = ["patera-caching[sqlite]"]
 database = ["patera-database"]
 email = ["patera-email"]
-frontend = ["patera-frontendext", "patera-frontend"]
-statemachine = ["patera-statemachine"]
 taskmanager = ["patera-taskmanager"]
 testing = ["httpx", "anyio", "pytest", "pytest-cov"]
-dev = ["uvicorn"]
+dev = ["uvicorn", "watchfiles"]
 all = [
     "patera-database",
     "patera-migrate",
@@ -49,7 +47,6 @@ all = [
     "patera-aiinterface",
     "patera-auth",
     "patera-caching",
-    "patera-statemachine",
     "patera-taskmanager"
 ]
 
@@ -62,9 +59,6 @@ members = [
     "packages/patera-database",
     "packages/patera-migrate",
     "packages/patera-email",
-    "packages/patera-frontend",
-    "packages/patera-frontendext",
-    "packages/patera-statemachine",
     "packages/patera-taskmanager"
 ]
 
@@ -76,9 +70,6 @@ patera-caching = { workspace = true }
 patera-database = { workspace = true }
 patera-migrate = { workspace = true }
 patera-email = { workspace = true }
-patera-frontend = { workspace = true }
-patera-frontendext = { workspace = true }
-patera-statemachine = { workspace = true }
 patera-taskmanager = { workspace = true }
 
 [build-system]
@@ -118,4 +109,5 @@ dev = [
     "pre-commit>=4.5.1",
     "ruff>=0.15.5",
     "uvicorn>=0.42.0",
+    "watchfiles>=1.1.1",
 ]

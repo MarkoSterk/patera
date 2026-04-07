@@ -38,7 +38,7 @@ from .dialect_overview_extras import (
 
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
-from patera.ctx import bind_session
+from patera.ctx import bind_session, request_context
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
@@ -411,10 +411,15 @@ def managed_cli_session(cls: Type["SqlDatabase"]) -> Callable:
             await db_extension.connect()  # connects to db
             assert db_extension._session_factory is not None
 
-            async with db_extension.create_session() as session:
-                async with session.begin():
-                    with bind_session(db_extension.session_name, session):
-                        result = await run_sync_or_async(func, self, *args, **kwargs)
+            with request_context(
+                app=self,
+            ):
+                async with db_extension.create_session() as session:
+                    async with session.begin():
+                        with bind_session(db_extension.session_name, session):
+                            result = await run_sync_or_async(
+                                func, self, *args, **kwargs
+                            )
 
             await db_extension.disconnect()  # disconnects from db
             wrapper.__managed_cli_session_wrapped__ = True  # type: ignore

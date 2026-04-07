@@ -14,6 +14,7 @@ from typing import (
     TYPE_CHECKING,
 )
 from sentence_transformers import SentenceTransformer
+from torch import Tensor
 from patera import Request
 from patera.database.sql import DeclarativeBaseModel
 
@@ -48,6 +49,9 @@ class _AugmentationConfig(BaseModel):
         "torch",
         description="Backend to use for the embedding model ('torch', 'onnx', 'openvino')",
     )
+    MINIMAL_SIMILARITY: Optional[float] = Field(
+        0.9, description="Minimal similarity for documents to be used for augmentation"
+    )
 
 
 class AugmentationConfig(TypedDict):
@@ -56,6 +60,7 @@ class AugmentationConfig(TypedDict):
     DEVICE: NotRequired[str]
     CACHE_FOLDER: NotRequired[str]
     BACKEND: NotRequired[str]
+    MINIMAL_SIMILARITY: NotRequired[float]
 
 
 class BaseAugmentationProvider(Generic[ModelT]):
@@ -69,7 +74,7 @@ class BaseAugmentationProvider(Generic[ModelT]):
         retriever_limit: int = 5,
     ) -> None:
         self._embedding_model: SentenceTransformer = cast(SentenceTransformer, None)
-        self._configs: Optional[dict] = None
+        self._configs: dict = cast(dict, None)
         self._vector_column = vector_column
         self._text_column = text_column
         self._retriever_limit = retriever_limit
@@ -79,8 +84,14 @@ class BaseAugmentationProvider(Generic[ModelT]):
         """
         Initialize embedding model
         """
-        self._configs = {key.lower(): value for key, value in configs.items()}
-        self._embedding_model = SentenceTransformer(**self._configs)
+        self._configs = configs
+        self._embedding_model = SentenceTransformer(
+            model_name_or_path=self._configs["MODEL_NAME_OR_PATH"],
+            modules=self._configs["MODULES"],
+            device=self._configs["DEVICE"],
+            backend=self._configs["BACKEND"],
+            cache_folder=self._configs["CACHE_FOLDER"],
+        )
         self._initilized = True
 
     async def _augment_prompt(self, req: Request, prompt: str) -> list[str]:
@@ -106,7 +117,9 @@ class BaseAugmentationProvider(Generic[ModelT]):
         """
         query_embedding = self._embedding_model.encode(query)
         documents = await self.loader(req)
-        embeddings = [getattr(document, self._vector_column) for document in documents]
+        embeddings = [
+            Tensor(getattr(document, self._vector_column)) for document in documents
+        ]
         similarities = [
             self._embedding_model.similarity(query_embedding, embedding)
             for embedding in embeddings
@@ -115,6 +128,8 @@ class BaseAugmentationProvider(Generic[ModelT]):
             zip(documents, similarities), key=lambda x: x[1], reverse=True
         )
         documents = [
-            document for document, _ in sorted_documents[: self._retriever_limit]
+            document
+            for document, sim in sorted_documents[: self._retriever_limit]
+            if sim >= self._configs.get("MINIMAL_SIMILARITY", 0.9)
         ]
         return documents

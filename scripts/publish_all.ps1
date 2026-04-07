@@ -20,10 +20,8 @@ $extensions = @(
     "patera_auth",
     "patera_caching",
     "patera_database",
+    "patera_migrate",
     "patera_email",
-    "patera_frontend",
-    "patera_frontendext",
-    "patera_statemachine",
     "patera_taskmanager"
 )
 
