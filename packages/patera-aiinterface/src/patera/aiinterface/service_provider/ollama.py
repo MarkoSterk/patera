@@ -62,7 +62,7 @@ class OllamaServiceProvider(BaseServiceProvider):
         messages: list[dict[str, str]] = []
         session_id = req.route_parameters.get("session_id", None)
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            messages = await ext.history_provider._get_history_messages(req)  # type: ignore
+            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
 
         if (
             hasattr(ext, "augmentation_provider")
@@ -87,7 +87,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             sys_message = {"role": "system", "content": sys_prompt}
             messages.append(sys_message)
             if hasattr(ext, "history_provider") and ext.history_provider is not None:
-                ext.history_provider._save_message(sys_message, session_id, 0)  # type: ignore
+                ext.history_provider.save_message(sys_message, session_id, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -112,13 +112,13 @@ class OllamaServiceProvider(BaseServiceProvider):
             json_response = response.json()
 
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            ext.history_provider._save_message(
+            ext.history_provider.save_message(
                 messages[len(messages) - 1], session_id, len(messages) - 1
             )  # type: ignore
 
         ollama_response = from_ollama(json_response)
         if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            ext.history_provider._save_message(
+            ext.history_provider.save_message(
                 ollama_response.message.to_dict(), session_id, len(messages)
             )  # type: ignore
         return ollama_response

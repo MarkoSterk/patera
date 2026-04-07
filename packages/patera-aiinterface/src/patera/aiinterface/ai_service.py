@@ -15,6 +15,7 @@ from typing import (
     NotRequired,
     TypeVar,
     Generic,
+    cast,
 )
 from collections.abc import AsyncIterator
 from pydantic import BaseModel, Field
@@ -102,7 +103,7 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
         Extension init method
         """
         self._app: Patera
-        self._configs: dict[str, str | bool | float]
+        self._configs: dict[str, str | bool | float | dict[Any, Any]]
 
     def init_app(self, app: Patera):
         """
@@ -120,8 +121,11 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
             hasattr(self, "augmentation_provider")
             and self.augmentation_provider is not None
         ):
+            from .augmentation_provider import BaseAugmentationProvider
+
+            assert isinstance(self.augmentation_provider, BaseAugmentationProvider)
             self.augmentation_provider._init_embedding_model(
-                self._configs["AUGMENTATION"]
+                cast(dict[Any, Any], self._configs["AUGMENTATION"])
             )  # type: ignore
 
     async def chat(self, req: Request, msg: str) -> ChatResponse:

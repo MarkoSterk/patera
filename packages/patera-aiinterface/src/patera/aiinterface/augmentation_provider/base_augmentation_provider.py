@@ -3,6 +3,7 @@ RAG interface
 """
 
 from typing import (
+    Any,
     Generic,
     Type,
     TypeVar,
@@ -74,7 +75,7 @@ class BaseAugmentationProvider(Generic[ModelT]):
         self._retriever_limit = retriever_limit
         self._initilized: bool = False
 
-    def _init_embedding_model(self, configs: dict) -> None:
+    def _init_embedding_model(self, configs: dict[Any, Any]) -> None:
         """
         Initialize embedding model
         """

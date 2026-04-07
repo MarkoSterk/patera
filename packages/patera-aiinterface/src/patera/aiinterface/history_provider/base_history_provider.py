@@ -3,12 +3,17 @@ Chat history provider
 """
 
 from uuid import UUID
-from typing import Any, Type, Generic, TypeVar
+from typing import Any, Type, Generic, TypeVar, TypedDict
 from patera import Request
 from patera.database.sql import SqlDatabase, DeclarativeBaseModel
 from patera.ctx import current_request
 
 ModelT = TypeVar("ModelT", bound=DeclarativeBaseModel)
+
+
+class ChatHistoryMessage(TypedDict):
+    role: str
+    content: str
 
 
 class BaseHistoryProvider(Generic[ModelT]):
@@ -64,7 +69,7 @@ class BaseHistoryProvider(Generic[ModelT]):
         history: list[ModelT] = await history_query.all()
         return self.order_by(history)
 
-    async def _get_history_messages(self, req: Request) -> list[dict[str, str]]:
+    async def get_history_messages(self, req: Request) -> list[ChatHistoryMessage]:
         session_id = req.route_parameters.get("session_id", None)
         if session_id is None:
             raise ValueError("Missing session id for chat history loader.")
@@ -77,7 +82,7 @@ class BaseHistoryProvider(Generic[ModelT]):
             for m in history
         ]
 
-    def _save_message(
+    def save_message(
         self, message: dict[str, Any], memory_id: str | int | UUID, order_number: int
     ) -> None:
         database: SqlDatabase = current_request.app.extensions.get(
