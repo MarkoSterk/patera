@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import inspect
-from typing import Any, Callable, TYPE_CHECKING, Optional, Type, TypeVar
+from typing import Any, Callable, TYPE_CHECKING, Optional, Type, TypeVar, Generic
 
 from pydantic import BaseModel
 from ..media_types import MediaType
@@ -13,7 +13,8 @@ from ..utilities import run_sync_or_async
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
 
-T = TypeVar("T", bound="Controller")
+AppT = TypeVar("AppT", bound="Patera")
+T = TypeVar("T", bound="Controller[Any]")
 
 
 def path(
@@ -28,12 +29,12 @@ def path(
     return decorator
 
 
-class Controller(Injectable):
+class Controller(Injectable, Generic[AppT]):
     # _controller_decorator_methods: list[Callable]
 
     def __init__(
         self,
-        app: "Patera",
+        app: AppT,
         url_path: str = "/",
         open_api_spec: bool = True,
         open_api_tags: Optional[list[str]] = None,
@@ -137,7 +138,7 @@ class Controller(Injectable):
         return self._open_api_spec
 
     @property
-    def app(self) -> "Patera":
+    def app(self) -> AppT:
         """App object"""
         return self._app
 
