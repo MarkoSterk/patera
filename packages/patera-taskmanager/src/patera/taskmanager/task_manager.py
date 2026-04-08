@@ -12,8 +12,6 @@ from typing import (
     cast,
     TYPE_CHECKING,
     Any,
-    TypedDict,
-    NotRequired,
 )
 from functools import wraps
 
@@ -33,7 +31,7 @@ if TYPE_CHECKING:
     from patera import Patera
 
 
-class _TaskManagerConfigs(BaseModel):
+class TaskManagerConfig(BaseModel):
     """Configuration model for TaskManager extension."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -64,17 +62,6 @@ class _TaskManagerConfigs(BaseModel):
     )
 
 
-class TaskManagerConfig(TypedDict):
-    """TypedDict for TaskManager configuration."""
-
-    NICE_NAME: NotRequired[str]
-    SCHEDULER: NotRequired[Type[BaseScheduler]]
-    JOB_STORES: NotRequired[dict[str, BaseJobStore]]
-    EXECUTORS: NotRequired[dict[str, BaseExecutor]]
-    JOB_DEFAULTS: NotRequired[dict[str, bool | int]]
-    DAEMON: NotRequired[bool]
-
-
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
@@ -101,7 +88,7 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
         self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
 
-        self._configs = self.validate_configs(self._configs, _TaskManagerConfigs)
+        self._configs = self.validate_configs(self._configs, TaskManagerConfig)
         self._job_stores = self._configs["JOB_STORES"]
         self._executors = self._configs["EXECUTORS"]
         self._job_defaults = self._configs["JOB_DEFAULTS"]

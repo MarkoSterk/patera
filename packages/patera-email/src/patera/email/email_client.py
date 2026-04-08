@@ -10,8 +10,6 @@ from typing import (
     Optional,
     TypeVar,
     cast,
-    TypedDict,
-    NotRequired,
 )
 from pydantic import BaseModel, Field
 from jinja2 import Environment
@@ -23,7 +21,7 @@ if TYPE_CHECKING:
     from patera import Patera
 
 
-class _EmailConfigs(BaseModel):
+class EmailConfig(BaseModel):
     """
     Email client configuration model
     """
@@ -36,19 +34,6 @@ class _EmailConfigs(BaseModel):
     USERNAME: Optional[str] = Field(None, description="SMTP username")
     PASSWORD: Optional[str] = Field(None, description="SMTP password")
     USE_TLS: Optional[bool] = Field(False, description="Use TLS for SMTP connection")
-
-
-class EmailConfig(TypedDict):
-    """
-    Email client configuration dictionary
-    """
-
-    SENDER_NAME_OR_ADDRESS: str
-    SMTP_SERVER: str
-    SMTP_PORT: int
-    USERNAME: NotRequired[str]
-    PASSWORD: NotRequired[str]
-    USE_TLS: NotRequired[bool]
 
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
@@ -68,7 +53,7 @@ class EmailClient(BaseExtension[AppT], Generic[AppT]):
         """Initilizes the extension with the Patera app"""
         self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
-        self._configs = self.validate_configs(self._configs, _EmailConfigs)
+        self._configs = self.validate_configs(self._configs, EmailConfig)
 
         self._app.add_extension(self)
         self.render_engine = self._app.jinja_environment

@@ -94,7 +94,7 @@ def app(import_name: str, configs: Type[BaseConfig]) -> Callable[[Type[T]], Type
     return decorator
 
 
-def on_startup(func) -> Callable:
+def on_startup(func: Callable) -> Callable:
     """
     Decorated methods will run in alphabetical order on app startup
     """
@@ -102,7 +102,7 @@ def on_startup(func) -> Callable:
     return func
 
 
-def on_shutdown(func) -> Callable:
+def on_shutdown(func: Callable) -> Callable:
     """
     Decorated methods will run in alphabetical order on app shutdown
     """

@@ -223,9 +223,7 @@ def _get_ignore_patterns():
     return DEFAULT_IGNORE_PATTERNS
 
 
-def _start_prod(
-    cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
-):
+def _start_prod(cwd: str, debug: bool, app: Optional[str] = None):
     """
     Starts application in dev mode.
     """
@@ -233,10 +231,6 @@ def _start_prod(
     from granian.constants import Interfaces, Loops
     from granian.log import LogLevels
     from ..patera import Patera
-
-    loaded_env = load_env_file(cwd, env_file)
-    if loaded_env is not None:
-        print(f"Loaded environment from: {loaded_env}")
 
     app_path = app
     if app_path is None:
@@ -269,15 +263,9 @@ def _start_prod(
     ).serve()
 
 
-def _start_dev(
-    cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
-):
+def _start_dev(cwd: str, debug: bool, app: Optional[str] = None):
     import uvicorn
     from ..patera import Patera
-
-    loaded_env = load_env_file(cwd, env_file)
-    if loaded_env is not None:
-        print(f"Loaded environment from: {loaded_env}")
 
     app_path = app
     if app_path is None:
@@ -314,19 +302,15 @@ def _start_dev(
     )
 
 
-def start_dev(
-    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
-):
+def start_dev(cwd: str, command: str, app: Optional[str] = None):
     try:
-        _start_dev(cwd, True, app, env_file)
+        _start_dev(cwd, True, app)
     except Exception:
         print("Faled to start Granian dev server. Install patera[dev] if not already.")
 
 
-def start_prod(
-    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
-):
-    _start_prod(cwd, False, app, env_file)
+def start_prod(cwd: str, command: str, app: Optional[str] = None):
+    _start_prod(cwd, False, app)
 
 
 def start_cli(
@@ -337,12 +321,7 @@ def start_cli(
     env_file: Optional[str] = None,
     **kwargs,
 ):
-
     from ..patera import Patera
-
-    loaded_env = load_env_file(cwd, env_file)
-    if loaded_env is not None:
-        print(f"Loaded environment from: {loaded_env}")
 
     app_path = app
     if app_path is None:
@@ -365,7 +344,6 @@ def start_testing(
     command: str,
     *args,
     app: Optional[str] = None,
-    env_file: Optional[str] = None,
     **kwargs,
 ):
     try:
@@ -375,10 +353,6 @@ def start_testing(
             "Failed to import Pytest. Please add dependency for running tests. Run: 'pip install patera[testing]'"
         )
         return
-
-    loaded_env = load_env_file(cwd, env_file)
-    if loaded_env is not None:
-        print(f"Loaded environment from: {loaded_env}")
 
     pytest_args = kwargs.pop("pytest_args", []) or []
 

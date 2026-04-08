@@ -22,8 +22,6 @@ from typing import (
     Protocol,
     runtime_checkable,
     Type,
-    TypedDict,
-    NotRequired,
 )
 from enum import StrEnum
 from pydantic import BaseModel, field_validator, Field, ConfigDict
@@ -63,7 +61,7 @@ class LogLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
-class _LoggerConfigBase(BaseModel):
+class LoggerConfigBase(BaseModel):
     """
     Base config model for loggers
     """
@@ -108,7 +106,14 @@ class _LoggerConfigBase(BaseModel):
     @field_validator("SINK", mode="before")
     @classmethod
     def normalize_sink(cls, v):
-        """Accept case-insensitive strings and convert to canonical form."""
+        """Accept case-insensitive sink aliases and convert to canonical form."""
+        if v is None:
+            return v
+        if isinstance(v, Path):
+            return v
+        if not isinstance(v, str):
+            raise TypeError("SINK must be a string, pathlib.Path, or None.")
+
         s = v.strip().upper()
         if s in {"STDERR", "SYS.ERR", "CONSOLE", "ERR"}:
             return "STDERR"
@@ -116,25 +121,27 @@ class _LoggerConfigBase(BaseModel):
             return "STDOUT"
         if s in {"NULL", "DEVNULL", "NONE"}:
             return "NULL"
-        # Otherwise treat it as a path
+
+        # Otherwise treat it as a filesystem path
         return Path(v)
 
+    @field_validator("LEVEL", mode="before")
+    @classmethod
+    def normalize_level(cls, v):
+        """Accept enum instances or case-insensitive strings from .env files."""
+        if v is None or isinstance(v, LogLevel):
+            return v
+        if not isinstance(v, str):
+            raise TypeError("LEVEL must be a LogLevel, string, or None.")
 
-class LoggerConfig(TypedDict):
-    SINK: NotRequired[str | Path]
-    LEVEL: NotRequired[LogLevel]
-    FORMAT: NotRequired[str]
-    ENQUEUE: NotRequired[bool]
-    BACKTRACE: NotRequired[bool]
-    DIAGNOSE: NotRequired[bool]
-    COLORIZE: NotRequired[bool]
-    DELAY: NotRequired[bool]
-    ROTATION: NotRequired[RotationType]
-    RETENTION: NotRequired[RetentionType]
-    COMPRESSION: NotRequired[CompressionType]
-    SERIALIZE: NotRequired[bool]
-    ENCODING: NotRequired[str]
-    MODE: NotRequired[str]
+        value = v.strip().upper()
+        try:
+            return LogLevel(value)
+        except ValueError as exc:
+            allowed = ", ".join(level.value for level in LogLevel)
+            raise ValueError(
+                f"Invalid log level '{v}'. Allowed values: {allowed}"
+            ) from exc
 
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
@@ -146,8 +153,8 @@ class LoggerBase(ABC, Generic[AppT]):
     Subclasses implement get_sink() and optionally override getters below.
     """
 
-    configs_model: ClassVar[Optional[Type[_LoggerConfigBase]]] = cast(
-        Type[_LoggerConfigBase], None
+    configs_model: ClassVar[Optional[Type[LoggerConfigBase]]] = cast(
+        Type[LoggerConfigBase], None
     )
 
     def __init__(self, app: AppT):
@@ -160,10 +167,10 @@ class LoggerBase(ABC, Generic[AppT]):
 
     def validate_configs(self, configs: dict[str, Any]) -> dict[str, Any]:
         if self.configs_model is not None and issubclass(
-            self.configs_model, _LoggerConfigBase
+            self.configs_model, LoggerConfigBase
         ):
             return self.configs_model.model_validate(configs).model_dump()
-        return _LoggerConfigBase.model_validate(configs).model_dump()
+        return LoggerConfigBase.model_validate(configs).model_dump()
 
     @property
     def app(self) -> AppT:

@@ -17,7 +17,13 @@ IMPORT_STR_RE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*$")
 
 
 class BaseConfig(BaseSettings):
-    model_config = SettingsConfigDict(extra="allow")
+    model_config = SettingsConfigDict(
+        extra="allow",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="PATERA_",
+        env_nested_delimiter=".",
+    )
 
     # required
     APP_NAME: str = Field(description="Human-readable name of the app")

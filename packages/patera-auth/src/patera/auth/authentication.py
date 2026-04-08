@@ -13,8 +13,6 @@ from typing import (
     TYPE_CHECKING,
     Type,
     TypeVar,
-    TypedDict,
-    NotRequired,
 )
 import base64
 from datetime import datetime, timedelta, timezone
@@ -51,7 +49,7 @@ USER_LOADER_ERROR_MSG: str = (
 )
 
 
-class _AuthenticationConfigs(BaseModel):
+class AuthenticationConfig(BaseModel):
     """
     Authentication configuration model
     """
@@ -63,13 +61,6 @@ class _AuthenticationConfigs(BaseModel):
         default="Missing user role(s)",
         description="Default authorization error message",
     )
-
-
-class AuthConfig(TypedDict):
-    """Authentication configurations"""
-
-    AUTHENTICATION_ERROR_MSG: NotRequired[str]
-    AUTHORIZATION_ERROR_MSG: NotRequired[str]
 
 
 class AuthUtils:
@@ -213,7 +204,7 @@ class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):
         self.authorization_error: str
 
         self._configs = app.get_conf(self.configs_name, {})
-        self._configs = self.validate_configs(self._configs, _AuthenticationConfigs)
+        self._configs = self.validate_configs(self._configs, AuthenticationConfig)
 
         self.authentication_error = self._configs["AUTHENTICATION_ERROR_MSG"]
         self.authorization_error = self._configs["AUTHORIZATION_ERROR_MSG"]

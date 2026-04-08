@@ -6,11 +6,9 @@ from functools import wraps
 from typing import (
     Callable,
     Generic,
-    NotRequired,
     Optional,
     Type,
     TypeVar,
-    TypedDict,
     cast,
     TYPE_CHECKING,
     Any,
@@ -26,7 +24,7 @@ if TYPE_CHECKING:
     from patera import Patera, Response, Request
 
 
-class _CachingConfigs(BaseModel):
+class CachingConfig(BaseModel):
     """Configuration model for Caching extension."""
 
     BACKEND: Optional[Type[BaseCacheBackend]] = Field(
@@ -36,13 +34,6 @@ class _CachingConfigs(BaseModel):
     DURATION: Optional[int] = Field(
         default=300, description="Default cache duration in seconds"
     )
-
-
-class CachingConfig(TypedDict):
-    """Cache configurations"""
-
-    BACKEND: NotRequired[Type[BaseCacheBackend]]
-    DURATION: NotRequired[int]
 
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
@@ -68,7 +59,7 @@ class Caching(BaseExtension[AppT], Generic[AppT]):
     def init_app(self, app: AppT) -> None:
         self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
-        self._configs = self.validate_configs(self._configs, _CachingConfigs)
+        self._configs = self.validate_configs(self._configs, CachingConfig)
 
         self._duration = self._configs["DURATION"]
         backend_cls = self._configs.get("BACKEND", None)

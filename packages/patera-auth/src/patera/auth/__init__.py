@@ -7,7 +7,7 @@ from .authentication import (
     role_required,
     Authentication,
     AuthUtils,
-    AuthConfig,
+    AuthenticationConfig as AuthConfig,
 )
 
 from .exceptions import AuthenticationException, AuthorizationException

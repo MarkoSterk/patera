@@ -3,7 +3,7 @@
 from __future__ import annotations
 from datetime import datetime
 import os
-from typing import TYPE_CHECKING, Optional, Type, Any, cast, TypedDict, NotRequired
+from typing import TYPE_CHECKING, Optional, Type, Any, cast
 from pydantic import BaseModel, Field
 from wtforms_sqlalchemy.orm import model_form
 from patera.exceptions.runtime_exceptions import CustomException
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from patera import Patera
 
 
-class _AdminDashboardConfig(BaseModel):
+class AdminDashboardConfig(BaseModel):
     """Admin dashboard configuration model."""
 
     model_config = {"strict": True}
@@ -54,17 +54,6 @@ class _AdminDashboardConfig(BaseModel):
     )
 
 
-class AdminConfig(TypedDict):
-    """Admin configurations typed dictionary"""
-
-    DASHBOARD_URL: NotRequired[str]
-    LOGO_URL: NotRequired[str]
-    URL_FOR_FOR_LOGIN: str
-    URL_FOR_FOR_LOGOUT: str
-    URL_FOR_FOR_PASSWORD_RESET: NotRequired[str]
-    USE_REMEMBER_ME: NotRequired[bool]
-
-
 class AdminMissingDatabaseExtension(CustomException):
     def __init__(self, db_name: str):
         self.message = f"Failed to load database extension with {db_name=}"
@@ -85,7 +74,7 @@ class AdminDashboard(BaseExtension):
     def init_app(self, app: "Patera") -> None:
         self._app = app
         self._configs = app.get_conf(self._configs_name, {})
-        self._configs = self.validate_configs(self._configs, _AdminDashboardConfig)
+        self._configs = self.validate_configs(self._configs, AdminDashboardConfig)
         # pylint: disable-next=W0212
         self._databases_models = self.get_registered_models()
         self._databases = self._get_all_databases()

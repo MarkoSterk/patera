@@ -11,10 +11,8 @@ from typing import (
     Callable,
     Tuple,
     Type,
-    TypedDict,
     cast,
     TYPE_CHECKING,
-    NotRequired,
     TypeVar,
     Generic,
 )
@@ -50,7 +48,7 @@ if TYPE_CHECKING:
     from patera import Patera
 
 
-class _SqlDatabaseConfig(BaseModel):
+class SqlDatabaseConfig(BaseModel):
     """Configuration options for SqlDatabase extension"""
 
     model_config = ConfigDict(extra="allow")
@@ -79,15 +77,6 @@ class _SqlDatabaseConfig(BaseModel):
     AUTOFUSH: Optional[bool] = Field(
         False, description="Wether session should autoflush or not. Defaults to False."
     )
-
-
-class SqlDatabaseConfig(TypedDict):
-    DATABASE_URI: str
-    DATABASE_SESSION_NAME: NotRequired[str]
-    SHOW_SQL: NotRequired[bool]
-    NICE_NAME: NotRequired[str]
-    EXPIRE_ON_COMMIT: NotRequired[bool]
-    AUTOFUSH: NotRequired[bool]
 
 
 _DIALECT_EXTRAS: Dict[str, Callable] = {
@@ -135,7 +124,7 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
             raise ValueError(
                 f"Configurations for {self.configs_name} not found in app configurations."
             )
-        self._configs = self.validate_configs(self._configs, _SqlDatabaseConfig)
+        self._configs = self.validate_configs(self._configs, SqlDatabaseConfig)
         self._db_uri = self._configs["DATABASE_URI"]  # type: ignore
         self._session_name = self._configs["DATABASE_SESSION_NAME"]  # type: ignore
         self._app.add_extension(self)

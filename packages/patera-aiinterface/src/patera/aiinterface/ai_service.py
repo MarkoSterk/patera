@@ -11,8 +11,6 @@ from typing import (
     Callable,
     ParamSpec,
     Type,
-    TypedDict,
-    NotRequired,
     TypeVar,
     Generic,
     cast,
@@ -25,12 +23,11 @@ from patera.base_extension import BaseExtension
 from .service_provider import BaseServiceProvider, ChatResponse
 
 from .augmentation_provider.base_augmentation_provider import (
-    AugmentationConfig,
     _AugmentationConfig,
 )
 
 
-class _AiServiceConfigs(BaseModel):
+class AiServiceConfig(BaseModel):
     """
     AI service configuration model
     """
@@ -67,23 +64,6 @@ class _AiServiceConfigs(BaseModel):
     )
 
 
-class AiServiceConfig(TypedDict):
-    """AI configurations typed dictionary"""
-
-    API_KEY: NotRequired[str]
-    BASE_URL: NotRequired[str]
-    ORGANIZATION_ID: NotRequired[str]
-    PROJECT_ID: NotRequired[str]
-    TIMEOUT: NotRequired[int]
-    MODEL: str
-    TEMPERATURE: NotRequired[float]
-    RESPONSE_FORMAT: NotRequired[dict[str, str]]
-    TOOL_CHOICE: NotRequired[bool]
-    MAX_RETRIES: NotRequired[int]
-    STREAM: NotRequired[bool]
-    AUGMENTATION: NotRequired[AugmentationConfig]
-
-
 AppT = TypeVar("AppT", bound="Patera")
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
 HistoryT = TypeVar("HistoryT", default=None)
@@ -115,7 +95,7 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
             raise ValueError(
                 f"Configurations for {self.configs_name} not found in app configurations."
             )
-        self._configs = self.validate_configs(self._configs, _AiServiceConfigs)
+        self._configs = self.validate_configs(self._configs, AiServiceConfig)
         self._app.add_extension(self)
         if (
             hasattr(self, "augmentation_provider")

@@ -4,7 +4,7 @@ Logging module
 
 from .logger_config_base import (
     LoggerBase,
-    LoggerConfig,
+    LoggerConfigBase as LoggerConfig,
     LogLevel,
     Writable,
     SinkInput,

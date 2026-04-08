@@ -8,8 +8,6 @@ from typing import (
     Type,
     TypeVar,
     Optional,
-    TypedDict,
-    NotRequired,
     cast,
     TYPE_CHECKING,
 )
@@ -52,15 +50,6 @@ class _AugmentationConfig(BaseModel):
     MINIMAL_SIMILARITY: Optional[float] = Field(
         0.9, description="Minimal similarity for documents to be used for augmentation"
     )
-
-
-class AugmentationConfig(TypedDict):
-    MODEL_NAME_OR_PATH: NotRequired[str]
-    MODULES: NotRequired[list[str]]
-    DEVICE: NotRequired[str]
-    CACHE_FOLDER: NotRequired[str]
-    BACKEND: NotRequired[str]
-    MINIMAL_SIMILARITY: NotRequired[float]
 
 
 class BaseAugmentationProvider(Generic[ModelT]):
