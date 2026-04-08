@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import (
     Dict,
     Any,
+    Generic,
+    TypeVar,
     Union,
     Optional,
     ClassVar,
@@ -135,7 +137,10 @@ class LoggerConfig(TypedDict):
     MODE: NotRequired[str]
 
 
-class LoggerBase(ABC):
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
+
+
+class LoggerBase(ABC, Generic[AppT]):
     """
     Base template for configuring a Loguru sink.
     Subclasses implement get_sink() and optionally override getters below.
@@ -145,8 +150,8 @@ class LoggerBase(ABC):
         Type[_LoggerConfigBase], None
     )
 
-    def __init__(self, app: "Patera"):
-        self.app: "Patera" = app
+    def __init__(self, app: AppT):
+        self._app: AppT = app
         # loads configs for the logger from application configurations
         # by the config class name as upper-case
         # example: CustomLoggerConfig -> CUSTOM_LOGGER_CONFIG
@@ -159,6 +164,10 @@ class LoggerBase(ABC):
         ):
             return self.configs_model.model_validate(configs).model_dump()
         return _LoggerConfigBase.model_validate(configs).model_dump()
+
+    @property
+    def app(self) -> AppT:
+        return self._app
 
     @property
     def logger_name(self) -> str:

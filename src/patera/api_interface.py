@@ -8,6 +8,7 @@ from typing import (
     Callable,
     Dict,
     Any,
+    Generic,
     Optional,
     Tuple,
     Type,
@@ -135,14 +136,17 @@ class MissingApiInterfaceConfigurations(Exception):
         super().__init__(msg)
 
 
-class ApiInterface(BaseExtension):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class ApiInterface(BaseExtension[AppT], Generic[AppT]):
     def __init__(self) -> None:
         super().__init__()
-        self._app: Optional[Patera] = None
+        self._app: AppT = cast(AppT, None)
         self._service_url = None
 
-    def init_app(self, app: Patera) -> None:
-        self._app = app
+    def init_app(self, app: AppT) -> None:
+        self._app = app  # type: ignore
         serv_url = getattr(self, "__service_url__", None)
         if serv_url is None:
             raise Exception(
