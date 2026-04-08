@@ -377,7 +377,7 @@ class Patera(Injectable):
         return self.configs.get(config_name, default)
 
     def _get_nested_config(self, config_name: str, default: Any = None) -> Any:
-        names: list[str] = config_name.split(",")  # names/paths of entire config tree
+        names: list[str] = config_name.split(".")  # names/paths of entire config tree
         first_name = names.pop(0)  # start of nested config
         last_name = names.pop()  # name of final level config
         config = self.get_conf(first_name)  # top level/start
