@@ -3,13 +3,15 @@ Base/Blueprint class for cache implementation
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Generic, Optional, TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from patera import Patera
 
+AppT = TypeVar("AppT", bound="Patera")
 
-class BaseCacheBackend(ABC):
+
+class BaseCacheBackend(ABC, Generic[AppT]):
     """
     Abstract cache backend blueprint.
 
@@ -22,7 +24,7 @@ class BaseCacheBackend(ABC):
     @classmethod
     @abstractmethod
     def configure_from_app(
-        cls, app: "Patera", configs: dict[str, Any]
+        cls, app: AppT, configs: dict[str, Any]
     ) -> "BaseCacheBackend":
         """Create a configured backend instance using app config."""
 

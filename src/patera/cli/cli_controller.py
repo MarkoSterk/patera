@@ -4,7 +4,7 @@ CLI controller module for Patera.
 
 import inspect
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Callable, cast, TypeVar, Generic, Any
 from functools import wraps
 
 from ..injectable import Injectable
@@ -13,16 +13,19 @@ from ..utilities import run_sync_or_async
 if TYPE_CHECKING:
     from ..patera import Patera
 
+AppT = TypeVar("AppT", bound="Patera")
+T = TypeVar("T", bound="CLIController[Any]")
 
-class CLIController(Injectable):
+
+class CLIController(Injectable, Generic[AppT]):
     """
     Base class for CLI controllers.
     This class automatically registers methods decorated with @command and @argument
     as CLI commands in the provided Patera app instance.
     """
 
-    def __init__(self, app: "Patera"):
-        self._app: "Patera" = app
+    def __init__(self, app: AppT):
+        self._app: AppT = app
         self._cli_commands: dict[str, Callable] = {}
         self._cli_commands_help: dict[str, str] = {}
         self._ctrl_name: str = self.__class__.__name__
@@ -123,7 +126,7 @@ class CLIController(Injectable):
         return converted
 
     @property
-    def app(self) -> "Patera":
+    def app(self) -> AppT:
         """Returns the Patera app instance."""
         return self._app
 

@@ -4,9 +4,11 @@ Task manager class
 
 from typing import (
     Callable,
+    Generic,
     Tuple,
     Optional,
     Type,
+    TypeVar,
     cast,
     TYPE_CHECKING,
     Any,
@@ -73,14 +75,17 @@ class TaskManagerConfig(TypedDict):
     DAEMON: NotRequired[bool]
 
 
-class TaskManager(BaseExtension):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class TaskManager(BaseExtension[AppT], Generic[AppT]):
     """
     Task manager class for scheduling and managing backgroudn tasks.
     """
 
     def __init__(self) -> None:
         self._configs: dict[str, Any] = {}
-        self._app: "Patera"
+        self._app: AppT = cast(AppT, None)
         self._job_stores: dict
         self._executors: dict
         self._job_defaults: dict
@@ -89,7 +94,7 @@ class TaskManager(BaseExtension):
         self._initial_jobs_methods_list: list[Tuple] = []
         self._active_jobs: dict[str, Job] = {}
 
-    def init_app(self, app: "Patera"):
+    def init_app(self, app: AppT):
         """
         Initlizer for TaskManager with Patera app
         """
@@ -243,13 +248,6 @@ class TaskManager(BaseExtension):
     def nice_name(self) -> str:
         """Nice name of the instance"""
         return self._configs["NICE_NAME"]
-
-    @property
-    def app(self) -> "Patera":
-        """
-        Application instance
-        """
-        return cast("Patera", self._app)
 
 
 def schedule_job(*args, **kwargs):

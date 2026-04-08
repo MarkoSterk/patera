@@ -5,9 +5,11 @@ from __future__ import annotations
 from functools import wraps
 from typing import (
     Callable,
+    Generic,
     NotRequired,
     Optional,
     Type,
+    TypeVar,
     TypedDict,
     cast,
     TYPE_CHECKING,
@@ -43,7 +45,10 @@ class CachingConfig(TypedDict):
     DURATION: NotRequired[int]
 
 
-class Caching(BaseExtension):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class Caching(BaseExtension[AppT], Generic[AppT]):
     """
     Caching system for route handlers with **pluggable backend class**.
 
@@ -55,13 +60,13 @@ class Caching(BaseExtension):
     """
 
     def __init__(self) -> None:
-        self._app: "Optional[Patera]" = None
+        self._app: AppT = cast(AppT, None)
         self._duration: int = 300
         self._backend: Optional[BaseCacheBackend] = None
         self._configs: dict[str, Any] = {}
 
-    def init_app(self, app: "Patera") -> None:
-        self._app = app
+    def init_app(self, app: AppT) -> None:
+        self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, _CachingConfigs)
 

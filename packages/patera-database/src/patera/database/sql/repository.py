@@ -35,6 +35,7 @@ from patera.base_extension import BaseExtension
 T = TypeVar("T", bound=DeclarativeBaseModel)
 M = TypeVar("M", bound=DeclarativeBaseModel)
 F = TypeVar("F", bound=Callable[..., Any])
+AppT = TypeVar("AppT", bound=Patera)
 
 
 def query(sql_query: str) -> Callable[[F], F]:
@@ -45,7 +46,7 @@ def query(sql_query: str) -> Callable[[F], F]:
     return decorator
 
 
-class Repository(BaseExtension, Generic[T]):
+class Repository(BaseExtension[AppT], Generic[T, AppT]):
     model: type[T]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -65,7 +66,7 @@ class Repository(BaseExtension, Generic[T]):
         super().__init__()
         self._database: SqlDatabase | None = None
 
-    def init_app(self, app: Patera) -> None:
+    def init_app(self, app: AppT) -> None:
         self._app = app
 
     def get_database(self) -> SqlDatabase:
@@ -73,7 +74,7 @@ class Repository(BaseExtension, Generic[T]):
             self._database
         database = cast(
             SqlDatabase,
-            cast(Patera, self._app).extensions.get(self.model.db_name(), None),
+            cast(AppT, self._app).extensions.get(self.model.db_name(), None),
         )
         if database is None:
             raise ValueError(f"No database found for model {self.model.__name__}")

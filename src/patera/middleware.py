@@ -4,7 +4,7 @@ Middleware base class
 
 from abc import abstractmethod, ABC
 from patera.injectable import Injectable
-from typing import Callable, TYPE_CHECKING, Awaitable, Any, Protocol
+from typing import Callable, TYPE_CHECKING, Awaitable, Any, Generic, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -24,15 +24,17 @@ class AppCallableType(Protocol):
 # A middleware factory: given (app_instance, next_app) returns a wrapped app
 MiddlewareFactory = Callable[["Patera", AppCallableType], AppCallableType]
 
+AppT = TypeVar("AppT", bound="Patera")
 
-class MiddlewareBase(Injectable, ABC):
+
+class MiddlewareBase(Injectable, ABC, Generic[AppT]):
     """
     Base class for middleware
     """
 
     _configs_name: str | None = None
 
-    def __init__(self, app: "Patera", next_app: AppCallableType):
+    def __init__(self, app: AppT, next_app: AppCallableType):
         """
         Accepts the application and the next part of the middleware chain
         """
@@ -82,7 +84,7 @@ class MiddlewareBase(Injectable, ABC):
         )
 
     @property
-    def app(self) -> "Patera":
+    def app(self) -> AppT:
         """
         Returns the application instance
         """

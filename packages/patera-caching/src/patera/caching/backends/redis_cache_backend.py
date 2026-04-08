@@ -10,7 +10,7 @@ CACHE_KEY_PREFIX      = "patera:cache:"              # optional prefix/namespace
 from __future__ import annotations
 
 import pickle
-from typing import Optional, cast, List, TYPE_CHECKING, Any
+from typing import Generic, Optional, TypeVar, cast, List, TYPE_CHECKING, Any
 
 from redis.asyncio import Redis, from_url
 
@@ -19,8 +19,10 @@ from .base_cache_backend import BaseCacheBackend
 if TYPE_CHECKING:
     from patera import Patera
 
+AppT = TypeVar("AppT", bound="Patera")
 
-class RedisCacheBackend(BaseCacheBackend):
+
+class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
     """Redis-backed cache using binary pickled payloads."""
 
     def __init__(
@@ -43,7 +45,7 @@ class RedisCacheBackend(BaseCacheBackend):
 
     @classmethod
     def configure_from_app(
-        cls, app: Patera, configs: dict[str, Any]
+        cls, app: AppT, configs: dict[str, Any]
     ) -> "RedisCacheBackend":
         url = configs.get("REDIS_URL", "")
         password = configs.get("REDIS_PASSWORD", None)

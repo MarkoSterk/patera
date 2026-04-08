@@ -84,12 +84,13 @@ class AiServiceConfig(TypedDict):
     AUGMENTATION: NotRequired[AugmentationConfig]
 
 
+AppT = TypeVar("AppT", bound="Patera")
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
 HistoryT = TypeVar("HistoryT", default=None)
 AugmentationT = TypeVar("AugmentationT", default=None)
 
 
-class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
+class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, AugmentationT]):
     """
     Main AI service class for handling chat requests and connecting to the AI provider
     """
@@ -102,10 +103,9 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
         """
         Extension init method
         """
-        self._app: Patera
         self._configs: dict[str, str | bool | float | dict[Any, Any]]
 
-    def init_app(self, app: Patera):
+    def init_app(self, app: AppT):
         """
         Initilizer method for extension
         """
@@ -131,7 +131,7 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
     async def chat(self, req: Request, msg: str) -> ChatResponse:
         return await self.service_provider.chat(req, msg, self)  # type: ignore
 
-    async def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
+    def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
         return self.service_provider.stream(req, msg, self)  # type: ignore
 
     @property
@@ -139,7 +139,7 @@ class AiService(BaseExtension, Generic[ServiceT, HistoryT, AugmentationT]):
         return self._configs
 
 
-AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any])
+AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any, Any])
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -189,12 +189,17 @@ def system_prompt(prompt: str) -> Callable[[Type[AiServiceT]], Type[AiServiceT]]
     return decorator
 
 
-def tool(name: Optional[str] = None, description: Optional[str] = None) -> Callable:
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def tool(
+    name: Optional[str] = None, description: Optional[str] = None
+) -> Callable[[F], F]:
     """
     Decorator for adding a method as a tool to the Ai interface
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: F) -> F:
         """
         Marks method to as ai interface tool
         """

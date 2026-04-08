@@ -4,7 +4,7 @@ Pyway implementation for Patera
 
 import os
 from urllib.parse import urlparse
-from typing import Dict, Optional, cast
+from typing import Dict, Generic, Optional, TypeVar, cast
 from patera import Patera
 from patera.cli import CLIController, command
 from patera.database.sql import SqlDatabase
@@ -33,8 +33,11 @@ class _PateraPywayConfigs(BaseModel):
     MIGRATE_CONFIG_FILE: Optional[str] = Field(".pyway.conf", description="")
 
 
-class PywayCLIController(CLIController):
-    def __init__(self, app: Patera, extension: "Migrate"):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class PywayCLIController(CLIController[AppT]):
+    def __init__(self, app: AppT, extension: "Migrate"):
         super().__init__(app)
         self._ext = extension
 
@@ -102,10 +105,10 @@ class PywayCLIController(CLIController):
             self._clear_env_vars()
 
 
-class Migrate:
+class Migrate(Generic[AppT]):
     __db_name__: str
 
-    def __init__(self, app: Patera, db: SqlDatabase):
+    def __init__(self, app: AppT, db: SqlDatabase):
         self._app = app
         self._db = db
         self.__db_name__ = db.__db_name__

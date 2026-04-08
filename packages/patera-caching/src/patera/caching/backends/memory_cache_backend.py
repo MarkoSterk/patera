@@ -2,7 +2,7 @@
 In-memory cache implementation
 """
 
-from typing import Optional, cast, TYPE_CHECKING, Any
+from typing import Generic, Optional, TypeVar, cast, TYPE_CHECKING, Any
 import asyncio
 
 from cachetools import TTLCache
@@ -12,8 +12,10 @@ from .base_cache_backend import BaseCacheBackend
 if TYPE_CHECKING:
     from patera import Patera
 
+AppT = TypeVar("AppT", bound="Patera")
 
-class MemoryCacheBackend(BaseCacheBackend):
+
+class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
     """
     In-memory cache using cachetools.TTLCache for bounded size and base TTL.
 
@@ -32,7 +34,7 @@ class MemoryCacheBackend(BaseCacheBackend):
     # ---- config ----
     @classmethod
     def configure_from_app(
-        cls, app: "Patera", configs: dict[str, Any]
+        cls, app: AppT, configs: dict[str, Any]
     ) -> "MemoryCacheBackend":
         default_ttl = configs["DURATION"]
         maxsize = configs.get("MEMORY_MAXSIZE", 10_000)

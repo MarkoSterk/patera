@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import pickle
 import time
-from typing import Optional, TYPE_CHECKING, Tuple, cast, Any
+from typing import Generic, Optional, TYPE_CHECKING, Tuple, TypeVar, cast, Any
 from pydantic import BaseModel, Field
 
 import aiosqlite
@@ -24,6 +24,8 @@ from .base_cache_backend import BaseCacheBackend
 
 if TYPE_CHECKING:
     from patera import Patera
+
+AppT = TypeVar("AppT", bound="Patera")
 
 
 class SQLiteCacheConfig(BaseModel):
@@ -45,7 +47,7 @@ class SQLiteCacheConfig(BaseModel):
     )
 
 
-class SQLiteCacheBackend(BaseCacheBackend):
+class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
     """SQLite-backed cache using pickled payloads (async via aiosqlite)."""
 
     def __init__(
@@ -79,7 +81,7 @@ class SQLiteCacheBackend(BaseCacheBackend):
 
     @classmethod
     def configure_from_app(
-        cls, app: "Patera", configs: dict[str, Any]
+        cls, app: AppT, configs: dict[str, Any]
     ) -> "SQLiteCacheBackend":
         db_path = cast(str, configs.get("SQLITE_PATH", "./pyjolt_cache.db"))
         table = cast(str, configs.get("SQLITE_TABLE", "cache_entries"))

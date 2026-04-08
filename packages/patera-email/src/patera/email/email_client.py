@@ -4,7 +4,15 @@ Email client extension
 
 import aiosmtplib as smtplib
 from email.message import EmailMessage
-from typing import TYPE_CHECKING, Optional, cast, TypedDict, NotRequired
+from typing import (
+    TYPE_CHECKING,
+    Generic,
+    Optional,
+    TypeVar,
+    cast,
+    TypedDict,
+    NotRequired,
+)
 from pydantic import BaseModel, Field
 from jinja2 import Environment
 
@@ -43,19 +51,22 @@ class EmailConfig(TypedDict):
     USE_TLS: NotRequired[bool]
 
 
-class EmailClient(BaseExtension):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class EmailClient(BaseExtension[AppT], Generic[AppT]):
     """
     Email client extension class
     """
 
     def __init__(self) -> None:
-        self._app: "Optional[Patera]" = None
+        self._app: AppT = cast(AppT, None)
         self._configs: dict[str, str | int | bool] = {}
         self.render_engine: Environment = None  # type: ignore
 
-    def init_app(self, app: "Patera") -> None:
+    def init_app(self, app: AppT) -> None:
         """Initilizes the extension with the Patera app"""
-        self._app = app
+        self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, _EmailConfigs)
 

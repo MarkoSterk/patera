@@ -15,6 +15,8 @@ from typing import (
     cast,
     TYPE_CHECKING,
     NotRequired,
+    TypeVar,
+    Generic,
 )
 from functools import wraps
 from sqlalchemy import MetaData, Table, select, func
@@ -97,8 +99,10 @@ _DIALECT_EXTRAS: Dict[str, Callable] = {
     "oracle": _extras_oracle,
 }
 
+AppT = TypeVar("AppT", bound="Patera")
 
-class SqlDatabase(BaseExtension):
+
+class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
     """
     A simple async Database interface using SQLAlchemy.
     """
@@ -107,7 +111,7 @@ class SqlDatabase(BaseExtension):
 
     def __init__(self) -> None:
         super().__init__()
-        self._app: "Optional[Patera]" = None
+        self._app: "Optional[AppT]" = None
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
@@ -116,7 +120,7 @@ class SqlDatabase(BaseExtension):
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
 
-    def init_app(self, app: "Patera") -> None:
+    def init_app(self, app: AppT) -> None:
         """
         Initializes the database interface
         app.get_conf("DATABASE_URI") must return a connection string like:

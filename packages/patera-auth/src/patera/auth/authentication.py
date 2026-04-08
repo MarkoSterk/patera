@@ -6,11 +6,13 @@ Authentication module of Patera
 from abc import ABC, abstractmethod
 from typing import (
     Callable,
+    Generic,
     Optional,
     Dict,
     Any,
     TYPE_CHECKING,
     Type,
+    TypeVar,
     TypedDict,
     NotRequired,
 )
@@ -182,7 +184,10 @@ class AuthUtils:
             raise
 
 
-class Authentication(MiddlewareBase, ABC):
+AppT = TypeVar("AppT", bound="Patera")
+
+
+class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):
     """
     Authentication middleware for Patera application
     User must implement user_loader method and optionally role_check method
@@ -198,7 +203,7 @@ class Authentication(MiddlewareBase, ABC):
 
     _configs_name = None
 
-    def __init__(self, app: "Patera", next_app: AppCallableType) -> None:
+    def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         """
         Initilizer for authentication module
         """
