@@ -195,7 +195,7 @@ def _get_ignore_dirs():
     ]
     DECLARED_IGNORE_DIRS = [
         d.strip()
-        for d in os.environ.get("GRANIAN_RELOAD_IGNORE_DIRS", "").split(",")
+        for d in os.environ.get("RELOAD_IGNORE_DIRS", "").split(",")
         if d.strip()
     ]
     DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
@@ -215,7 +215,7 @@ def _get_ignore_patterns():
     ]
     DECLARED_IGNORE_PATTERNS = [
         p.strip()
-        for p in os.environ.get("GRANIAN_RELOAD_IGNORE_PATTERNS", "").split(",")
+        for p in os.environ.get("RELOAD_IGNORE_PATTERNS", "").split(",")
         if p.strip()
     ]
     DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
@@ -248,11 +248,9 @@ def _start_prod(
             "(example: 'app:App')"
         )
         return
-    address: str = os.environ.get("HOST", "127.0.0.1")
-    if address == "localhost":
-        address = "127.0.0.1"
+    address: str = "0.0.0.0"
     _port: int = int(os.environ.get("PORT", 3000))
-    _loop = Loops(os.environ.get("GRANIAN_LOOP", "auto"))
+    _loop = Loops(os.environ.get("LOOP", "auto"))
 
     DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
     DEFAULT_IGNORE_PATTERNS = _get_ignore_patterns()
@@ -295,7 +293,7 @@ def _start_dev(
     if address == "localhost":
         address = "127.0.0.1"
     _port: int = int(os.environ.get("PORT", 3000))
-    _loop = os.environ.get("GRANIAN_LOOP", "auto")
+    _loop = os.environ.get("LOOP", "auto")
     if _loop not in ["auto", "asyncio", "uvloop"]:
         raise ValueError(
             "Loop configuration for development server must be one of: 'asyncio', 'auto', 'uvloop'"

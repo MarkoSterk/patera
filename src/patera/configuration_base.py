@@ -170,14 +170,6 @@ class BaseConfig(BaseSettings):
         None,
         description="CLI Controllers to be registered with the app. These are added in addition to all auto-registered controllers.",
     )
-    EXTENSIONS: Optional[Sequence[str]] = Field(
-        None,
-        description="Extensions to be registered with the app. These are added in addition to all auto-registered controllers.",
-    )
-    MODELS: Optional[Sequence[str]] = Field(
-        None,
-        description="Models to be registered with the app. These are added in addition to all auto-registered controllers.",
-    )
     EXCEPTION_HANDLERS: Optional[Sequence[str]] = Field(
         None,
         description="Exception handlers to be registered with the app. These are added in addition to all auto-registered handlers.",
@@ -192,8 +184,6 @@ class BaseConfig(BaseSettings):
     @field_validator(
         "CONTROLLERS",
         "CLI_CONTROLLERS",
-        "EXTENSIONS",
-        "MODELS",
         "EXCEPTION_HANDLERS",
         "MIDDLEWARE",
         mode="before",
