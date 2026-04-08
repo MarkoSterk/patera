@@ -201,8 +201,6 @@ class BaseConfig(BaseSettings):
     @field_validator(
         "CONTROLLERS",
         "CLI_CONTROLLERS",
-        "EXTENSIONS",
-        "MODELS",
         "EXCEPTION_HANDLERS",
         "MIDDLEWARE",
     )
