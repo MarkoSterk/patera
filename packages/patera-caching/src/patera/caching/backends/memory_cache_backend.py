@@ -12,7 +12,7 @@ from .base_cache_backend import BaseCacheBackend
 if TYPE_CHECKING:
     from patera import Patera
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):

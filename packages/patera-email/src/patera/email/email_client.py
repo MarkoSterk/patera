@@ -51,7 +51,7 @@ class EmailConfig(TypedDict):
     USE_TLS: NotRequired[bool]
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class EmailClient(BaseExtension[AppT], Generic[AppT]):

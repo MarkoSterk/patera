@@ -45,7 +45,7 @@ class CachingConfig(TypedDict):
     DURATION: NotRequired[int]
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class Caching(BaseExtension[AppT], Generic[AppT]):

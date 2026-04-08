@@ -99,7 +99,7 @@ _DIALECT_EXTRAS: Dict[str, Callable] = {
     "oracle": _extras_oracle,
 }
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class SqlDatabase(BaseExtension[AppT], Generic[AppT]):

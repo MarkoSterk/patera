@@ -75,7 +75,7 @@ class TaskManagerConfig(TypedDict):
     DAEMON: NotRequired[bool]
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class TaskManager(BaseExtension[AppT], Generic[AppT]):

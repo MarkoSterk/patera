@@ -184,7 +184,7 @@ class AuthUtils:
             raise
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):

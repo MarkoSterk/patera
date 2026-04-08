@@ -8,7 +8,7 @@ from typing import Generic, Optional, TYPE_CHECKING, Any, TypeVar
 if TYPE_CHECKING:
     from patera import Patera
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class BaseCacheBackend(ABC, Generic[AppT]):

@@ -33,7 +33,7 @@ class _PateraPywayConfigs(BaseModel):
     MIGRATE_CONFIG_FILE: Optional[str] = Field(".pyway.conf", description="")
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class PywayCLIController(CLIController[AppT]):
