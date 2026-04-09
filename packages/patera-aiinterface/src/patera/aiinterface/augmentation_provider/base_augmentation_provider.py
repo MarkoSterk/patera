@@ -2,15 +2,9 @@
 RAG interface
 """
 
-from typing import (
-    Any,
-    Generic,
-    Type,
-    TypeVar,
-    Optional,
-    cast,
-    TYPE_CHECKING,
-)
+import os
+from pathlib import Path
+from typing import Any, Generic, Type, TypeVar, Optional, cast, TYPE_CHECKING
 from sentence_transformers import SentenceTransformer
 from torch import Tensor
 from patera import Request
@@ -19,7 +13,7 @@ from patera.database.sql import DeclarativeBaseModel
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    pass
+    from ..ai_service import AiService
 
 
 ModelT = TypeVar("ModelT", bound=DeclarativeBaseModel)
@@ -41,7 +35,7 @@ class _AugmentationConfig(BaseModel):
         None, description="Device to use for embedding model (e.g., 'cpu', 'cuda')"
     )
     CACHE_FOLDER: Optional[str] = Field(
-        None, description="Cache folder for the embedding model"
+        ".ai_cache", description="Cache folder for the embedding model"
     )
     BACKEND: Optional[str] = Field(
         "torch",
@@ -68,20 +62,28 @@ class BaseAugmentationProvider(Generic[ModelT]):
         self._text_column = text_column
         self._retriever_limit = retriever_limit
         self._initilized: bool = False
+        self._ext: "AiService" = cast("AiService", None)
 
-    def _init_embedding_model(self, configs: dict[Any, Any]) -> None:
+    def _init_embedding_model(self, configs: dict[Any, Any], ext: "AiService") -> None:
         """
         Initialize embedding model
         """
+        base = Path(ext.app.get_conf("BASE_PATH"))
+        cache = base / configs.get("CACHE_FOLDER", ".ai_cache")
+
+        os.environ["HF_HOME"] = str(cache)
+        os.environ["TRANSFORMERS_CACHE"] = str(cache)
+        os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(cache / "sentence_transformers")
+
         self._configs = configs
         self._embedding_model = SentenceTransformer(
             model_name_or_path=self._configs["MODEL_NAME_OR_PATH"],
             modules=self._configs["MODULES"],
             device=self._configs["DEVICE"],
             backend=self._configs["BACKEND"],
-            cache_folder=self._configs["CACHE_FOLDER"],
         )
         self._initilized = True
+        self._ext = ext
 
     async def _augment_prompt(self, req: Request, prompt: str) -> list[str]:
         """

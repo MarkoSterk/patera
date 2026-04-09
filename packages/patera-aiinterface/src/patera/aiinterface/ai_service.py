@@ -105,7 +105,8 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
 
             assert isinstance(self.augmentation_provider, BaseAugmentationProvider)
             self.augmentation_provider._init_embedding_model(
-                cast(dict[Any, Any], self._configs["AUGMENTATION"])
+                cast(dict[Any, Any], self._configs["AUGMENTATION"]),
+                self,  # type: ignore
             )  # type: ignore
 
     async def chat(self, req: Request, msg: str) -> ChatResponse:
