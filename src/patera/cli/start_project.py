@@ -313,14 +313,18 @@ def start_dev(
 ):
     try:
         _start_dev(cwd, True, app, env_file)
-    except Exception:
+    except Exception as e:
+        print("ERROR: ", str(e))
         print("Faled to start Uvicorn dev server. Install patera[dev] if not already.")
 
 
 def start_prod(
     cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
 ):
-    _start_prod(cwd, False, app, env_file)
+    try:
+        _start_prod(cwd, False, app, env_file)
+    except Exception as e:
+        print("FAILED TO START PATERA APP: ", str(e))
 
 
 def start_cli(
