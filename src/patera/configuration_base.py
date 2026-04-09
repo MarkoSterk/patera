@@ -19,17 +19,18 @@ IMPORT_STR_RE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*$")
 class BaseConfig(BaseSettings):
     model_config = SettingsConfigDict(
         extra="allow",
-        env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="PATERA_",
-        env_nested_delimiter=".",
+        env_nested_delimiter="__",
     )
 
+    APP_NAME: Optional[str] = Field(
+        "Patera app", description="Human-readable name of the app"
+    )
+    VERSION: Optional[str] = Field("1.0", description="Application version")
     # required
-    APP_NAME: str = Field(description="Human-readable name of the app")
-    VERSION: str = Field(description="Application version")
     BASE_PATH: str = Field(
-        description="Base path of app. os.path.dirname(__file__) in the configs.py is the usual value."
+        description="Base path of app. Hardcoded in env file or os.path.dirname(__file__) in the configs.py is the usual value."
     )
 
     REQUEST_CLASS: Optional[type[Request]] = Field(
@@ -38,7 +39,7 @@ class BaseConfig(BaseSettings):
     )
     RESPONSE_CLASS: Optional[type[Response]] = Field(
         Response,
-        description="Response class to use. Must be a subclass of patera.response",
+        description="Response class to use. Must be a subclass of patera.response.Response",
     )
 
     # required for Authentication extension

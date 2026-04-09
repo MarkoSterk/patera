@@ -223,7 +223,9 @@ def _get_ignore_patterns():
     return DEFAULT_IGNORE_PATTERNS
 
 
-def _start_prod(cwd: str, debug: bool, app: Optional[str] = None):
+def _start_prod(
+    cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
+):
     """
     Starts application in dev mode.
     """
@@ -231,6 +233,8 @@ def _start_prod(cwd: str, debug: bool, app: Optional[str] = None):
     from granian.constants import Interfaces, Loops
     from granian.log import LogLevels
     from ..patera import Patera
+
+    load_env_file(cwd, env_file)
 
     app_path = app
     if app_path is None:
@@ -242,16 +246,16 @@ def _start_prod(cwd: str, debug: bool, app: Optional[str] = None):
             "(example: 'app:App')"
         )
         return
-    address: str = "0.0.0.0"
-    _port: int = int(os.environ.get("PORT", 3000))
-    _loop = Loops(os.environ.get("LOOP", "auto"))
+    _address: str = os.environ.get("PATERA_HOST", "0.0.0.0")
+    _port: int = int(os.environ.get("PATERA_PORT", 80))
+    _loop = Loops(os.environ.get("PATERA_LOOP", "auto"))
 
     DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
     DEFAULT_IGNORE_PATTERNS = _get_ignore_patterns()
 
     Granian(
         app_path,
-        address=address,
+        address=_address,
         port=_port,
         interface=Interfaces.ASGI,
         loop=_loop,
@@ -263,9 +267,13 @@ def _start_prod(cwd: str, debug: bool, app: Optional[str] = None):
     ).serve()
 
 
-def _start_dev(cwd: str, debug: bool, app: Optional[str] = None):
+def _start_dev(
+    cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
+):
     import uvicorn
     from ..patera import Patera
+
+    load_env_file(cwd, env_file)
 
     app_path = app
     if app_path is None:
@@ -277,11 +285,9 @@ def _start_dev(cwd: str, debug: bool, app: Optional[str] = None):
             "(example: 'app:App')"
         )
         return
-    address: str = os.environ.get("HOST", "127.0.0.1")
-    if address == "localhost":
-        address = "127.0.0.1"
-    _port: int = int(os.environ.get("PORT", 3000))
-    _loop = os.environ.get("LOOP", "auto")
+    _address: str = os.environ.get("PATERA_HOST", "localhost")
+    _port: int = int(os.environ.get("PATERA_PORT", 3000))
+    _loop = str(os.environ.get("PATERA_LOOP", "auto"))
     if _loop not in ["auto", "asyncio", "uvloop"]:
         raise ValueError(
             "Loop configuration for development server must be one of: 'asyncio', 'auto', 'uvloop'"
@@ -291,7 +297,7 @@ def _start_dev(cwd: str, debug: bool, app: Optional[str] = None):
 
     uvicorn.run(
         app_path,
-        host=address,
+        host=_address,
         port=_port,
         loop=_loop,
         lifespan="on",
@@ -302,15 +308,19 @@ def _start_dev(cwd: str, debug: bool, app: Optional[str] = None):
     )
 
 
-def start_dev(cwd: str, command: str, app: Optional[str] = None):
+def start_dev(
+    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
+):
     try:
-        _start_dev(cwd, True, app)
+        _start_dev(cwd, True, app, env_file)
     except Exception:
-        print("Faled to start Granian dev server. Install patera[dev] if not already.")
+        print("Faled to start Uvicorn dev server. Install patera[dev] if not already.")
 
 
-def start_prod(cwd: str, command: str, app: Optional[str] = None):
-    _start_prod(cwd, False, app)
+def start_prod(
+    cwd: str, command: str, app: Optional[str] = None, env_file: Optional[str] = None
+):
+    _start_prod(cwd, False, app, env_file)
 
 
 def start_cli(
@@ -322,6 +332,8 @@ def start_cli(
     **kwargs,
 ):
     from ..patera import Patera
+
+    load_env_file(cwd, env_file)
 
     app_path = app
     if app_path is None:

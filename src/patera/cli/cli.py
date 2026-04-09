@@ -28,6 +28,13 @@ def main():
         required=False,
         help="Import string of App class implementation",
     )
+    start_dev_parser.add_argument(
+        "--env-file",
+        type=str,
+        default=None,
+        required=False,
+        help="Path to environment variable file",
+    )
 
     start_prod_parser = subparsers.add_parser("prod")
     start_prod_parser.add_argument(
@@ -36,6 +43,13 @@ def main():
         default=None,
         required=False,
         help="Import string of App class implementation",
+    )
+    start_prod_parser.add_argument(
+        "--env-file",
+        type=str,
+        default=None,
+        required=False,
+        help="Path to environment variable file",
     )
 
     start_cli_parser = subparsers.add_parser("cli")
