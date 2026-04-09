@@ -128,7 +128,7 @@ def iter_candidate_files(root: Path):
 
 def find_pyjolt_app_import(
     pyjolt_class: Type,
-    root: Optional[Path] = None,
+    root: Path,
 ) -> Optional[str]:
     """
     Find the first class that subclasses `pyjolt_class` and return its import string.
@@ -138,16 +138,12 @@ def find_pyjolt_app_import(
         "app.main:App"
         "main:App"
     """
-    root = (root or Path.cwd()).resolve()
     app_dir = root / "app"
 
     if not has_python_files(root) and not has_python_files(app_dir):
         raise RuntimeError(
             f"{root} does not appear to contain Python modules in the root or in ./app"
         )
-
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
 
     importlib.invalidate_caches()
 
@@ -195,7 +191,7 @@ def _get_ignore_dirs():
     ]
     DECLARED_IGNORE_DIRS = [
         d.strip()
-        for d in os.environ.get("RELOAD_IGNORE_DIRS", "").split(",")
+        for d in os.environ.get("PATERA_RELOAD_IGNORE_DIRS", "").split(",")
         if d.strip()
     ]
     DEFAULT_IGNORE_DIRS.extend(DECLARED_IGNORE_DIRS)
@@ -215,7 +211,7 @@ def _get_ignore_patterns():
     ]
     DECLARED_IGNORE_PATTERNS = [
         p.strip()
-        for p in os.environ.get("RELOAD_IGNORE_PATTERNS", "").split(",")
+        for p in os.environ.get("PATERA_RELOAD_IGNORE_PATTERNS", "").split(",")
         if p.strip()
     ]
     DEFAULT_IGNORE_PATTERNS.extend(DECLARED_IGNORE_PATTERNS)
@@ -235,10 +231,13 @@ def _start_prod(
     from ..patera import Patera
 
     load_env_file(cwd, env_file)
+    root = Path.cwd().resolve()
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
 
     app_path = app
     if app_path is None:
-        app_path = find_pyjolt_app_import(Patera, Path(cwd))
+        app_path = find_pyjolt_app_import(Patera, root)
 
     if app_path is None:
         print(
@@ -275,9 +274,13 @@ def _start_dev(
 
     load_env_file(cwd, env_file)
 
+    root = Path.cwd().resolve()
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
     app_path = app
     if app_path is None:
-        app_path = find_pyjolt_app_import(Patera, Path(cwd))
+        app_path = find_pyjolt_app_import(Patera, root)
 
     if app_path is None:
         print(
@@ -294,7 +297,7 @@ def _start_dev(
         )
 
     DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
-
+    print("Starting application on path: ", app_path)
     uvicorn.run(
         app_path,
         host=_address,

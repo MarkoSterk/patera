@@ -265,18 +265,14 @@ class Patera(Injectable):
 
         if not cli_mode:
             self._enable_cors()  # enables CORS middleware if configured
+            self._load_modules(middleware)
             self._load_modules(loggers)
-            # self._load_modules(models)
-            # self._load_modules(extensions)
             self._load_modules(controllers)
             self._load_modules(cli_controllers)
             self._load_modules(exception_handlers)
-            self._load_modules(middleware)
         # if in CLI mode only models and extension are registered
         # and configured with the app
         else:
-            # self._load_modules(models)
-            # self._load_modules(extensions)
             self._load_modules(cli_controllers)
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
@@ -323,12 +319,6 @@ class Patera(Injectable):
                 self.logger.info(f"Registering exception handler: {obj.__name__}")
                 self.register_exception_handler(obj)
                 continue
-            # if inspect.isclass(obj) and inherits_from(obj, "DeclarativeBaseModel"):
-            #     self.logger.info(f"Loaded database model: {obj.__name__}")
-            #     if obj.db_name() not in self._db_models:
-            #         self._db_models[obj.db_name()] = []
-            #     self._db_models[obj.db_name()].append(obj)
-            #     continue
             if inherits_from(obj, "CLIController"):
                 cli_controller = obj(self)
                 self.register_cli_controller(cli_controller)
@@ -343,7 +333,7 @@ class Patera(Injectable):
             if inspect.isclass(obj) and issubclass(obj, LoggerBase):
                 sink_id = obj(self).configure()
                 self._logger_sink_ids.append(sink_id)
-                print(f"Registering logger: {obj.__name__}")
+                self.logger.info(f"Registering logger: {obj.__name__}")
                 continue
             raise WrongModuleLoadType(
                 f"Failed to load module {obj.__name__ or obj.__class__.__name__}. Extensions can be passed as instances or classes (if custom config names are not used and instance is not used elsewhere). Controllers, cli controllers, exception handlers and middleware as classes."
