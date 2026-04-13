@@ -130,8 +130,6 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
-        for model in self._app._db_models.get(self.__db_name__, []):
-            self._models[model.__name__] = model
         # the SqlDatabase instance is stored in app._extensions with key as db_name for later retrieval in session decorators and elsewhere
         # in addition to the standard classname and config name storage
         self.app._extensions[self.db_name] = self

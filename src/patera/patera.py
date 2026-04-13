@@ -236,7 +236,6 @@ class Patera(Injectable):
         self._cli_controllers: dict[str, "CLIController"] = {}
         self._exception_handlers: dict[str, Callable] = {}
         self._json_spec: Optional[dict] = None
-        self._db_models: dict[str, list[Type]] = {}
         self._db_name_configs_map: dict[str, str] = {}
 
         self._extensions: dict[str, Injectable] = {}
