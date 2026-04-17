@@ -223,7 +223,7 @@ def _start_prod(
     cwd: str, debug: bool, app: Optional[str] = None, env_file: Optional[str] = None
 ):
     """
-    Starts application in dev mode.
+    Starts application in production mode.
     """
     from granian import Granian
     from granian.constants import Interfaces, Loops
@@ -231,6 +231,7 @@ def _start_prod(
     from ..patera import Patera
 
     load_env_file(cwd, env_file)
+    os.environ["PATERA_DEBUG"] = "False"
     root = Path.cwd().resolve()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
@@ -273,6 +274,7 @@ def _start_dev(
     from ..patera import Patera
 
     load_env_file(cwd, env_file)
+    os.environ["PATERA_DEBUG"] = "True"
 
     root = Path.cwd().resolve()
     if str(root) not in sys.path:
@@ -297,7 +299,6 @@ def _start_dev(
         )
 
     DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
-    print("Starting application on path: ", app_path)
     uvicorn.run(
         app_path,
         host=_address,

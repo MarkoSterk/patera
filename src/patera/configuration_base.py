@@ -72,24 +72,6 @@ class BaseConfig(BaseSettings):
             "it's possible to disable that."
         ),
     )
-    USE_AUTO_MODULE_LOADER: Optional[bool] = Field(
-        True, description="If auto module loader should be used."
-    )
-    AUTO_MODULE_LOADER_PATHS: Optional[list[str]] = Field(
-        [
-            "controllers",
-            "api.controllers",
-            "exceptions",
-            "exceptions.handlers",
-            "cli",
-            "cli.controllers",
-        ],
-        description="Application searches these paths and auto loads controllers, CLI controllers, exception handlers",
-    )
-
-    APPEND_AUTO_MODULE_LOADER_PATHS: Optional[list[str]] = Field(
-        None, description="Paths to append to the AUTO_MODULE_LOADER_PATHS list"
-    )
 
     STATIC_DIR: Optional[str] = Field(
         "/static", description="Relative static dir from root"
@@ -168,31 +150,28 @@ class BaseConfig(BaseSettings):
         ),
     )
 
-    # controllers, cli_controllers, extensions, models, exception handlers and middleware to load
-    CONTROLLERS: Optional[Sequence[str]] = Field(
-        None,
-        description="Controllers to be registered with the app. These are added in addition to all auto-registered controllers.",
+    CONTROLLER_FOLDERS: Optional[Sequence[str]] = Field(
+        None, description="List of additional folders to load controllers from"
     )
-    CLI_CONTROLLERS: Optional[Sequence[str]] = Field(
-        None,
-        description="CLI Controllers to be registered with the app. These are added in addition to all auto-registered controllers.",
+    CLI_CONTROLLER_FOLDERS: Optional[Sequence[str]] = Field(
+        None, description="List of additional folders to load cli controllers from"
     )
-    EXCEPTION_HANDLERS: Optional[Sequence[str]] = Field(
-        None,
-        description="Exception handlers to be registered with the app. These are added in addition to all auto-registered handlers.",
+    EXCEPTION_HANDLER_FOLDERS: Optional[Sequence[str]] = Field(
+        None, description="List of additional folders to load exception handlers from"
     )
-    MIDDLEWARE: Optional[Sequence[str]] = Field(
-        None, description="Middleware to be registered with the app"
+    MIDDLEWARE_FOLDERS: Optional[Sequence[str]] = Field(
+        None, description="List of additional folders to load middleware from"
     )
-    LOGGERS: Optional[Sequence[str]] = Field(
-        None, description="Loggers to be registered with the app."
+    LOGGER_FOLDERS: Optional[Sequence[str]] = Field(
+        None, description="List of additional folders to load loggers from"
     )
 
     @field_validator(
-        "CONTROLLERS",
-        "CLI_CONTROLLERS",
-        "EXCEPTION_HANDLERS",
-        "MIDDLEWARE",
+        "CONTROLLER_FOLDERS",
+        "CLI_CONTROLLER_FOLDERS",
+        "EXCEPTION_HANDLER_FOLDERS",
+        "MIDDLEWARE_FOLDERS",
+        "LOGGER_FOLDERS",
         mode="before",
     )
     @classmethod
@@ -204,24 +183,6 @@ class BaseConfig(BaseSettings):
         if any(not isinstance(x, str) for x in v):
             raise TypeError("Must be a sequence[str] or None.")
         return list(v)
-
-    @field_validator(
-        "CONTROLLERS",
-        "CLI_CONTROLLERS",
-        "EXCEPTION_HANDLERS",
-        "MIDDLEWARE",
-    )
-    @classmethod
-    def _validate_import_strings(cls, v):
-        if not v:
-            return v
-        bad = [s for s in v if not IMPORT_STR_RE.match(s)]
-        if bad:
-            raise ValueError(
-                "Invalid import strings (use 'package.module:ClassOrObject'): "
-                + ", ".join(bad)
-            )
-        return v
 
     @staticmethod
     def value_to_bool(value: str | int | bool) -> bool:

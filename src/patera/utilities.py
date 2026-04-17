@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import (
     Any,
     Callable,
+    Iterable,
+    List,
     Optional,
     Type,
     get_origin,
@@ -244,3 +246,20 @@ def fs_safe_join(base: Path, *paths: str) -> Path:
         raise FileNotFoundError("Path traversal detected")
 
     return candidate
+
+
+def find_python_files_by_name(root_path: Path, keywords: Iterable[str]) -> List[Path]:
+    """
+    Recursively scans the given root path for Python files whose filenames
+    contain ANY of the provided keywords (case-insensitive).
+
+    :param root_path: The root directory to scan
+    :param keywords: Iterable of strings to match in filenames
+    :return: List of Path objects matching the criteria
+    """
+
+    return [
+        path
+        for path in root_path.rglob("*.py")
+        if any(k in path.name.lower() for k in keywords)
+    ]

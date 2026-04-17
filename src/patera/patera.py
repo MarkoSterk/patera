@@ -3,14 +3,17 @@ Patera application class
 """
 
 # mypy: check-untyped-defs = True
+import importlib
 import os
 import inspect
 import json
 from collections.abc import AsyncIterator, Iterable
 from enum import StrEnum
+from pathlib import Path
 from typing import (
     Any,
     Callable,
+    List,
     Mapping,
     Optional,
     Type,
@@ -42,8 +45,8 @@ from .response import Response
 from .utilities import (
     get_app_root_path,
     run_sync_or_async,
-    import_module,
     _extract_response_type,
+    find_python_files_by_name,
 )
 from .router import Router
 from .static import Static
@@ -247,34 +250,112 @@ class Patera(Injectable):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
-        # models: Optional[list[str]] = self.get_conf("MODELS", None)
-        controllers: Optional[list[str]] = self.get_conf("CONTROLLERS", None)
-        cli_controllers: Optional[list[str]] = self.get_conf("CLI_CONTROLLERS", None)
-        exception_handlers: Optional[list[str]] = self.get_conf(
-            "EXCEPTION_HANDLERS", None
-        )
-        # extensions: Optional[list[str]] = self.get_conf("EXTENSIONS", None)
-        middleware: Optional[list[str]] = self.get_conf("MIDDLEWARE", None)
-        loggers: Optional[list[str]] = self.get_conf("LOGGERS", None)
-        # if NOT in CLI mode (cli_mode = False)
-        # all extensions, models, controllers, exception handlers and middleware
-        # is registered and configured with the app.
-
         self._resolve_autowires()
-
+        self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
-            self._enable_cors()  # enables CORS middleware if configured
-            self._load_modules(middleware)
-            self._load_modules(loggers)
-            self._load_modules(controllers)
-            self._load_modules(cli_controllers)
-            self._load_modules(exception_handlers)
-        # if in CLI mode only models and extension are registered
-        # and configured with the app
-        else:
-            self._load_modules(cli_controllers)
+            self._enable_cors()
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
+
+    def _load_controllers_exc_handlers_middleware(self, cli_mode: bool = False) -> None:
+        app_root: Path = Path(self._root_path)
+
+        _cli_controller_folders: list[str] = ["cli", "cli_controllers"]
+        _additional_cli_controller_folders = self.get_conf("CLI_CONTROLLER_FOLDERS")
+        if _additional_cli_controller_folders is None:
+            _additional_cli_controller_folders = []
+        _cli_controller_folders.extend(_additional_cli_controller_folders)
+        for folder in _cli_controller_folders:
+            folder_path = app_root / folder
+            files = find_python_files_by_name(folder_path, ["cli", "cli_controller"])
+            self._load_detected_module(files, CLIController)
+
+        if cli_mode:
+            return
+
+        _logger_folders: list[str] = ["logging", "loggers"]
+        _additional_logger_folders = self.get_conf("LOGGER_FOLDERS")
+        if _additional_logger_folders is None:
+            _additional_logger_folders = []
+        _logger_folders.extend(_additional_logger_folders)
+        for folder in _logger_folders:
+            folder_path = app_root / folder
+            files = find_python_files_by_name(folder_path, ["logger", "log"])
+            self._load_detected_module(files, LoggerBase)
+
+        _controller_folders: list[str] = ["api", "public"]
+        _additional_controller_folders = self.get_conf("CONTROLLER_FOLDERS")
+        if _additional_controller_folders is None:
+            _additional_controller_folders = []
+        _controller_folders.extend(_additional_cli_controller_folders)
+        for folder in _controller_folders:
+            folder_path = app_root / folder
+            files = find_python_files_by_name(
+                folder_path, ["api", "controller", "public", "router", "routes"]
+            )
+            self._load_detected_module(files, Controller)
+
+        _exception_handler_folders: list[str] = ["exceptions"]
+        _additional_exception_handler_folders = self.get_conf(
+            "EXCEPTION_HANDLER_FOLDERS"
+        )
+        if _additional_exception_handler_folders is None:
+            _additional_exception_handler_folders = []
+        _exception_handler_folders.extend(_additional_exception_handler_folders)
+        for folder in _exception_handler_folders:
+            folder_path = app_root / folder
+            files = find_python_files_by_name(
+                folder_path, ["handler", "exception_controller", "controller"]
+            )
+            self._load_detected_module(files, ExceptionHandler)
+
+        _middleware_folders: list[str] = ["middleware", "middlewares"]
+        _additional_middleware_folders = self.get_conf("MIDDLEWARE_FOLDERS")
+        if _additional_middleware_folders is None:
+            _additional_middleware_folders = []
+        _middleware_folders.extend(_additional_middleware_folders)
+        for folder in _middleware_folders:
+            folder_path = app_root / folder
+            files = find_python_files_by_name(folder_path, ["middleware", "mw"])
+            self._load_detected_module(files, MiddlewareBase)
+
+    def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
+        """
+        Tries to load implementations (controllers, exc. handlers, middleware, loggers)
+        """
+        app_root = Path(self._root_path)
+        root_package = app_root.name
+        for file_path in file_paths:
+            relative_path = file_path.relative_to(app_root)
+            module_path = relative_path.with_suffix("")
+            import_path = f"{root_package}.{'.'.join(module_path.parts)}"
+            module = importlib.import_module(import_path)
+            for _, obj in inspect.getmembers(
+                module,
+                lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
+            ):
+                if issubclass(obj, Controller) and obj is not Controller:
+                    self.logger.info(f"Registering controller: {obj.__name__}")
+                    self.register_controller(obj)
+                    continue
+                elif issubclass(obj, CLIController) and obj is not CLIController:
+                    self.logger.info(f"Registering CLI controller: {obj.__name__}")
+                    obj_inst = obj(self)
+                    self.register_cli_controller(obj_inst)
+                    continue
+                elif issubclass(obj, MiddlewareBase) and obj is not MiddlewareBase:
+                    self.logger.info(f"Registering middleware: {obj.__name__}")
+                    self._middleware.append(
+                        lambda app, next_app, mdlwr_class=obj: mdlwr_class(
+                            app, next_app
+                        )
+                    )
+                    continue
+                elif issubclass(obj, LoggerBase) and obj is not LoggerBase:
+                    self.logger.info(f"Registering logger sink: {obj.__name__}")
+                    sink_id = obj(self).configure()
+                    self._logger_sink_ids.append(sink_id)
+                    continue
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self._extensions.get(target_type.__name__, None)
@@ -301,43 +382,6 @@ class Patera(Injectable):
             lambda app, next_app: CORSMiddleware(app, next_app)
         )
 
-    def _load_modules(self, modules: Optional[list[str]] = None):
-        if modules is None:
-            return
-        for import_string in modules:
-            obj = import_module(import_string)
-            if obj is None:
-                raise MissingImportModule(
-                    f"Failed to load module: {import_string}. Check path in configurations."
-                )
-            if inspect.isclass(obj) and issubclass(obj, Controller):
-                self.logger.info(f"Registering controller: {obj.__name__}")
-                self.register_controller(obj)
-                continue
-            if inspect.isclass(obj) and issubclass(obj, ExceptionHandler):
-                self.logger.info(f"Registering exception handler: {obj.__name__}")
-                self.register_exception_handler(obj)
-                continue
-            if inherits_from(obj, "CLIController"):
-                cli_controller = obj(self)
-                self.register_cli_controller(cli_controller)
-                self.logger.info(f"Registering cli controller: {obj.__name__}")
-                continue
-            if inspect.isclass(obj) and issubclass(obj, MiddlewareBase):
-                self.logger.info(f"Registering middleware: {obj.__name__}")
-                self._middleware.append(
-                    lambda app, next_app, mdlwr_class=obj: mdlwr_class(app, next_app)
-                )
-                continue
-            if inspect.isclass(obj) and issubclass(obj, LoggerBase):
-                sink_id = obj(self).configure()
-                self._logger_sink_ids.append(sink_id)
-                self.logger.info(f"Registering logger: {obj.__name__}")
-                continue
-            raise WrongModuleLoadType(
-                f"Failed to load module {obj.__name__ or obj.__class__.__name__}. Extensions can be passed as instances or classes (if custom config names are not used and instance is not used elsewhere). Controllers, cli controllers, exception handlers and middleware as classes."
-            )
-
     def _get_startup_methods(self):
         methods = []
         for name in dir(self):
@@ -363,7 +407,10 @@ class Patera(Injectable):
         """
         if config_name and "." in config_name:
             return self._get_nested_config(config_name, default)
-        return self.configs.get(config_name, default)
+        value = self.configs.get(config_name, default)
+        if value is None:
+            return default
+        return value
 
     def _get_nested_config(self, config_name: str, default: Any = None) -> Any:
         names: list[str] = config_name.split(".")  # names/paths of entire config tree
@@ -374,7 +421,10 @@ class Patera(Injectable):
             return default
         for name in names:
             config = config.get(name, {})
-        return config.get(last_name, default)
+        value = config.get(last_name, default)
+        if value is None:
+            return default
+        return value
 
     def add_global_context_method(self, func: Callable):
         """
