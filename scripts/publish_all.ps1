@@ -1,6 +1,6 @@
 # Load .env file
-if (Test-Path ".env") {
-    Get-Content ".env" | ForEach-Object {
+if (Test-Path ".env.pypi") {
+    Get-Content ".env.pypi" | ForEach-Object {
         if ($_ -match "^\s*([^#][^=]*)=(.*)$") {
             $name = $matches[1].Trim()
             $value = $matches[2].Trim()
@@ -15,7 +15,6 @@ Write-Host "Publishing patera..."
 uv publish dist/patera-*
 
 $extensions = @(
-    "patera_admin",
     "patera_aiinterface",
     "patera_auth",
     "patera_caching",

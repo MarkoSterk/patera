@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Load .env
-if [[ -f ".env" ]]; then
+if [[ -f ".env.pypi" ]]; then
   set -a
-  source .env
+  source .env.pypi
   set +a
 else
   echo "Error: .env file not found."
@@ -36,15 +36,11 @@ publish_package "patera"
 
 # Publish extensions
 packages=(
-  patera_admin
   patera_aiinterface
   patera_auth
   patera_caching
   patera_database
   patera_email
-  patera_frontend
-  patera_frontendext
-  patera_statemachine
   patera_taskmanager
 )
 
