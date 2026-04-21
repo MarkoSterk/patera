@@ -247,6 +247,8 @@ def _start_prod(
         )
         return
     _address: str = os.environ.get("PATERA_HOST", "0.0.0.0")
+    if _address == "localhost":
+        _address = "0.0.0.0"
     _port: int = int(os.environ.get("PATERA_PORT", 80))
     _loop = Loops(os.environ.get("PATERA_LOOP", "auto"))
 
