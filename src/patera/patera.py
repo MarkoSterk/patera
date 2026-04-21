@@ -283,11 +283,17 @@ class Patera(Injectable):
             files = find_python_files_by_name(folder_path, ["logger", "log"])
             self._load_detected_module(files, LoggerBase)
 
-        _controller_folders: list[str] = ["api", "public"]
+        _controller_folders: list[str] = [
+            "api",
+            "public",
+            "controllers",
+            "routers",
+            "routes",
+        ]
         _additional_controller_folders = self.get_conf("CONTROLLER_FOLDERS")
         if _additional_controller_folders is None:
             _additional_controller_folders = []
-        _controller_folders.extend(_additional_cli_controller_folders)
+        _controller_folders.extend(_additional_controller_folders)
         for folder in _controller_folders:
             folder_path = app_root / folder
             files = find_python_files_by_name(

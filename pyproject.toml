@@ -19,9 +19,12 @@ dependencies = [
     "loguru>=0.7.3",
     "mako>=1.3.10",
     "markupsafe>=3.0.3",
+    "patera-aiinterface",
     "patera-auth",
     "patera-caching",
     "patera-database",
+    "patera-email",
+    "patera-migrate",
     "patera-taskmanager",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
@@ -65,12 +68,12 @@ members = [
 
 [tool.uv.sources]
 patera-aiinterface = { workspace = true }
-patera-migrate = { workspace = true }
-patera-email = { workspace = true }
-patera-database = { workspace = true }
-patera-caching = { workspace = true }
-patera-taskmanager = { workspace = true }
 patera-auth = { workspace = true }
+patera-database = { workspace = true }
+patera-taskmanager = { workspace = true }
+patera-email = { workspace = true }
+patera-caching = { workspace = true }
+patera-migrate = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

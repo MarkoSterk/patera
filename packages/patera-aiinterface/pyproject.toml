@@ -3,14 +3,14 @@ name = "patera-aiinterface"
 version = "0.2.2"
 requires-python = ">=3.13"
 dependencies = [
-  "patera-database",
-  "docstring-parser>=0.17.0",
-  "numpy>=2.4.3",
-  "openai>=2.26.0",
-  "pgvector>=0.4.2",
-  "patera",
-  "sentence-transformers>=5.2.3",
-  "torch>=2.10.0",
+    "docstring-parser>=0.18.0",
+    "numpy>=2.4.4",
+    "openai>=2.32.0",
+    "patera",
+    "patera-database",
+    "pgvector>=0.4.2",
+    "sentence-transformers>=5.4.1",
+    "torch>=2.11.0",
 ]
 
 [tool.uv.sources]
