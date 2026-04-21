@@ -15,7 +15,6 @@ from .decorators import (
     cors,
     no_cors,
     socket,
-    development,
 )
 
 __all__ = [
@@ -35,5 +34,4 @@ __all__ = [
     "cors",
     "no_cors",
     "socket",
-    "development",
 ]

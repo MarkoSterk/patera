@@ -83,7 +83,8 @@ class Controller(Injectable, Generic[AppT]):
             endpoint_handler = getattr(method, "_handler", None)
             if endpoint_handler:
                 dev_only: bool = getattr(method, "_development", False)
-                if dev_only and not self.app.get_conf("DEBUG", False):
+                ignore: bool = getattr(method, "_ignore", False)
+                if ignore or (dev_only and not self.app.get_conf("DEBUG", False)):
                     continue
                 if endpoint_handler.get("tags") is not None:
                     endpoint_handler["tags"].extend(self._open_api_tags)

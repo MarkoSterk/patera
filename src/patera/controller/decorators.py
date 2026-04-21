@@ -9,7 +9,6 @@ from typing import (
     Optional,
     ParamSpec,
     Protocol,
-    Type,
     cast,
     get_type_hints,
 )
@@ -330,13 +329,3 @@ def no_cors(func: Callable) -> Callable:
     """
     setattr(func, "_disable_cors", True)
     return func
-
-
-def development(func_or_cls: Callable | Type[Any]) -> Callable | Type:
-    """
-    Decorator to mark a controller or endpoint as development only.
-    The decorated controller or endpoint will be unreachable if the
-    application is not in DEBUG mode.
-    """
-    setattr(func_or_cls, "_development", True)
-    return func_or_cls

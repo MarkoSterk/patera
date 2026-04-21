@@ -334,6 +334,10 @@ class Patera(Injectable):
                 module,
                 lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
             ):
+                ignore: bool = getattr(obj, "_ignore", False)
+                dev_only: bool = getattr(obj, "_development", False)
+                if ignore or (dev_only and not self.get_conf("DEBUG", False)):
+                    continue
                 if issubclass(obj, Controller) and obj is not Controller:
                     self.logger.info(f"Registering controller: {obj.__name__}")
                     self.register_controller(obj)
@@ -437,10 +441,6 @@ class Patera(Injectable):
         The bare-bones application without any middleware.
         Calls the route handler directly.
         """
-        # res: Response = await run_sync_or_async(
-        #     req.route_handler, req, **req.route_parameters
-        # )
-        # return res
         if req.response.expected_body_type is None:
             expected = _extract_response_type(req.route_handler)
             # pylint: disable=protected-access
@@ -774,7 +774,8 @@ class Patera(Injectable):
         base_path: str = self._app_base_url if with_base_path else ""
         for ctrl in ctrls:
             dev_only: bool = getattr(ctrl, "_development", False)
-            if dev_only and not self.get_conf("DEBUG", False):
+            ignore: bool = getattr(ctrl, "_ignore", False)
+            if ignore or (dev_only and not self.get_conf("DEBUG", False)):
                 continue
             ctrl_path: str = getattr(ctrl, "_controller_path")
             ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")

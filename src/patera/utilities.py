@@ -263,3 +263,22 @@ def find_python_files_by_name(root_path: Path, keywords: Iterable[str]) -> List[
         for path in root_path.rglob("*.py")
         if any(k in path.name.lower() for k in keywords)
     ]
+
+
+def development(func_or_cls: Callable | Type[Any]) -> Callable | Type[Any]:
+    """
+    Decorator to mark a controller/cli controller/middleware/logger or endpoint method as development only.
+    The decorated class or endpoint will be ignored and unreachable if the
+    application is not in DEBUG=True mode.
+    """
+    setattr(func_or_cls, "_development", True)
+    return func_or_cls
+
+
+def ignore(func_or_cls: Callable | Type[Any]) -> Callable | Type[Any]:
+    """
+    Decorator to mark a controller/cli controller/middleware/logger or endpoint method as development only.
+    The decorated class or endpoint will be ignored and unreachable
+    """
+    setattr(func_or_cls, "_ignore", True)
+    return func_or_cls
