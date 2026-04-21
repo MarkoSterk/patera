@@ -69,7 +69,10 @@ class BaseAugmentationProvider(Generic[ModelT]):
         Initialize embedding model
         """
         base = Path(ext.app.get_conf("BASE_PATH"))
-        cache = base / configs.get("CACHE_FOLDER", ".ai_cache")
+        cache_folder = Path(configs.get("CACHE_FOLDER", ".ai_cache")).expanduser()
+        cache = (
+            cache_folder if cache_folder.is_absolute() else base / cache_folder
+        ).resolve()
 
         os.environ["HF_HOME"] = str(cache)
         os.environ["TRANSFORMERS_CACHE"] = str(cache)
