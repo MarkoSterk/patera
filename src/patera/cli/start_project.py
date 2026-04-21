@@ -238,6 +238,8 @@ def _start_prod(
 
     app_path = app
     if app_path is None:
+        app_path = os.environ.get("PATERA_IMPORT", None)
+    if app_path is None:
         app_path = find_pyjolt_app_import(Patera, root)
 
     if app_path is None:
@@ -283,6 +285,8 @@ def _start_dev(
         sys.path.insert(0, str(root))
 
     app_path = app
+    if app_path is None:
+        app_path = os.environ.get("PATERA_IMPORT", None)
     if app_path is None:
         app_path = find_pyjolt_app_import(Patera, root)
 
