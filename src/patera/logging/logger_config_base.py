@@ -190,7 +190,13 @@ class LoggerBase(ABC, Generic[AppT]):
             return sys.stdout
         if sink == "NULL":
             return "NUL" if sys.platform.startswith("win") else "/dev/null"
-        p = Path(sink)
+
+        sink_p = Path(sink)
+        if sink_p.is_absolute():
+            sink_p.mkdir(parents=True, exist_ok=True)
+            return sink_p
+        sink = str(sink).lstrip("\\/")
+        p = Path(self.app.root_path) / sink
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 
