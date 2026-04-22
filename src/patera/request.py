@@ -243,6 +243,7 @@ class Request:
         self,
         scope: dict,
         receive: Callable[..., Any],
+        send: Callable[..., Any] | None,
         app: "Patera",
         route_parameters: dict | Mapping,
         route_handler: Callable,
@@ -250,7 +251,7 @@ class Request:
         self._app = app
         self.scope = scope
         self._receive = receive
-        self._send: Callable | None = None
+        self._send: Callable | None = send
 
         self._body: Union[bytes, None] = None
         self._json: Union[dict, None] = None

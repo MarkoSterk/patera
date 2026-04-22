@@ -222,34 +222,50 @@ def consumes(media_type: MediaType) -> _EndpointDecorator:
 
 
 def produces(
-    media_type: MediaType, status_code: HttpStatus = HttpStatus.OK
+    media_type: MediaType,
+    status_code: HttpStatus = HttpStatus.OK,
 ) -> _EndpointDecorator:
     """
-    Decorator indicating what media types the endpoint
-    produces and what the default status code is.
+    Decorator indicating what media type the endpoint produces and what the default status code is.
+
+    Important:
+    - this acts as metadata and default behavior
+    - it does not override an explicit response media type or explicit content-type header
     """
 
     def decorator(func: Callable[..., Any]) -> AsyncMethod:
-
         @wraps(func)
-        async def wrapper(self: Controller, *args: Any, **kwargs: Any) -> "Response":
-            # Request is auto-injected as first arg after self
+        async def wrapper(self: Controller, *args: Any, **kwargs: Any) -> Response[Any]:
             if not args:
                 raise RuntimeError(
                     "Request must be auto-injected as the first argument after self."
                 )
-            res: "Response" = await run_sync_or_async(func, self, *args, **kwargs)
-            res.set_header("content-type", media_type.value)
-            if status_code != HttpStatus.OK:
+
+            res: Response[Any] = await run_sync_or_async(func, self, *args, **kwargs)
+
+            if res.media_type is None and res.content_type is None:
+                res.media_type = media_type.value
+
+            if (
+                int(res.status_code) == int(HttpStatus.OK)
+                and status_code != HttpStatus.OK
+            ):
                 res.status(status_code)
+
             return res
 
-        # Preserve/merge handler metadata (produces list)
         prev = getattr(func, "_handler", {}) or {}
         merged = dict(prev)
-        merged.update({"produces": media_type, "default_status_code": status_code})
+        merged.update(
+            {
+                "produces": media_type,
+                "default_status_code": status_code,
+            }
+        )
+
         # pylint: disable=protected-access
         wrapper._handler = merged  # type: ignore[attr-defined]
+
         return wrapper
 
     return decorator

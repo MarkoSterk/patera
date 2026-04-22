@@ -14,6 +14,7 @@ from typing import (
     get_type_hints,
     get_args,
     Annotated,
+    TYPE_CHECKING,
 )
 import asyncio
 import importlib
@@ -30,6 +31,9 @@ from asyncio import Task
 import aiofiles
 
 from .exceptions import StaticAssetNotFound
+
+if TYPE_CHECKING:
+    from .response import Response
 
 
 def supress():
@@ -282,3 +286,15 @@ def ignore(func_or_cls: Callable | Type[Any]) -> Callable | Type[Any]:
     """
     setattr(func_or_cls, "_ignore", True)
     return func_or_cls
+
+
+def encode_response_headers(res: "Response[Any]") -> list[tuple[bytes, bytes]]:
+    encoded: list[tuple[bytes, bytes]] = []
+
+    for key, value in res.headers.items():
+        encoded.append((key.lower().encode("latin-1"), value.encode("latin-1")))
+
+    for cookie in res.cookies:
+        encoded.append((b"set-cookie", cookie.encode("latin-1")))
+
+    return encoded

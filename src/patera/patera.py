@@ -6,7 +6,6 @@ Patera application class
 import importlib
 import os
 import inspect
-import json
 from collections.abc import AsyncIterator, Iterable
 from enum import StrEnum
 from pathlib import Path
@@ -25,7 +24,6 @@ from typing import (
 import aiofiles
 from loguru import logger
 from werkzeug.exceptions import NotFound, MethodNotAllowed
-from pydantic import BaseModel
 
 from jinja2 import (
     Environment,
@@ -35,7 +33,6 @@ from jinja2 import (
     Undefined,
 )
 
-from patera.media_types import MediaType
 from .ctx import current_request, CurrentContextProxy
 from .exceptions.http_exceptions import HtmlAborterException
 from .http_statuses import HttpStatus
@@ -47,6 +44,7 @@ from .utilities import (
     run_sync_or_async,
     _extract_response_type,
     find_python_files_by_name,
+    encode_response_headers,
 )
 from .router import Router
 from .static import Static
@@ -63,6 +61,8 @@ from .cli import CLIController
 from .logging.logger_config_base import LoggerBase
 from .logging.inmemory_buffer import InMemoryLogBuffer
 from .injectable import Injectable
+from .serializers import SerializerRegistry
+from .response_renderer import ResponseRenderer
 
 logger.remove()
 
@@ -217,6 +217,10 @@ class Patera(Injectable):
             auto_reload=self.get_conf("AUTO_RELOAD", False),
             enable_async=True,
         )
+        self.response_serializers = SerializerRegistry()
+        self.response_serializers.register_defaults()
+        self.response_renderer = ResponseRenderer(self.response_serializers)
+
         sink_id = DefaultLogger(self).configure()
         self._logger_sink_ids.append(sink_id)
 
@@ -361,6 +365,10 @@ class Patera(Injectable):
                         )
                     )
                     continue
+                elif issubclass(obj, ExceptionHandler) and obj is not ExceptionHandler:
+                    self.logger.info(f"Registering exception handler: {obj.__name__}")
+                    self.register_exception_handler(obj)
+                    continue
                 elif issubclass(obj, LoggerBase) and obj is not LoggerBase:
                     self.logger.info(f"Registering logger sink: {obj.__name__}")
                     sink_id = obj(self).configure()
@@ -447,9 +455,8 @@ class Patera(Injectable):
         The bare-bones application without any middleware.
         Calls the route handler directly.
         """
-        if req.response.expected_body_type is None:
+        if req.response.expected_body_type() is None:
             expected = _extract_response_type(req.route_handler)
-            # pylint: disable=protected-access
             req.response._set_expected_body_type(expected)
         res: Response = await req.route_handler.__self__(req.route_handler, req)  # type: ignore
         return res
@@ -517,29 +524,34 @@ class Patera(Injectable):
         self, res: Response, send, response_type: Optional[Type[Any]] = None
     ):
         """
-        Sends response
+        Sends response.
+
+        Serialization is delegated to the response renderer / serializer registry.
+        This method focuses on transport concerns:
+        - zero-copy responses
+        - streaming responses
+        - normal ASGI start/body sending
         """
-        # Build headers for ASGI send
-        headers = []
-        for k, v in res.headers.items():
-            headers.append((k.encode("utf-8"), v.encode("utf-8")))
-        await send(
-            {
-                "type": "http.response.start",
-                "status": res.status_code.value
-                if isinstance(res.status_code, HttpStatus)
-                else res.status_code,
-                "headers": headers,
-            }
-        )
-        # Zero-copy _parameters_ were stashed in res._zero_copy
+        self.response_renderer.apply_default_content_type(res)
+
         if res.zero_copy is not None:
+            self.response_renderer.finalize_headers(
+                res, body_bytes=None, is_streaming=True
+            )
+
+            await res.send(
+                {
+                    "type": "http.response.start",
+                    "status": int(res.status_code),
+                    "headers": encode_response_headers(res),
+                }
+            )
+
             params = res.zero_copy
             file_path = params["file_path"]
             start = params["start"]
             length = params["length"]
 
-            # stream in 1 MiB chunks
             chunk_size = 1 * 1024 * 1024
             remaining = length
 
@@ -560,7 +572,19 @@ class Patera(Injectable):
                     )
             return
 
-        if getattr(res, "is_streaming", False) and res.is_streaming:
+        if res.is_streaming:
+            self.response_renderer.finalize_headers(
+                res, body_bytes=None, is_streaming=True
+            )
+
+            await res.send(
+                {
+                    "type": "http.response.start",
+                    "status": int(res.status_code),
+                    "headers": encode_response_headers(res),
+                }
+            )
+
             stream_iter = res.stream_iterable
             if stream_iter is None:
                 await send(
@@ -577,7 +601,6 @@ class Patera(Injectable):
                     }
                 )
 
-            # Final empty chunk with more_body=False
             await send(
                 {
                     "type": "http.response.body",
@@ -587,36 +610,24 @@ class Patera(Injectable):
             )
             return
 
-        if res.body and res.content_type in [
-            MediaType.APPLICATION_JSON,
-            MediaType.APPLICATION_PROBLEM_JSON,
-            MediaType.APPLICATION_X_NDJSON,
-        ]:
-            if (
-                response_type
-                and issubclass(response_type, BaseModel)
-                and isinstance(res.body, dict)
-            ):
-                res.body = response_type(**res.body).model_dump_json().encode("utf-8")
-            elif (
-                response_type
-                and issubclass(response_type, BaseModel)
-                and isinstance(res.body, BaseModel)
-            ):
-                res.body = res.body.model_dump_json().encode("utf-8")
-            elif res.body and response_type is None and isinstance(res.body, BaseModel):
-                res.body = res.body.model_dump_json().encode("utf-8")
-            elif not response_type and isinstance(res.body, dict):
-                # tries to serialize plain dict to json. Works if the dict contains only json serializable types
-                res.body = json.dumps(res.body).encode("utf-8")
-            elif res.body and not isinstance(res.body, (bytes, bytearray)):
-                # tries to serialize other types (not bytes or bytesarray) to json
-                res.body = json.dumps(res.body).encode("utf-8")
+        body_bytes = await self.response_renderer.render_body(res, response_type)
+        self.response_renderer.finalize_headers(
+            res, body_bytes=body_bytes, is_streaming=False
+        )
+
+        await res.send(
+            {
+                "type": "http.response.start",
+                "status": int(res.status_code),
+                "headers": encode_response_headers(res),
+            }
+        )
 
         await send(
             {
                 "type": "http.response.body",
-                "body": res.body or b"",
+                "body": body_bytes or b"",
+                "more_body": False,
             }
         )
 
@@ -648,7 +659,7 @@ class Patera(Injectable):
 
         route_handler, path_kwargs = self.router.match(url_path, method)
         req = self.request_class(
-            scope, receive, self, path_kwargs, cast(Callable, route_handler)
+            scope, receive, send, self, path_kwargs, cast(Callable, route_handler)
         )
 
         if not route_handler:
@@ -1005,11 +1016,15 @@ class Patera(Injectable):
         if not route_handler:
             await send({"type": "websocket.close", "code": 1000})
             return
-        req = Request(scope, receive, self, path_kwargs, cast(Callable, route_handler))
+        req = Request(
+            scope, receive, send, self, path_kwargs, cast(Callable, route_handler)
+        )
         req.set_send(send)
         try:
             with request_context(
-                app=self, request=req, controller=route_handler.__self__
+                app=self,
+                request=req,
+                controller=route_handler.__self__,  # type: ignore
             ):  # type: ignore
                 await run_sync_or_async(route_handler, req, **path_kwargs)
         # pylint: disable-next=W0718
