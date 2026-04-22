@@ -7,16 +7,15 @@ as Nginx. This reverse proxy server approach is more efficient.
 from __future__ import annotations
 import os
 import mimetypes
-from typing import TYPE_CHECKING
+
 from werkzeug.security import safe_join
 
 from .controller import Controller, get
 from .utilities import get_file, get_range_file
 from .http_statuses import HttpStatus
 
-if TYPE_CHECKING:
-    from .request import Request
-    from .response import Response
+from .request import Request
+from .response import Response
 
 
 class Static(Controller):
