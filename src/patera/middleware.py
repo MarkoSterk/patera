@@ -4,7 +4,16 @@ Middleware base class
 
 from abc import abstractmethod, ABC
 from patera.injectable import Injectable
-from typing import Callable, TYPE_CHECKING, Awaitable, Any, Generic, Protocol, TypeVar
+from typing import (
+    Callable,
+    TYPE_CHECKING,
+    Awaitable,
+    Any,
+    Generic,
+    Protocol,
+    Type,
+    TypeVar,
+)
 
 from pydantic import BaseModel, ValidationError
 
@@ -21,8 +30,18 @@ class AppCallableType(Protocol):
     def __call__(self, req: "Request") -> Awaitable["Response"]: ...
 
 
-# A middleware factory: given (app_instance, next_app) returns a wrapped app
-MiddlewareFactory = Callable[["Patera", AppCallableType], AppCallableType]
+def order(order: int = 0) -> Callable[[Type["MiddlewareBase"]], Type["MiddlewareBase"]]:
+    """
+    Decorator to set the order of middlewares.
+    Lower values are processed first. Default order is 0.
+    """
+
+    def decorator(cls_type: Type["MiddlewareBase"]) -> Type["MiddlewareBase"]:
+        setattr(cls_type, "_order", order)
+        return cls_type
+
+    return decorator
+
 
 AppT = TypeVar("AppT", bound="Patera")
 
@@ -32,9 +51,9 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
     Base class for middleware
     """
 
-    _configs_name: str | None = None
-
-    def __init__(self, app: AppT, next_app: AppCallableType):
+    def __init__(
+        self, app: AppT, next_app: "Callable[[Request], Awaitable[Response]]"
+    ) -> None:
         """
         Accepts the application and the next part of the middleware chain
         """
@@ -76,14 +95,6 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
         return await run_sync_or_async(self.middleware, req)
 
     @property
-    def configs_name(self) -> str:
-        return (
-            self._configs_name
-            if self._configs_name
-            else self.__class__.__name__.capitalize()
-        )
-
-    @property
     def app(self) -> AppT:
         """
         Returns the application instance
@@ -91,7 +102,7 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
         return self._app
 
     @property
-    def next(self) -> "Callable[[Request], Awaitable[Any]]":
+    def next(self) -> "Callable[[Request], Awaitable[Response]]":
         """
         Returns the next part of the middleware chain
         """
