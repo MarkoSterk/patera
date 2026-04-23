@@ -254,9 +254,6 @@ def _start_prod(
     _port: int = int(os.environ.get("PATERA_PORT", 80))
     _loop = Loops(os.environ.get("PATERA_LOOP", "auto"))
 
-    DEFAULT_IGNORE_DIRS = _get_ignore_dirs()
-    DEFAULT_IGNORE_PATTERNS = _get_ignore_patterns()
-
     Granian(
         app_path,
         address=_address,
@@ -264,9 +261,7 @@ def _start_prod(
         interface=Interfaces.ASGI,
         loop=_loop,
         factory=True,
-        reload=debug,
-        reload_ignore_dirs=DEFAULT_IGNORE_DIRS,
-        reload_ignore_patterns=DEFAULT_IGNORE_PATTERNS,
+        reload=False,
         log_level=LogLevels.debug if debug else LogLevels.info,
     ).serve()
 
