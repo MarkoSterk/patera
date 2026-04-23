@@ -22,7 +22,7 @@ from typing import (
     Union,
 )
 import aiofiles
-from loguru import logger
+from loguru import Logger, logger
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 
 from jinja2 import (
@@ -958,7 +958,7 @@ class Patera(Injectable):
         return self.get_conf("APP_NAME")
 
     @property
-    def logger(self):
+    def logger(self) -> Logger:
         return self._logger
 
     @property
