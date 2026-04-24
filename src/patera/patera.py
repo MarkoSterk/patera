@@ -1019,7 +1019,6 @@ class Patera(Injectable):
         req = Request(
             scope, receive, send, self, path_kwargs, cast(Callable, route_handler)
         )
-        req.set_send(send)
         try:
             with request_context(
                 app=self,

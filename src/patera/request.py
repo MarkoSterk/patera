@@ -14,6 +14,7 @@ import python_multipart as pm
 from pydantic_core import core_schema
 
 from .response import Response
+from .ctx import current_request, CurrentContextProxy
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -243,7 +244,7 @@ class Request:
         self,
         scope: dict,
         receive: Callable[..., Any],
-        send: Callable[..., Any] | None,
+        send: Callable[..., Any],
         app: "Patera",
         route_parameters: dict | Mapping,
         route_handler: Callable,
@@ -251,7 +252,7 @@ class Request:
         self._app = app
         self.scope = scope
         self._receive = receive
-        self._send: Callable | None = send
+        self._send: Callable = send
 
         self._body: Union[bytes, None] = None
         self._json: Union[dict, None] = None
@@ -278,8 +279,6 @@ class Request:
 
     @property
     def method(self) -> str:
-        if self._send is not None:
-            return "SOCKET"
         return self.scope.get("method", "").upper()
 
     @property
@@ -296,7 +295,7 @@ class Request:
         return {key.decode("latin1").lower(): val.decode("latin1") for key, val in raw}
 
     @property
-    def query_params(self) -> dict[str, str]:
+    def query_parameters(self) -> dict[str, str]:
         qs = self.scope.get("query_string", b"")
         parsed = parse_qs(qs.decode("utf-8"))
         return cast(
@@ -372,25 +371,12 @@ class Request:
         return {**f, **fs}
 
     async def send(self, message: dict) -> None:
-        if self._send is None:
-            raise RuntimeError("Send function is available only on websocket requests")
         return await self._send(message)
 
-    def set_send(self, send: Callable) -> None:
-        self._send = send
-
     async def receive(self) -> dict:
-        if self._send is None:
-            raise RuntimeError(
-                "Receive function is available only on websocket requests"
-            )
         return await self._receive()
 
     async def accept(self) -> None:
-        if self._send is None:
-            raise RuntimeError(
-                "Accept function is available only on websocket requests"
-            )
         await self._send({"type": "websocket.accept"})
 
     @staticmethod
@@ -467,7 +453,7 @@ class Request:
             )
 
         pm.parse_form(
-            headers={"Content-Type": content_type, "content-type": content_type},
+            headers={"Content-Type": content_type, "content-type": content_type},  # type: ignore
             input_stream=stream,
             on_field=on_field,
             on_file=on_file,
@@ -485,7 +471,7 @@ class Request:
         if location == "form_and_files":
             return await self.form_and_files()
         if location == "query":
-            return self.query_params
+            return self.query_parameters
         return None
 
     @property
@@ -497,5 +483,5 @@ class Request:
         return self._response
 
     @property
-    def context(self) -> dict[str, Any]:
-        return self._context
+    def context(self) -> CurrentContextProxy:
+        return current_request
