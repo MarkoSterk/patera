@@ -239,6 +239,7 @@ class Patera(Injectable):
 
         self._app: AppCallableType = self._base_app
         self._middleware: list[Callable] = []
+        self._middleware_classes: dict[int, Type[MiddlewareBase]] = {}
         self._controllers: dict[str, "Controller"] = {}
         self._cli_controllers: dict[str, "CLIController"] = {}
         self._exception_handlers: dict[str, Callable] = {}
@@ -328,6 +329,13 @@ class Patera(Injectable):
             folder_path = app_root / folder
             files = find_python_files_by_name(folder_path, ["middleware", "mw"])
             self._load_detected_module(files, MiddlewareBase)
+            for order_key in sorted(self._middleware_classes.keys()):
+                mw_class = self._middleware_classes[order_key]
+                self._middleware.append(
+                    lambda app, next_app, mdlwr_class=mw_class: mdlwr_class(
+                        app, next_app
+                    )
+                )
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
         """
@@ -359,11 +367,14 @@ class Patera(Injectable):
                     continue
                 elif issubclass(obj, MiddlewareBase) and obj is not MiddlewareBase:
                     self.logger.info(f"Registering middleware: {obj.__name__}")
-                    self._middleware.append(
-                        lambda app, next_app, mdlwr_class=obj: mdlwr_class(
-                            app, next_app
+                    order = getattr(obj, "_order", 0)
+                    order_keys = self._middleware_classes.keys()
+                    if order in order_keys:
+                        order = max(order_keys) + 1
+                        self.logger.warning(
+                            f"For middleware {obj.__name__}: Order {getattr(obj, '_order', 0)} is already taken, assigned order {order} instead."
                         )
-                    )
+                    self._middleware_classes[order] = obj
                     continue
                 elif issubclass(obj, ExceptionHandler) and obj is not ExceptionHandler:
                     self.logger.info(f"Registering exception handler: {obj.__name__}")
