@@ -726,7 +726,6 @@ class Patera(Injectable):
         )
 
     def register_static_controller(self, base_path: str):
-        print("Register static: ", base_path)
         static_controller_dec = path(f"{base_path}", open_api_spec=False)
         static_controller = static_controller_dec(Static)
         self.register_controller(static_controller, with_base_path=False)  # type: ignore

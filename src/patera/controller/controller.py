@@ -51,6 +51,7 @@ class Controller(Injectable, Generic[AppT]):
         self.get_before_request_methods()
         self.get_after_request_methods()
         self._resolve_autowires()
+        self._after_init_methods()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self.app._extensions.get(target_type.__name__, None)
@@ -61,6 +62,15 @@ class Controller(Injectable, Generic[AppT]):
             self.app._extensions[value.configs_name] = value
             self.app._extensions[target_type.__name__] = value
         return value
+
+    def _after_init_methods(self):
+        for name in dir(self):
+            method = getattr(self, name)
+            if not callable(method):
+                continue
+            after_init_handler = getattr(method, "_after_init", False)
+            if after_init_handler:
+                method()
 
     def get_endpoint_methods(self) -> dict[str, dict[str, str | Callable]]:
         """Returns a dictionery with all endpoint methods"""

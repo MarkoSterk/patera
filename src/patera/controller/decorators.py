@@ -295,6 +295,11 @@ def after_request(func: Callable[..., Any]) -> Callable[..., Any]:
     return func
 
 
+def after_init(func: Callable[..., Any]) -> Callable[..., Any]:
+    setattr(func, "_after_init", True)
+    return func
+
+
 def cors(
     *,
     allow_origins: Optional[list[str]] = None,
