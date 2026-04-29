@@ -162,14 +162,13 @@ class LoggerBase(ABC, Generic[AppT]):
         # loads configs for the logger from application configurations
         # by the config class name as upper-case
         # example: CustomLoggerConfig -> CUSTOM_LOGGER_CONFIG
-        self.conf: Dict[str, Any] = app.get_conf(self.logger_name, None) or {}  # type: ignore
+        self.conf: Dict[str, Any] = (
+            app.get_conf(self.configs_name, app.get_conf(self.__class__.__name__, {}))
+            or {}
+        )  # type: ignore
         self.conf = self.validate_configs(self.conf)
 
     def validate_configs(self, configs: dict[str, Any]) -> dict[str, Any]:
-        if self.configs_model is not None and issubclass(
-            self.configs_model, LoggerConfigBase
-        ):
-            return self.configs_model.model_validate(configs).model_dump()
         return LoggerConfigBase.model_validate(configs).model_dump()
 
     @property
@@ -177,7 +176,7 @@ class LoggerBase(ABC, Generic[AppT]):
         return self._app
 
     @property
-    def logger_name(self) -> str:
+    def configs_name(self) -> str:
         """Returns class name as upper snake case"""
         name = self.__class__.__name__
         return re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()

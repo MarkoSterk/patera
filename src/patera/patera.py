@@ -285,7 +285,7 @@ class Patera(Injectable):
         _logger_folders.extend(_additional_logger_folders)
         for folder in _logger_folders:
             folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["logger", "log"])
+            files = find_python_files_by_name(folder_path, ["logger", "log_sink"])
             self._load_detected_module(files, LoggerBase)
 
         _controller_folders: list[str] = [
