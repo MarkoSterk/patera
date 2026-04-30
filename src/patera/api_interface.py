@@ -192,7 +192,7 @@ class ApiInterface(BaseExtension[AppT], Generic[AppT]):
                     url,
                     headers=headers,
                     timeout=timeout,
-                    params=req.query_params,
+                    params=req.query_parameters,
                     follow_redirects=follow_redirects,
                 )
             else:
@@ -209,7 +209,7 @@ class ApiInterface(BaseExtension[AppT], Generic[AppT]):
                         headers=headers,
                         timeout=timeout,
                         json=cast(BaseModel, data).model_dump(),
-                        params=req.query_params,
+                        params=req.query_parameters,
                         follow_redirects=follow_redirects,
                     )
                 else:
@@ -225,7 +225,7 @@ class ApiInterface(BaseExtension[AppT], Generic[AppT]):
                         timeout=timeout,
                         data=form,
                         files=files,
-                        params=req.query_params,
+                        params=req.query_parameters,
                         follow_redirects=follow_redirects,
                     )
 
