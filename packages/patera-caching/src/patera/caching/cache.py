@@ -27,33 +27,31 @@ if TYPE_CHECKING:
 class CachingConfig(BaseModel):
     """Configuration model for Caching extension."""
 
-    BACKEND: Optional[Type[BaseCacheBackend]] = Field(
-        default=None,
-        description="Caching backend class, must be subclass of BaseCacheBackend",
-    )
     DURATION: Optional[int] = Field(
         default=300, description="Default cache duration in seconds"
     )
 
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
+BackendT = TypeVar("BackendT", bound="BaseCacheBackend", default="BaseCacheBackend")
 
 
-class Caching(BaseExtension[AppT], Generic[AppT]):
+class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
     """
     Caching system for route handlers with **pluggable backend class**.
 
-    Provide caching implementation as `BACKEND` config. This should be
+    Provide caching implementation as `backend` class variable. This should be
     a valid caching implementation of the BaseCacheBackend class.
     If not provided, defaults to in-memory caching (MemoryCacheBackend).
 
     Default cache duration is set with `DURATION` config (seconds)
     """
 
+    backend: Optional[BackendT] = None
+
     def __init__(self) -> None:
         self._app: AppT = cast(AppT, None)
         self._duration: int = 300
-        self._backend: Optional[BaseCacheBackend] = None
         self._configs: dict[str, Any] = {}
 
     def init_app(self, app: AppT) -> None:
@@ -62,19 +60,14 @@ class Caching(BaseExtension[AppT], Generic[AppT]):
         self._configs = self.validate_configs(self._configs, CachingConfig)
 
         self._duration = self._configs["DURATION"]
-        backend_cls = self._configs.get("BACKEND", None)
-        if backend_cls is None:
+        if self.backend is None:
             # loads default backend - MemoryCacheBackend
             # pylint: disable-next=C0415
             from .backends.memory_cache_backend import MemoryCacheBackend
 
-            backend_cls = MemoryCacheBackend
-        if not issubclass(backend_cls, BaseCacheBackend):
-            raise TypeError(
-                "CACHE_BACKEND must be a class and subclass of BaseCacheBackend"
-            )
+            self.backend = MemoryCacheBackend  # type: ignore
 
-        self._backend = cast(Type[BaseCacheBackend], backend_cls).configure_from_app(
+        self._backend = cast(Type[BaseCacheBackend], self.backend).configure_from_app(
             app, self._configs
         )
 
@@ -123,7 +116,9 @@ class Caching(BaseExtension[AppT], Generic[AppT]):
         return req.res
 
 
-def cache(cls: Type[Caching], duration: Optional[int] = None) -> Callable:
+def cache(
+    cls: Type[Caching], duration: Optional[int] = None, key: Optional[str] = None
+) -> Callable:
     """Decorator for caching route handler results using the Caching extension."""
 
     def decorator(handler: Callable) -> Callable:
@@ -135,9 +130,13 @@ def cache(cls: Type[Caching], duration: Optional[int] = None) -> Callable:
             req: Request = args[0]
             method: str = req.method
             path: str = req.path
-            query_params = sorted(req.query_params.items())
+            query_params = sorted(req.query_parameters.items())
             cache_key = (
-                f"{handler.__name__}:{method}:{path}:{hash(frozenset(query_params))}"
+                key
+                if key is not None
+                else (
+                    f"{handler.__name__}:{method}:{path}:{hash(frozenset(query_params))}"
+                )
             )
 
             cached_value: Optional[Response] = await cache_extension.get(cache_key, req)

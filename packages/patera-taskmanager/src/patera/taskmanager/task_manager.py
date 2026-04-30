@@ -22,7 +22,7 @@ from apscheduler.jobstores.base import JobLookupError, BaseJobStore
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.base import BaseExecutor
 from apscheduler.executors.asyncio import AsyncIOExecutor
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 from patera.utilities import run_sync_or_async, run_in_background
 from patera.base_extension import BaseExtension
@@ -34,27 +34,9 @@ if TYPE_CHECKING:
 class TaskManagerConfig(BaseModel):
     """Configuration model for TaskManager extension."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     NICE_NAME: Optional[str] = Field(
         "Task manager",
         description="Human readable name for the task manager for the admin dashboard",
-    )
-    SCHEDULER: Optional[Type[BaseScheduler]] = Field(
-        default=AsyncIOScheduler,
-        description="Scheduler class to use, must be subclass of apscheduler.schedulers.BaseScheduler. Default AsyncIOScheduler",
-    )
-    JOB_STORES: Optional[dict[str, BaseJobStore]] = Field(
-        default={"default": MemoryJobStore()},
-        description="Job stores configuration dictionary. Default MemoryJobStore",
-    )
-    EXECUTORS: Optional[dict[str, BaseExecutor]] = Field(
-        default={"default": AsyncIOExecutor()},
-        description="Executors configuration dictionary. Default AsyncIOExecutor",
-    )
-    JOB_DEFAULTS: Optional[dict[str, bool | int]] = Field(
-        default={"coalesce": False, "max_instances": 3},
-        description="Default job settings dictionary",
     )
     DAEMON: Optional[bool] = Field(
         default=True,
@@ -67,76 +49,98 @@ AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 class TaskManager(BaseExtension[AppT], Generic[AppT]):
     """
-    Task manager class for scheduling and managing backgroudn tasks.
+    Task manager class for scheduling and managing background tasks.
+
+    Scheduler configuration is declared on the class implementation:
+
+    - scheduler
+    - job_stores
+    - executors
+    - job_defaults
+
+    Runtime configuration is loaded from application configs.
     """
+
+    scheduler_cls: Type[BaseScheduler] = AsyncIOScheduler
+    job_stores: dict[str, BaseJobStore] = {"default": MemoryJobStore()}
+    executors: dict[str, BaseExecutor] = {"default": AsyncIOExecutor()}
+    job_defaults: dict[str, bool | int] = {
+        "coalesce": False,
+        "max_instances": 3,
+    }
 
     def __init__(self) -> None:
         self._configs: dict[str, Any] = {}
         self._app: AppT = cast(AppT, None)
-        self._job_stores: dict
-        self._executors: dict
-        self._job_defaults: dict
-        self._daemon: bool
-        self._scheduler: AsyncIOScheduler
+        self._daemon: bool = True
+        self._scheduler: BaseScheduler
         self._initial_jobs_methods_list: list[Tuple] = []
         self._active_jobs: dict[str, Job] = {}
 
-    def init_app(self, app: AppT):
+    def init_app(self, app: AppT) -> None:
         """
-        Initlizer for TaskManager with Patera app
+        Initializes the TaskManager with the Patera app.
         """
         self._app = app  # type: ignore
+
         self._configs = self.load_configs() or {}
-
         self._configs = self.validate_configs(self._configs, TaskManagerConfig)
-        self._job_stores = self._configs["JOB_STORES"]
-        self._executors = self._configs["EXECUTORS"]
-        self._job_defaults = self._configs["JOB_DEFAULTS"]
-        self._daemon = self._configs["DAEMON"]
-        self._scheduler = self._configs["SCHEDULER"]
 
-        self._scheduler = self._scheduler(
-            jobstores=self._job_stores,
-            executors=self._executors,
-            job_defaults=self._job_defaults,
+        self._daemon = self._configs["DAEMON"]
+
+        if not issubclass(self.scheduler_cls, BaseScheduler):
+            raise TypeError(
+                "scheduler_cls must be a class and subclass of BaseScheduler"
+            )
+
+        self._scheduler = self.scheduler_cls(
+            jobstores=self.job_stores,
+            executors=self.executors,
+            job_defaults=self.job_defaults,
             daemon=self._daemon,
-        )  # type: ignore
-        # self._app.add_extension(self)
+        )
+
         self._get_defined_jobs()
         self._app.add_on_startup_method(self._start_scheduler)
         self._app.add_on_shutdown_method(self._stop_scheduler)
 
-    def pause_scheduler(self):
+    def pause_scheduler(self) -> None:
         """
-        Pauses scheduler execution
+        Pauses scheduler execution.
         """
         self.scheduler.pause()
 
-    def resume_scheduler(self):
+    def resume_scheduler(self) -> None:
         """
-        Resumes paused scheduler execution
+        Resumes paused scheduler execution.
         """
         self.scheduler.resume()
 
-    async def _start_scheduler(self):
+    async def _start_scheduler(self) -> None:
         """
-        On startup hook for starting the scheduler
+        Startup hook for starting the scheduler.
         """
         self.scheduler.start()
         self._start_initial_jobs()
 
-    async def _stop_scheduler(self):
+    async def _stop_scheduler(self) -> None:
         """
-        On shutdown hook for shuting the scheduler down
+        Shutdown hook for stopping the scheduler.
         """
         self.scheduler.shutdown()
 
-    def _get_defined_jobs(self):
+    def _get_defined_jobs(self) -> None:
+        """
+        Finds methods decorated with @schedule_job.
+        """
         for name in dir(self):
             method = getattr(self, name)
+
             if not callable(method):
                 continue
+
             scheduler_method = getattr(method, "_scheduler_job", None)
+
             if scheduler_method:
                 self._initial_jobs_methods_list.append(
                     (method, scheduler_method["args"], scheduler_method["kwargs"])
@@ -144,120 +148,134 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
 
     def _start_initial_jobs(self) -> None:
         """
-        Starts all initial jobs (decorated functions)
+        Starts all scheduled jobs declared with @schedule_job.
         """
-        if (
-            self._initial_jobs_methods_list is None
-            or len(self._initial_jobs_methods_list) == 0
-        ):
+        if not self._initial_jobs_methods_list:
             return
+
         for func, args, kwargs in self._initial_jobs_methods_list:
             job: Job = self.scheduler.add_job(func, *args, **kwargs)
             self._active_jobs[job.id] = job
+
         self._initial_jobs_methods_list = []
 
-    def run_background_task(self, func: Callable, *args, **kwargs):
+    def run_background_task(self, func: Callable, *args, **kwargs) -> None:
         """
-        Runs a method in the background (fire and forget).
-        Used for running functions whose execution doesn't have to be awaited/returned to the user.
-        Example: a route handler can return a response immediately, and the
-        task is executed in a seperate thread (sending an email for example).
+        Runs a method in the background.
 
-        Uses the patera.utilities.run_in_background method
+        This is useful for fire-and-forget work whose result does not need to
+        be awaited before returning a response to the client.
         """
         run_in_background(func, *args, **kwargs)
 
     def add_job(self, func: Callable, *args, **kwargs) -> Job:
         """
-        Adds job
+        Adds a job manually.
         """
         job: Job = self.scheduler.add_job(func, *args, **kwargs)
         self._active_jobs[job.id] = job
         return job
 
-    def remove_job(self, job: str | Job, job_store: Optional[str] = None):
+    def remove_job(self, job: str | Job, job_store: Optional[str] = None) -> None:
         """
         Removes a job.
-        :param job: job id (str) or the Job instance returned by the scheduler.add_job method
-        """
-        if isinstance(job, Job):
-            job = job.id  # type: ignore
-        return self._remove_job(cast(str, job), job_store)
 
-    def pause_job(self, job: str | Job):
-        """
-        Pauses the job
+        :param job: Job ID or Job instance returned by scheduler.add_job().
         """
         if isinstance(job, Job):
-            return job.pause()  # type: ignore
+            job = job.id
+
+        self._remove_job(cast(str, job), job_store)
+
+    def pause_job(self, job: str | Job) -> None:
+        """
+        Pauses a job.
+        """
+        if isinstance(job, Job):
+            job.pause()
+            return
+
         active_job: Optional[Job] = self._active_jobs.get(job, None)
-        if job is None:
-            raise JobLookupError(job)
-        return cast(Job, active_job).pause()
 
-    def resume_job(self, job: str | Job):
+        if active_job is None:
+            raise JobLookupError(job)
+
+        active_job.pause()
+
+    def resume_job(self, job: str | Job) -> None:
         """
-        Resumes job
-        :param paused_job: id or Job instance
+        Resumes a paused job.
         """
         if isinstance(job, Job):
-            return job.resume()  # type: ignore
+            job.resume()
+            return
+
         paused_job: Optional[Job] = self._active_jobs.get(job, None)
+
         if paused_job is None:
-            raise JobLookupError(paused_job)
-        return paused_job.resume()
+            raise JobLookupError(job)
+
+        paused_job.resume()
 
     def get_job(self, job_id: str) -> Job | None:
+        """
+        Returns a job by ID.
+        """
         return self._active_jobs.get(job_id, None)
 
-    def _remove_job(self, job_id: str, job_store=None):
+    def _remove_job(self, job_id: str, job_store: Optional[str] = None) -> None:
         """
-        Removes job from job list
+        Removes a job from the scheduler and active job list.
         """
         self.scheduler.remove_job(job_id, job_store)
-        del self._active_jobs[job_id]
+
+        if job_id in self._active_jobs:
+            del self._active_jobs[job_id]
 
     @property
     def jobs(self) -> dict[str, Job]:
         """
-        Returns dictionary of running jobs
+        Returns a dictionary of active jobs.
         """
         return self._active_jobs
 
     @property
-    def scheduler(self) -> AsyncIOScheduler:
+    def scheduler(self) -> BaseScheduler:
         """
-        Returns the background scheduler instance
+        Returns the scheduler instance.
         """
         return self._scheduler
 
     @property
+    def app(self) -> AppT:
+        """
+        Returns the Patera application instance.
+        """
+        return self._app
+
+    @property
     def nice_name(self) -> str:
-        """Nice name of the instance"""
+        """
+        Returns the human readable name of the task manager.
+        """
         return self._configs["NICE_NAME"]
 
 
-def schedule_job(*args, **kwargs):
+def schedule_job(*args, **kwargs) -> Callable:
     """
-    ```
-    A decorator to add a function as a scheduled job in the given APScheduler instance.
-    The decorated function is added to a list of tuples (func, args, kwargs) and the job
-    is started when the scheduler instance is started (on_startup event of Patera)
-    IMPORTANT: The decorator should be the top-most decorator of the function to make sure
-    any other decorator is applied before the job is added to the job list
-    :param args: Positional arguments to pass to scheduler.add_job().
-                Typically, the first of these args is the trigger (e.g. 'interval', 'cron', etc.).
-    :param kwargs: Keyword arguments to pass to scheduler.add_job().
+    Decorator for declaring a scheduled job.
+
+    The decorated method is added to the scheduler when the Patera
+    application starts.
+
     Example:
-    Runs a job with id 'my_job_id' every 5 minutes
 
-    @schedule_job('interval', minutes=5, id='my_job_id')
+    @schedule_job("interval", minutes=5, id="my_job_id")
     async def my_job(self):
-        #some task
-    ```
+        ...
     """
 
-    def decorator(func: Callable):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *f_args, **f_kwargs):
             return await run_sync_or_async(func, self, *f_args, **f_kwargs)
