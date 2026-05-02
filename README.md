@@ -1300,7 +1300,7 @@ class AsyncNoSqlBackendBase(ABC):
     def configure_from_app(cls, app: "Patera", variable_prefix: str) -> "AsyncNoSqlBackendBase":
         """
         Classmethod to configure backend from app config.
-        Called during NoSqlDatabase.init_app().
+        Called during NoSqlDatabase.init().
         """
         ...
 

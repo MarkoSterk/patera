@@ -16,25 +16,24 @@ AppT = TypeVar("AppT", bound="Patera")
 
 
 class BaseExtension(Injectable, ABC, Generic[AppT]):
-    _app: "Optional[AppT]"
+    _app: AppT
     _configs: dict[str, Any]
 
-    def __init__(self) -> None:
-        self._app = None
+    def __init__(self, app: AppT) -> None:
+        self._app = app
         self._resolve_autowires()
+        self.init()
+
+    @abstractmethod
+    def init(self) -> None: ...
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self.app._extensions.get(target_type.__name__, None)
         if value is None:
-            value = target_type()
-            if hasattr(value, "init_app"):
-                value.init_app(self.app)
+            value = target_type(self.app)
             self.app._extensions[value.configs_name] = value
             self.app._extensions[target_type.__name__] = value
         return value
-
-    @abstractmethod
-    def init_app(self, app: AppT) -> None: ...
 
     def validate_configs(
         self, configs: dict[str, Any], model: type[BaseModel]

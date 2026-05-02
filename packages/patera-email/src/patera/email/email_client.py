@@ -12,7 +12,6 @@ from typing import (
     cast,
 )
 from pydantic import BaseModel, Field
-from jinja2 import Environment
 
 from patera.base_extension import BaseExtension
 from patera.utilities import run_sync_or_async
@@ -44,14 +43,8 @@ class EmailClient(BaseExtension[AppT], Generic[AppT]):
     Email client extension class
     """
 
-    def __init__(self) -> None:
-        self._app: AppT = cast(AppT, None)
-        self._configs: dict[str, str | int | bool] = {}
-        self.render_engine: Environment = None  # type: ignore
-
-    def init_app(self, app: AppT) -> None:
+    def init(self) -> None:
         """Initilizes the extension with the Patera app"""
-        self._app = app  # type: ignore
         self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, EmailConfig)
 

@@ -98,9 +98,13 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
 
     __db_name__: str
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._app: "Optional[AppT]" = None
+    def init(self) -> None:
+        """
+        Initializes the database interface
+        app.get_conf("DATABASE_URI") must return a connection string like:
+        "postgresql+asyncpg://user:pass@localhost/dbname"
+        or "sqlite+aiosqlite:///./patera.db"
+        """
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
@@ -108,15 +112,6 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         self._session_name: str
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
-
-    def init_app(self, app: AppT) -> None:
-        """
-        Initializes the database interface
-        app.get_conf("DATABASE_URI") must return a connection string like:
-        "postgresql+asyncpg://user:pass@localhost/dbname"
-        or "sqlite+aiosqlite:///./patera.db"
-        """
-        self._app = app
         self._configs = cast(
             dict[str, str | bool], self.load_configs()
         )  # app.get_conf(self.configs_name, None)
@@ -138,7 +133,7 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         if "migrate" in [cl.__name__.lower() for cl in self.__class__.mro()]:
             from patera.migrate import Migrate  # type: ignore
 
-            self._migrate = Migrate(app, self)
+            self._migrate = Migrate(self._app, self)
 
     async def connect(self) -> None:
         """

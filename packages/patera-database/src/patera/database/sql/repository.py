@@ -62,16 +62,12 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
             if callable(value) and hasattr(value, "__custom_query__"):
                 setattr(cls, name, cls._wrap_method(value))
 
-    def __init__(self) -> None:
-        super().__init__()
+    def init(self) -> None:
         self._database: SqlDatabase | None = None
-
-    def init_app(self, app: AppT) -> None:
-        self._app = app
 
     def get_database(self) -> SqlDatabase:
         if self._database is not None:
-            self._database
+            return self._database
         database = cast(
             SqlDatabase,
             cast(AppT, self._app).extensions.get(self.model.db_name(), None),

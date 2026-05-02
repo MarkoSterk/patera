@@ -26,9 +26,7 @@ class ExceptionHandler(Injectable):
         value = self.app._extensions.get(key)
 
         if value is None:
-            value = target_type()
-            if hasattr(value, "init_app"):
-                value.init_app(self.app)
+            value = target_type(self._app)
             self.app._extensions[key] = value
 
         return value

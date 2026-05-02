@@ -11,7 +11,6 @@ from typing import (
     TypeVar,
     cast,
     TYPE_CHECKING,
-    Any,
 )
 from functools import wraps
 
@@ -69,19 +68,14 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
         "max_instances": 3,
     }
 
-    def __init__(self) -> None:
-        self._configs: dict[str, Any] = {}
-        self._app: AppT = cast(AppT, None)
+    def init(self) -> None:
+        """
+        Initializes the TaskManager with the Patera app.
+        """
         self._daemon: bool = True
         self._scheduler: BaseScheduler
         self._initial_jobs_methods_list: list[Tuple] = []
         self._active_jobs: dict[str, Job] = {}
-
-    def init_app(self, app: AppT) -> None:
-        """
-        Initializes the TaskManager with the Patera app.
-        """
-        self._app = app  # type: ignore
 
         self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, TaskManagerConfig)

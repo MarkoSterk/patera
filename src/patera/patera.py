@@ -54,7 +54,6 @@ from .logger import DefaultLogger
 from .ctx import request_context
 from .controller import Controller
 from .exceptions import ExceptionHandler
-from .base_extension import BaseExtension
 from .configuration_base import BaseConfig
 from .middleware import MiddlewareBase, AppCallableType
 from .cli import CLIController
@@ -389,9 +388,7 @@ class Patera(Injectable):
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self._extensions.get(target_type.__name__, None)
         if value is None:
-            value = target_type()
-            if hasattr(value, "init_app"):
-                value.init_app(self)
+            value = target_type(self)
             self._extensions[value.configs_name] = value
             self._extensions[target_type.__name__] = value
 
@@ -774,10 +771,6 @@ class Patera(Injectable):
             return
         self._extensions[extension.configs_name] = extension
         self._extensions[extension.__class__.__name__] = extension
-
-    def activate_extension(self, extension: "Type[BaseExtension]"):
-        extension_instance = extension()
-        extension_instance.init_app(self)
 
     def _add_route_function(
         self, method: str, url_path: str, func: Callable, endpoint_name: str

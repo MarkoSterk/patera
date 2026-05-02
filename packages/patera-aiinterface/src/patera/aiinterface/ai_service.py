@@ -79,18 +79,11 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
     history_provider: Optional[HistoryT]
     augmentation_provider: Optional[AugmentationT]
 
-    def __init__(self) -> None:
-        """
-        Extension init method
-        """
-        self._configs: dict[str, str | bool | float | dict[Any, Any]]
-
-    def init_app(self, app: AppT):
+    def init(self):
         """
         Initilizer method for extension
         """
-        self._app = app  # type: ignore
-        self._configs = app.get_conf(self.configs_name, None)
+        self._configs = self._app.get_conf(self.configs_name, None)
         if self._configs is None:
             raise ValueError(
                 f"Configurations for {self.configs_name} not found in app configurations."

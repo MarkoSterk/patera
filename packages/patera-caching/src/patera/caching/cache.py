@@ -11,7 +11,6 @@ from typing import (
     TypeVar,
     cast,
     TYPE_CHECKING,
-    Any,
 )
 from pydantic import BaseModel, Field
 
@@ -49,13 +48,7 @@ class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
 
     backend: Optional[BackendT] = None
 
-    def __init__(self) -> None:
-        self._app: AppT = cast(AppT, None)
-        self._duration: int = 300
-        self._configs: dict[str, Any] = {}
-
-    def init_app(self, app: AppT) -> None:
-        self._app = app  # type: ignore
+    def init(self) -> None:
         self._configs = self.load_configs() or {}
         self._configs = self.validate_configs(self._configs, CachingConfig)
 
@@ -68,7 +61,7 @@ class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
             self.backend = MemoryCacheBackend  # type: ignore
 
         self._backend = cast(Type[BaseCacheBackend], self.backend).configure_from_app(
-            app, self._configs
+            self._app, self._configs
         )
 
         # self._app.add_extension(self)

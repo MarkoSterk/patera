@@ -64,9 +64,7 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self.app._extensions.get(target_type.__name__, None)
         if value is None:
-            value = target_type()
-            if hasattr(value, "init_app"):
-                value.init_app(self.app)
+            value = target_type(self.app)
             self.app._extensions[value.configs_name] = value
             self.app._extensions[target_type.__name__] = value
         return value
