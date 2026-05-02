@@ -372,3 +372,7 @@ class LoggerBase(ABC, Generic[AppT]):
         logger_sink_id: int = logger.add(sink, **kwargs)
 
         return logger_sink_id
+
+    @property
+    def logger_name(self) -> str:
+        return self.__class__.__name__

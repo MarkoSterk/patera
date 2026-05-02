@@ -22,7 +22,8 @@ from typing import (
     Union,
 )
 import aiofiles
-from loguru import Logger, logger
+from loguru import logger
+from loguru._logger import Logger
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 
 from jinja2 import (
