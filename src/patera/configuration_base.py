@@ -23,7 +23,9 @@ class BaseConfig(BaseSettings):
         env_prefix="PATERA_",
         env_nested_delimiter="__",
     )
-
+    APP_PACKAGE: Optional[str] = Field(
+        "app", description="Python package where app code is located. Default is 'app'."
+    )
     APP_NAME: Optional[str] = Field(
         "Patera app", description="Human-readable name of the app"
     )

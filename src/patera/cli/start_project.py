@@ -180,10 +180,10 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
     Yield candidate Python files in priority order.
 
     Priority:
-    1. Common entrypoint names in root/app
-    2. Common entrypoint names in root
-    3. Common entrypoint names anywhere below root
-    4. All remaining Python files
+    1. Common entrypoint names in root/APP_PACKAGE
+    # 2. Common entrypoint names in root
+    # 3. Common entrypoint names anywhere below root
+    # 4. All remaining Python files
 
     Important:
     This must not scan .venv, site-packages, node_modules, etc.
@@ -203,7 +203,7 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
 
     ignore_dirs = set(_get_ignore_dirs())
     yielded: set[Path] = set()
-    app_dir = root / "app"
+    app_dir = root / os.environ.get("PATERA_APP_PACKAGE", "app")
 
     def add_file(file_path: Path) -> bool:
         try:
@@ -220,29 +220,29 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
         yielded.add(resolved)
         return True
 
-    # root/app/* search
+    # root/APP_PACKAGE/* search
     if app_dir.is_dir() and not _is_ignored_path(app_dir, ignore_dirs):
         for name in common_names:
             file_path = app_dir / name
             if file_path.is_file() and add_file(file_path):
                 yield file_path
 
-    # Root-level search
-    for name in common_names:
-        file_path = root / name
-        if file_path.is_file() and add_file(file_path):
-            yield file_path
+    # # Root-level search
+    # for name in common_names:
+    #     file_path = root / name
+    #     if file_path.is_file() and add_file(file_path):
+    #         yield file_path
 
-    # Searches common file names anywhere below root
-    for name in common_names:
-        for file_path in _iter_files_pruned(root, filename=name):
-            if add_file(file_path):
-                yield file_path
+    # # Searches common file names anywhere below root
+    # for name in common_names:
+    #     for file_path in _iter_files_pruned(root, filename=name):
+    #         if add_file(file_path):
+    #             yield file_path
 
-    # Fallback for searching everything else
-    for file_path in _iter_files_pruned(root):
-        if add_file(file_path):
-            yield file_path
+    # # Fallback for searching everything else
+    # for file_path in _iter_files_pruned(root):
+    #     if add_file(file_path):
+    #         yield file_path
 
 
 def find_pyjolt_app_import(
@@ -376,7 +376,7 @@ def _start_prod(
         loop=loop,
         factory=True,
         reload=False,
-        log_level=LogLevels.debug if debug else LogLevels.info,
+        log_level=LogLevels.info,
     ).serve()
 
 
@@ -448,7 +448,7 @@ def start_prod(
     try:
         _start_prod(cwd, False, app, env_file)
     except Exception as e:
-        print("FAILED TO START PATERA APP: ", str(e))
+        print("Failed to start Patera app in production mode: ", str(e))
 
 
 def start_cli(
