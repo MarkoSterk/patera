@@ -192,23 +192,16 @@ class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):
         - role_required: to mark route handlers/controllers that require specific roles
     """
 
-    _configs_name = None
-
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         """
         Initilizer for authentication module
         """
         super().__init__(app, next_app)  # type: ignore
-        self._configs: dict[str, Any] = {}
-        self.authentication_error: str
-        self.authorization_error: str
-
-        self._configs = app.get_conf(self.configs_name, {})
-        self._configs = self.validate_configs(self._configs, AuthenticationConfig)
-
+        self._configs = app.get_conf(
+            self.configs_name, app.get_conf(self.__class__.__name__, {})
+        )
         self.authentication_error = self._configs["AUTHENTICATION_ERROR_MSG"]
         self.authorization_error = self._configs["AUTHORIZATION_ERROR_MSG"]
-        # self._app.add_extension(self) #is this neccessary? - Probably not
 
     async def middleware(self, req: "Request") -> "Response":
         """
