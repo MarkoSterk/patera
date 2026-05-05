@@ -84,8 +84,6 @@ def abort(
     """
     Aborts request by raising an aborter exception
     """
-    if isinstance(status_code, HttpStatus):
-        status_code = status_code.value
     raise AborterException(msg, status_code, status, data)
 
 
@@ -97,6 +95,4 @@ def html_abort(
     """
     Aborts request with html response
     """
-    if isinstance(status_code, HttpStatus):
-        status_code = status_code.value
     raise HtmlAborterException(template, status_code, data)
