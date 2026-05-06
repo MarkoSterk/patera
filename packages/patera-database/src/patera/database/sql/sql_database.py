@@ -38,7 +38,7 @@ from .dialect_overview_extras import (
 
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
-from patera.ctx import bind_session, request_context
+from patera.ctx import bind_session, request_context, current_request
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
@@ -306,10 +306,15 @@ def readonly_session(cls: Type[SqlDatabase]) -> Callable:
                 raise ValueError(
                     f"Database extension with name {cls.__name__} is not registered"
                 )
+            if current_request.session(db_extension.session_name) is not None:
+                # session already exists.
+                return await run_sync_or_async(func, self, *args, **kwargs)
+
             async with db_extension.create_session() as session:
                 with bind_session(db_extension.session_name, session):
                     return await run_sync_or_async(func, self, *args, **kwargs)
-            wrapper.__managed_session_wrapped__ = True  # type: ignore
+
+        wrapper.__managed_session_wrapped__ = True  # type: ignore
 
         return wrapper
 
@@ -345,12 +350,21 @@ def managed_session(cls: Type["SqlDatabase"]) -> Callable:
                 raise ValueError(
                     f"Database extension with name {cls.__name__} is not registered"
                 )
+            existing_session = current_request.session(db_extension.session_name)
+
+            if existing_session is not None:
+                if existing_session.in_transaction():
+                    return await run_sync_or_async(func, self, *args, **kwargs)
+
+                async with existing_session.begin():
+                    return await run_sync_or_async(func, self, *args, **kwargs)
+
             async with db_extension.create_session() as session:
                 async with session.begin():
                     with bind_session(db_extension.session_name, session):
                         return await run_sync_or_async(func, self, *args, **kwargs)
-            wrapper.__managed_session_wrapped__ = True  # type: ignore
 
+        wrapper.__managed_session_wrapped__ = True  # type: ignore
         return wrapper
 
     def decorator(target: Any) -> Any:
