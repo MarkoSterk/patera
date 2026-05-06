@@ -78,9 +78,7 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
         self._active_jobs: dict[str, Job] = {}
 
         self._configs = self.load_configs() or {}
-        self._configs = self.validate_configs(self._configs, TaskManagerConfig)
-
-        self._daemon = self._configs["DAEMON"]
+        self._daemon = self._configs.get("DAEMON", True)
 
         if not issubclass(self.scheduler_cls, BaseScheduler):
             raise TypeError(

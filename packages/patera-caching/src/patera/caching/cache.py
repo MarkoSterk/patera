@@ -50,7 +50,6 @@ class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
 
     def init(self) -> None:
         self._configs = self.load_configs() or {}
-        self._configs = self.validate_configs(self._configs, CachingConfig)
 
         self._duration = self._configs["DURATION"]
         if self.backend is None:

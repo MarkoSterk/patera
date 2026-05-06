@@ -108,18 +108,10 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
-        self._configs: dict[str, str | bool] = {}
         self._session_name: str
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
-        self._configs = cast(
-            dict[str, str | bool], self.load_configs()
-        )  # app.get_conf(self.configs_name, None)
-        if self._configs is None:
-            raise ValueError(
-                f"Configurations for {self.configs_name} not found in app configurations."
-            )
-        self._configs = self.validate_configs(self._configs, SqlDatabaseConfig)
+        self._configs = self.load_configs() or {}
         self._db_uri = self._configs["DATABASE_URI"]  # type: ignore
         self._session_name = self._configs["DATABASE_SESSION_NAME"]  # type: ignore
         self._app.add_extension(self)

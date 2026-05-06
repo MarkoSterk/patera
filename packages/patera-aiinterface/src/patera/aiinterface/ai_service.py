@@ -83,12 +83,7 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
         """
         Initilizer method for extension
         """
-        self._configs = self._app.get_conf(self.configs_name, None)
-        if self._configs is None:
-            raise ValueError(
-                f"Configurations for {self.configs_name} not found in app configurations."
-            )
-        self._configs = self.validate_configs(self._configs, AiServiceConfig)
+        self._configs = self.load_configs() or {}
         self._app.add_extension(self)
         if (
             hasattr(self, "augmentation_provider")
