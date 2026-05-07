@@ -21,7 +21,7 @@ class BaseExtension(Injectable, ABC, Generic[AppT]):
 
     def __init__(self, app: AppT) -> None:
         self._app = app
-        self._resolve_autowires()
+        self._resolve_injections()
         self.init()
 
     @abstractmethod
@@ -34,6 +34,24 @@ class BaseExtension(Injectable, ABC, Generic[AppT]):
             self.app._extensions[value.configs_name] = value
             self.app._extensions[target_type.__name__] = value
         return value
+
+    def _resolve_config_var(
+        self,
+        config_name: str,
+        declared_type: type[Any],
+    ) -> Any:
+        value = self.app.get_conf(config_name)
+
+        if isinstance(value, declared_type):
+            return value
+
+        try:
+            return declared_type(value)
+        except Exception as exc:
+            raise TypeError(
+                f"Config variable {config_name!r} must be of type "
+                f"{declared_type.__name__}, got {type(value).__name__}"
+            ) from exc
 
     def validate_configs(
         self, configs: dict[str, Any], model: type[BaseModel]

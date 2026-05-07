@@ -50,7 +50,7 @@ class Controller(Injectable, Generic[AppT]):
         )
         self.get_before_request_methods()
         self.get_after_request_methods()
-        self._resolve_autowires()
+        self._resolve_injections()
         self._after_init_methods()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
@@ -60,6 +60,24 @@ class Controller(Injectable, Generic[AppT]):
             self.app._extensions[value.configs_name] = value
             self.app._extensions[target_type.__name__] = value
         return value
+
+    def _resolve_config_var(
+        self,
+        config_name: str,
+        declared_type: type[Any],
+    ) -> Any:
+        value = self.app.get_conf(config_name)
+
+        if isinstance(value, declared_type):
+            return value
+
+        try:
+            return declared_type(value)
+        except Exception as exc:
+            raise TypeError(
+                f"Config variable {config_name!r} must be of type "
+                f"{declared_type.__name__}, got {type(value).__name__}"
+            ) from exc
 
     def _after_init_methods(self):
         for name in dir(self):

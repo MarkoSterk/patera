@@ -255,7 +255,7 @@ class Patera(Injectable):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
-        self._resolve_autowires()
+        self._resolve_injections()
         self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
             self._enable_cors()
@@ -394,6 +394,24 @@ class Patera(Injectable):
             self._extensions[target_type.__name__] = value
 
         return value
+
+    def _resolve_config_var(
+        self,
+        config_name: str,
+        declared_type: type[Any],
+    ) -> Any:
+        value = self.app.get_conf(config_name)
+
+        if isinstance(value, declared_type):
+            return value
+
+        try:
+            return declared_type(value)
+        except Exception as exc:
+            raise TypeError(
+                f"Config variable {config_name!r} must be of type "
+                f"{declared_type.__name__}, got {type(value).__name__}"
+            ) from exc
 
     def _enable_cors(self):
         cors_enabled: bool = self.get_conf("CORS_ENABLED", True)

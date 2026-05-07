@@ -30,7 +30,7 @@ class CLIController(Injectable, Generic[AppT]):
         self._cli_commands_help: dict[str, str] = {}
         self._ctrl_name: str = self.__class__.__name__
         self._register_commands()
-        self._resolve_autowires()
+        self._resolve_injections()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         key = f"{target_type.__module__}.{target_type.__qualname__}"
@@ -41,6 +41,24 @@ class CLIController(Injectable, Generic[AppT]):
             self.app._extensions[key] = value
 
         return value
+
+    def _resolve_config_var(
+        self,
+        config_name: str,
+        declared_type: type[Any],
+    ) -> Any:
+        value = self.app.get_conf(config_name)
+
+        if isinstance(value, declared_type):
+            return value
+
+        try:
+            return declared_type(value)
+        except Exception as exc:
+            raise TypeError(
+                f"Config variable {config_name!r} must be of type "
+                f"{declared_type.__name__}, got {type(value).__name__}"
+            ) from exc
 
     def _register_commands(self):
         for attr_name in dir(self):
