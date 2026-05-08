@@ -13,7 +13,7 @@ from ..utilities import run_sync_or_async
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="Controller[Any]")
 
 

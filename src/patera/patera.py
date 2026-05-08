@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import (
     Any,
     Callable,
+    Generic,
     List,
     Mapping,
     Optional,
@@ -79,6 +80,7 @@ A Fast, Simple, and Productive Python Web Framework
 PATERA_VERSION: str = "0.111.x"
 
 T = TypeVar("T", bound="Patera")
+ConfT = TypeVar("ConfT", bound=BaseConfig, default=BaseConfig)
 
 
 def app_path(url_path: Optional[str] = None) -> Callable[[Type[T]], Type[T]]:
@@ -89,7 +91,7 @@ def app_path(url_path: Optional[str] = None) -> Callable[[Type[T]], Type[T]]:
     return decorator
 
 
-def app(import_name: str, configs: Type[BaseConfig]) -> Callable[[Type[T]], Type[T]]:
+def app(import_name: str, configs: Type[ConfT]) -> Callable[[Type[T]], Type[T]]:
     def decorator(cls: Type[T]) -> Type[T]:
         setattr(cls, "_app_configs", {"import_name": import_name, "configs": configs})
         return cls
@@ -141,23 +143,19 @@ class WrongModuleLoadType(Exception):
         super().__init__(msg)
 
 
-def validate_config(config_obj_or_type: Type[BaseConfig] | BaseConfig) -> BaseConfig:
-    # If it's already an instance
-    if isinstance(config_obj_or_type, BaseConfig):
-        return cast(BaseConfig, config_obj_or_type)  # already validated by Pydantic
+def validate_config(config_type: type[ConfT]) -> ConfT:
+    if not inspect.isclass(config_type) or not issubclass(config_type, BaseConfig):
+        raise MissingAppConfigurations(
+            "Configs must be a subclass of patera.BaseConfig."
+        )
 
-    if inspect.isclass(config_obj_or_type) and issubclass(
-        config_obj_or_type, BaseConfig
-    ):
-        try:
-            instance = config_obj_or_type()  # type: ignore[call-arg]
-        except Exception as e:
-            raise MissingAppConfigurations(
-                f"Could not instantiate config class {config_obj_or_type.__name__}: {e}"
-            ) from e
-        return BaseConfig.model_validate(instance.model_dump())
-
-    raise MissingAppConfigurations("Configs must be a subclass of patera.BaseConfig.")
+    try:
+        config_factory = cast(Callable[[], ConfT], config_type)
+        return config_factory()
+    except Exception as e:
+        raise MissingAppConfigurations(
+            f"Could not instantiate config class {config_type.__name__}: {e}"
+        ) from e
 
 
 def inherits_from(class_obj_or_instance, base_name: str) -> bool:
@@ -169,67 +167,64 @@ def inherits_from(class_obj_or_instance, base_name: str) -> bool:
     )
 
 
-class Patera(Injectable):
+class Patera(Injectable, Generic[ConfT]):
     """Patera class implementation. Used to create a new application instance"""
 
     def __init__(self, cli_mode: bool = False):
         """Init function"""
-        app_configs: dict[str, str | object | dict] | None = getattr(
-            self.__class__, "_app_configs", None
-        )
+        app_configs = getattr(self.__class__, "_app_configs", None)
+
         if app_configs is None:
             raise MissingAppConfigurations()
 
-        import_name: str = cast(str, app_configs.get("import_name", None))
-        configs: Type[BaseConfig] = cast(
-            Type[BaseConfig], app_configs.get("configs", None)
-        )
-        if configs is None or not issubclass(configs, BaseConfig):
+        import_name = cast(str, app_configs.get("import_name"))
+        config_type = cast(type[ConfT], app_configs.get("configs"))
+        if not inspect.isclass(config_type) or not issubclass(config_type, BaseConfig):
             raise MissingAppConfigurations(
                 "Missing valid configs object in @app_configs. "
                 "Configuration class must inherit from patera.BaseConfig"
             )
         self._this_path = os.path.dirname(__file__)
         self._app_base_url: str = getattr(self.__class__, "_base_url_path", "")
-        self._is_built = False
-        self._root_path = get_app_root_path(import_name)
-        # Dictionary which holds application configurations
-        validated_configs: BaseConfig = validate_config(configs)
-        self._configs = {**validated_configs.model_dump()}
-        static_dir = self.get_conf("STATIC_DIR").lstrip("/\\")
-        self._static_files_path = os.path.join(self._root_path, static_dir)
-        self._templates_path = self._root_path + self.get_conf("TEMPLATES_DIR")
+        self._is_built: bool = False
+        self._root_path: str = get_app_root_path(import_name)
+        self._configs: ConfT = validate_config(cast(type[ConfT], config_type))
+        static_dir = self._configs.STATIC_DIR.lstrip("/\\")
+        self._static_files_path: str = os.path.join(self._root_path, static_dir)
+        self._templates_path: str = os.path.join(
+            self._root_path, self._configs.TEMPLATES_DIR
+        )
 
-        self._all_templates_paths = [self._templates_path]
+        self._all_templates_paths: list[str] = [self._templates_path]
 
         self._url_for_alias: dict[str, str] = {
-            self.get_conf("STATIC_CONTROLLER_NAME"): "Static.get"
+            self._configs.STATIC_CONTROLLER_NAME: "Static.get"
         }
         self._logger_sink_ids: list[int] = []
 
         # creates Jinja2 environment for entire app
-        self._jinja_environment = Environment(
+        self._jinja_environment: Environment = Environment(
             loader=None,
             autoescape=select_autoescape(["html", "xml"]),
-            undefined=StrictUndefined
-            if self.get_conf("TEMPLATES_STRICT", True)
-            else Undefined,
-            auto_reload=self.get_conf("AUTO_RELOAD", False),
+            undefined=StrictUndefined if self._configs.TEMPLATES_STRICT else Undefined,
+            auto_reload=self._configs.AUTO_RELOAD,
             enable_async=True,
         )
-        self.response_serializers = SerializerRegistry()
+        self.response_serializers: SerializerRegistry = SerializerRegistry()
         self.response_serializers.register_defaults()
-        self.response_renderer = ResponseRenderer(self.response_serializers)
+        self.response_renderer: ResponseRenderer = ResponseRenderer(
+            self.response_serializers
+        )
 
         sink_id = DefaultLogger(self).configure()
         self._logger_sink_ids.append(sink_id)
 
-        self._router = Router(self.get_conf("STRICT_SLASHES", False))
-        self._socket_router = Router(self.get_conf("STRICT_SLASHES", False))
-        self._logger = logger
+        self._router: Router = Router(self._configs.STRICT_SLASHES)
+        self._socket_router: Router = Router(self._configs.STRICT_SLASHES)
+        self._logger: Logger = cast(Logger, logger)
 
-        self.log_buffer = InMemoryLogBuffer(
-            maxlen=self._configs.get("IN_MEMORY_LOG_BUFFER_SIZE", 1)
+        self.log_buffer: InMemoryLogBuffer = InMemoryLogBuffer(
+            maxlen=self._configs.IN_MEMORY_LOG_BUFFER_SIZE
         )
         # Capture everything (TRACE and above) in the in-memory log buffer
         self._log_buffer_sink_id = logger.add(
@@ -266,7 +261,7 @@ class Patera(Injectable):
         app_root: Path = Path(self._root_path)
 
         _cli_controller_folders: list[str] = ["cli", "cli_controllers"]
-        _additional_cli_controller_folders = self.get_conf("CLI_CONTROLLER_FOLDERS")
+        _additional_cli_controller_folders = self._configs.CLI_CONTROLLER_FOLDERS
         if _additional_cli_controller_folders is None:
             _additional_cli_controller_folders = []
         _cli_controller_folders.extend(_additional_cli_controller_folders)
@@ -452,7 +447,7 @@ class Patera(Injectable):
         """
         if config_name and "." in config_name:
             return self._get_nested_config(config_name, default)
-        value = self.configs.get(config_name, default)
+        value = getattr(self._configs, config_name, default)
         if value is None:
             return default
         return value
@@ -465,8 +460,10 @@ class Patera(Injectable):
         if config is None:
             return default
         for name in names:
-            config = config.get(name, {})
-        value = config.get(last_name, default)
+            config = getattr(config, name, None)
+            if config is None:
+                return default
+        value = getattr(config, last_name, default)
         if value is None:
             return default
         return value
@@ -885,7 +882,7 @@ class Patera(Injectable):
             title=self.app_name,
             version=self.version,
             openapi_version="3.0.3",
-            servers=[f"http://localhost:{self.get_conf('PORT', 3000)}"],
+            servers=[f"http://localhost:{self._configs.PORT}"],
         )
 
     def add_on_startup_method(self, func: Callable):
@@ -944,7 +941,7 @@ class Patera(Injectable):
         return self._router
 
     @property
-    def configs(self) -> dict[str, Any]:
+    def configs(self) -> ConfT:
         """
         Returns configuration dictionary
         """
@@ -973,11 +970,11 @@ class Patera(Injectable):
 
     @property
     def version(self) -> str:
-        return self.get_conf("VERSION")
+        return self._configs.VERSION
 
     @property
     def app_name(self) -> str:
-        return self.get_conf("APP_NAME")
+        return self._configs.APP_NAME
 
     @property
     def logger(self) -> Logger:
@@ -993,7 +990,7 @@ class Patera(Injectable):
         Returns the Request class used by the application.
         Can be overridden in configs to provide a custom Request subclass.
         """
-        return self.get_conf("REQUEST_CLASS", Request)
+        return self.configs.REQUEST_CLASS
 
     @property
     def response_class(self) -> Type[Response]:
@@ -1001,7 +998,7 @@ class Patera(Injectable):
         Returns the Response class used by the application.
         Can be overridden in configs to provide a custom Response subclass.
         """
-        return self.get_conf("RESPONSE_CLASS", Response)
+        return self.configs.RESPONSE_CLASS
 
     @property
     def extensions(self) -> "dict[str, Injectable]":

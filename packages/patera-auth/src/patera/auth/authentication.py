@@ -54,10 +54,10 @@ class AuthenticationConfig(BaseModel):
     Authentication configuration model
     """
 
-    AUTHENTICATION_ERROR_MSG: Optional[str] = Field(
+    AUTHENTICATION_ERROR_MSG: str = Field(
         default="Login required", description="Default authentication error message"
     )
-    AUTHORIZATION_ERROR_MSG: Optional[str] = Field(
+    AUTHORIZATION_ERROR_MSG: str = Field(
         default="Missing user role(s)",
         description="Default authorization error message",
     )
@@ -175,10 +175,10 @@ class AuthUtils:
             raise
 
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
-class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):
+class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[AppT]):
     """
     Authentication middleware for Patera application
     User must implement user_loader method and optionally role_check method
@@ -200,8 +200,8 @@ class Authentication(MiddlewareBase[AppT], ABC, Generic[AppT]):
         self._configs = app.get_conf(
             self.configs_name, app.get_conf(self.__class__.__name__, {})
         )
-        self.authentication_error = self._configs["AUTHENTICATION_ERROR_MSG"]
-        self.authorization_error = self._configs["AUTHORIZATION_ERROR_MSG"]
+        self.authentication_error = self.configs.AUTHENTICATION_ERROR_MSG
+        self.authorization_error = self.configs.AUTHORIZATION_ERROR_MSG
 
     async def middleware(self, req: "Request") -> "Response":
         """

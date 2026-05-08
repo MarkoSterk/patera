@@ -6,6 +6,7 @@ import aiosmtplib as smtplib
 from email.message import EmailMessage
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
     Optional,
     TypeVar,
@@ -32,29 +33,27 @@ class EmailConfig(BaseModel):
     SMTP_PORT: int = Field(description="SMTP server port")
     USERNAME: Optional[str] = Field(None, description="SMTP username")
     PASSWORD: Optional[str] = Field(None, description="SMTP password")
-    USE_TLS: Optional[bool] = Field(False, description="Use TLS for SMTP connection")
+    USE_TLS: bool = Field(False, description="Use TLS for SMTP connection")
 
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
-class EmailClient(BaseExtension[AppT], Generic[AppT]):
+class EmailClient(BaseExtension[AppT, EmailConfig], Generic[AppT]):
     """
     Email client extension class
     """
 
     def init(self) -> None:
         """Initilizes the extension with the Patera app"""
-        self._configs = self.load_configs() or {}
-
         self._app.add_extension(self)
         self.render_engine = self._app.jinja_environment
 
     def get_client(self) -> smtplib.SMTP:
         """Returns the email client instance"""
         return smtplib.SMTP(
-            hostname=cast(str, self._configs.get("SMTP_SERVER")),
-            port=cast(int, self._configs.get("SMTP_PORT")),
+            hostname=cast(str, self.configs.SMTP_SERVER),
+            port=cast(int, self.configs.SMTP_PORT),
             start_tls=False,
         )
 
@@ -103,7 +102,7 @@ class EmailClient(BaseExtension[AppT], Generic[AppT]):
             to_address = [to_address]
 
         msg: EmailMessage = EmailMessage()
-        msg["From"] = cast(str, self._configs.get("SENDER_NAME_OR_ADDRESS"))
+        msg["From"] = cast(str, self.configs.SENDER_NAME_OR_ADDRESS)
         msg["To"] = ", ".join(to_address)
         msg["Subject"] = subject
         msg.set_content(body)
@@ -118,14 +117,11 @@ class EmailClient(BaseExtension[AppT], Generic[AppT]):
                 )
 
         async with self.get_client() as client:
-            if cast(bool, self._configs.get("USE_TLS")):
+            if cast(bool, self.configs.USE_TLS):
                 await client.starttls()
-            if (
-                self._configs.get("USERNAME") is not None
-                and self._configs.get("PASSWORD") is not None
-            ):
+            if self.configs.USERNAME is not None and self.configs.PASSWORD is not None:
                 await client.login(
-                    cast(str, self._configs.get("USERNAME")),
-                    cast(str, self._configs.get("PASSWORD")),
+                    cast(str, self.configs.USERNAME),
+                    cast(str, self.configs.PASSWORD),
                 )
             await client.send_message(msg)

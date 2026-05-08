@@ -15,7 +15,7 @@ from typing import (
     TypeVar,
 )
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from .utilities import run_sync_or_async
 
@@ -43,10 +43,11 @@ def order(order: int = 0) -> Callable[[Type["MiddlewareBase"]], Type["Middleware
     return decorator
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]")
+ConfT = TypeVar("ConfT", bound=BaseModel, default=BaseModel)
 
 
-class MiddlewareBase(Injectable, ABC, Generic[AppT]):
+class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     """
     Base class for middleware
     """
@@ -87,16 +88,6 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
                 f"{declared_type.__name__}, got {type(value).__name__}"
             ) from exc
 
-    def validate_configs(
-        self, configs: dict[str, Any], model: type[BaseModel]
-    ) -> dict[str, Any]:
-        try:
-            return model.model_validate(configs).model_dump()
-        except ValidationError as e:
-            raise ValueError(
-                f"Invalid configuration for {self.configs_name or self.__class__.__name__}: {e}"
-            ) from e
-
     @abstractmethod
     async def middleware(self, req: "Request") -> "Response":
         """
@@ -123,3 +114,13 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT]):
         Returns the next part of the middleware chain
         """
         return self._next
+
+    @property
+    def configs(self) -> ConfT:
+        """Returns the middleware's configuration instance"""
+        configs: ConfT = self.app.get_conf(
+            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
+        )
+        if configs is None or not isinstance(configs, BaseModel):
+            raise TypeError(f"Invalid configuration for {self.__class__.__name__}")
+        return configs

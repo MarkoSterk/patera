@@ -3,6 +3,7 @@ Task manager class
 """
 
 from typing import (
+    Any,
     Callable,
     Generic,
     Tuple,
@@ -33,20 +34,20 @@ if TYPE_CHECKING:
 class TaskManagerConfig(BaseModel):
     """Configuration model for TaskManager extension."""
 
-    NICE_NAME: Optional[str] = Field(
+    NICE_NAME: str = Field(
         "Task manager",
         description="Human readable name for the task manager for the admin dashboard",
     )
-    DAEMON: Optional[bool] = Field(
+    DAEMON: bool = Field(
         default=True,
         description="Whether the scheduler should run as a daemon. Default True",
     )
 
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
-class TaskManager(BaseExtension[AppT], Generic[AppT]):
+class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     """
     Task manager class for scheduling and managing background tasks.
 
@@ -77,8 +78,7 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
         self._initial_jobs_methods_list: list[Tuple] = []
         self._active_jobs: dict[str, Job] = {}
 
-        self._configs = self.load_configs() or {}
-        self._daemon = self._configs.get("DAEMON", True)
+        self._daemon = self.configs.DAEMON
 
         if not issubclass(self.scheduler_cls, BaseScheduler):
             raise TypeError(
@@ -250,7 +250,7 @@ class TaskManager(BaseExtension[AppT], Generic[AppT]):
         """
         Returns the human readable name of the task manager.
         """
-        return self._configs["NICE_NAME"]
+        return self.configs.NICE_NAME
 
 
 def schedule_job(*args, **kwargs) -> Callable:

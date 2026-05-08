@@ -3,29 +3,28 @@ Base extension class
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, cast, TypeVar, Generic
-from abc import abstractmethod, ABC
-from pydantic import BaseModel, ValidationError
+from typing import TYPE_CHECKING, Any, cast, TypeVar, Generic
+from pydantic import BaseModel
 
 from .injectable import Injectable
 
 if TYPE_CHECKING:
     from .patera import Patera
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]")
+ConfT = TypeVar("ConfT", bound=BaseModel, default=BaseModel)
 
 
-class BaseExtension(Injectable, ABC, Generic[AppT]):
+class BaseExtension(Injectable, Generic[AppT, ConfT]):
     _app: AppT
-    _configs: dict[str, Any]
 
     def __init__(self, app: AppT) -> None:
         self._app = app
         self._resolve_injections()
         self.init()
 
-    @abstractmethod
-    def init(self) -> None: ...
+    def init(self) -> None:
+        pass
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self.app._extensions.get(target_type.__name__, None)
@@ -53,16 +52,6 @@ class BaseExtension(Injectable, ABC, Generic[AppT]):
                 f"{declared_type.__name__}, got {type(value).__name__}"
             ) from exc
 
-    def validate_configs(
-        self, configs: dict[str, Any], model: type[BaseModel]
-    ) -> dict[str, Any]:
-        try:
-            return model.model_validate(configs).model_dump()
-        except ValidationError as e:
-            raise ValueError(
-                f"Invalid configuration for {self.configs_name}/{self.__class__.__name__}: {e}"
-            ) from e
-
     @property
     def app(self) -> AppT:
         if self._app is None:
@@ -70,17 +59,16 @@ class BaseExtension(Injectable, ABC, Generic[AppT]):
         return cast(AppT, self._app)
 
     @property
-    def configs(self) -> dict[str, Any]:
-        """Returns a dictinary of extension configs"""
-        return self._configs
+    def configs(self) -> ConfT:
+        """Returns the extension's configuration instance"""
+        configs: ConfT = self.app.get_conf(
+            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
+        )
+        if configs is None or not isinstance(configs, BaseModel):
+            raise TypeError(f"Invalid configuration for {self.__class__.__name__}")
+        return configs
 
     @property
     def nice_name(self) -> str | None:
         """Returns nice name of the extension or None"""
-        return self._configs.get("NICE_NAME", None)
-
-    def load_configs(self) -> Optional[dict[str, Any]]:
-        configs = self.app.get_conf(
-            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
-        )
-        return configs
+        return getattr(self.configs, "NICE_NAME", None)

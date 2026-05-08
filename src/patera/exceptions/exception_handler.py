@@ -3,7 +3,7 @@ Exception controller implementation
 """
 
 from functools import wraps
-from typing import Any, Callable, TYPE_CHECKING, Type
+from typing import Any, Callable, TYPE_CHECKING, Generic, Type, TypeVar
 
 from ..controller.decorators import AsyncMethod, P, R
 from ..utilities import run_sync_or_async, _extract_response_type
@@ -14,9 +14,11 @@ if TYPE_CHECKING:
     from ..response import Response
     from ..request import Request
 
+AppT = TypeVar("AppT", bound="Patera[Any]")
 
-class ExceptionHandler(Injectable):
-    def __init__(self, app: "Patera"):
+
+class ExceptionHandler(Injectable, Generic[AppT]):
+    def __init__(self, app: AppT):
         self._exception_mapping: dict[str, Callable] = {}
         self._app = app
         self._resolve_injections()

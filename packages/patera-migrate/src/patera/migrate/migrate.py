@@ -4,7 +4,7 @@ Pyway implementation for Patera
 
 import os
 from urllib.parse import urlparse
-from typing import Dict, Generic, Optional, TypeVar, cast
+from typing import Any, Dict, Generic, Optional, TypeVar, cast
 from patera import Patera
 from patera.cli import CLIController, command
 from patera.database.sql import SqlDatabase
@@ -22,18 +22,18 @@ from pyway.checksum import Checksum as PywayChecksum
 class _PateraPywayConfigs(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    MIGRATE_CLI_NAME: Optional[str] = Field(
+    MIGRATE_CLI_NAME: str = Field(
         "migrate", description="Name of the cli command prefix"
     )
-    MIGRATE_DATABASE_MIGRATION_DIR: Optional[str] = Field("migrations", description="")
-    MIGRATE_SQL_MIGRATION_PREFIX: Optional[str] = Field("V", description="")
-    MIGRATE_SQL_MIGRATION_SEPARATOR: Optional[str] = Field("__", description="")
-    MIGRATE_SQL_MIGRATION_SUFFIXES: Optional[str] = Field(".sql", description="")
-    MIGRATE_TABLE: Optional[str] = Field("pyway_migrations", description="")
-    MIGRATE_CONFIG_FILE: Optional[str] = Field(".pyway.conf", description="")
+    MIGRATE_DATABASE_MIGRATION_DIR: str = Field("migrations", description="")
+    MIGRATE_SQL_MIGRATION_PREFIX: str = Field("V", description="")
+    MIGRATE_SQL_MIGRATION_SEPARATOR: str = Field("__", description="")
+    MIGRATE_SQL_MIGRATION_SUFFIXES: str = Field(".sql", description="")
+    MIGRATE_TABLE: str = Field("pyway_migrations", description="")
+    MIGRATE_CONFIG_FILE: str = Field(".pyway.conf", description="")
 
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
 class PywayCLIController(CLIController[AppT]):
@@ -112,22 +112,18 @@ class Migrate(Generic[AppT]):
         self._app = app
         self._db = db
         self.__db_name__ = db.__db_name__
-        self._configs = self._app.get_conf(self.configs_name, {})
-        self._configs = self._db.validate_configs(self._configs, _PateraPywayConfigs)
+        _configs = db.configs.model_dump()
+        self._configs = _PateraPywayConfigs(**_configs)
         self._cli_controller = PywayCLIController(self._app, self)
-        self._cli_controller.set_ctrl_name(
-            cast(str, self._configs.get("MIGRATE_CLI_NAME"))
-        )
+        self._cli_controller.set_ctrl_name(cast(str, self._configs.MIGRATE_CLI_NAME))
         self._app.register_cli_controller(self._cli_controller)
-        self._migrations_path: Path = Path(self._app.root_path) / cast(
-            str, self._configs.get("MIGRATE_DATABASE_MIGRATION_DIR")
+        self._migrations_path: Path = (
+            Path(self._app.root_path) / self._configs.MIGRATE_DATABASE_MIGRATION_DIR
         )
         self._migrations_path.mkdir(exist_ok=True)
-        self._configs_path: Path = self._migrations_path / cast(
-            str, self._configs.get("MIGRATE_CONFIG_FILE")
+        self._configs_path: Path = (
+            self._migrations_path / self._configs.MIGRATE_CONFIG_FILE
         )
-        # configs need to be initilized manually
-        # self.create_pyway_config()
 
     def create_pyway_config(self) -> None:
         if self._configs_path.exists():
@@ -136,8 +132,8 @@ class Migrate(Generic[AppT]):
         db = self.parse_database_uri(self.database_uri)
 
         lines = [
-            f"database_migration_dir: {self._configs.get('MIGRATE_DATABASE_MIGRATION_DIR')}",
-            f"database_table: {self._configs.get('MIGRATE_TABLE')}",
+            f"database_migration_dir: {self._configs.MIGRATE_DATABASE_MIGRATION_DIR}",
+            f"database_table: {self._configs.MIGRATE_TABLE}",
             f"database_type: {db.get('type')}",
             f"database_username: {db.get('username')}",
             f"database_password: {db.get('password')}",

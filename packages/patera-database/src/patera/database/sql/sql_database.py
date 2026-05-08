@@ -70,11 +70,11 @@ class SqlDatabaseConfig(BaseModel):
         None,
         description="Name of the database for admin dashboard view. Defaults to db_name variable.",
     )
-    EXPIRE_ON_COMMIT: Optional[bool] = Field(
+    EXPIRE_ON_COMMIT: bool = Field(
         False,
         description="Wether session should expire upon commit or not. Defaults to False.",
     )
-    AUTOFUSH: Optional[bool] = Field(
+    AUTOFLUSH: bool = Field(
         False, description="Wether session should autoflush or not. Defaults to False."
     )
 
@@ -88,10 +88,10 @@ _DIALECT_EXTRAS: Dict[str, Callable] = {
     "oracle": _extras_oracle,
 }
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
-class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
+class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
     """
     A simple async Database interface using SQLAlchemy.
     """
@@ -111,9 +111,8 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         self._session_name: str
         self._models: dict[str, type[DeclarativeBaseModel]] = {}
         self._number_of_tables: int = 0
-        self._configs = self.load_configs() or {}
-        self._db_uri = self._configs["DATABASE_URI"]  # type: ignore
-        self._session_name = self._configs["DATABASE_SESSION_NAME"]  # type: ignore
+        self._db_uri = self.configs.DATABASE_URI
+        self._session_name = self.configs.DATABASE_SESSION_NAME
         self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
@@ -135,15 +134,15 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
         if not self._engine:
             self._engine = create_async_engine(
                 cast(str, self._db_uri),
-                echo=cast(bool, self._configs.get("SHOW_SQL", False)),
+                echo=self.configs.SHOW_SQL,
                 pool_pre_ping=True,
                 pool_recycle=1800,
             )
 
         self._session_factory = async_sessionmaker(
             bind=self._engine,
-            expire_on_commit=self._configs["EXPIRE_ON_COMMIT"],  # type: ignore
-            autoflush=self._configs["AUTOFUSH"],  # type: ignore
+            expire_on_commit=self.configs.EXPIRE_ON_COMMIT,
+            autoflush=self.configs.AUTOFLUSH,
         )
 
     async def disconnect(self) -> None:
@@ -283,11 +282,11 @@ class SqlDatabase(BaseExtension[AppT], Generic[AppT]):
 
     @property
     def nice_name(self) -> str:
-        return self._configs.get("NICE_NAME", self.db_name)  # type: ignore
+        return self.configs.NICE_NAME or self.db_name
 
     @property
     def database_uri(self) -> str:
-        return cast(str, self._configs.get("DATABASE_URI"))
+        return self.configs.DATABASE_URI
 
     @property
     def models_list(self) -> list[Type[DeclarativeBaseModel]]:

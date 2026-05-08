@@ -51,7 +51,7 @@ class OllamaServiceProvider(BaseServiceProvider):
         """
         Builds and sends chat prompt with chat service configs
         """
-        url = ext.configs.get("BASE_URL")
+        url = ext.configs.BASE_URL
         if not url:
             raise ValueError(
                 "BASE_URL is required in AiServiceConfig for OllamaServiceProvider."
@@ -76,7 +76,7 @@ class OllamaServiceProvider(BaseServiceProvider):
         }
 
         if ext.configs.get("API_KEY"):
-            headers["Authorization"] = f"Bearer {ext.configs['API_KEY']}"
+            headers["Authorization"] = f"Bearer {ext.configs.API_KEY}"
 
         if len(messages) == 0:
             sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
@@ -92,19 +92,19 @@ class OllamaServiceProvider(BaseServiceProvider):
         messages.append({"role": "user", "content": msg})
 
         payload: Dict[str, Any] = {
-            "model": ext.configs["MODEL"],
+            "model": ext.configs.MODEL,
             "messages": messages,
             "stream": False,
             "options": {},
         }
 
-        if ext.configs.get("TEMPERATURE") is not None:
-            payload["options"]["temperature"] = ext.configs["TEMPERATURE"]
+        if ext.configs.TEMPERATURE is not None:
+            payload["options"]["temperature"] = ext.configs.TEMPERATURE
 
         if not payload["options"]:
             payload.pop("options")
 
-        timeout = ext.configs.get("TIMEOUT", 60)
+        timeout = ext.configs.TIMEOUT
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(url, headers=headers, json=payload)
@@ -134,7 +134,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             session_id = req.route_parameters.get("session_id")
             messages = await ext.history_provider._get_history(session_id)  # type: ignore
 
-        url = ext.configs.get("API_URL")
+        url = ext.configs.BASE_URL
         if not url:
             raise ValueError(
                 "API_URL is required in AiConfig for OllamaServiceProvider."
@@ -145,28 +145,32 @@ class OllamaServiceProvider(BaseServiceProvider):
         }
 
         if ext.configs.get("API_KEY"):
-            headers["Authorization"] = f"Bearer {ext.configs['API_KEY']}"
+            headers["Authorization"] = f"Bearer {ext.configs.API_KEY}"
 
         if len(messages) == 0:
-            messages = [
-                {"role": "system", "content": ext.configs["SYSTEM_PROMPT"]},
-            ]
+            sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
+            if sys_prompt is None:
+                raise ValueError(
+                    "System prompt is required for OllamaServiceProvider. Set it using the @system_prompt decorator on the chat service."
+                )
+            sys_message = {"role": "system", "content": sys_prompt}
+            messages.append(sys_message)
         messages.append({"role": "user", "content": msg})
 
         payload: Dict[str, Any] = {
-            "model": ext.configs["MODEL"],
+            "model": ext.configs.MODEL,
             "messages": messages,
             "stream": True,
             "options": {},
         }
 
-        if ext.configs.get("TEMPERATURE") is not None:
-            payload["options"]["temperature"] = ext.configs["TEMPERATURE"]
+        if ext.configs.TEMPERATURE is not None:
+            payload["options"]["temperature"] = ext.configs.TEMPERATURE
 
         if not payload["options"]:
             payload.pop("options")
 
-        timeout = ext.configs.get("TIMEOUT", 60)
+        timeout = ext.configs.TIMEOUT
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(

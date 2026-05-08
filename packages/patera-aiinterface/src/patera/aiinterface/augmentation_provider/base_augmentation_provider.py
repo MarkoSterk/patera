@@ -4,7 +4,7 @@ RAG interface
 
 import os
 from pathlib import Path
-from typing import Any, Generic, Type, TypeVar, Optional, cast, TYPE_CHECKING
+from typing import Generic, Literal, Type, TypeVar, Optional, cast, TYPE_CHECKING
 from sentence_transformers import SentenceTransformer
 from torch import Tensor
 from patera import Request
@@ -25,23 +25,20 @@ class _AugmentationConfig(BaseModel):
     Check sentence_transformers.SentenceTransformer for more details on the parameters
     """
 
-    MODEL_NAME_OR_PATH: Optional[str] = Field(
+    MODEL_NAME_OR_PATH: str = Field(
         "all-MiniLM-L6-v2", description="Model name or path for the embedding model"
-    )
-    MODULES: Optional[list[str]] = Field(
-        None, description="List of modules to use for augmentation"
     )
     DEVICE: Optional[str] = Field(
         None, description="Device to use for embedding model (e.g., 'cpu', 'cuda')"
     )
-    CACHE_FOLDER: Optional[str] = Field(
+    CACHE_FOLDER: str = Field(
         ".ai_cache", description="Cache folder for the embedding model"
     )
-    BACKEND: Optional[str] = Field(
+    BACKEND: Literal["torch", "onnx", "openvino"] = Field(
         "torch",
         description="Backend to use for the embedding model ('torch', 'onnx', 'openvino')",
     )
-    MINIMAL_SIMILARITY: Optional[float] = Field(
+    MINIMAL_SIMILARITY: float = Field(
         0.9, description="Minimal similarity for documents to be used for augmentation"
     )
 
@@ -57,19 +54,21 @@ class BaseAugmentationProvider(Generic[ModelT]):
         retriever_limit: int = 5,
     ) -> None:
         self._embedding_model: SentenceTransformer = cast(SentenceTransformer, None)
-        self._configs: dict = cast(dict, None)
+        self._configs: _AugmentationConfig = cast(_AugmentationConfig, None)
         self._vector_column = vector_column
         self._text_column = text_column
         self._retriever_limit = retriever_limit
         self._initilized: bool = False
         self._ext: "AiService" = cast("AiService", None)
 
-    def _init_embedding_model(self, configs: dict[Any, Any], ext: "AiService") -> None:
+    def _init_embedding_model(
+        self, configs: _AugmentationConfig, ext: "AiService"
+    ) -> None:
         """
         Initialize embedding model
         """
-        base = Path(ext.app.get_conf("BASE_PATH"))
-        cache_folder = Path(configs.get("CACHE_FOLDER", ".ai_cache")).expanduser()
+        base = Path(ext.app.configs.BASE_PATH)  # Path(ext.app.get_conf("BASE_PATH"))
+        cache_folder = Path(configs.CACHE_FOLDER).expanduser()
         cache = (
             cache_folder if cache_folder.is_absolute() else base / cache_folder
         ).resolve()
@@ -80,10 +79,9 @@ class BaseAugmentationProvider(Generic[ModelT]):
 
         self._configs = configs
         self._embedding_model = SentenceTransformer(
-            model_name_or_path=self._configs["MODEL_NAME_OR_PATH"],
-            modules=self._configs["MODULES"],
-            device=self._configs["DEVICE"],
-            backend=self._configs["BACKEND"],
+            model_name_or_path=self._configs.MODEL_NAME_OR_PATH,
+            device=self._configs.DEVICE,
+            backend=self._configs.BACKEND,
         )
         self._initilized = True
         self._ext = ext
@@ -124,6 +122,6 @@ class BaseAugmentationProvider(Generic[ModelT]):
         documents = [
             document
             for document, sim in sorted_documents[: self._retriever_limit]
-            if sim >= self._configs.get("MINIMAL_SIMILARITY", 0.9)
+            if sim >= self._configs.MINIMAL_SIMILARITY
         ]
         return documents

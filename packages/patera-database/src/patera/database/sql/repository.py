@@ -35,7 +35,7 @@ from patera.base_extension import BaseExtension
 T = TypeVar("T", bound=DeclarativeBaseModel)
 M = TypeVar("M", bound=DeclarativeBaseModel)
 F = TypeVar("F", bound=Callable[..., Any])
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
 def query(sql_query: str) -> Callable[[F], F]:

@@ -13,7 +13,6 @@ from typing import (
     Type,
     TypeVar,
     Generic,
-    cast,
 )
 from collections.abc import AsyncIterator
 from pydantic import BaseModel, Field
@@ -40,37 +39,36 @@ class AiServiceConfig(BaseModel):
     PROJECT_ID: Optional[str] = Field(
         None, description="Project ID for the AI provider"
     )
-    TIMEOUT: Optional[int] = Field(
+    TIMEOUT: int = Field(
         60, description="Timeout for AI provider requests in seconds. Default 60 s"
     )
     MODEL: str = Field(description="Model name to use for AI requests")
-    TEMPERATURE: Optional[float] = Field(
-        0.0, description="Temperature for AI model responses"
-    )
-    RESPONSE_FORMAT: Optional[dict[str, str]] = Field(
+    TEMPERATURE: float = Field(0.0, description="Temperature for AI model responses")
+    RESPONSE_FORMAT: dict[str, str] = Field(
         {"type": "json_object"}, description="Desired response format from the AI model"
     )
-    TOOL_CHOICE: Optional[bool] = Field(
+    TOOL_CHOICE: bool = Field(
         False, description="Whether to enable tool choice for the AI model"
     )
-    MAX_RETRIES: Optional[int] = Field(
+    MAX_RETRIES: int = Field(
         0, description="Maximum number of retries for AI provider requests"
     )
-    STREAM: Optional[bool] = Field(
-        False, description="If the answer should be streamed."
-    )
+    STREAM: bool = Field(False, description="If the answer should be streamed.")
     AUGMENTATION: Optional[_AugmentationConfig] = Field(
         None, description="Configuration for prompt augmentation provider."
     )
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]")
 ServiceT = TypeVar("ServiceT", bound=BaseServiceProvider)
 HistoryT = TypeVar("HistoryT", default=None)
 AugmentationT = TypeVar("AugmentationT", default=None)
 
 
-class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, AugmentationT]):
+class AiService(
+    BaseExtension[AppT, AiServiceConfig],
+    Generic[AppT, ServiceT, HistoryT, AugmentationT],
+):
     """
     Main AI service class for handling chat requests and connecting to the AI provider
     """
@@ -83,7 +81,6 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
         """
         Initilizer method for extension
         """
-        self._configs = self.load_configs() or {}
         self._app.add_extension(self)
         if (
             hasattr(self, "augmentation_provider")
@@ -92,8 +89,9 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
             from .augmentation_provider import BaseAugmentationProvider
 
             assert isinstance(self.augmentation_provider, BaseAugmentationProvider)
+            assert self.configs.AUGMENTATION is not None
             self.augmentation_provider._init_embedding_model(
-                cast(dict[Any, Any], self._configs["AUGMENTATION"]),
+                self.configs.AUGMENTATION,
                 self,  # type: ignore
             )  # type: ignore
 
@@ -102,10 +100,6 @@ class AiService(BaseExtension[AppT], Generic[AppT, ServiceT, HistoryT, Augmentat
 
     def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
         return self.service_provider.stream(req, msg, self)  # type: ignore
-
-    @property
-    def configs(self) -> dict[str, Any]:
-        return self._configs
 
 
 AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any, Any])

@@ -38,7 +38,7 @@ class Response(Generic[U]):
     ```
     """
 
-    def __init__(self, app: "Patera", request: "Request") -> None:
+    def __init__(self, app: "Patera[Any]", request: "Request") -> None:
         self._app = app
         self._request = request
 

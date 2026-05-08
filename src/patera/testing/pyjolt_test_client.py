@@ -2,7 +2,7 @@
 Test client class
 """
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient, ASGITransport
 
@@ -15,7 +15,7 @@ class PyJoltTestClient:
     Test client class for testing of Patera applications
     """
 
-    def __init__(self, app: "Patera", base_url: str = "http://testserver"):
+    def __init__(self, app: "Patera[Any]", base_url: str = "http://testserver"):
         self.app = app
         self._lifespan: LifespanManager = cast(LifespanManager, None)
         self._transport: ASGITransport = cast(ASGITransport, None)

@@ -89,8 +89,8 @@ class OpenAIServiceProvider(BaseServiceProvider):
         Builds and sends chat prompt with chat service configs
         to the OpenAI Chat Completions API.
         """
-        base_url = ext.configs.get("BASE_URL", "https://api.openai.com/v1")
-        api_key = ext.configs.get("API_KEY")
+        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
+        api_key = ext.configs.API_KEY
 
         if not api_key:
             raise ValueError(
@@ -125,9 +125,6 @@ class OpenAIServiceProvider(BaseServiceProvider):
         if len(messages) == 0:
             sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
             if sys_prompt is None:
-                sys_prompt = ext.configs.get("SYSTEM_PROMPT")
-
-            if sys_prompt is None:
                 raise ValueError(
                     "System prompt is required for OpenAIServiceProvider. "
                     "Set it using the @system_prompt decorator on the chat service "
@@ -144,27 +141,15 @@ class OpenAIServiceProvider(BaseServiceProvider):
         messages.append(user_message)
 
         payload: Dict[str, Any] = {
-            "model": ext.configs["MODEL"],
+            "model": ext.configs.MODEL,
             "messages": messages,
             "stream": False,
         }
 
-        if ext.configs.get("TEMPERATURE") is not None:
-            payload["temperature"] = ext.configs["TEMPERATURE"]
+        if ext.configs.TEMPERATURE is not None:
+            payload["temperature"] = ext.configs.TEMPERATURE
 
-        if ext.configs.get("MAX_TOKENS") is not None:
-            payload["max_tokens"] = ext.configs["MAX_TOKENS"]
-
-        if ext.configs.get("TOP_P") is not None:
-            payload["top_p"] = ext.configs["TOP_P"]
-
-        if ext.configs.get("FREQUENCY_PENALTY") is not None:
-            payload["frequency_penalty"] = ext.configs["FREQUENCY_PENALTY"]
-
-        if ext.configs.get("PRESENCE_PENALTY") is not None:
-            payload["presence_penalty"] = ext.configs["PRESENCE_PENALTY"]
-
-        timeout = ext.configs.get("TIMEOUT", 60)
+        timeout = ext.configs.TIMEOUT
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(url, headers=headers, json=payload)
@@ -210,8 +195,8 @@ class OpenAIServiceProvider(BaseServiceProvider):
                     + "\n\n".join(augmenting_info)
                 )
 
-        base_url = ext.configs.get("BASE_URL", "https://api.openai.com/v1")
-        api_key = ext.configs.get("API_KEY")
+        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
+        api_key = ext.configs.API_KEY
 
         if not api_key:
             raise ValueError(
@@ -244,30 +229,18 @@ class OpenAIServiceProvider(BaseServiceProvider):
         messages.append(user_message)
 
         payload: Dict[str, Any] = {
-            "model": ext.configs["MODEL"],
+            "model": ext.configs.MODEL,
             "messages": messages,
             "stream": True,
         }
 
-        if ext.configs.get("TEMPERATURE") is not None:
-            payload["temperature"] = ext.configs["TEMPERATURE"]
-
-        if ext.configs.get("MAX_TOKENS") is not None:
-            payload["max_tokens"] = ext.configs["MAX_TOKENS"]
-
-        if ext.configs.get("TOP_P") is not None:
-            payload["top_p"] = ext.configs["TOP_P"]
-
-        if ext.configs.get("FREQUENCY_PENALTY") is not None:
-            payload["frequency_penalty"] = ext.configs["FREQUENCY_PENALTY"]
-
-        if ext.configs.get("PRESENCE_PENALTY") is not None:
-            payload["presence_penalty"] = ext.configs["PRESENCE_PENALTY"]
+        if ext.configs.TEMPERATURE is not None:
+            payload["temperature"] = ext.configs.TEMPERATURE
 
         # For final usage in stream
         payload["stream_options"] = {"include_usage": True}
 
-        timeout = ext.configs.get("TIMEOUT", 60)
+        timeout = ext.configs.TIMEOUT
         accumulated_content: list[str] = []
 
         async with httpx.AsyncClient(timeout=timeout) as client:

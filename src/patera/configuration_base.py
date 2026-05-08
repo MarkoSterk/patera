@@ -23,23 +23,21 @@ class BaseConfig(BaseSettings):
         env_prefix="PATERA_",
         env_nested_delimiter="__",
     )
-    APP_PACKAGE: Optional[str] = Field(
+    APP_PACKAGE: str = Field(
         "app", description="Python package where app code is located. Default is 'app'."
     )
-    APP_NAME: Optional[str] = Field(
-        "Patera app", description="Human-readable name of the app"
-    )
-    VERSION: Optional[str] = Field("1.0", description="Application version")
+    APP_NAME: str = Field("Patera app", description="Human-readable name of the app")
+    VERSION: str = Field("1.0", description="Application version")
     # required
     BASE_PATH: str = Field(
         description="Base path of app. Hardcoded in env file or os.path.dirname(__file__) in the configs.py is the usual value."
     )
 
-    REQUEST_CLASS: Optional[type[Request]] = Field(
+    REQUEST_CLASS: type[Request] = Field(
         Request,
         description="Request class to use. Must be a subclass of patera.request.Request",
     )
-    RESPONSE_CLASS: Optional[type[Response]] = Field(
+    RESPONSE_CLASS: type[Response] = Field(
         Response,
         description="Response class to use. Must be a subclass of patera.response.Response",
     )
@@ -50,21 +48,17 @@ class BaseConfig(BaseSettings):
     )
 
     # optionals with sensible defaults
-    DEBUG: Optional[bool] = Field(
-        True, description="If the app should run in debug mode or not."
-    )
-    HOST: Optional[str] = Field(
-        "localhost", description="Host ip where the app should run."
-    )
-    PORT: Optional[int] = Field(3000, description="Port on which the app should run.")
-    LIFESPAN: Optional[str] = Field(
+    DEBUG: bool = Field(True, description="If the app should run in debug mode or not.")
+    HOST: str = Field("localhost", description="Host ip where the app should run.")
+    PORT: int = Field(3000, description="Port on which the app should run.")
+    LIFESPAN: str = Field(
         "on",
         description="Whether to use server lifespan events/signals. Options: on, auto, off",
     )
-    TEMPLATES_DIR: Optional[str] = Field(
+    TEMPLATES_DIR: str = Field(
         "/templates", description="Relative templates dir from root"
     )
-    AUTO_RELOAD: Optional[bool] = Field(
+    AUTO_RELOAD: bool = Field(
         True,
         description=(
             "Some loaders load templates from locations where the template sources "
@@ -75,50 +69,36 @@ class BaseConfig(BaseSettings):
         ),
     )
 
-    STATIC_DIR: Optional[str] = Field(
-        "/static", description="Relative static dir from root"
-    )
-    STATIC_URL: Optional[str] = Field(
-        "/static", description="URL prefix for static files"
-    )
-    STATIC_CONTROLLER_NAME: Optional[str] = Field(
+    STATIC_DIR: str = Field("/static", description="Relative static dir from root")
+    STATIC_URL: str = Field("/static", description="URL prefix for static files")
+    STATIC_CONTROLLER_NAME: str = Field(
         "static", description="Mount name for static files controller"
     )
-    TEMPLATES_STRICT: Optional[bool] = Field(
-        True, description="Strict template rendering"
-    )
-    STRICT_SLASHES: Optional[bool] = Field(
-        False, description="Route '/x' vs '/x/' strictness"
-    )
-    OPEN_API: Optional[bool] = Field(True, description="Enable OpenAPI endpoint")
-    OPEN_API_URL: Optional[str] = Field("/openapi", description="OpenAPI base path")
-    OPEN_API_DESCRIPTION: Optional[str] = Field(
-        "Simple API", description="OpenAPI description"
-    )
+    TEMPLATES_STRICT: bool = Field(True, description="Strict template rendering")
+    STRICT_SLASHES: bool = Field(False, description="Route '/x' vs '/x/' strictness")
+    OPEN_API: bool = Field(True, description="Enable OpenAPI endpoint")
+    OPEN_API_URL: str = Field("/openapi", description="OpenAPI base path")
+    OPEN_API_DESCRIPTION: str = Field("Simple API", description="OpenAPI description")
 
     # CORS settings
-    CORS_ENABLED: Optional[bool] = Field(True, description="Enable CORS")
-    CORS_ALLOW_ORIGINS: Optional[Sequence[str]] = Field(
+    CORS_ENABLED: bool = Field(True, description="Enable CORS")
+    CORS_ALLOW_ORIGINS: Sequence[str] = Field(
         ["*"], description="List of allowed origins"
     )
-    CORS_ALLOW_METHODS: Optional[Sequence[str]] = Field(
+    CORS_ALLOW_METHODS: Sequence[str] = Field(
         ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         description="List of allowed methods",
     )
-    CORS_ALLOW_HEADERS: Optional[Sequence[str]] = Field(
+    CORS_ALLOW_HEADERS: Sequence[str] = Field(
         ["Authorization", "Content-Type"], description="List of allowed headers"
     )
-    CORS_EXPOSE_HEADERS: Optional[Sequence[str]] = Field(
-        [], description="Expose headers"
-    )
-    CORS_ALLOW_CREDENTIALS: Optional[bool] = Field(
-        True, description="Allow credentials"
-    )
+    CORS_EXPOSE_HEADERS: Sequence[str] = Field([], description="Expose headers")
+    CORS_ALLOW_CREDENTIALS: bool = Field(True, description="Allow credentials")
     CORS_MAX_AGE: Optional[int] = Field(
         None, description="Max age in seconds. None to disable."
     )
 
-    DEFAULT_LOGGER: Optional[dict[str, Any]] = Field(
+    DEFAULT_LOGGER: dict[str, Any] = Field(
         {
             "SINK": OutputSink.STDERR,
             "LEVEL": "TRACE",

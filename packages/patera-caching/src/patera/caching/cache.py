@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import wraps
 from typing import (
+    Any,
     Callable,
     Generic,
     Optional,
@@ -26,16 +27,14 @@ if TYPE_CHECKING:
 class CachingConfig(BaseModel):
     """Configuration model for Caching extension."""
 
-    DURATION: Optional[int] = Field(
-        default=300, description="Default cache duration in seconds"
-    )
+    DURATION: int = Field(default=300, description="Default cache duration in seconds")
 
 
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 BackendT = TypeVar("BackendT", bound="BaseCacheBackend", default="BaseCacheBackend")
 
 
-class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
+class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     """
     Caching system for route handlers with **pluggable backend class**.
 
@@ -49,9 +48,8 @@ class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
     backend: Optional[BackendT] = None
 
     def init(self) -> None:
-        self._configs = self.load_configs() or {}
 
-        self._duration = self._configs["DURATION"]
+        self._duration = self.configs.DURATION
         if self.backend is None:
             # loads default backend - MemoryCacheBackend
             # pylint: disable-next=C0415
@@ -60,7 +58,7 @@ class Caching(BaseExtension[AppT], Generic[AppT, BackendT]):
             self.backend = MemoryCacheBackend  # type: ignore
 
         self._backend = cast(Type[BaseCacheBackend], self.backend).configure_from_app(
-            self._app, self._configs
+            self._app, self.configs.model_dump()
         )
 
         # self._app.add_extension(self)

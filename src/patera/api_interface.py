@@ -136,7 +136,7 @@ class MissingApiInterfaceConfigurations(Exception):
         super().__init__(msg)
 
 
-AppT = TypeVar("AppT", bound="Patera")
+AppT = TypeVar("AppT", bound="Patera[Any]")
 
 
 class ApiInterface(BaseExtension[AppT], Generic[AppT]):
