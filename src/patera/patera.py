@@ -104,8 +104,8 @@ def print_startup_message(
     print()
 
 
-T = TypeVar("T", bound="Patera")
-ConfT = TypeVar("ConfT", bound=BaseConfig, default=BaseConfig)
+T = TypeVar("T", bound="Patera[Any]")
+ConfT = TypeVar("ConfT", bound=BaseConfig)
 
 
 def app_path(url_path: Optional[str] = None) -> Callable[[Type[T]], Type[T]]:
