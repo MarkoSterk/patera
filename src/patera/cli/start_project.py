@@ -351,7 +351,6 @@ def _start_prod(
     from granian.log import LogLevels
     from ..patera import Patera
 
-    load_env_file(cwd, env_file)
     os.environ["PATERA_DEBUG"] = "False"
 
     root = _resolve_root(cwd)
