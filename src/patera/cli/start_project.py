@@ -20,7 +20,7 @@ def load_env_file(cwd: str, env_file: Optional[str] = None) -> Optional[Path]:
 
     Rules:
     - If env_file is provided, load that file relative to cwd unless absolute.
-    - If env_file is not provided, try '.env', '.env.dev', and then '.env.prod'.
+    - If env_file is not provided, try '.env', '.env.dev', and then '.env.local'.
     - Only check inside cwd for implicit lookup.
     - Returns the loaded file path, or None if no file was loaded.
     """
@@ -38,7 +38,7 @@ def load_env_file(cwd: str, env_file: Optional[str] = None) -> Optional[Path]:
         load_dotenv(dotenv_path=env_path, override=False)
         return env_path
 
-    for name in [".env", ".env.dev", ".env.prod"]:
+    for name in [".env", ".env.dev", ".env.local"]:
         env_path = root / name
         if env_path.is_file():
             print("Loading environment variables from: ", env_path)
