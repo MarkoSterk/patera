@@ -500,6 +500,20 @@ class Response(Generic[U]):
         """
         return self._app
 
+    @property
+    def request(self) -> "Request":
+        """
+        Returns the request associated with this response.
+        """
+        return self._request
+
+    @property
+    def req(self) -> "Request":
+        """
+        Returns the request associated with this response.
+        """
+        return self._request
+
     @staticmethod
     def _parse_content_type(content_type: str) -> tuple[str, Optional[str]]:
         """

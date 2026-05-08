@@ -227,23 +227,6 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
             if file_path.is_file() and add_file(file_path):
                 yield file_path
 
-    # # Root-level search
-    # for name in common_names:
-    #     file_path = root / name
-    #     if file_path.is_file() and add_file(file_path):
-    #         yield file_path
-
-    # # Searches common file names anywhere below root
-    # for name in common_names:
-    #     for file_path in _iter_files_pruned(root, filename=name):
-    #         if add_file(file_path):
-    #             yield file_path
-
-    # # Fallback for searching everything else
-    # for file_path in _iter_files_pruned(root):
-    #     if add_file(file_path):
-    #         yield file_path
-
 
 def find_pyjolt_app_import(
     pyjolt_class: Type,
@@ -401,6 +384,7 @@ def _start_dev(
     address: str = os.environ.get("PATERA_HOST", "localhost")
     port: int = int(os.environ.get("PATERA_PORT", 3000))
     loop = str(os.environ.get("PATERA_LOOP", "auto"))
+    access_log: bool = os.environ.get("PATERA_ACCESS_LOG", "false").lower() == "true"
 
     if loop not in ["auto", "asyncio", "uvloop"]:
         raise ValueError(
@@ -421,7 +405,9 @@ def _start_dev(
         factory=True,
         reload_dirs=[str(root)],
         reload_excludes=[*ignore_dirs, *ignore_patterns],
-        log_level="debug",
+        log_level="critical",
+        access_log=access_log,
+        log_config=None,
     )
 
 

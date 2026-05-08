@@ -79,6 +79,31 @@ A Fast, Simple, and Productive Python Web Framework
 
 PATERA_VERSION: str = "0.111.x"
 
+
+def print_startup_message(
+    host: str,
+    port: int,
+    debug_mode: bool,
+    *,
+    app_name: str = "Application",
+    scheme: str = "http",
+) -> None:
+    url = f"{scheme}://{host}:{port}"
+
+    mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
+
+    print()
+    print("═" * 64)
+    print(f"  {app_name} is running")
+    print("─" * 64)
+    print(f"  Mode:    {mode_label}")
+    print(f"  Host:    {host}")
+    print(f"  Port:    {port}")
+    print(f"  URL:     \033]8;;{url}\033\\{url}\033]8;;\033\\")
+    print("═" * 64)
+    print()
+
+
 T = TypeVar("T", bound="Patera")
 ConfT = TypeVar("ConfT", bound=BaseConfig, default=BaseConfig)
 
@@ -274,7 +299,7 @@ class Patera(Injectable, Generic[ConfT]):
             return
 
         _logger_folders: list[str] = ["logging", "loggers"]
-        _additional_logger_folders = self.get_conf("LOGGER_FOLDERS")
+        _additional_logger_folders = self._configs.LOGGER_FOLDERS
         if _additional_logger_folders is None:
             _additional_logger_folders = []
         _logger_folders.extend(_additional_logger_folders)
@@ -290,7 +315,7 @@ class Patera(Injectable, Generic[ConfT]):
             "routers",
             "routes",
         ]
-        _additional_controller_folders = self.get_conf("CONTROLLER_FOLDERS")
+        _additional_controller_folders = self._configs.CONTROLLER_FOLDERS
         if _additional_controller_folders is None:
             _additional_controller_folders = []
         _controller_folders.extend(_additional_controller_folders)
@@ -302,9 +327,7 @@ class Patera(Injectable, Generic[ConfT]):
             self._load_detected_module(files, Controller)
 
         _exception_handler_folders: list[str] = ["exceptions"]
-        _additional_exception_handler_folders = self.get_conf(
-            "EXCEPTION_HANDLER_FOLDERS"
-        )
+        _additional_exception_handler_folders = self._configs.EXCEPTION_HANDLER_FOLDERS
         if _additional_exception_handler_folders is None:
             _additional_exception_handler_folders = []
         _exception_handler_folders.extend(_additional_exception_handler_folders)
@@ -316,7 +339,7 @@ class Patera(Injectable, Generic[ConfT]):
             self._load_detected_module(files, ExceptionHandler)
 
         _middleware_folders: list[str] = ["middleware", "middlewares"]
-        _additional_middleware_folders = self.get_conf("MIDDLEWARE_FOLDERS")
+        _additional_middleware_folders = self._configs.MIDDLEWARE_FOLDERS
         if _additional_middleware_folders is None:
             _additional_middleware_folders = []
         _middleware_folders.extend(_additional_middleware_folders)
@@ -349,7 +372,7 @@ class Patera(Injectable, Generic[ConfT]):
             ):
                 ignore: bool = getattr(obj, "_ignore", False)
                 dev_only: bool = getattr(obj, "_development", False)
-                if ignore or (dev_only and not self.get_conf("DEBUG", False)):
+                if ignore or (dev_only and not self._configs.DEBUG):
                     continue
                 if issubclass(obj, Controller) and obj is not Controller:
                     self.logger.info(f"Registering controller: {obj.__name__}")
@@ -409,7 +432,7 @@ class Patera(Injectable, Generic[ConfT]):
             ) from exc
 
     def _enable_cors(self):
-        cors_enabled: bool = self.get_conf("CORS_ENABLED", True)
+        cors_enabled: bool = self._configs.CORS_ENABLED
         if not cors_enabled:
             return
 
@@ -491,16 +514,18 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Aborts request because route was not found
         """
-        exc: NotFound | MethodNotAllowed | None = path_data.get("exc")
-        if exc is not None:
-            handler: Callable | None = (
-                self._exception_handlers.get(exc.__class__.__name__, None) or None
+        ##Does a NotFound exception handler exist? If yes, runs it and sends the response, else sends generic 404 response
+        handler: Callable | None = (
+            self._exception_handlers.get(NotFound.__name__, None) or None
+        )
+        if handler:
+            res: Response = await run_sync_or_async(
+                handler, req, NotFound("Endpoint not found", response=req.res)
             )
-            if handler:
-                res = await run_sync_or_async(handler, req, exc)
-                response_type = res.expected_body_type() or exc.__class__
-                return await self.send_response(res, send, response_type)
+            response_type = res.expected_body_type()
+            return await self.send_response(res, send, response_type)
         ##sends generic response if custom handler not available
+        self._log_response(req, HttpStatus.NOT_FOUND)
         await send(
             {
                 "type": "http.response.start",
@@ -557,13 +582,13 @@ class Patera(Injectable, Generic[ConfT]):
         - normal ASGI start/body sending
         """
         self.response_renderer.apply_default_content_type(res)
-
+        self._log_response(res.request, res.status_code)
         if res.zero_copy is not None:
             self.response_renderer.finalize_headers(
                 res, body_bytes=None, is_streaming=True
             )
 
-            await res.send(
+            await send(
                 {
                     "type": "http.response.start",
                     "status": int(res.status_code),
@@ -601,7 +626,7 @@ class Patera(Injectable, Generic[ConfT]):
                 res, body_bytes=None, is_streaming=True
             )
 
-            await res.send(
+            await send(
                 {
                     "type": "http.response.start",
                     "status": int(res.status_code),
@@ -639,7 +664,7 @@ class Patera(Injectable, Generic[ConfT]):
             res, body_bytes=body_bytes, is_streaming=False
         )
 
-        await res.send(
+        await send(
             {
                 "type": "http.response.start",
                 "status": int(res.status_code),
@@ -685,7 +710,6 @@ class Patera(Injectable, Generic[ConfT]):
         req = self.request_class(
             scope, receive, send, self, path_kwargs, cast(Callable, route_handler)
         )
-
         if not route_handler:
             return await self.abort_route_not_found(send, req, path_kwargs)
 
@@ -728,7 +752,7 @@ class Patera(Injectable, Generic[ConfT]):
             # Catches every error and returns internal server error message
             # if the app is in production (DEBUG = False)
             # else reraises the error
-            if not self.get_conf("DEBUG", False):
+            if not self.configs.DEBUG:
                 res = req.res.json(
                     {
                         "status": "error",
@@ -745,8 +769,16 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Logs incoming request
         """
-        logger.info(
+        self.logger.info(
             f"HTTP request. CLIENT: {(scope.get('client') or ('-', ''))[0]}, SCHEME: {scope['scheme']}, METHOD: {method}, PATH: {url_path}, QUERY_STRING: {scope['query_string'].decode('utf-8')}"
+        )
+
+    def _log_response(self, req: Request, status_code: int) -> None:
+        """
+        Logs outgoing response
+        """
+        self.logger.info(
+            f"HTTP response. CLIENT: {(req.scope.get('client') or ('-', ''))[0]}, SCHEME: {req.scope['scheme']}, METHOD: {req.method}, PATH: {req.path}, STATUS_CODE: {status_code}"
         )
 
     def register_static_controller(self, base_path: str):
@@ -755,9 +787,7 @@ class Patera(Injectable, Generic[ConfT]):
         self.register_controller(static_controller, with_base_path=False)  # type: ignore
 
     def register_openapi_controller(self):
-        openapi_controller_dec = path(
-            self.get_conf("OPEN_API_URL"), open_api_spec=False
-        )
+        openapi_controller_dec = path(self.configs.OPEN_API_URL, open_api_spec=False)
         openapi_controller = openapi_controller_dec(OpenAPIController)
         self.register_controller(openapi_controller)
 
@@ -768,9 +798,8 @@ class Patera(Injectable, Generic[ConfT]):
         is the outermost layer.
         """
         print(PATERA_ASCIIART)
-        print(f"Starting Patera {PATERA_VERSION} application '{self.app_name}'")
-        self.register_static_controller(self.get_conf("STATIC_URL"))
-        if self.get_conf("OPEN_API", False):
+        self.register_static_controller(self.configs.STATIC_URL)
+        if self.configs.OPEN_API:
             self.build_openapi_spec()
             self.register_openapi_controller()
         built_app: AppCallableType = self._base_app
@@ -778,6 +807,12 @@ class Patera(Injectable, Generic[ConfT]):
             built_app = factory(self, built_app)
         self._app = built_app
         self._is_built = True
+        print_startup_message(
+            host=self.configs.HOST,
+            port=self.configs.PORT,
+            debug_mode=self.configs.DEBUG,
+            app_name=self.app_name,
+        )
 
     def add_extension(self, extension: Injectable):
         """
@@ -811,7 +846,7 @@ class Patera(Injectable, Generic[ConfT]):
         for ctrl in ctrls:
             dev_only: bool = getattr(ctrl, "_development", False)
             ignore: bool = getattr(ctrl, "_ignore", False)
-            if ignore or (dev_only and not self.get_conf("DEBUG", False)):
+            if ignore or (dev_only and not self.configs.DEBUG):
                 continue
             ctrl_path: str = getattr(ctrl, "_controller_path")
             ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")
