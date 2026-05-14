@@ -10,7 +10,6 @@ from typing import (
     Optional,
     Callable,
     ParamSpec,
-    Type,
     TypeVar,
     Generic,
 )
@@ -95,7 +94,7 @@ class AiService(
                 self.configs.AUGMENTATION,
                 self,  # type: ignore
             )  # type: ignore
-    
+
     async def _wrapper(self, func, **kwargs) -> ChatResponse:
         """
         Wrapper method for handling chat requests, calling the service provider and returning the response
@@ -106,9 +105,16 @@ class AiService(
         use_augmentation: bool = getattr(func, "__use_augmentation__", False)
         req = current_request.request
 
-        return await self.service_provider.chat(req, system_prompt, user_prompt,
-                                                use_history, use_augmentation, self, **kwargs)
-    
+        return await self.service_provider.chat(
+            req,
+            system_prompt,
+            user_prompt,
+            use_history,
+            use_augmentation,
+            self,
+            **kwargs,
+        )
+
     def _stream_wrapper(self, func, *args, **kwargs) -> AsyncIterator[ChatResponse]:
         """
         Wrapper method for handling streaming chat requests, calling the service provider and yielding the response
@@ -119,10 +125,10 @@ class AiService(
         use_augmentation: bool = getattr(func, "__use_augmentation__", False)
         req = current_request.request
 
-        return self.service_provider.stream(req, system_prompt, user_prompt,
-                                                           use_history, use_augmentation):
+        return self.service_provider.stream(
+            req, system_prompt, user_prompt, use_history, use_augmentation
+        )
 
-    
     @classmethod
     def _wrap_method(cls, func):
         @wraps(func)
@@ -194,6 +200,7 @@ def system_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., A
 
     return decorator
 
+
 def history(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator for adding history to chat requests
@@ -202,6 +209,7 @@ def history(func: Callable[..., Any]) -> Callable[..., Any]:
     setattr(func, "__use_history__", True)
     return func
 
+
 def augmentation(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator for adding augmentation to chat requests
@@ -209,6 +217,7 @@ def augmentation(func: Callable[..., Any]) -> Callable[..., Any]:
 
     setattr(func, "__use_augmentation__", True)
     return func
+
 
 def user_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
@@ -224,7 +233,9 @@ def user_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any
 
     return decorator
 
+
 F = TypeVar("F", bound=Callable[..., Any])
+
 
 def stream(func: Callable[..., Any]) -> Callable[..., Any]:
     """
@@ -233,6 +244,7 @@ def stream(func: Callable[..., Any]) -> Callable[..., Any]:
 
     setattr(func, "__stream__", True)
     return func
+
 
 def tool(
     name: Optional[str] = None, description: Optional[str] = None
