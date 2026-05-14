@@ -119,9 +119,8 @@ class AiService(
         use_augmentation: bool = getattr(func, "__use_augmentation__", False)
         req = current_request.request
 
-        for response in self.service_provider.stream(req, system_prompt, user_prompt,
+        return self.service_provider.stream(req, system_prompt, user_prompt,
                                                            use_history, use_augmentation):
-            yield response
 
     
     @classmethod

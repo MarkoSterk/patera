@@ -93,4 +93,4 @@ class BaseServiceProvider(ABC):
                 user_prompt: str, use_history: bool,
                 use_augmentation: bool,
                 ext: AiService) -> AsyncIterator[ChatResponse]:
-        raise NotImplementedError("If you wish to use streaming implement this method")
+        raise NotImplementedError("If you wish to use streaming implement this method in service provider")
