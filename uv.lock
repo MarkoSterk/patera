@@ -6,6 +6,7 @@ requires-python = ">=3.13"
 members = [
     "patera",
     "patera-aiinterface",
+    "patera-apiinterface",
     "patera-auth",
     "patera-caching",
     "patera-database",
@@ -1257,12 +1258,16 @@ aiinterface = [
 ]
 all = [
     { name = "patera-aiinterface" },
+    { name = "patera-apiinterface" },
     { name = "patera-auth" },
     { name = "patera-caching" },
     { name = "patera-database" },
     { name = "patera-email" },
     { name = "patera-migrate" },
     { name = "patera-taskmanager" },
+]
+apiinterface = [
+    { name = "patera-apiinterface" },
 ]
 auth = [
     { name = "patera-auth" },
@@ -1322,6 +1327,8 @@ requires-dist = [
     { name = "markupsafe", specifier = ">=3.0.3" },
     { name = "patera-aiinterface", marker = "extra == 'aiinterface'", editable = "packages/patera-aiinterface" },
     { name = "patera-aiinterface", marker = "extra == 'all'", editable = "packages/patera-aiinterface" },
+    { name = "patera-apiinterface", marker = "extra == 'all'", editable = "packages/patera-apiinterface" },
+    { name = "patera-apiinterface", marker = "extra == 'apiinterface'", editable = "packages/patera-apiinterface" },
     { name = "patera-auth", marker = "extra == 'all'", editable = "packages/patera-auth" },
     { name = "patera-auth", marker = "extra == 'auth'", editable = "packages/patera-auth" },
     { name = "patera-caching", marker = "extra == 'all'", editable = "packages/patera-caching" },
@@ -1346,7 +1353,7 @@ requires-dist = [
     { name = "websockets", specifier = ">=16.0" },
     { name = "werkzeug", specifier = ">=3.1.6" },
 ]
-provides-extras = ["aiinterface", "auth", "caching", "caching-redis", "caching-sqlite", "database", "email", "taskmanager", "testing", "dev", "all"]
+provides-extras = ["aiinterface", "apiinterface", "auth", "caching", "caching-redis", "caching-sqlite", "database", "email", "taskmanager", "testing", "dev", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1383,6 +1390,17 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=5.4.1" },
     { name = "torch", specifier = ">=2.11.0" },
 ]
+
+[[package]]
+name = "patera-apiinterface"
+version = "0.3.0"
+source = { editable = "packages/patera-apiinterface" }
+dependencies = [
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-auth"

@@ -29,6 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aiinterface = ["patera-aiinterface"]
+apiinterface = ["patera-apiinterface"]
 auth = ["patera-auth"]
 caching = ["patera-caching"]
 caching-redis = ["patera-caching[redis]"]
@@ -43,6 +44,7 @@ all = [
     "patera-migrate",
     "patera-email",
     "patera-aiinterface",
+    "patera-apiinterface",
     "patera-auth",
     "patera-caching",
     "patera-taskmanager"
@@ -51,6 +53,7 @@ all = [
 [tool.uv.workspace]
 members = [
     "packages/patera-aiinterface",
+    "packages/patera-apiinterface",
     "packages/patera-auth",
     "packages/patera-caching",
     "packages/patera-database",
@@ -61,6 +64,7 @@ members = [
 
 [tool.uv.sources]
 patera-aiinterface = { workspace = true }
+patera-apiinterface = { workspace = true }
 patera-auth = { workspace = true }
 patera-database = { workspace = true }
 patera-taskmanager = { workspace = true }
