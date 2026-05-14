@@ -72,6 +72,13 @@ class CurrentContextProxy:
         if value is None:
             raise RuntimeError("No request.")
         return value
+    
+    @property
+    def req(self):
+        value = self._ctx().request
+        if value is None:
+            raise RuntimeError("No request.")
+        return value
 
     @property
     def sessions(self) -> ActiveSessions:

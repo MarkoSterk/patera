@@ -17,6 +17,7 @@ from typing import (
 from collections.abc import AsyncIterator
 from pydantic import BaseModel, Field
 from patera import Patera, Request
+from patera.ctx import current_request
 from patera.base_extension import BaseExtension
 
 from .service_provider import BaseServiceProvider, ChatResponse
@@ -94,12 +95,55 @@ class AiService(
                 self.configs.AUGMENTATION,
                 self,  # type: ignore
             )  # type: ignore
+    
+    async def _wrapper(self, func, **kwargs) -> ChatResponse:
+        """
+        Wrapper method for handling chat requests, calling the service provider and returning the response
+        """
+        system_prompt: str = getattr(func, "__system_prompt__", "")
+        user_prompt: str = getattr(func, "__user_prompt__", "")
+        use_history: bool = getattr(func, "__use_history__", False)
+        use_augmentation: bool = getattr(func, "__use_augmentation__", False)
+        req = current_request.request
 
-    async def chat(self, req: Request, msg: str) -> ChatResponse:
-        return await self.service_provider.chat(req, msg, self)  # type: ignore
+        return await self.service_provider.chat(req, system_prompt, user_prompt,
+                                                use_history, use_augmentation, self, **kwargs)
+    
+    def _stream_wrapper(self, func, *args, **kwargs) -> AsyncIterator[ChatResponse]:
+        """
+        Wrapper method for handling streaming chat requests, calling the service provider and yielding the response
+        """
+        system_prompt: str = getattr(func, "__system_prompt__", "")
+        user_prompt: str = getattr(func, "__user_prompt__", "")
+        use_history: bool = getattr(func, "__use_history__", False)
+        use_augmentation: bool = getattr(func, "__use_augmentation__", False)
+        req = current_request.request
 
-    def stream(self, req: Request, msg: str) -> AsyncIterator[ChatResponse]:
-        return self.service_provider.stream(req, msg, self)  # type: ignore
+        for response in self.service_provider.stream(req, system_prompt, user_prompt,
+                                                           use_history, use_augmentation):
+            yield response
+
+    
+    @classmethod
+    def _wrap_method(cls, func):
+        @wraps(func)
+        async def inner(self, *args, **kwargs):
+            stream: bool = getattr(func, "__stream__", False)
+            if stream:
+                return self._stream_wrapper(func, *args, **kwargs)
+            return await self._wrapper(func, **kwargs)
+
+        return inner
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        for name, value in list(cls.__dict__.items()):
+            if name.startswith("_"):
+                continue
+
+            if callable(value) and hasattr(value, "__system_prompt__"):
+                setattr(cls, name, AiService._wrap_method(value))
 
 
 AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any, Any])
@@ -114,7 +158,7 @@ def session_id(
 
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         """
-        Decorator for setting memory id of a tool method
+        Decorator for setting memory id
         """
 
         @wraps(func)
@@ -137,23 +181,59 @@ def session_id(
     return decorator
 
 
-def system_prompt(prompt: str) -> Callable[[Type[AiServiceT]], Type[AiServiceT]]:
+def system_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    Decorator for setting system prompt of AI service
+    Decorator for setting system prompt
     """
 
-    def decorator(cls: Type[AiServiceT]) -> Type[AiServiceT]:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         """
         Sets system prompt for the AI service
         """
-        setattr(cls, "__system_prompt__", prompt)
-        return cls
+        setattr(func, "__system_prompt__", prompt)
+        return func
 
     return decorator
 
+def history(func: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Decorator for adding history to chat requests
+    """
+
+    setattr(func, "__use_history__", True)
+    return func
+
+def augmentation(func: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Decorator for adding augmentation to chat requests
+    """
+
+    setattr(func, "__use_augmentation__", True)
+    return func
+
+def user_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Decorator for setting user prompt
+    """
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        """
+        Sets user prompt for the tool method
+        """
+        setattr(func, "__user_prompt__", prompt)
+        return func
+
+    return decorator
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+def stream(func: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Decorator for marking a method as a streaming method
+    """
+
+    setattr(func, "__stream__", True)
+    return func
 
 def tool(
     name: Optional[str] = None, description: Optional[str] = None

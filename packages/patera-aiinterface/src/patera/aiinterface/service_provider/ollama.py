@@ -47,46 +47,43 @@ def from_ollama(data: dict[str, Any]) -> ChatResponse:
 
 
 class OllamaServiceProvider(BaseServiceProvider):
-    async def chat(self, req: Request, msg: str, ext: AiService) -> ChatResponse:
+    async def chat(self, req: Request, system_prompt: str,
+                   user_prompt: str, use_history: bool,
+                   use_augmentation: bool,
+                   ext: AiService, **kwargs) -> ChatResponse:
         """
         Builds and sends chat prompt with chat service configs
         """
         url = ext.configs.BASE_URL
-        if not url:
-            raise ValueError(
-                "BASE_URL is required in AiServiceConfig for OllamaServiceProvider."
-            )
-
         url = url.rstrip("/") + "/api/chat"
+        msg: str = ""
+        if kwargs:
+            for key, value in kwargs.items():
+                msg = user_prompt.replace(f"<:{key}>", value)
 
         messages: list[dict[str, str]] = []
         session_id = req.route_parameters.get("session_id", None)
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
+        if use_history and hasattr(ext, "history_provider") and ext.history_provider is not None:
             messages = await ext.history_provider.get_history_messages(req)  # type: ignore
 
-        if (
+        if (use_augmentation and
             hasattr(ext, "augmentation_provider")
             and ext.augmentation_provider is not None
         ):
             augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)
-            msg = msg + "Additional Information:\n\n" + "\n\n".join(augmenting_info)
+            msg = msg + "\n\n----AUGMENTATION---:\n\n" + "\n\n".join(augmenting_info)
 
         headers = {
             "Content-Type": "application/json",
         }
 
-        if ext.configs.get("API_KEY"):
+        if ext.configs.API_KEY:
             headers["Authorization"] = f"Bearer {ext.configs.API_KEY}"
 
         if len(messages) == 0:
-            sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
-            if sys_prompt is None:
-                raise ValueError(
-                    "System prompt is required for OllamaServiceProvider. Set it using the @system_prompt decorator on the chat service."
-                )
-            sys_message = {"role": "system", "content": sys_prompt}
+            sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
-            if hasattr(ext, "history_provider") and ext.history_provider is not None:
+            if use_history and hasattr(ext, "history_provider") and ext.history_provider is not None:
                 ext.history_provider.save_message(sys_message, session_id, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
@@ -111,13 +108,13 @@ class OllamaServiceProvider(BaseServiceProvider):
             response.raise_for_status()
             json_response = response.json()
 
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
+        if use_history and hasattr(ext, "history_provider") and ext.history_provider is not None:
             ext.history_provider.save_message(
                 messages[len(messages) - 1], session_id, len(messages) - 1
             )  # type: ignore
 
         ollama_response = from_ollama(json_response)
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
+        if use_history and hasattr(ext, "history_provider") and ext.history_provider is not None:
             ext.history_provider.save_message(
                 ollama_response.message.to_dict(), session_id, len(messages)
             )  # type: ignore
