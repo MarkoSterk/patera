@@ -16,7 +16,7 @@ uv publish dist/patera-*
 
 $extensions = @(
     "patera_aiinterface",
-    "patera-apiinterface",
+    "patera_apiinterface",
     "patera_auth",
     "patera_caching",
     "patera_database",
