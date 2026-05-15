@@ -18,6 +18,7 @@ from .chat_response import (
     ChatMessage,
     UsageStats,
 )
+from .base_service_provider import BaseServiceProvider
 
 
 def from_ollama(data: dict[str, Any]) -> ChatResponse:
@@ -45,7 +46,7 @@ def from_ollama(data: dict[str, Any]) -> ChatResponse:
     )
 
 
-class OllamaServiceProvider:
+class OllamaServiceProvider(BaseServiceProvider):
     async def chat(
         self,
         req: Request,

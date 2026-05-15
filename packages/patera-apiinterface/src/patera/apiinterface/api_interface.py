@@ -15,7 +15,6 @@ from typing import (
     cast,
     get_type_hints,
     TypeVar,
-    TYPE_CHECKING,
 )
 import httpx
 from httpx import Response
@@ -23,13 +22,7 @@ from functools import wraps
 from enum import StrEnum
 from pydantic import BaseModel
 
-from .http_methods import HttpMethod
-from .media_types import MediaType
-from .base_extension import BaseExtension
-from .request import UploadedFile, Request
-
-if TYPE_CHECKING:
-    from .patera import Patera
+from patera import Patera, HttpMethod, MediaType, BaseExtension, UploadedFile, Request
 
 
 class AuthType(StrEnum):

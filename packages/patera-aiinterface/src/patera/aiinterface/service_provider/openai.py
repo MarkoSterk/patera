@@ -18,6 +18,7 @@ from .chat_response import (
     ChatMessage,
     UsageStats,
 )
+from .base_service_provider import BaseServiceProvider
 
 
 def from_openai(data: dict[str, Any]) -> ChatResponse:
@@ -82,7 +83,7 @@ def from_openai_chunk(data: dict[str, Any]) -> Optional[ChatResponse]:
     )
 
 
-class OpenAIServiceProvider:
+class OpenAIServiceProvider(BaseServiceProvider):
     async def chat(
         self,
         req: Request,
