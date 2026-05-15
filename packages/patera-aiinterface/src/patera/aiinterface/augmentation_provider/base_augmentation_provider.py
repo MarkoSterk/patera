@@ -41,6 +41,10 @@ class _AugmentationConfig(BaseModel):
     MINIMAL_SIMILARITY: float = Field(
         0.9, description="Minimal similarity for documents to be used for augmentation"
     )
+    MATCH_LIMIT: int = Field(
+        5,
+        description="Number of results which match similarity criteria from retriever",
+    )
 
 
 class BaseAugmentationProvider(Generic[ModelT]):
@@ -51,13 +55,11 @@ class BaseAugmentationProvider(Generic[ModelT]):
         *,
         vector_column: str = "vector",
         text_column: str = "text",
-        retriever_limit: int = 5,
     ) -> None:
         self._embedding_model: SentenceTransformer = cast(SentenceTransformer, None)
         self._configs: _AugmentationConfig = cast(_AugmentationConfig, None)
         self._vector_column = vector_column
         self._text_column = text_column
-        self._retriever_limit = retriever_limit
         self._initilized: bool = False
         self._ext: "AiService" = cast("AiService", None)
 
@@ -121,7 +123,7 @@ class BaseAugmentationProvider(Generic[ModelT]):
         )
         documents = [
             document
-            for document, sim in sorted_documents[: self._retriever_limit]
+            for document, sim in sorted_documents[: self._configs.MATCH_LIMIT]
             if sim >= self._configs.MINIMAL_SIMILARITY
         ]
         return documents

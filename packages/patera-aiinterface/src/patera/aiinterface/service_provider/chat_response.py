@@ -3,17 +3,11 @@ Chat service provider
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import Any, Literal, TypeVar
 from dataclasses import dataclass, asdict
-from patera import Request
-from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
 
-if TYPE_CHECKING:
-    from ..ai_service import AiService
 
 Role = Literal["system", "user", "assistant", "tool"]
-
 T = TypeVar("T")
 
 
@@ -79,31 +73,4 @@ class ChatResponse:
             usage=UsageStats.from_dict(data["usage"]) if data.get("usage") else None,
             request_id=data.get("request_id"),
             created_at=data.get("created_at"),
-        )
-
-
-class BaseServiceProvider(ABC):
-    @abstractmethod
-    async def chat(
-        self,
-        req: Request,
-        system_prompt: str,
-        user_prompt: str,
-        use_history: bool,
-        use_augmentation: bool,
-        ext: AiService,
-        **kwargs,
-    ) -> ChatResponse: ...
-
-    def stream(
-        self,
-        req: Request,
-        system_prompt: str,
-        user_prompt: str,
-        use_history: bool,
-        use_augmentation: bool,
-        ext: AiService,
-    ) -> AsyncIterator[ChatResponse]:
-        raise NotImplementedError(
-            "If you wish to use streaming implement this method in service provider"
         )

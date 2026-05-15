@@ -60,6 +60,10 @@ class BaseHistoryProvider(Generic[ModelT]):
         if database is None:
             raise ValueError(f"No database found for model {self.model.__name__}")
         session = current_request.session(database.session_name)
+        if session is None:
+            raise ValueError(
+                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+            )
         history_query = self.model.query(session).filter(
             getattr(self.model, self.id_column) == session_id
         )
@@ -70,9 +74,11 @@ class BaseHistoryProvider(Generic[ModelT]):
         return self.order_by(history)
 
     async def get_history_messages(self, req: Request) -> list[ChatHistoryMessage]:
-        session_id = req.route_parameters.get("session_id", None)
+        session_id = req.route_parameters.get(self.id_column, None)
         if session_id is None:
-            raise ValueError("Missing session id for chat history loader.")
+            raise ValueError(
+                f"Missing session id ({self.id_column}) for chat history loader."
+            )
         history = await self._get_history(session_id)
         return [
             {
@@ -82,15 +88,19 @@ class BaseHistoryProvider(Generic[ModelT]):
             for m in history
         ]
 
-    def save_message(
-        self, message: dict[str, Any], memory_id: str | int | UUID, order_number: int
-    ) -> None:
+    def save_message(self, message: dict[str, Any], order_number: int) -> None:
+        req: Request = current_request.request
+        memory_id = req.route_parameters.get(self.id_column)
         database: SqlDatabase = current_request.app.extensions.get(
             self.model.db_name(), None
         )
         if database is None:
             raise ValueError(f"No database found for model {self.model.__name__}")
         session = current_request.session(database.session_name)
+        if session is None:
+            raise ValueError(
+                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+            )
         message_obj = self.model()
         setattr(message_obj, self.id_column, memory_id)
         setattr(message_obj, self.message_column, message["content"])
