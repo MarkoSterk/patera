@@ -17,6 +17,9 @@ from .http_methods import HttpMethod
 from .http_statuses import HttpStatus
 from .logging.logger_config_base import LogLevel
 
+# Semantic for Service class
+Service = BaseExtension
+
 __all__ = [
     "Patera",
     "abort",
@@ -39,4 +42,5 @@ __all__ = [
     "MiddlewareBase",
     "development",
     "ignore",
+    "Service",
 ]
