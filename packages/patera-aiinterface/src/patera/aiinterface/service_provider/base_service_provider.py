@@ -84,13 +84,26 @@ class ChatResponse:
 
 class BaseServiceProvider(ABC):
     @abstractmethod
-    async def chat(self, req: Request, system_prompt: str,
-                   user_prompt: str, use_history: bool,
-                   use_augmentation: bool,
-                   ext: AiService, **kwargs) -> ChatResponse: ...
+    async def chat(
+        self,
+        req: Request,
+        system_prompt: str,
+        user_prompt: str,
+        use_history: bool,
+        use_augmentation: bool,
+        ext: AiService,
+        **kwargs,
+    ) -> ChatResponse: ...
 
-    def stream(elf, req: Request, system_prompt: str,
-                user_prompt: str, use_history: bool,
-                use_augmentation: bool,
-                ext: AiService) -> AsyncIterator[ChatResponse]:
-        raise NotImplementedError("If you wish to use streaming implement this method in service provider")
+    def stream(
+        self,
+        req: Request,
+        system_prompt: str,
+        user_prompt: str,
+        use_history: bool,
+        use_augmentation: bool,
+        ext: AiService,
+    ) -> AsyncIterator[ChatResponse]:
+        raise NotImplementedError(
+            "If you wish to use streaming implement this method in service provider"
+        )

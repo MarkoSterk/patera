@@ -12,6 +12,7 @@ from typing import (
     ParamSpec,
     TypeVar,
     Generic,
+    cast,
 )
 from collections.abc import AsyncIterator
 from pydantic import BaseModel, Field
@@ -111,7 +112,7 @@ class AiService(
             user_prompt,
             use_history,
             use_augmentation,
-            self,
+            self,  # type: ignore
             **kwargs,
         )
 
@@ -126,7 +127,12 @@ class AiService(
         req = current_request.request
 
         return self.service_provider.stream(
-            req, system_prompt, user_prompt, use_history, use_augmentation
+            req,
+            system_prompt,
+            user_prompt,
+            use_history,
+            use_augmentation,
+            self,  # type: ignore
         )
 
     @classmethod
@@ -155,6 +161,8 @@ AiServiceT = TypeVar("AiServiceT", bound=AiService[Any, Any, Any, Any])
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+AsyncFuncT = TypeVar("AsyncFuncT", bound=Callable[..., Awaitable[Any]])
 
 
 def session_id(
@@ -186,64 +194,58 @@ def session_id(
     return decorator
 
 
-def system_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def system_prompt(prompt: str) -> Callable[[AsyncFuncT], AsyncFuncT]:
     """
-    Decorator for setting system prompt
+    Decorator for setting system prompt.
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """
-        Sets system prompt for the AI service
-        """
-        setattr(func, "__system_prompt__", prompt)
+    def decorator(func: AsyncFuncT) -> AsyncFuncT:
+        cast(Any, func).__system_prompt__ = prompt
         return func
 
     return decorator
 
 
-def history(func: Callable[..., Any]) -> Callable[..., Any]:
+def history(func: AsyncFuncT) -> AsyncFuncT:
     """
-    Decorator for adding history to chat requests
+    Decorator for adding history to chat requests.
     """
 
-    setattr(func, "__use_history__", True)
+    cast(Any, func).__use_history__ = True
     return func
 
 
-def augmentation(func: Callable[..., Any]) -> Callable[..., Any]:
+def augmentation(func: AsyncFuncT) -> AsyncFuncT:
     """
-    Decorator for adding augmentation to chat requests
+    Decorator for adding augmentation to chat requests.
     """
 
-    setattr(func, "__use_augmentation__", True)
+    cast(Any, func).__use_augmentation__ = True
     return func
 
 
-def user_prompt(prompt: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def user_prompt(prompt: str) -> Callable[[AsyncFuncT], AsyncFuncT]:
     """
-    Decorator for setting user prompt
+    Decorator for setting user prompt.
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """
-        Sets user prompt for the tool method
-        """
-        setattr(func, "__user_prompt__", prompt)
+    def decorator(func: AsyncFuncT) -> AsyncFuncT:
+        cast(Any, func).__user_prompt__ = prompt
         return func
 
     return decorator
+
+
+def stream(func: AsyncFuncT) -> AsyncFuncT:
+    """
+    Decorator for marking a method as a streaming method.
+    """
+
+    cast(Any, func).__stream__ = True
+    return func
 
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-
-def stream(func: Callable[..., Any]) -> Callable[..., Any]:
-    """
-    Decorator for marking a method as a streaming method
-    """
-
-    setattr(func, "__stream__", True)
-    return func
 
 
 def tool(
