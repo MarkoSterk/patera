@@ -10,7 +10,6 @@ from .ai_service import (
     user_prompt,
     history,
     augmentation,
-    stream,
     session_id,
     AiServiceConfig,
 )
@@ -25,5 +24,4 @@ __all__ = [
     "user_prompt",
     "history",
     "augmentation",
-    "stream",
 ]

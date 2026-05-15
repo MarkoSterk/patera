@@ -4,6 +4,7 @@ Makes connecting to LLM's easy
 """
 
 from functools import wraps
+import inspect
 from typing import (
     Any,
     Awaitable,
@@ -139,8 +140,9 @@ class AiService(
     def _wrap_method(cls, func):
         @wraps(func)
         async def inner(self, *args, **kwargs):
-            stream: bool = getattr(func, "__stream__", False)
-            if stream:
+            result = inspect.get_annotations(func)
+            return_type = result.get("return", "")
+            if "AsyncIterator" in str(return_type):
                 return self._stream_wrapper(func, *args, **kwargs)
             return await self._wrapper(func, **kwargs)
 
@@ -234,15 +236,6 @@ def user_prompt(prompt: str) -> Callable[[AsyncFuncT], AsyncFuncT]:
         return func
 
     return decorator
-
-
-def stream(func: AsyncFuncT) -> AsyncFuncT:
-    """
-    Decorator for marking a method as a streaming method.
-    """
-
-    cast(Any, func).__stream__ = True
-    return func
 
 
 F = TypeVar("F", bound=Callable[..., Any])
