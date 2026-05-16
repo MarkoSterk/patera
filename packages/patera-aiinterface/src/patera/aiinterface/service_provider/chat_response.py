@@ -52,6 +52,8 @@ class ChatResponse:
     request_id: str | None = None
     created_at: str | None = None
 
+    session_id: Any = None
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "provider": self.provider,
@@ -61,6 +63,7 @@ class ChatResponse:
             "usage": self.usage.to_dict() if self.usage else None,
             "request_id": self.request_id,
             "created_at": self.created_at,
+            "session_id": self.session_id,
         }
 
     @classmethod
@@ -73,4 +76,5 @@ class ChatResponse:
             usage=UsageStats.from_dict(data["usage"]) if data.get("usage") else None,
             request_id=data.get("request_id"),
             created_at=data.get("created_at"),
+            session_id=data.get("session_id"),
         )

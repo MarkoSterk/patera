@@ -21,7 +21,7 @@ from .chat_response import (
 from .base_service_provider import BaseServiceProvider
 
 
-def from_ollama(data: dict[str, Any]) -> ChatResponse:
+def from_ollama(data: dict[str, Any], session_id: Any = None) -> ChatResponse:
     message_data = data.get("message", {})
 
     return ChatResponse(
@@ -43,6 +43,7 @@ def from_ollama(data: dict[str, Any]) -> ChatResponse:
                 else None
             ),
         ),
+        session_id=session_id,
     )
 
 
@@ -133,7 +134,7 @@ class OllamaServiceProvider(BaseServiceProvider):
                 session_id, messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
-        ollama_response = from_ollama(json_response)
+        ollama_response = from_ollama(json_response, session_id)
         if use_history:
             ext.history_provider.save_message(  # type: ignore
                 session_id, ollama_response.message.to_dict(), len(messages)
