@@ -951,7 +951,8 @@ class Patera(Injectable, Generic[ConfT]):
         ctrl_name, command = command_name.split(":", 1)
         ctrl = cast(CLIController, self._cli_controllers.get(ctrl_name, None))
         if ctrl is None:
-            print(f"CLI controller with name {ctrl_name} was not found")
+            print(f"ERROR: CLI controller with name {ctrl_name} was not found")
+            return
 
         method = ctrl.find_method(command)
         if method is None:
