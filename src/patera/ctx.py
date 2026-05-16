@@ -72,7 +72,7 @@ class CurrentContextProxy:
         if value is None:
             raise RuntimeError("No request.")
         return value
-    
+
     @property
     def req(self):
         value = self._ctx().request
@@ -81,22 +81,14 @@ class CurrentContextProxy:
         return value
 
     @property
-    def sessions(self) -> ActiveSessions:
-        value = self._ctx().sessions
-        if value is None:
-            raise RuntimeError("No current database sessions.")
-        return value
+    def sessions(self) -> ActiveSessions | None:
+        return self._ctx().sessions
 
     def session(self, session_name: str):
         sessions = self._ctx().sessions
         if sessions is None:
-            raise RuntimeError("No current database sessions.")
-        session = sessions.get_session(session_name)
-        if session is None:
-            raise RuntimeError(
-                f"No active database session named '{session_name}' in current request context."
-            )
-        return session
+            return None
+        return sessions.get_session(session_name)
 
     @property
     def controller(self):
