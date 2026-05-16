@@ -743,7 +743,7 @@ class Patera(Injectable, Generic[ConfT]):
                     )
                     if not handler:
                         # pylint: disable-next=W0719
-                        raise
+                        raise Exception from exc
                     res = await run_sync_or_async(handler, req, exc)
                     response_type = res.expected_body_type() or exc.__class__
                     return await self.send_response(res, send, response_type)
@@ -763,7 +763,7 @@ class Patera(Injectable, Generic[ConfT]):
                     f"Unhandled critical error: ({req.method}) {req.path}, {req.route_parameters}"
                 )
                 return await self.send_response(res, send, exc.__class__)
-            raise
+            raise Exception from exc
 
     def _log_request(self, scope, method: str, url_path: str) -> None:
         """

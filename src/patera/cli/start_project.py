@@ -405,7 +405,6 @@ def _start_dev(
         factory=True,
         reload_dirs=[str(root)],
         reload_excludes=[*ignore_dirs, *ignore_patterns],
-        log_level="critical",
         access_log=access_log,
         log_config=None,
     )
