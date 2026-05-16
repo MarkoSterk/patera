@@ -78,6 +78,8 @@ class OllamaServiceProvider(BaseServiceProvider):
                 f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
             )
 
+        session_id: Any = None
+
         url = ext.configs.BASE_URL
         url = url.rstrip("/") + "/api/chat"
 
@@ -85,7 +87,7 @@ class OllamaServiceProvider(BaseServiceProvider):
 
         messages: list[dict[str, str]] = []
         if use_history:
-            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
+            session_id, messages = await ext.history_provider.get_history_messages(req)  # type: ignore
 
         if use_augmentation:
             augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
@@ -102,7 +104,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
             if use_history:
-                ext.history_provider.save_message(sys_message, 0)  # type: ignore
+                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -128,13 +130,13 @@ class OllamaServiceProvider(BaseServiceProvider):
 
         if use_history:
             ext.history_provider.save_message(  # type: ignore
-                messages[len(messages) - 1], len(messages) - 1
+                session_id, messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
         ollama_response = from_ollama(json_response)
         if use_history:
             ext.history_provider.save_message(  # type: ignore
-                ollama_response.message.to_dict(), len(messages)
+                session_id, ollama_response.message.to_dict(), len(messages)
             )  # type: ignore
         return ollama_response
 
