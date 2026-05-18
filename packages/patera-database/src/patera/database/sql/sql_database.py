@@ -294,7 +294,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         return [model for model in self._models.values()]
 
 
-def readonly_session(cls: Type[SqlDatabase]) -> Callable:
+def readonly_session(cls: type[SqlDatabase[Any]]) -> Callable:
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
@@ -337,7 +337,7 @@ def readonly_session(cls: Type[SqlDatabase]) -> Callable:
     return decorator
 
 
-def managed_session(cls: Type["SqlDatabase"]) -> Callable:
+def managed_session(cls: type[SqlDatabase[Any]]) -> Callable:
 
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
@@ -386,7 +386,7 @@ def managed_session(cls: Type["SqlDatabase"]) -> Callable:
     return decorator
 
 
-def managed_cli_session(cls: Type["SqlDatabase"]) -> Callable:
+def managed_cli_session(cls: type[SqlDatabase[Any]]) -> Callable:
 
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
