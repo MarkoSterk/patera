@@ -370,6 +370,9 @@ class Patera(Injectable, Generic[ConfT]):
                 module,
                 lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
             ):
+                # ignores abstract classes and classes with _ignore = True or _development = True (when DEBUG = False)
+                if inspect.isabstract(obj):
+                    continue
                 ignore: bool = getattr(obj, "_ignore", False)
                 dev_only: bool = getattr(obj, "_development", False)
                 if ignore or (dev_only and not self._configs.DEBUG):

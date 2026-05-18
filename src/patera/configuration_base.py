@@ -42,11 +42,6 @@ class BaseConfig(BaseSettings):
         description="Response class to use. Must be a subclass of patera.response.Response",
     )
 
-    # required for Authentication extension
-    SECRET_KEY: Optional[str] = Field(
-        None, description="High entropy random string for signing cookies/jwts"
-    )
-
     # optionals with sensible defaults
     DEBUG: bool = Field(True, description="If the app should run in debug mode or not.")
     HOST: str = Field("localhost", description="Host ip where the app should run.")
