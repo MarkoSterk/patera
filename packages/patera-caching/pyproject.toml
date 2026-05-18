@@ -1,6 +1,6 @@
 [project]
 name = "patera-caching"
-version = "0.4.7"
+version = "0.4.8"
 requires-python = ">=3.13"
 dependencies = [
   "cachetools>=7.0.5",
