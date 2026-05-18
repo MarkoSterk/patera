@@ -224,8 +224,7 @@ class OllamaServiceProvider(BaseServiceProvider):
                         yield from_ollama(json.loads(line))
 
     def format_message(self, user_prompt: str, **kwargs) -> str:
-        msg: str = ""
         if kwargs:
             for key, value in kwargs.items():
-                msg = user_prompt.replace(f"<:{key}>", value)
-        return msg
+                user_prompt = user_prompt.replace(f"<:{key}>", value)
+        return user_prompt
