@@ -808,6 +808,7 @@ class Patera(Injectable, Generic[ConfT]):
                 self.logger.critical(
                     f"Unhandled critical error: ({req.method}) {req.path}, {req.route_parameters}"
                 )
+                self.logger.exception(exc)
                 return await self.send_response(res, send, exc.__class__)
             raise Exception from exc
 
