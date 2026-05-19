@@ -797,6 +797,7 @@ class Patera(Injectable, Generic[ConfT]):
             # Catches every error and returns internal server error message
             # if the app is in production (DEBUG = False)
             # else reraises the error
+            req.res.reset()
             if not self.configs.DEBUG:
                 res = req.res.json(
                     {
