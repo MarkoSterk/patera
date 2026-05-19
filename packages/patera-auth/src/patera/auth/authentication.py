@@ -30,7 +30,6 @@ if TYPE_CHECKING:
 
 from patera.ctx import current_request
 from patera.controller import Controller
-from patera.utilities import run_sync_or_async
 from patera.middleware import AppCallableType, MiddlewareBase
 
 from .exceptions import AuthenticationException, AuthorizationException
@@ -225,7 +224,7 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
             controller_authentication_attributes is not None
             or handler_authentication_attributes is not None
         ):  # type: ignore
-            user: Optional[Any] = await run_sync_or_async(self.user_loader, req)
+            user: Optional[Any] = await self.user_loader(req)
             if user is None:
                 # not Authenticated
                 raise AuthenticationException(self.authentication_error)
@@ -245,9 +244,7 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         if len(roles) == 0:  # roles not are specified
             # user is authenticated
             return await self.next(req)
-        authorized: bool = await run_sync_or_async(
-            self.role_check, req.user, list(roles)
-        )
+        authorized: bool = await self.role_check(req.user, list(roles))
         if not authorized:
             # not authorized
             raise AuthorizationException(self.authorization_error, list(roles))
@@ -274,7 +271,9 @@ def login_required(handler: "Callable|Type[Controller]") -> "Callable|Type[Contr
     """
     Decorator for login required
     """
-    setattr(handler, "_authentication", {"required": True})
+    attributes: dict[str, Any] = getattr(handler, "_authentication", {})
+    attributes["required"] = True
+    setattr(handler, "_authentication", attributes)
     return handler
 
 

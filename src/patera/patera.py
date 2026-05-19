@@ -283,77 +283,112 @@ class Patera(Injectable, Generic[ConfT]):
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
 
     def _load_controllers_exc_handlers_middleware(self, cli_mode: bool = False) -> None:
-        app_root: Path = Path(self._root_path)
+        cli_controller_folders: list[str] = ["cli", "cli_controllers"]
+        cli_controller_folders.extend(self._configs.CLI_CONTROLLER_FOLDERS or [])
 
-        _cli_controller_folders: list[str] = ["cli", "cli_controllers"]
-        _additional_cli_controller_folders = self._configs.CLI_CONTROLLER_FOLDERS
-        if _additional_cli_controller_folders is None:
-            _additional_cli_controller_folders = []
-        _cli_controller_folders.extend(_additional_cli_controller_folders)
-        for folder in _cli_controller_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["cli", "cli_controller"])
-            self._load_detected_module(files, CLIController)
+        self._load_detected_modules_once(
+            cli_controller_folders,
+            ["cli", "cli_controller"],
+            CLIController,
+        )
 
         if cli_mode:
             return
 
-        _logger_folders: list[str] = ["logging", "loggers"]
-        _additional_logger_folders = self._configs.LOGGER_FOLDERS
-        if _additional_logger_folders is None:
-            _additional_logger_folders = []
-        _logger_folders.extend(_additional_logger_folders)
-        for folder in _logger_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["logger", "log_sink"])
-            self._load_detected_module(files, LoggerBase)
+        logger_folders: list[str] = ["logging", "loggers"]
+        logger_folders.extend(self._configs.LOGGER_FOLDERS or [])
 
-        _controller_folders: list[str] = [
+        self._load_detected_modules_once(
+            logger_folders,
+            ["logger", "log_sink"],
+            LoggerBase,
+        )
+
+        controller_folders: list[str] = [
             "api",
             "public",
             "controllers",
             "routers",
             "routes",
         ]
-        _additional_controller_folders = self._configs.CONTROLLER_FOLDERS
-        if _additional_controller_folders is None:
-            _additional_controller_folders = []
-        _controller_folders.extend(_additional_controller_folders)
-        for folder in _controller_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(
-                folder_path, ["api", "controller", "public", "router", "routes"]
-            )
-            self._load_detected_module(files, Controller)
+        controller_folders.extend(self._configs.CONTROLLER_FOLDERS or [])
 
-        _exception_handler_folders: list[str] = ["exceptions"]
-        _additional_exception_handler_folders = self._configs.EXCEPTION_HANDLER_FOLDERS
-        if _additional_exception_handler_folders is None:
-            _additional_exception_handler_folders = []
-        _exception_handler_folders.extend(_additional_exception_handler_folders)
-        for folder in _exception_handler_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(
-                folder_path, ["handler", "exception_controller", "controller"]
-            )
-            self._load_detected_module(files, ExceptionHandler)
+        self._load_detected_modules_once(
+            controller_folders,
+            ["api", "controller", "public", "router", "routes"],
+            Controller,
+        )
 
-        _middleware_folders: list[str] = ["middleware", "middlewares"]
-        _additional_middleware_folders = self._configs.MIDDLEWARE_FOLDERS
-        if _additional_middleware_folders is None:
-            _additional_middleware_folders = []
-        _middleware_folders.extend(_additional_middleware_folders)
-        for folder in _middleware_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["middleware", "mw"])
-            self._load_detected_module(files, MiddlewareBase)
-            for order_key in sorted(self._middleware_classes.keys()):
-                mw_class = self._middleware_classes[order_key]
-                self._middleware.append(
-                    lambda app, next_app, mdlwr_class=mw_class: mdlwr_class(
-                        app, next_app
-                    )
+        exception_handler_folders: list[str] = ["exceptions"]
+        exception_handler_folders.extend(self._configs.EXCEPTION_HANDLER_FOLDERS or [])
+
+        self._load_detected_modules_once(
+            exception_handler_folders,
+            ["handler", "exception_controller", "controller"],
+            ExceptionHandler,
+        )
+
+        middleware_folders: list[str] = ["middleware", "middlewares"]
+        middleware_folders.extend(self._configs.MIDDLEWARE_FOLDERS or [])
+
+        self._load_detected_modules_once(
+            middleware_folders,
+            ["middleware", "mw"],
+            MiddlewareBase,
+        )
+
+        seen_middleware_classes: set[type[MiddlewareBase]] = set()
+
+        for order_key in sorted(self._middleware_classes.keys()):
+            mw_class = self._middleware_classes[order_key]
+
+            if mw_class in seen_middleware_classes:
+                self.logger.warning(
+                    f"Skipping duplicate middleware registration: {mw_class.__name__}"
                 )
+                continue
+
+            seen_middleware_classes.add(mw_class)
+
+            self._middleware.append(
+                lambda app, next_app, mdlwr_class=mw_class: mdlwr_class(
+                    app,
+                    next_app,
+                )
+            )
+
+    def _unique_list(self, values: list[str]) -> list[str]:
+        """
+        Returns a list with duplicates removed while preserving order.
+        """
+        return list(dict.fromkeys(values))
+
+    def _load_detected_modules_once(
+        self,
+        folders: list[str],
+        name_patterns: list[str],
+        load_class: Type,
+    ) -> None:
+        """
+        Scans folders for matching Python files and loads each discovered file only once.
+        This protects against duplicate default/configured folders and overlapping scans.
+        """
+        app_root: Path = Path(self._root_path)
+        loaded_files: set[Path] = set()
+
+        for folder in self._unique_list(folders):
+            folder_path = app_root / folder
+            files = find_python_files_by_name(folder_path, name_patterns)
+
+            unique_files: list[Path] = []
+            for file in files:
+                resolved_file = file.resolve()
+                if resolved_file in loaded_files:
+                    continue
+                loaded_files.add(resolved_file)
+                unique_files.append(file)
+
+            self._load_detected_module(unique_files, load_class)
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
         """
