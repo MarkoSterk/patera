@@ -63,7 +63,7 @@ from .logging.logger_config_base import LoggerBase
 from .logging.inmemory_buffer import InMemoryLogBuffer
 from .injectable import Injectable
 from .serializers import SerializerRegistry
-from .response_renderer import ResponseRenderer
+from .response_renderer import ResponseRenderer, ResponseRendererException
 
 logger.remove()
 
@@ -238,7 +238,7 @@ class Patera(Injectable, Generic[ConfT]):
         self.response_serializers: SerializerRegistry = SerializerRegistry()
         self.response_serializers.register_defaults()
         self.response_renderer: ResponseRenderer = ResponseRenderer(
-            self.response_serializers
+            self.response_serializers, self
         )
 
         sink_id = DefaultLogger(self).configure()
@@ -768,17 +768,24 @@ class Patera(Injectable, Generic[ConfT]):
                         req.response.expected_body_type()
                     )
                     return await self.send_response(res, send, response_type)
+                except ResponseRendererException as exc:  # noqa: F841
+                    req.res.reset()
+                    raise
                 except HtmlAborterException as exc:
+                    req.res.reset()
                     res = (await req.res.html(exc.template, context=exc.data)).status(
                         exc.status_code
                     )
                     return await self.send_response(res, send, None)
                 # pylint: disable-next=W0718
                 except Exception as exc:
+                    req.res.reset()
                     handler = (
                         self._exception_handlers.get(exc.__class__.__name__, None)
                         or None
                     )
+                    if not handler:
+                        handler = self._exception_handlers.get(Exception.__name__, None)
                     if not handler:
                         # pylint: disable-next=W0719
                         raise Exception from exc

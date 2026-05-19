@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, TYPE_CHECKING
 
 from .http_statuses import HttpStatus
 from .media_types import MediaType
 from .response import Response
 from .serializers import SerializerRegistry
+
+if TYPE_CHECKING:
+    from .patera import Patera  # noqa: F401
+
+
+class ResponseRendererException(Exception):
+    pass
 
 
 class ResponseRenderer:
@@ -13,8 +20,9 @@ class ResponseRenderer:
     Finalizes non-streaming, non-zero-copy responses.
     """
 
-    def __init__(self, serializers: SerializerRegistry) -> None:
+    def __init__(self, serializers: SerializerRegistry, app: "Patera") -> None:
         self.serializers = serializers
+        self._app = app
 
     async def render_body(
         self,
@@ -24,8 +32,12 @@ class ResponseRenderer:
         """
         Applies default Content-Type inference and serializes the body.
         """
-        self.apply_default_content_type(response)
-        return await self.serializers.serialize(response, response_type)
+        try:
+            self.apply_default_content_type(response)
+            return await self.serializers.serialize(response, response_type)
+        except Exception as e:
+            self._app.logger.error(f"Error occurred while serializing response: {e}")
+            raise ResponseRendererException("Failed to render response body") from e
 
     def apply_default_content_type(self, response: Response[Any]) -> None:
         """

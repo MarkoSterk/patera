@@ -417,6 +417,37 @@ class Response(Generic[U]):
         self._cookies.clear()
         return self
 
+    def reset(
+        self,
+        *,
+        keep_expected_body_type: bool = False,
+    ) -> Self:
+        """
+        Resets all outgoing response state.
+
+        This is useful before building an error response after a handler or
+        serializer failure. It prevents partially prepared headers, cookies,
+        body data, streams, redirects, and file-send metadata from leaking into
+        the final error response.
+
+        The app and request references are intentionally preserved.
+        """
+        self.status_code = HttpStatus.OK
+        self.headers.clear()
+        self.body = None
+
+        self.media_type = None
+        self.charset = None
+
+        self._zero_copy = None
+        self._stream = None
+        self._cookies.clear()
+
+        if not keep_expected_body_type:
+            self._expected_body_type = None
+
+        return self
+
     @property
     def content_type(self) -> Optional[str]:
         """
