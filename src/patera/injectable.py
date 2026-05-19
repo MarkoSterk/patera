@@ -75,13 +75,6 @@ class AutowireDef:
     target_type: type[Any]
 
 
-@dataclass(slots=True)
-class ConfigVarDef:
-    name: str
-    declared_type: type[Any]
-    config_name: str
-
-
 class Injectable:
     __autowires__: dict[str, AutowireDef] = {}
 
