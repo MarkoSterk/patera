@@ -18,12 +18,16 @@ T = TypeVar("T", bound="Controller[Any]")
 
 
 def path(
-    url_path: str = "/", open_api_spec: bool = True, tags: Optional[list[str]] = None
+    url_path: str = "/",
+    open_api_spec: bool = True,
+    tags: Optional[list[str]] = None,
+    alias: Optional[str] = None,
 ) -> "Callable":
     def decorator(cls: "Type[Controller]") -> "Type[Controller]":
         setattr(cls, "_controller_path", url_path)
         setattr(cls, "_include_open_api_spec", open_api_spec)
         setattr(cls, "_open_api_tags", tags)
+        setattr(cls, "_alias", alias)
         return cls
 
     return decorator
@@ -38,6 +42,7 @@ class Controller(Injectable, Generic[AppT]):
         url_path: str = "/",
         open_api_spec: bool = True,
         open_api_tags: Optional[list[str]] = None,
+        alias: Optional[str] = None,
     ):
         self._app = app
         self._path = url_path
@@ -48,6 +53,7 @@ class Controller(Injectable, Generic[AppT]):
         self._open_api_tags = (
             open_api_tags if open_api_tags is not None else [self.__class__.__name__]
         )
+        self._alias = alias
         self.get_before_request_methods()
         self.get_after_request_methods()
         self._resolve_injections()
@@ -168,6 +174,11 @@ class Controller(Injectable, Generic[AppT]):
     def app(self) -> AppT:
         """App object"""
         return self._app
+
+    @property
+    def alias(self) -> Optional[str]:
+        """Alias for the controller, used in url_for"""
+        return self._alias
 
     async def __call__(self, method: Callable, req: "Request") -> "Response":
         """

@@ -220,7 +220,7 @@ class Patera(Injectable, Generic[ConfT]):
         static_dir = self._configs.STATIC_DIR.lstrip("/\\")
         self._static_files_path: str = os.path.join(self._root_path, static_dir)
         self._templates_path: str = os.path.join(
-            self._root_path, self._configs.TEMPLATES_DIR
+            self._root_path, self._configs.TEMPLATES_DIR.lstrip("/\\")
         )
 
         self._all_templates_paths: list[str] = [self._templates_path]
@@ -902,14 +902,18 @@ class Patera(Injectable, Generic[ConfT]):
             ctrl_path: str = getattr(ctrl, "_controller_path")
             ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")
             ctrl_open_api_tags = getattr(ctrl, "_open_api_tags", None)
+            ctrl_alias = getattr(ctrl, "_alias", None)
             ctrl_instance = ctrl(
-                self, ctrl_path, ctrl_open_api_spec, ctrl_open_api_tags
+                self, ctrl_path, ctrl_open_api_spec, ctrl_open_api_tags, ctrl_alias
             )
 
             self._controllers[ctrl_instance.path] = ctrl_instance
             endpoint_methods: dict[str, dict[str, str | Callable]] = (
                 ctrl_instance.get_endpoint_methods()
             )
+            if ctrl_alias:
+                self._url_for_alias[ctrl_alias] = f"{ctrl_instance.__class__.__name__}"
+
             for http_method, endpoints in endpoint_methods.items():
                 for url_path, method in endpoints.items():
                     method_name: Callable = method["method"].__name__  # type: ignore
@@ -917,12 +921,17 @@ class Patera(Injectable, Generic[ConfT]):
                     endpoint_name: str = (
                         f"{ctrl_instance.__class__.__name__}.{method_name}"
                     )
-                    self._add_route_function(
-                        http_method,
-                        base_path + ctrl_instance.path + url_path,
-                        cast(Callable, cast(dict, method)["method"]),
-                        endpoint_name,
-                    )
+                    names: list[str] = [endpoint_name]
+                    if ctrl_alias:
+                        alias_name = f"{ctrl_alias}.{method_name}"
+                        names.append(alias_name)
+                    for name in names:
+                        self._add_route_function(
+                            http_method,
+                            base_path + ctrl_instance.path + url_path,
+                            cast(Callable, cast(dict, method)["method"]),
+                            name,
+                        )
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
         self._cli_controllers[ctrl.ctrl_name] = ctrl
