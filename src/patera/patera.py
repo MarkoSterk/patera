@@ -64,6 +64,7 @@ from .logging.inmemory_buffer import InMemoryLogBuffer
 from .injectable import Injectable
 from .serializers import SerializerRegistry
 from .response_renderer import ResponseRenderer, ResponseRendererException
+from .base_extension import BaseExtension
 
 logger.remove()
 
@@ -195,6 +196,8 @@ def inherits_from(class_obj_or_instance, base_name: str) -> bool:
 class Patera(Injectable, Generic[ConfT]):
     """Patera class implementation. Used to create a new application instance"""
 
+    app_extensions: list[Type[BaseExtension[Any]]] = []
+
     def __init__(self, cli_mode: bool = False):
         """Init function"""
         app_configs = getattr(self.__class__, "_app_configs", None)
@@ -275,6 +278,7 @@ class Patera(Injectable, Generic[ConfT]):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
+        self._register_app_extensions()
         self._resolve_injections()
         self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
@@ -1013,6 +1017,23 @@ class Patera(Injectable, Generic[ConfT]):
     def add_template_path(self, path: str):
         """Adds a template path"""
         self._all_templates_paths.append(path)
+
+    def _register_app_extensions(self) -> None:
+        """Registers application extensions."""
+        app_extensions = getattr(self.__class__, "app_extensions", [])
+
+        for extension in app_extensions:
+            if not inspect.isclass(extension):
+                raise TypeError(
+                    "Items in 'app_extensions' must be extension classes, not instances."
+                )
+
+            if not issubclass(extension, BaseExtension):
+                raise TypeError(
+                    f"App extension {extension.__name__} must inherit from BaseExtension."
+                )
+
+            self._resolve_dependency(extension)
 
     @property
     def json_spec(self) -> dict | None:
