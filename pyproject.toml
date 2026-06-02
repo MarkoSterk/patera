@@ -37,7 +37,7 @@ caching-sqlite = ["patera-caching[sqlite]"]
 database = ["patera-database"]
 email = ["patera-email"]
 taskmanager = ["patera-taskmanager"]
-testing = ["httpx", "anyio", "pytest", "pytest-cov"]
+testing = ["anyio", "pytest", "pytest-cov"]
 dev = ["uvicorn", "watchfiles"]
 all = [
     "patera-database",

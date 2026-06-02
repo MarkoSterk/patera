@@ -10,9 +10,7 @@ wheels/
 # Virtual environments
 .venv
 .env
-.env.dev
 .env.prod
 .env.pypi
-.env.*
 .ruff_cache/
 .mypy_cache/

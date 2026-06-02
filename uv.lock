@@ -1284,7 +1284,6 @@ taskmanager = [
 ]
 testing = [
     { name = "anyio" },
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -1307,7 +1306,6 @@ requires-dist = [
     { name = "h11", specifier = ">=0.16.0" },
     { name = "httpcore", specifier = ">=1.0.9" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'testing'" },
     { name = "idna", specifier = ">=3.11" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },

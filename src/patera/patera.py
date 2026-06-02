@@ -76,6 +76,7 @@ PATERA_ASCIIART: str = r"""
  | |  / ____ \   | |  | |____| | \ \  / ____ \
  |_| /_/    \_\  |_|  |______|_|  \_\/_/    \_\
 A Fast, Simple, and Productive Python Web Framework
+
 """
 
 PATERA_VERSION: str = "0.111.x"
@@ -88,8 +89,9 @@ def print_startup_message(
     *,
     app_name: str = "Application",
     scheme: str = "http",
+    app_path: str = "",
 ) -> None:
-    url = f"{scheme}://{host}:{port}"
+    url = f"{scheme}://{host}:{port}{app_path}"
 
     mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
 
@@ -863,6 +865,7 @@ class Patera(Injectable, Generic[ConfT]):
             port=self.configs.PORT,
             debug_mode=self.configs.DEBUG,
             app_name=self.app_name,
+            app_path=self._app_base_url,
         )
 
     def add_extension(self, extension: Injectable):
