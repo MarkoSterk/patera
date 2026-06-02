@@ -1,10 +1,11 @@
 from patera.controller import Controller, path, get, produces
-from patera import Request, Response, HttpStatus, MediaType
+from patera import Request, Response, HttpStatus, MediaType, ignore
 
 from app import App
 
 
 @path("/")
+@ignore
 class PublicController(Controller[App]):
     @get("/")
     @produces(MediaType.TEXT_HTML)
