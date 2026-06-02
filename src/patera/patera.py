@@ -50,6 +50,7 @@ from .utilities import (
 )
 from .router import Router
 from .static import Static
+from .static_pages import StaticPages
 from .open_api import OpenAPIController
 from .controller import path
 from .logger import DefaultLogger
@@ -219,8 +220,10 @@ class Patera(Injectable, Generic[ConfT]):
         self._is_built: bool = False
         self._root_path: str = get_app_root_path(import_name)
         self._configs: ConfT = validate_config(cast(type[ConfT], config_type))
+
         static_dir = self._configs.STATIC_DIR.lstrip("/\\")
         self._static_files_path: str = os.path.join(self._root_path, static_dir)
+
         self._templates_path: str = os.path.join(
             self._root_path, self._configs.TEMPLATES_DIR.lstrip("/\\")
         )
@@ -839,6 +842,13 @@ class Patera(Injectable, Generic[ConfT]):
         static_controller = static_controller_dec(Static)
         self.register_controller(static_controller, with_base_path=False)  # type: ignore
 
+    def register_static_pages_controller(self, base_path: str):
+        if not self.configs.USE_STATIC_PAGES:
+            return
+        static_pages_controller_dec = path(f"{base_path}", open_api_spec=False)
+        static_pages_controller = static_pages_controller_dec(StaticPages)
+        self.register_controller(static_pages_controller)
+
     def register_openapi_controller(self):
         openapi_controller_dec = path(self.configs.OPEN_API_URL, open_api_spec=False)
         openapi_controller = openapi_controller_dec(OpenAPIController)
@@ -852,6 +862,7 @@ class Patera(Injectable, Generic[ConfT]):
         """
         print(PATERA_ASCIIART)
         self.register_static_controller(self.configs.STATIC_URL)
+        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
         if self.configs.OPEN_API:
             self.build_openapi_spec()
             self.register_openapi_controller()
