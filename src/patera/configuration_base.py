@@ -46,6 +46,7 @@ class BaseConfig(BaseSettings):
     DEBUG: bool = Field(True, description="If the app should run in debug mode or not.")
     HOST: str = Field("localhost", description="Host ip where the app should run.")
     PORT: int = Field(3000, description="Port on which the app should run.")
+    PROTOCOL: str = Field("http", description="Protocol to use in URLs, http or https")
     LIFESPAN: str = Field(
         "on",
         description="Whether to use server lifespan events/signals. Options: on, auto, off",

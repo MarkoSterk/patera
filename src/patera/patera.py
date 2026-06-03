@@ -80,7 +80,9 @@ A Fast, Simple, and Productive Python Web Framework
 
 """
 
-PATERA_VERSION: str = "0.111.x"
+PATERA_VERSION: str = "0.114.x"
+
+OPEN_API_VERSION: str = "3.0.3"
 
 
 def print_startup_message(
@@ -538,12 +540,6 @@ class Patera(Injectable, Generic[ConfT]):
             return default
         return value
 
-    def add_global_context_method(self, func: Callable):
-        """
-        Adds global context method to global_context_methods array
-        """
-        self.global_context_methods.append(func)
-
     async def _base_app(self, req: Request) -> Response:
         """
         The bare-bones application without any middleware.
@@ -850,6 +846,9 @@ class Patera(Injectable, Generic[ConfT]):
         self.register_controller(static_pages_controller)
 
     def register_openapi_controller(self):
+        if not self.configs.OPEN_API:
+            return
+        self.build_openapi_spec()
         openapi_controller_dec = path(self.configs.OPEN_API_URL, open_api_spec=False)
         openapi_controller = openapi_controller_dec(OpenAPIController)
         self.register_controller(openapi_controller)
@@ -863,9 +862,8 @@ class Patera(Injectable, Generic[ConfT]):
         print(PATERA_ASCIIART)
         self.register_static_controller(self.configs.STATIC_URL)
         self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
-        if self.configs.OPEN_API:
-            self.build_openapi_spec()
-            self.register_openapi_controller()
+        self.register_openapi_controller()
+
         built_app: AppCallableType = self._base_app
         for factory in reversed(self._middleware):
             built_app = factory(self, built_app)
@@ -990,8 +988,10 @@ class Patera(Injectable, Generic[ConfT]):
             self._controllers,
             title=self.app_name,
             version=self.version,
-            openapi_version="3.0.3",
-            servers=[f"http://localhost:{self._configs.PORT}"],
+            openapi_version=OPEN_API_VERSION,
+            servers=[
+                f"{self._configs.PROTOCOL}://{self._configs.HOST}:{self._configs.PORT}"
+            ],
         )
 
     def add_on_startup_method(self, func: Callable):
