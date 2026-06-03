@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ app_name }}</title>
+    <title>{{ app.configs.APP_NAME }}</title>
 </head>
 <body>
-    <h1>Welcome to {{ app_name }}!</h1>
-    <p>Version: {{ app_version }}</p>
+    <h1>Welcome to {{ app.configs.APP_NAME }}!</h1>
+    <p>Version: {{ app.configs.VERSION }}</p>
     <p>Link: {{ url_for('hello_controller.hello') }}</p>
 </body>
 </html>

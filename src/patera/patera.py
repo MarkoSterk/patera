@@ -230,7 +230,7 @@ class Patera(Injectable, Generic[ConfT]):
             self._root_path, self._configs.TEMPLATES_DIR.lstrip("/\\")
         )
 
-        self._all_templates_paths: list[str] = [self._templates_path]
+        self._all_templates_paths: list[str] = []
 
         self._url_for_alias: dict[str, str] = {
             self._configs.STATIC_CONTROLLER_NAME: "Static.get"
@@ -290,6 +290,14 @@ class Patera(Injectable, Generic[ConfT]):
         self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
             self._enable_cors()
+
+        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
+        self.register_static_controller(self.configs.STATIC_URL)
+        self.register_openapi_controller()
+        self.add_template_path(self._templates_path)  # path for standard templates.
+        # Static pages have priority and are added in
+        # StaticPages controller init before this,
+        # so they are discovered before standard templates
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
 
@@ -862,9 +870,6 @@ class Patera(Injectable, Generic[ConfT]):
         is the outermost layer.
         """
         print(PATERA_ASCIIART)
-        self.register_static_controller(self.configs.STATIC_URL)
-        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
-        self.register_openapi_controller()
 
         built_app: AppCallableType = self._base_app
         for factory in reversed(self._middleware):
