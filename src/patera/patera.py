@@ -563,7 +563,9 @@ class Patera(Injectable, Generic[ConfT]):
         )
         if handler:
             res: Response = await run_sync_or_async(
-                handler, req, NotFound("Endpoint not found", response=req.res)
+                handler,
+                req,
+                NotFound("Endpoint not found", response=req.res),  # type: ignore
             )
             response_type = res.expected_body_type()
             return await self.send_response(res, send, response_type)
