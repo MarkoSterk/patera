@@ -58,11 +58,6 @@ class Controller(Injectable, Generic[AppT]):
         self.get_after_request_methods()
         self._resolve_injections()
         self._after_init_methods()
-        self.init()
-
-    def init(self) -> None:
-        """Method called after main controller initialization. Can be used to add additional setup logic."""
-        pass
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
         value = self.app._extensions.get(target_type.__name__, None)

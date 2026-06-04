@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any  # noqa: F401
 import os
 
 from .media_types import MediaType
-from .controller import Controller, get, produces
+from .controller import Controller, get, produces, after_init
 from .request import Request
 from .response import Response
 
@@ -12,13 +12,15 @@ if TYPE_CHECKING:
 
 
 class StaticPages(Controller["Patera[Any]"]):
-    def init(self) -> None:
+    @after_init
+    def add_template_path(self) -> None:
         """
         Add template path to Jinja2 templates search path.
         """
         path: str = os.path.join(
             self.app.root_path, self.app.configs.STATIC_PAGES_DIR.lstrip("/\\")
         )
+        print(f"Adding static pages path: {path}")
         self.app.add_template_path(path)
 
     @get("/<path:page>")
