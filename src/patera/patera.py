@@ -296,7 +296,7 @@ class Patera(Injectable, Generic[ConfT]):
         self.register_openapi_controller()
         self.add_template_path(self._templates_path)  # path for standard templates.
         # Static pages have priority and are added in
-        # StaticPages controller init before this,
+        # StaticPages controller init before standard templates,
         # so they are discovered before standard templates
 
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
