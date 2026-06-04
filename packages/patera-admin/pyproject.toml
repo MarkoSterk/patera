@@ -1,0 +1,19 @@
+[project]
+name = "patera-admin"
+version = "0.4.15"
+requires-python = ">=3.13"
+dependencies = [
+    "patera",
+    "patera-auth",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+patera-auth = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.admin"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
