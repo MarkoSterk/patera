@@ -20,7 +20,6 @@ class StaticPages(Controller["Patera[Any]"]):
         path: str = os.path.join(
             self.app.root_path, self.app.configs.STATIC_PAGES_DIR.lstrip("/\\")
         )
-        print(f"Adding static pages path: {path}")
         self.app.add_template_path(path)
 
     @get("/<path:page>")

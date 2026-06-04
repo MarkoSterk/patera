@@ -1047,6 +1047,7 @@ class Patera(Injectable, Generic[ConfT]):
     def add_template_path(self, path: str):
         """Adds a template path"""
         self._all_templates_paths.append(path)
+        self.logger.info(f"Registered templates path: {path}")
 
     def _register_app_extensions(self) -> None:
         """Registers application extensions."""
