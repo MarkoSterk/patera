@@ -113,7 +113,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         self._number_of_tables: int = 0
         self._db_uri = self.configs.DATABASE_URI
         self._session_name = self.configs.DATABASE_SESSION_NAME
-        self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
         # the SqlDatabase instance is stored in app._extensions with key as db_name for later retrieval in session decorators and elsewhere

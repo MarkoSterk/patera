@@ -83,7 +83,6 @@ class AiService(
         """
         Initilizer method for extension
         """
-        self._app.add_extension(self)
         if (
             hasattr(self, "augmentation_provider")
             and self.augmentation_provider is not None
