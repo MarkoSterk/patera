@@ -285,15 +285,16 @@ class Patera(Injectable, Generic[ConfT]):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
+        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
+        self.register_static_controller(self.configs.STATIC_URL)
+        self.register_openapi_controller()
+
         self._register_app_extensions()
         self._resolve_injections()
         self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
             self._enable_cors()
 
-        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
-        self.register_static_controller(self.configs.STATIC_URL)
-        self.register_openapi_controller()
         self.add_template_path(self._templates_path)  # path for standard templates.
         # Static pages have priority and are added in
         # StaticPages controller init before standard templates,
