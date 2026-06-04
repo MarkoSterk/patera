@@ -15,6 +15,7 @@ Write-Host "Publishing patera..."
 uv publish dist/patera-*
 
 $extensions = @(
+    "patera_admin",
     "patera_aiinterface",
     "patera_apiinterface",
     "patera_auth",
