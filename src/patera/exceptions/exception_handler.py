@@ -59,8 +59,8 @@ class ExceptionHandler(Injectable, Generic[AppT]):
             return handlers
 
         for name in dir(owner_cls):
-            method = getattr(self, name)
-            if not callable(method):
+            method = getattr(self, name, None)
+            if method is None or not callable(method):
                 continue
             handled_exceptions = getattr(method, "_handled_exceptions", []) or []
             for handled_exception in handled_exceptions:

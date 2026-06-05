@@ -273,6 +273,7 @@ class Patera(Injectable, Generic[ConfT]):
         self._controllers: dict[str, "Controller"] = {}
         self._cli_controllers: dict[str, "CLIController"] = {}
         self._exception_handlers: dict[str, Callable] = {}
+        self._exception_handler_instances: dict[str, ExceptionHandler] = {}
         self._json_spec: Optional[dict] = None
         self._db_name_configs_map: dict[str, str] = {}
 
@@ -959,7 +960,12 @@ class Patera(Injectable, Generic[ConfT]):
     def register_exception_handler(self, *handlers: "type[ExceptionHandler]"):
         """Registers exception controller with application"""
         for handler in handlers:
+            if handler.__name__ in self._exception_handler_instances:
+                continue
             handler_instance = handler(self)
+            self._exception_handler_instances[handler_instance.__class__.__name__] = (
+                handler_instance
+            )
             handled_exceptions = handler_instance.get_exception_mapping()
             self._exception_handlers.update(handled_exceptions)
 

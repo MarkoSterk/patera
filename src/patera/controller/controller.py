@@ -87,8 +87,8 @@ class Controller(Injectable, Generic[AppT]):
 
     def _after_init_methods(self):
         for name in dir(self):
-            method = getattr(self, name)
-            if not callable(method):
+            method = getattr(self, name, None)
+            if method is None or not callable(method):
                 continue
             after_init_handler = getattr(method, "_after_init", False)
             if after_init_handler:
@@ -109,8 +109,8 @@ class Controller(Injectable, Generic[AppT]):
             return endpoints
 
         for name in dir(self):
-            method = getattr(self, name)
-            if not callable(method):
+            method = getattr(self, name, None)
+            if method is None or not callable(method):
                 continue
             endpoint_handler = getattr(method, "_handler", None)
             if endpoint_handler:
@@ -135,8 +135,8 @@ class Controller(Injectable, Generic[AppT]):
             return
 
         for name in dir(self):
-            method = getattr(self, name)
-            if not callable(method):
+            method = getattr(self, name, None)
+            if method is None or not callable(method):
                 continue
             handler = getattr(method, "_before_request", None)
             if handler:
@@ -148,8 +148,8 @@ class Controller(Injectable, Generic[AppT]):
             return
 
         for name in dir(self):
-            method = getattr(self, name)
-            if not callable(method):
+            method = getattr(self, name, None)
+            if method is None or not callable(method):
                 continue
             handler = getattr(method, "_after_request", None)
             if handler:

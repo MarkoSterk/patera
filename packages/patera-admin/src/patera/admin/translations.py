@@ -60,4 +60,6 @@ TRANSLATIONS_MAP: dict[str, dict[str, str]] = {
         "de": "Sprache wechseln",
         "si": "Menjava jezika",
     },
+    "next": {"en": "Next", "de": "Nächste", "si": "Naslednja"},
+    "previous": {"en": "Previous", "de": "Lätzte", "si": "Prejšnja"},
 }

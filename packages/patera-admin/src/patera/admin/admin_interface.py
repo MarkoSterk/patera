@@ -2,15 +2,22 @@
 Admin extension
 """
 
+from enum import StrEnum
 import os
-from typing import Optional, Type, TypeVar, Any
+from typing import Generic, Optional, Type, TypeVar, Any
 from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
-from patera.auth import role_required
 
 from .translations import TRANSLATIONS_MAP
+
+
+class Permissions(StrEnum):
+    ADMIN_CAN_ENTER = "admin_can_enter"
+    ADMIN_CAN_VIEW = "admin_can_view"
+    ADMIN_CAN_EDIT = "admin_can_edit"
+    ADMIN_CAN_DELETE = "admin_can_delete"
 
 
 class AdminConfig(BaseModel):
@@ -20,9 +27,6 @@ class AdminConfig(BaseModel):
 
     ADMIN_BASE_URL: str = Field(
         "/admin", description="Base URL for the admin interface"
-    )
-    ROLES_REQUIRED: list[str] = Field(
-        ["admin"], description="List of roles required to access the admin interface"
     )
     DEFAULT_LANGUAGE: str = Field(
         "en",
@@ -49,9 +53,7 @@ class AdminConfig(BaseModel):
 AppT = TypeVar("AppT", bound="Patera[Any]")
 
 
-class AdminInterface(
-    BaseExtension[AppT, AdminConfig],
-):
+class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     """
     Main Admin class
     """
@@ -83,6 +85,10 @@ class AdminInterface(
         from .admin_exception_handler import _AdminExceptionHandler
 
         self.app.register_exception_handler(_AdminExceptionHandler)
+        handler: _AdminExceptionHandler = self.app._exception_handler_instances.get(
+            _AdminExceptionHandler.__name__
+        )  # type: ignore
+        handler.admin_interface = self
 
     def _register_admin_controller(self) -> None:
         """
@@ -94,15 +100,12 @@ class AdminInterface(
 
         # Decorators to be applied to the admin controller
         admin_controller_dec = path(base_url, open_api_spec=False)  # path decorator
-        admin_roles_required_dec = role_required(
-            *self.configs.ROLES_REQUIRED
-        )  # auth decorator
-
         # decorated admin controller
-        admin_controller = admin_controller_dec(
-            admin_roles_required_dec(_AdminController)
-        )
+        admin_controller = admin_controller_dec(_AdminController)
         self._app.register_controller(admin_controller)
+        ctrl_path = getattr(admin_controller, "_controller_path")
+        ctrl_instance: _AdminController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance.admin_interface = self
 
     def _register_models_controller(self) -> None:
         if self.managed_models is None or len(self.managed_models) == 0:
@@ -187,7 +190,7 @@ class AdminInterface(
     def logo_url(self) -> str:
         if self.configs.LOGO_URL:
             return self.configs.LOGO_URL
-        return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/logo.png"
+        return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/patera_logo.png"
 
     def url_for(self, target: str, **kwargs) -> str:
-        return self.app.url_for(target, **kwargs)
+        return self.app.url_for(target, **{"lang": self.current_language, **kwargs})

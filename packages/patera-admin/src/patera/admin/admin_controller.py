@@ -11,9 +11,9 @@ from werkzeug.security import safe_join
 from patera.utilities import get_file, get_range_file
 from patera.controller import Controller, get, before_request
 from patera import Patera, Request, Response, HttpStatus
-from patera.injectable import Inject
+from patera.auth import role_required
 
-from .admin_interface import AdminInterface
+from .admin_interface import AdminInterface, Permissions
 from .exceptions import UnsupportedLanguage
 
 
@@ -22,7 +22,9 @@ class _AdminController(Controller[Patera]):
     Admin controller
     """
 
-    admin_interface: Inject[AdminInterface]
+    def __init__(self, *args, **kwargs):
+        self._admin_interface: AdminInterface = cast(AdminInterface, None)
+        super().__init__(*args, **kwargs)
 
     @before_request
     async def check_language(self, req: Request):
@@ -40,7 +42,6 @@ class _AdminController(Controller[Patera]):
             {
                 **self.context_variables,
                 "login_media_type": self.admin_interface.configs.LOGIN_MEDIA_TYPE.lower(),
-                "url_for_for_login": self.admin_interface.configs.URL_FOR_FOR_LOGIN,
                 "dashboard_url": self.admin_interface.url_for(
                     "_AdminController.dashboard"
                 ),
@@ -48,6 +49,7 @@ class _AdminController(Controller[Patera]):
         )
 
     @get("/dashboard")
+    @role_required(Permissions.ADMIN_CAN_ENTER)
     async def dashboard(self, req: Request) -> Response:
         """
         Admin dashboard page
@@ -92,4 +94,15 @@ class _AdminController(Controller[Patera]):
             "logo_url": self.admin_interface.logo_url,
             "admin_interface": self.admin_interface,
             "admin_url_for": self.admin_interface.url_for,
+            "url_for_for_login": self.admin_interface.configs.URL_FOR_FOR_LOGIN,
+            "url_for_for_logut": self.admin_interface.configs.URL_FOR_FOR_LOGOUT,
+            "url_for_for_logut_redirect": self.admin_interface.configs.URL_FOR_FOR_LOGOUT_REDIRECT,
         }
+
+    @property
+    def admin_interface(self) -> AdminInterface:
+        return self._admin_interface
+
+    @admin_interface.setter
+    def admin_interface(self, interface: AdminInterface) -> None:
+        self._admin_interface = interface
