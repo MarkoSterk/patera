@@ -114,15 +114,15 @@ class AdminInterface(
         """
         menu = [
             {
-                "name": self.translate("dashboard"),
-                "url": self.url_for("AdminController.dashboard"),
+                "name": "dashboard",
+                "url_for": "AdminController.dashboard",
             }
         ]
         # other menu items based on managed models and injected extensions
         menu.append(
             {
-                "name": self.translate("logout"),
-                "url": self._app.url_for(self.configs.URL_FOR_FOR_LOGOUT),
+                "name": "logout",
+                "url_for": self.configs.URL_FOR_FOR_LOGOUT,
             }
         )
         self._admin_menu = menu
@@ -159,6 +159,10 @@ class AdminInterface(
             self._models_map[model.__name__] = model
 
     @property
+    def admin_menu(self) -> list[dict[str, str]]:
+        return self._admin_menu
+
+    @property
     def supported_languages(self) -> list[str]:
         return self.__class__._supported_languages
 
@@ -186,4 +190,4 @@ class AdminInterface(
         return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/logo.png"
 
     def url_for(self, target: str, **kwargs) -> str:
-        return self.app.url_for(target, **{"lang": self.current_language, **kwargs})
+        return self.app.url_for(target, **kwargs)
