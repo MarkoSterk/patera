@@ -56,7 +56,8 @@ class AdminInterface(
     Main Admin class
     """
 
-    MANAGE_MODELS: list[Type] = []
+    MANAGED_MODELS: list[Type] = []
+    TRANSLATIONS_MAP = TRANSLATIONS_MAP
 
     _admin_menu: list[dict[str, str]] = []
     _models_map: dict[str, Type] = {}
@@ -126,7 +127,7 @@ class AdminInterface(
         )
         self._admin_menu = menu
 
-    def _find_injected_extension(self) -> dict[str, list[BaseExtension]]:
+    def _find_injected_extensions(self) -> dict[str, list[BaseExtension]]:
         """
         Finds injected extensions available for use in the dashboard
         """
@@ -148,8 +149,8 @@ class AdminInterface(
         Translates a given key based on the provided language
         """
         return (
-            TRANSLATIONS_MAP[key][self.current_language]
-            if key in TRANSLATIONS_MAP
+            self.__class__.TRANSLATIONS_MAP[key][self.current_language]
+            if key in self.__class__.TRANSLATIONS_MAP
             else key
         )
 
@@ -170,7 +171,7 @@ class AdminInterface(
         """
         Get the models to be managed by the admin interface
         """
-        return self.__class__.MANAGE_MODELS
+        return self.__class__.MANAGED_MODELS
 
     @property
     def current_language(self) -> str:
