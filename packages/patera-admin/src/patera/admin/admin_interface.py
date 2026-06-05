@@ -3,14 +3,13 @@ Admin extension
 """
 
 import os
-from typing import TypeVar, Any
+from typing import Optional, Type, TypeVar, Any
 from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
 from patera.auth import roles_required
 
-from .admin_controller import AdminController
 from .translations import TRANSLATIONS_MAP
 
 
@@ -25,11 +24,9 @@ class AdminConfig(BaseModel):
     ROLES_REQUIRED: list[str] = Field(
         ["admin"], description="List of roles required to access the admin interface"
     )
-    LANGUAGE_AWARE: bool = Field(
-        False, description="Whether the admin interface should be language aware"
-    )
-    ADMIN_STATIC_URL: str = Field(
-        "/_admin/static/", description="URL for admin static files"
+    DEFAULT_LANGUAGE: str = Field(
+        "en",
+        description="Default language of the interface",
     )
     URL_FOR_FOR_LOGIN: str = Field(
         description="URL_FOR string for the application login"
@@ -41,11 +38,11 @@ class AdminConfig(BaseModel):
         description="URL_FOR string for the application logout"
     )
     URL_FOR_FOR_LOGOUT_REDIRECT: str = Field(
-        "AdminController.login",
+        "_AdminController.login",
         description="URL_FOR string for the application logout redirect",
     )
-    LOGO_URL: str = Field(
-        "/", description="URL for the logo to be displayed in the admin interface"
+    LOGO_URL: Optional[str] = Field(
+        None, description="URL for the logo to be displayed in the admin interface"
     )
 
 
@@ -59,9 +56,11 @@ class AdminInterface(
     Main Admin class
     """
 
-    MANAGE_MODELS: list[Any] = []
+    MANAGE_MODELS: list[Type] = []
 
     _admin_menu: list[dict[str, str]] = []
+    _models_map: dict[str, Type] = {}
+    _supported_languages: list[str] = ["en", "de", "si"]
 
     def init(self):
         """
@@ -71,15 +70,26 @@ class AdminInterface(
         templates_path = os.path.join(self._admin_root_path, "templates")
         self._app.add_template_path(templates_path)
         self._construct_menu()
+        self._create_models_map()
+        self._register_admin_exception_handler()
         self._register_admin_controller()
+        self._register_models_controller()
+
+    def _register_admin_exception_handler(self) -> None:
+        """
+        Registers the admin exception handler
+        """
+        from .admin_exception_handler import _AdminExceptionHandler
+
+        self.app.register_exception_handler(_AdminExceptionHandler)
 
     def _register_admin_controller(self) -> None:
         """
         Registers the admin controller
         """
-        base_url = self.configs.ADMIN_BASE_URL
-        if self.configs.LANGUAGE_AWARE:
-            base_url = f"{base_url}/<string:lang>"
+        from .admin_controller import _AdminController
+
+        base_url = f"{self.configs.ADMIN_BASE_URL}/<string:lang>"
 
         # Decorators to be applied to the admin controller
         admin_controller_dec = path(base_url, open_api_spec=False)  # path decorator
@@ -89,9 +99,13 @@ class AdminInterface(
 
         # decorated admin controller
         admin_controller = admin_controller_dec(
-            admin_roles_required_dec(AdminController)
+            admin_roles_required_dec(_AdminController)
         )
         self._app.register_controller(admin_controller)
+
+    def _register_models_controller(self) -> None:
+        if self.managed_models is None or len(self.managed_models) == 0:
+            return
 
     def _construct_menu(self) -> None:
         """
@@ -100,7 +114,7 @@ class AdminInterface(
         menu = [
             {
                 "name": self.translate("dashboard"),
-                "url": self._app.url_for("AdminController.dashboard"),
+                "url": self.url_for("AdminController.dashboard"),
             }
         ]
         # other menu items based on managed models and injected extensions
@@ -133,14 +147,42 @@ class AdminInterface(
         """
         Translates a given key based on the provided language
         """
-        if not self.configs.LANGUAGE_AWARE:
-            return TRANSLATIONS_MAP[key]["en"] if key in TRANSLATIONS_MAP else key
-        lang = self._app.current_request.req.route_parameters.get("lang", "en")
-        return TRANSLATIONS_MAP[key][lang] if key in TRANSLATIONS_MAP else key
+        return (
+            TRANSLATIONS_MAP[key][self.current_language]
+            if key in TRANSLATIONS_MAP
+            else key
+        )
+
+    def _create_models_map(self) -> None:
+        for model in self.managed_models:
+            self._models_map[model.__name__] = model
 
     @property
-    def managed_models(self) -> list[Any]:
+    def supported_languages(self) -> list[str]:
+        return self.__class__._supported_languages
+
+    @property
+    def admin_root_path(self) -> str:
+        return self._admin_root_path
+
+    @property
+    def managed_models(self) -> list[Type]:
         """
         Get the models to be managed by the admin interface
         """
         return self.__class__.MANAGE_MODELS
+
+    @property
+    def current_language(self) -> str:
+        return self._app.current_request.req.route_parameters.get(
+            "lang", self.configs.DEFAULT_LANGUAGE
+        ).lower()
+
+    @property
+    def logo_url(self) -> str:
+        if self.configs.LOGO_URL:
+            return self.configs.LOGO_URL
+        return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/logo.png"
+
+    def url_for(self, target: str, **kwargs) -> str:
+        return self.app.url_for(target, **{"lang": self.current_language, **kwargs})

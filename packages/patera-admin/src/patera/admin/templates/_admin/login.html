@@ -1,11 +1,256 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard Login</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login</title>
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+  >
+
+  <style>
+    body {
+      min-height: 100vh;
+      background: #f8f9fa;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .logo-placeholder {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 1rem;
+    }
+
+    .language-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .language-switcher a {
+      text-decoration: none;
+      font-size: 1.5rem;
+      line-height: 1;
+      padding: 0.25rem 0.4rem;
+      border-radius: 0.5rem;
+      transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .language-switcher a:hover,
+    .language-switcher a:focus {
+      background-color: #e9ecef;
+      transform: translateY(-1px);
+    }
+
+    .language-switcher a.active {
+        background-color: #dee2e6;
+        box-shadow: 0 0 0 2px #0d6efd33;
+        transform: translateY(-1px);
+    }
+  </style>
 </head>
 <body>
-    <h1>Admin Dashboard Login</h1>
+
+  <main class="min-vh-100 d-flex align-items-center justify-content-center px-3">
+    <div class="login-card card shadow-sm border-0">
+      <div class="card-body p-4 p-md-5">
+
+        <div class="text-center mb-4">
+          <img
+            src="{{ logo_url }}"
+            alt="{{ translate('logo') }}"
+            class="logo-placeholder"
+          >
+
+          <h1 class="h4 mb-1">{{ translate('dashboard') }}</h1>
+          <p class="text-muted mb-0">{{ translate('please_sign_in_to_continue') }}</p>
+        </div>
+
+        <form>
+          <div class="mb-3">
+            <label for="email" class="form-label">{{ translate('email_address') }}</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="bi bi-envelope"></i>
+              </span>
+              <input
+                type="email"
+                class="form-control"
+                id="email"
+                name="email"
+                placeholder="{{ translate('email_address') }}"
+                autocomplete="email"
+              >
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="password" class="form-label">{{ translate('password') }}</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="bi bi-lock"></i>
+              </span>
+              <input
+                type="password"
+                class="form-control"
+                id="password"
+                name="password"
+                placeholder="{{ translate('password') }}"
+                autocomplete="current-password"
+              >
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="remember"
+                name="remember"
+              >
+              <label class="form-check-label" for="remember">
+                {{ translate('remember_me') }}
+              </label>
+            </div>
+
+            <a href="#" class="text-decoration-none">{{ translate('forgot_password') }}?</a>
+          </div>
+
+          <div id="error-container" class="p-2 text-center">
+
+          </div>
+
+          <button type="button" data-login-url="{{ url_for(url_for_for_login) }}"
+          data-media-type="{{ login_media_type }}" data-dashboard-url="{{ dashboard_url }}"
+          class="btn btn-primary w-100 login-btn">
+            <i class="bi bi-box-arrow-in-right me-1"></i>
+            {{ translate('login') }}
+          </button>
+        </form>
+
+        <div class="language-switcher" aria-label="{{ translate('change_language') }}">
+            <a href="{{ admin_url_for('_AdminController.login', lang='en') }}"
+                aria-label="English"
+                class="{% if lang == 'en' %}active{% endif %}">
+                🇬🇧
+            </a>
+
+            <a href="{{ admin_url_for('_AdminController.login', lang='de') }}"
+                aria-label="Deutsch"
+                class="{% if lang == 'de' %}active{% endif %}">
+                🇩🇪
+            </a>
+
+            <a href="{{ admin_url_for('_AdminController.login', lang='si') }}"
+                aria-label="Slovenščina"
+                class="{% if lang == 'si' %}active{% endif %}">
+                🇸🇮
+            </a>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+  </script>
+
+  <script>
+    const loginBtn = document.querySelector(".login-btn");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const rememberMe = document.getElementById("remember");
+    const url = loginBtn.getAttribute("data-login-url");
+    const dashboardUrl = loginBtn.getAttribute("data-dashboard-url");
+    const mediaType = loginBtn.getAttribute("data-media-type");
+    const errorContainer = document.getElementById("error-container");
+
+    function clearError(){
+        errorContainer.innerText = "";
+        errorContainer.classList.remove("bg-warning", "text-dark", "rounded", "mb-3")
+    }
+
+    function populateError(errorResponse){
+        errorContainer.innerText = errorResponse.message || "Something went wrong";
+        errorContainer.classList.add("bg-warning", "text-dark", "rounded", "mb-3")
+    }
+
+    function getInputData(){
+        return {
+            email: emailInput.value,
+            password: passwordInput.value,
+            remember: rememberMe?.checked || false
+        }
+    }
+
+    function getFormData(inputData){
+        const formData = new FormData()
+        for(const [key, value] of Object.entries(inputData)){
+            formData.append(key, value);
+        }
+        return formData;
+    }
+
+    async function getErrorResponse(response){
+        try{
+            return await response.json()
+        }catch{
+            return {message: "Something went wrong"}
+        }
+    }
+
+    async function loginRequest(data, mediaType){
+
+        const options = {
+            method: "POST",
+            body: data
+        }
+        if(mediaType === "application/json"){
+            options.headers = {
+                "Content-Type": mediaType
+            }
+        }
+
+        try{
+            let response = await fetch(url, options);
+            if(!response.ok){
+                response = await getErrorResponse(response)
+                populateError(response)
+                loginBtn.disabled = false;
+                return;
+            }
+            location.href = dashboardUrl;
+        }catch{
+            //network error
+            populateError({message: "Something went wrong"});
+            loginBtn.disabled = false;
+        }
+    }
+
+    loginBtn.addEventListener("click", async (e) => {
+        loginBtn.disabled = true;
+        clearError()
+        if(mediaType === "application/json"){
+            return await loginRequest(JSON.stringify(getInputData()), mediaType);
+        }
+        return await loginRequest(getFormData(getInputData()), mediaType)
+    })
+  </script>
 </body>
 </html>
