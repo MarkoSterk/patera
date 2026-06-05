@@ -10,8 +10,6 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    cast,
-    TYPE_CHECKING,
 )
 from pydantic import BaseModel, Field
 
@@ -19,19 +17,23 @@ from patera.utilities import run_sync_or_async
 from patera.base_extension import BaseExtension
 
 from .backends.base_cache_backend import BaseCacheBackend
-
-if TYPE_CHECKING:
-    from patera import Patera, Response, Request
+from patera import Patera, Response, Request
 
 
 class CachingConfig(BaseModel):
     """Configuration model for Caching extension."""
 
-    DURATION: int = Field(default=300, description="Default cache duration in seconds")
+    DURATION: Optional[int] = Field(
+        None, description="Default cache duration in seconds"
+    )
+    MAX_SIZE: Optional[int] = Field(
+        None,
+        description="Maximum number of items in the cache (if supported by backend)",
+    )
 
 
-AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
-BackendT = TypeVar("BackendT", bound="BaseCacheBackend", default="BaseCacheBackend")
+AppT = TypeVar("AppT", bound=Patera[Any], default=Patera[Any])
+BackendT = TypeVar("BackendT", bound=BaseCacheBackend, default=BaseCacheBackend)
 
 
 class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
@@ -45,36 +47,26 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     Default cache duration is set with `DURATION` config (seconds)
     """
 
-    backend: Optional[BackendT] = None
+    backend: BackendT
 
     def init(self) -> None:
 
         self._duration = self.configs.DURATION
-        if self.backend is None:
-            # loads default backend - MemoryCacheBackend
-            # pylint: disable-next=C0415
-            from .backends.memory_cache_backend import MemoryCacheBackend
 
-            self.backend = MemoryCacheBackend  # type: ignore
-
-        self._backend = cast(Type[BaseCacheBackend], self.backend).configure_from_app(
-            self._app, self.configs.model_dump()
-        )
+        self._backend = self.backend
 
         # self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
 
     async def connect(self) -> None:
-        if self._backend:
-            await self._backend.connect()
+        await self._backend.connect()
 
     async def disconnect(self) -> None:
-        if self._backend:
-            await self._backend.disconnect()
+        await self._backend.disconnect()
 
     async def set(
-        self, key: str, value: "Response", duration: Optional[int] = None
+        self, key: str, value: Response, duration: Optional[int] = None
     ) -> None:
         cached_value = {
             "status_code": value.status_code,
@@ -83,23 +75,27 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
         }
         if duration is None:
             duration = self._duration
-        await cast(BaseCacheBackend, self._backend).set(key, cached_value, duration)
+        await self._backend.set(key, cached_value, duration)
 
-    async def get(self, key: str, req: "Request") -> "Optional[Response]":
-        payload = await cast(BaseCacheBackend, self._backend).get(key)
+    async def get(self, key: str, req: Request) -> Optional[Response]:
+        payload = await self._backend.get(key)
         if payload is None:
             return None
         return await self._make_cached_response(payload, req)
 
-    async def delete(self, key: str) -> None:
-        await cast(BaseCacheBackend, self._backend).delete(key)
+    async def delete(
+        self,
+        key: str,
+        *,
+        regex: bool = False,
+        wildcard: bool = False,
+    ) -> None:
+        await self._backend.delete(key, regex=regex, wildcard=wildcard)
 
     async def clear(self) -> None:
-        await cast(BaseCacheBackend, self._backend).clear()
+        await self._backend.clear()
 
-    async def _make_cached_response(
-        self, cached_data: dict, req: "Request"
-    ) -> "Response":
+    async def _make_cached_response(self, cached_data: dict, req: Request) -> Response:
         req.res.body = cached_data["body"]
         req.res.status_code = cached_data["status_code"]
         req.res.headers = cached_data["headers"]
@@ -113,7 +109,7 @@ def cache(
 
     def decorator(handler: Callable) -> Callable:
         @wraps(handler)
-        async def wrapper(self, *args, **kwargs) -> "Response":
+        async def wrapper(self, *args, **kwargs) -> Response:
             cache_extension: Caching = self.app._extensions.get(cls.__name__, None)  # type: ignore
             if cache_extension is None:
                 raise RuntimeError("Caching extension not found in the app.")
