@@ -2,13 +2,13 @@
 Base/Blueprint class for cache implementation
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TYPE_CHECKING, Any, TypeVar
+from typing import Generic, Optional, Any, TypeVar
+from patera import Patera
+from ..cache import CachingConfig
 
-if TYPE_CHECKING:
-    from patera import Patera
-
-AppT = TypeVar("AppT", bound="Patera", default="Patera")
+AppT = TypeVar("AppT", bound=Patera[Any], default=Patera[Any])
 
 
 class BaseCacheBackend(ABC, Generic[AppT]):
@@ -16,16 +16,13 @@ class BaseCacheBackend(ABC, Generic[AppT]):
     Abstract cache backend blueprint.
 
     Subclasses should implement:
-    - configure_from_app(cls, app) -> BaseCacheBackend
+    - configure_from_app(self, app, configs) -> None
     - connect / disconnect
     - get / set / delete / clear
     """
 
-    @classmethod
     @abstractmethod
-    def configure_from_app(
-        cls, app: AppT, configs: dict[str, Any]
-    ) -> "BaseCacheBackend":
+    def configure_from_app(self, app: AppT, configs: CachingConfig) -> None:
         """Create a configured backend instance using app config."""
 
     @abstractmethod
@@ -45,8 +42,10 @@ class BaseCacheBackend(ABC, Generic[AppT]):
         """Store payload dict under key with optional TTL in seconds."""
 
     @abstractmethod
-    async def delete(self, key: str) -> None:
-        """Delete a cached entry if present."""
+    async def delete(
+        self, key: str, *, regex: bool = False, wildcard: bool = False
+    ) -> int:
+        """Delete cache entries."""
 
     @abstractmethod
     async def clear(self) -> None:
