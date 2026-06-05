@@ -1,6 +1,6 @@
 [project]
 name = "patera-auth"
-version = "0.4.16"
+version = "0.4.17"
 requires-python = ">=3.13"
 dependencies = [
   "bcrypt>=5.0.0",
