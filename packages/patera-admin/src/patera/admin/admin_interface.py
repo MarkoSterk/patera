@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
-from patera.auth import roles_required
+from patera.auth import role_required
 
 from .translations import TRANSLATIONS_MAP
 
@@ -94,7 +94,7 @@ class AdminInterface(
 
         # Decorators to be applied to the admin controller
         admin_controller_dec = path(base_url, open_api_spec=False)  # path decorator
-        admin_roles_required_dec = roles_required(
+        admin_roles_required_dec = role_required(
             *self.configs.ROLES_REQUIRED
         )  # auth decorator
 
