@@ -11,7 +11,6 @@ from typing import (
     Any,
     Generic,
     Protocol,
-    Type,
     TypeVar,
 )
 
@@ -30,13 +29,19 @@ class AppCallableType(Protocol):
     def __call__(self, req: "Request") -> Awaitable["Response"]: ...
 
 
-def order(order: int = 0) -> Callable[[Type["MiddlewareBase"]], Type["MiddlewareBase"]]:
+MiddlewareClsT = TypeVar(
+    "MiddlewareClsT",
+    bound=type["MiddlewareBase[Any, Any]"],
+)
+
+
+def order(order: int = 0) -> Callable[[MiddlewareClsT], MiddlewareClsT]:
     """
     Decorator to set the order of middlewares.
     Lower values are processed first. Default order is 0.
     """
 
-    def decorator(cls_type: Type["MiddlewareBase"]) -> Type["MiddlewareBase"]:
+    def decorator(cls_type: MiddlewareClsT) -> MiddlewareClsT:
         setattr(cls_type, "_order", order)
         return cls_type
 

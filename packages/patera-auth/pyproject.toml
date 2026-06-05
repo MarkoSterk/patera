@@ -1,12 +1,12 @@
 [project]
 name = "patera-auth"
-version = "0.3.0"
+version = "0.4.16"
 requires-python = ">=3.13"
 dependencies = [
   "bcrypt>=5.0.0",
   "cryptography>=46.0.5",
-  "jwt>=1.4.0",
   "patera",
+  "pyjwt>=2.12.1",
 ]
 
 [tool.uv.sources]

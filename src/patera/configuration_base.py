@@ -42,15 +42,11 @@ class BaseConfig(BaseSettings):
         description="Response class to use. Must be a subclass of patera.response.Response",
     )
 
-    # required for Authentication extension
-    SECRET_KEY: Optional[str] = Field(
-        None, description="High entropy random string for signing cookies/jwts"
-    )
-
     # optionals with sensible defaults
     DEBUG: bool = Field(True, description="If the app should run in debug mode or not.")
     HOST: str = Field("localhost", description="Host ip where the app should run.")
     PORT: int = Field(3000, description="Port on which the app should run.")
+    PROTOCOL: str = Field("http", description="Protocol to use in URLs, http or https")
     LIFESPAN: str = Field(
         "on",
         description="Whether to use server lifespan events/signals. Options: on, auto, off",
@@ -69,11 +65,29 @@ class BaseConfig(BaseSettings):
         ),
     )
 
-    STATIC_DIR: str = Field("/static", description="Relative static dir from root")
+    STATIC_DIR: str = Field("static", description="Relative static dir from root")
     STATIC_URL: str = Field("/static", description="URL prefix for static files")
     STATIC_CONTROLLER_NAME: str = Field(
         "static", description="Mount name for static files controller"
     )
+
+    USE_STATIC_PAGES: bool = Field(
+        False,
+        description=(
+            "Whether to use the built-in static pages controller. If True, it will serve "
+            "HTML files from the directory specified in STATIC_PAGES_DIR at the URL prefix "
+            "specified in STATIC_PAGES_URL. The controller will be mounted with the name specified "
+            "in STATIC_CONTROLLER_NAME."
+        ),
+    )
+    STATIC_PAGES_DIR: str = Field(
+        "static_pages", description="Relative static pages dir from templates dir"
+    )
+    STATIC_PAGES_URL: str = Field("/", description="URL prefix for static pages")
+    STATIC_PAGES_CONTROLLER_NAME: str = Field(
+        "static_pages", description="Mount name for static pages controller"
+    )
+
     TEMPLATES_STRICT: bool = Field(True, description="Strict template rendering")
     STRICT_SLASHES: bool = Field(False, description="Route '/x' vs '/x/' strictness")
     OPEN_API: bool = Field(True, description="Enable OpenAPI endpoint")

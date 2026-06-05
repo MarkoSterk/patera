@@ -7,6 +7,9 @@ from .ai_service import (
     ChatResponse,
     tool,
     system_prompt,
+    user_prompt,
+    history,
+    augmentation,
     session_id,
     AiServiceConfig,
 )
@@ -18,4 +21,7 @@ __all__ = [
     "AiServiceConfig",
     "system_prompt",
     "session_id",
+    "user_prompt",
+    "history",
+    "augmentation",
 ]

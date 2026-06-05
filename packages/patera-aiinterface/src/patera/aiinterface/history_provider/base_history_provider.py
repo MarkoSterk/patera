@@ -22,19 +22,19 @@ class BaseHistoryProvider(Generic[ModelT]):
     def __init__(
         self,
         *,
-        id_column: str = "session_id",
+        session_id_column: str = "session_id",
         message_column: str = "content",
         role_column: str = "role",
         order_column: str = "order_number",
     ) -> None:
-        self._id_column = id_column
+        self._session_id_column = session_id_column
         self._message_column = message_column
         self._role_column = role_column
         self._order_column = order_column
 
     @property
-    def id_column(self) -> str:
-        return self._id_column
+    def session_id_column(self) -> str:
+        return self._session_id_column
 
     @property
     def message_column(self) -> str:
@@ -60,8 +60,12 @@ class BaseHistoryProvider(Generic[ModelT]):
         if database is None:
             raise ValueError(f"No database found for model {self.model.__name__}")
         session = current_request.session(database.session_name)
+        if session is None:
+            raise ValueError(
+                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+            )
         history_query = self.model.query(session).filter(
-            getattr(self.model, self.id_column) == session_id
+            getattr(self.model, self.session_id_column) == session_id
         )
         if hasattr(self.model, self.order_column):
             history_query = history_query.order_by_strings(self.order_column)
@@ -69,12 +73,17 @@ class BaseHistoryProvider(Generic[ModelT]):
         history: list[ModelT] = await history_query.all()
         return self.order_by(history)
 
-    async def get_history_messages(self, req: Request) -> list[ChatHistoryMessage]:
-        session_id = req.route_parameters.get("session_id", None)
+    async def get_history_messages(
+        self, req: Request
+    ) -> tuple[Any, list[ChatHistoryMessage]]:
+        session_id = req.route_parameters.get(self.session_id_column, None)
         if session_id is None:
-            raise ValueError("Missing session id for chat history loader.")
+            # history provider must implement generate_session_id() method to generate
+            # a session id for the chat session/history
+            session_id = await self.generate_session_id()
+            return session_id, []
         history = await self._get_history(session_id)
-        return [
+        return session_id, [
             {
                 "role": getattr(m, self.role_column),
                 "content": getattr(m, self.message_column),
@@ -82,8 +91,12 @@ class BaseHistoryProvider(Generic[ModelT]):
             for m in history
         ]
 
+    async def generate_session_id(self) -> Any:
+        raise NotImplementedError("""If you wish to use the chat history provider
+                                  please provide a method to generate session ids.""")
+
     def save_message(
-        self, message: dict[str, Any], memory_id: str | int | UUID, order_number: int
+        self, session_id: Any, message: dict[str, Any], order_number: int
     ) -> None:
         database: SqlDatabase = current_request.app.extensions.get(
             self.model.db_name(), None
@@ -91,8 +104,12 @@ class BaseHistoryProvider(Generic[ModelT]):
         if database is None:
             raise ValueError(f"No database found for model {self.model.__name__}")
         session = current_request.session(database.session_name)
+        if session is None:
+            raise ValueError(
+                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+            )
         message_obj = self.model()
-        setattr(message_obj, self.id_column, memory_id)
+        setattr(message_obj, self.session_id_column, session_id)
         setattr(message_obj, self.message_column, message["content"])
         setattr(message_obj, self.role_column, message["role"])
         setattr(message_obj, self.order_column, order_number)

@@ -109,7 +109,7 @@ class DeclarativeBaseModel(DeclarativeBase):
             database: SqlDatabase = cls.get_database()
             session = current_request.session(database.session_name)
         return AsyncQuery(
-            session=session,
+            session=session,  # type: ignore
             model=cls,
         )
 

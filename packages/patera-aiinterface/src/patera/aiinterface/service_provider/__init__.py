@@ -2,6 +2,7 @@
 Service provider subpackage
 """
 
-from .base_service_provider import BaseServiceProvider, ChatResponse
+from .chat_response import ChatResponse
+from .base_service_provider import BaseServiceProvider
 
-__all__ = ["BaseServiceProvider", "ChatResponse"]
+__all__ = ["ChatResponse", "BaseServiceProvider"]

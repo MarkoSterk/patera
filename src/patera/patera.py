@@ -50,6 +50,7 @@ from .utilities import (
 )
 from .router import Router
 from .static import Static
+from .static_pages import StaticPages
 from .open_api import OpenAPIController
 from .controller import path
 from .logger import DefaultLogger
@@ -63,7 +64,8 @@ from .logging.logger_config_base import LoggerBase
 from .logging.inmemory_buffer import InMemoryLogBuffer
 from .injectable import Injectable
 from .serializers import SerializerRegistry
-from .response_renderer import ResponseRenderer
+from .response_renderer import ResponseRenderer, ResponseRendererException
+from .base_extension import BaseExtension
 
 logger.remove()
 
@@ -75,9 +77,12 @@ PATERA_ASCIIART: str = r"""
  | |  / ____ \   | |  | |____| | \ \  / ____ \
  |_| /_/    \_\  |_|  |______|_|  \_\/_/    \_\
 A Fast, Simple, and Productive Python Web Framework
+
 """
 
-PATERA_VERSION: str = "0.111.x"
+PATERA_VERSION: str = "0.114.x"
+
+OPEN_API_VERSION: str = "3.0.3"
 
 
 def print_startup_message(
@@ -87,8 +92,9 @@ def print_startup_message(
     *,
     app_name: str = "Application",
     scheme: str = "http",
+    app_path: str = "",
 ) -> None:
-    url = f"{scheme}://{host}:{port}"
+    url = f"{scheme}://{host}:{port}{app_path}"
 
     mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
 
@@ -195,6 +201,8 @@ def inherits_from(class_obj_or_instance, base_name: str) -> bool:
 class Patera(Injectable, Generic[ConfT]):
     """Patera class implementation. Used to create a new application instance"""
 
+    app_extensions: list[Type[BaseExtension[Any]]] = []
+
     def __init__(self, cli_mode: bool = False):
         """Init function"""
         app_configs = getattr(self.__class__, "_app_configs", None)
@@ -214,13 +222,15 @@ class Patera(Injectable, Generic[ConfT]):
         self._is_built: bool = False
         self._root_path: str = get_app_root_path(import_name)
         self._configs: ConfT = validate_config(cast(type[ConfT], config_type))
+
         static_dir = self._configs.STATIC_DIR.lstrip("/\\")
         self._static_files_path: str = os.path.join(self._root_path, static_dir)
+
         self._templates_path: str = os.path.join(
-            self._root_path, self._configs.TEMPLATES_DIR
+            self._root_path, self._configs.TEMPLATES_DIR.lstrip("/\\")
         )
 
-        self._all_templates_paths: list[str] = [self._templates_path]
+        self._all_templates_paths: list[str] = []
 
         self._url_for_alias: dict[str, str] = {
             self._configs.STATIC_CONTROLLER_NAME: "Static.get"
@@ -238,7 +248,7 @@ class Patera(Injectable, Generic[ConfT]):
         self.response_serializers: SerializerRegistry = SerializerRegistry()
         self.response_serializers.register_defaults()
         self.response_renderer: ResponseRenderer = ResponseRenderer(
-            self.response_serializers
+            self.response_serializers, self
         )
 
         sink_id = DefaultLogger(self).configure()
@@ -275,85 +285,130 @@ class Patera(Injectable, Generic[ConfT]):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
+        self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
+        self.register_static_controller(self.configs.STATIC_URL)
+        self.register_openapi_controller()
+
+        self._register_app_extensions()
         self._resolve_injections()
         self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
             self._enable_cors()
 
+        self.add_template_path(self._templates_path)  # path for standard templates.
+        # Static pages have priority and are added in
+        # StaticPages controller init before standard templates,
+        # so they are discovered before standard templates
+
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
 
     def _load_controllers_exc_handlers_middleware(self, cli_mode: bool = False) -> None:
-        app_root: Path = Path(self._root_path)
+        cli_controller_folders: list[str] = ["cli", "cli_controllers"]
+        cli_controller_folders.extend(self._configs.CLI_CONTROLLER_FOLDERS or [])
 
-        _cli_controller_folders: list[str] = ["cli", "cli_controllers"]
-        _additional_cli_controller_folders = self._configs.CLI_CONTROLLER_FOLDERS
-        if _additional_cli_controller_folders is None:
-            _additional_cli_controller_folders = []
-        _cli_controller_folders.extend(_additional_cli_controller_folders)
-        for folder in _cli_controller_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["cli", "cli_controller"])
-            self._load_detected_module(files, CLIController)
+        self._load_detected_modules_once(
+            cli_controller_folders,
+            ["cli", "cli_controller"],
+            CLIController,
+        )
 
         if cli_mode:
             return
 
-        _logger_folders: list[str] = ["logging", "loggers"]
-        _additional_logger_folders = self._configs.LOGGER_FOLDERS
-        if _additional_logger_folders is None:
-            _additional_logger_folders = []
-        _logger_folders.extend(_additional_logger_folders)
-        for folder in _logger_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["logger", "log_sink"])
-            self._load_detected_module(files, LoggerBase)
+        logger_folders: list[str] = ["logging", "loggers"]
+        logger_folders.extend(self._configs.LOGGER_FOLDERS or [])
 
-        _controller_folders: list[str] = [
+        self._load_detected_modules_once(
+            logger_folders,
+            ["logger", "log_sink"],
+            LoggerBase,
+        )
+
+        controller_folders: list[str] = [
             "api",
             "public",
             "controllers",
             "routers",
             "routes",
         ]
-        _additional_controller_folders = self._configs.CONTROLLER_FOLDERS
-        if _additional_controller_folders is None:
-            _additional_controller_folders = []
-        _controller_folders.extend(_additional_controller_folders)
-        for folder in _controller_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(
-                folder_path, ["api", "controller", "public", "router", "routes"]
-            )
-            self._load_detected_module(files, Controller)
+        controller_folders.extend(self._configs.CONTROLLER_FOLDERS or [])
 
-        _exception_handler_folders: list[str] = ["exceptions"]
-        _additional_exception_handler_folders = self._configs.EXCEPTION_HANDLER_FOLDERS
-        if _additional_exception_handler_folders is None:
-            _additional_exception_handler_folders = []
-        _exception_handler_folders.extend(_additional_exception_handler_folders)
-        for folder in _exception_handler_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(
-                folder_path, ["handler", "exception_controller", "controller"]
-            )
-            self._load_detected_module(files, ExceptionHandler)
+        self._load_detected_modules_once(
+            controller_folders,
+            ["api", "controller", "public", "router", "routes"],
+            Controller,
+        )
 
-        _middleware_folders: list[str] = ["middleware", "middlewares"]
-        _additional_middleware_folders = self._configs.MIDDLEWARE_FOLDERS
-        if _additional_middleware_folders is None:
-            _additional_middleware_folders = []
-        _middleware_folders.extend(_additional_middleware_folders)
-        for folder in _middleware_folders:
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, ["middleware", "mw"])
-            self._load_detected_module(files, MiddlewareBase)
-            for order_key in sorted(self._middleware_classes.keys()):
-                mw_class = self._middleware_classes[order_key]
-                self._middleware.append(
-                    lambda app, next_app, mdlwr_class=mw_class: mdlwr_class(
-                        app, next_app
-                    )
+        exception_handler_folders: list[str] = ["exceptions"]
+        exception_handler_folders.extend(self._configs.EXCEPTION_HANDLER_FOLDERS or [])
+
+        self._load_detected_modules_once(
+            exception_handler_folders,
+            ["handler", "exception_controller", "controller"],
+            ExceptionHandler,
+        )
+
+        middleware_folders: list[str] = ["middleware", "middlewares"]
+        middleware_folders.extend(self._configs.MIDDLEWARE_FOLDERS or [])
+
+        self._load_detected_modules_once(
+            middleware_folders,
+            ["middleware", "mw"],
+            MiddlewareBase,
+        )
+
+        seen_middleware_classes: set[type[MiddlewareBase]] = set()
+
+        for order_key in sorted(self._middleware_classes.keys()):
+            mw_class = self._middleware_classes[order_key]
+
+            if mw_class in seen_middleware_classes:
+                self.logger.warning(
+                    f"Skipping duplicate middleware registration: {mw_class.__name__}"
                 )
+                continue
+
+            seen_middleware_classes.add(mw_class)
+
+            self._middleware.append(
+                lambda app, next_app, mdlwr_class=mw_class: mdlwr_class(
+                    app,
+                    next_app,
+                )
+            )
+
+    def _unique_list(self, values: list[str]) -> list[str]:
+        """
+        Returns a list with duplicates removed while preserving order.
+        """
+        return list(dict.fromkeys(values))
+
+    def _load_detected_modules_once(
+        self,
+        folders: list[str],
+        name_patterns: list[str],
+        load_class: Type,
+    ) -> None:
+        """
+        Scans folders for matching Python files and loads each discovered file only once.
+        This protects against duplicate default/configured folders and overlapping scans.
+        """
+        app_root: Path = Path(self._root_path)
+        loaded_files: set[Path] = set()
+
+        for folder in self._unique_list(folders):
+            folder_path = app_root / folder
+            files = find_python_files_by_name(folder_path, name_patterns)
+
+            unique_files: list[Path] = []
+            for file in files:
+                resolved_file = file.resolve()
+                if resolved_file in loaded_files:
+                    continue
+                loaded_files.add(resolved_file)
+                unique_files.append(file)
+
+            self._load_detected_module(unique_files, load_class)
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
         """
@@ -370,6 +425,9 @@ class Patera(Injectable, Generic[ConfT]):
                 module,
                 lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
             ):
+                # ignores abstract classes and classes with _ignore = True or _development = True (when DEBUG = False)
+                if inspect.isabstract(obj):
+                    continue
                 ignore: bool = getattr(obj, "_ignore", False)
                 dev_only: bool = getattr(obj, "_development", False)
                 if ignore or (dev_only and not self._configs.DEBUG):
@@ -491,12 +549,6 @@ class Patera(Injectable, Generic[ConfT]):
             return default
         return value
 
-    def add_global_context_method(self, func: Callable):
-        """
-        Adds global context method to global_context_methods array
-        """
-        self.global_context_methods.append(func)
-
     async def _base_app(self, req: Request) -> Response:
         """
         The bare-bones application without any middleware.
@@ -520,7 +572,9 @@ class Patera(Injectable, Generic[ConfT]):
         )
         if handler:
             res: Response = await run_sync_or_async(
-                handler, req, NotFound("Endpoint not found", response=req.res)
+                handler,
+                req,
+                NotFound("Endpoint not found", response=req.res),  # type: ignore
             )
             response_type = res.expected_body_type()
             return await self.send_response(res, send, response_type)
@@ -730,20 +784,27 @@ class Patera(Injectable, Generic[ConfT]):
                         req.response.expected_body_type()
                     )
                     return await self.send_response(res, send, response_type)
+                except ResponseRendererException as exc:  # noqa: F841
+                    req.res.reset()
+                    raise
                 except HtmlAborterException as exc:
+                    req.res.reset()
                     res = (await req.res.html(exc.template, context=exc.data)).status(
                         exc.status_code
                     )
                     return await self.send_response(res, send, None)
                 # pylint: disable-next=W0718
                 except Exception as exc:
+                    req.res.reset()
                     handler = (
                         self._exception_handlers.get(exc.__class__.__name__, None)
                         or None
                     )
                     if not handler:
+                        handler = self._exception_handlers.get(Exception.__name__, None)
+                    if not handler:
                         # pylint: disable-next=W0719
-                        raise
+                        raise Exception from exc
                     res = await run_sync_or_async(handler, req, exc)
                     response_type = res.expected_body_type() or exc.__class__
                     return await self.send_response(res, send, response_type)
@@ -752,6 +813,7 @@ class Patera(Injectable, Generic[ConfT]):
             # Catches every error and returns internal server error message
             # if the app is in production (DEBUG = False)
             # else reraises the error
+            req.res.reset()
             if not self.configs.DEBUG:
                 res = req.res.json(
                     {
@@ -762,8 +824,9 @@ class Patera(Injectable, Generic[ConfT]):
                 self.logger.critical(
                     f"Unhandled critical error: ({req.method}) {req.path}, {req.route_parameters}"
                 )
+                self.logger.exception(exc)
                 return await self.send_response(res, send, exc.__class__)
-            raise
+            raise Exception from exc
 
     def _log_request(self, scope, method: str, url_path: str) -> None:
         """
@@ -786,7 +849,17 @@ class Patera(Injectable, Generic[ConfT]):
         static_controller = static_controller_dec(Static)
         self.register_controller(static_controller, with_base_path=False)  # type: ignore
 
+    def register_static_pages_controller(self, base_path: str):
+        if not self.configs.USE_STATIC_PAGES:
+            return
+        static_pages_controller_dec = path(f"{base_path}", open_api_spec=False)
+        static_pages_controller = static_pages_controller_dec(StaticPages)
+        self.register_controller(static_pages_controller)
+
     def register_openapi_controller(self):
+        if not self.configs.OPEN_API:
+            return
+        self.build_openapi_spec()
         openapi_controller_dec = path(self.configs.OPEN_API_URL, open_api_spec=False)
         openapi_controller = openapi_controller_dec(OpenAPIController)
         self.register_controller(openapi_controller)
@@ -798,10 +871,7 @@ class Patera(Injectable, Generic[ConfT]):
         is the outermost layer.
         """
         print(PATERA_ASCIIART)
-        self.register_static_controller(self.configs.STATIC_URL)
-        if self.configs.OPEN_API:
-            self.build_openapi_spec()
-            self.register_openapi_controller()
+
         built_app: AppCallableType = self._base_app
         for factory in reversed(self._middleware):
             built_app = factory(self, built_app)
@@ -812,6 +882,7 @@ class Patera(Injectable, Generic[ConfT]):
             port=self.configs.PORT,
             debug_mode=self.configs.DEBUG,
             app_name=self.app_name,
+            app_path=self._app_base_url,
         )
 
     def add_extension(self, extension: Injectable):
@@ -851,14 +922,18 @@ class Patera(Injectable, Generic[ConfT]):
             ctrl_path: str = getattr(ctrl, "_controller_path")
             ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")
             ctrl_open_api_tags = getattr(ctrl, "_open_api_tags", None)
+            ctrl_alias = getattr(ctrl, "_alias", None)
             ctrl_instance = ctrl(
-                self, ctrl_path, ctrl_open_api_spec, ctrl_open_api_tags
+                self, ctrl_path, ctrl_open_api_spec, ctrl_open_api_tags, ctrl_alias
             )
 
             self._controllers[ctrl_instance.path] = ctrl_instance
             endpoint_methods: dict[str, dict[str, str | Callable]] = (
                 ctrl_instance.get_endpoint_methods()
             )
+            if ctrl_alias:
+                self._url_for_alias[ctrl_alias] = f"{ctrl_instance.__class__.__name__}"
+
             for http_method, endpoints in endpoint_methods.items():
                 for url_path, method in endpoints.items():
                     method_name: Callable = method["method"].__name__  # type: ignore
@@ -866,12 +941,17 @@ class Patera(Injectable, Generic[ConfT]):
                     endpoint_name: str = (
                         f"{ctrl_instance.__class__.__name__}.{method_name}"
                     )
-                    self._add_route_function(
-                        http_method,
-                        base_path + ctrl_instance.path + url_path,
-                        cast(Callable, cast(dict, method)["method"]),
-                        endpoint_name,
-                    )
+                    names: list[str] = [endpoint_name]
+                    if ctrl_alias:
+                        alias_name = f"{ctrl_alias}.{method_name}"
+                        names.append(alias_name)
+                    for name in names:
+                        self._add_route_function(
+                            http_method,
+                            base_path + ctrl_instance.path + url_path,
+                            cast(Callable, cast(dict, method)["method"]),
+                            name,
+                        )
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
         self._cli_controllers[ctrl.ctrl_name] = ctrl
@@ -916,8 +996,10 @@ class Patera(Injectable, Generic[ConfT]):
             self._controllers,
             title=self.app_name,
             version=self.version,
-            openapi_version="3.0.3",
-            servers=[f"http://localhost:{self._configs.PORT}"],
+            openapi_version=OPEN_API_VERSION,
+            servers=[
+                f"{self._configs.PROTOCOL}://{self._configs.HOST}:{self._configs.PORT}"
+            ],
         )
 
     def add_on_startup_method(self, func: Callable):
@@ -951,7 +1033,8 @@ class Patera(Injectable, Generic[ConfT]):
         ctrl_name, command = command_name.split(":", 1)
         ctrl = cast(CLIController, self._cli_controllers.get(ctrl_name, None))
         if ctrl is None:
-            print(f"CLI controller with name {ctrl_name} was not found")
+            print(f"ERROR: CLI controller with name {ctrl_name} was not found")
+            return
 
         method = ctrl.find_method(command)
         if method is None:
@@ -965,6 +1048,24 @@ class Patera(Injectable, Generic[ConfT]):
     def add_template_path(self, path: str):
         """Adds a template path"""
         self._all_templates_paths.append(path)
+        self.logger.info(f"Registered templates path: {path}")
+
+    def _register_app_extensions(self) -> None:
+        """Registers application extensions."""
+        app_extensions = getattr(self.__class__, "app_extensions", [])
+
+        for extension in app_extensions:
+            if not inspect.isclass(extension):
+                raise TypeError(
+                    "Items in 'app_extensions' must be extension classes, not instances."
+                )
+
+            if not issubclass(extension, BaseExtension):
+                raise TypeError(
+                    f"App extension {extension.__name__} must inherit from BaseExtension."
+                )
+
+            self._resolve_dependency(extension)
 
     @property
     def json_spec(self) -> dict | None:

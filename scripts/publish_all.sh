@@ -36,10 +36,13 @@ publish_package "patera"
 
 # Publish extensions
 packages=(
+  patera_admin
   patera_aiinterface
+  patera_apiinterface
   patera_auth
   patera_caching
   patera_database
+  patera_migrate
   patera_email
   patera_taskmanager
 )

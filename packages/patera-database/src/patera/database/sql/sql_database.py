@@ -113,7 +113,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         self._number_of_tables: int = 0
         self._db_uri = self.configs.DATABASE_URI
         self._session_name = self.configs.DATABASE_SESSION_NAME
-        self._app.add_extension(self)
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
         # the SqlDatabase instance is stored in app._extensions with key as db_name for later retrieval in session decorators and elsewhere
@@ -294,16 +293,16 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         return [model for model in self._models.values()]
 
 
-def readonly_session(cls: Type[SqlDatabase]) -> Callable:
+def readonly_session(db_impl_or_name: str) -> Callable:
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
             db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                cls.__name__, None
+                db_impl_or_name, None
             )
             if db_extension is None:
                 raise ValueError(
-                    f"Database extension with name {cls.__name__} is not registered"
+                    f"Database extension with name {db_impl_or_name} is not registered"
                 )
             if current_request.session(db_extension.session_name) is not None:
                 # session already exists.
@@ -337,17 +336,17 @@ def readonly_session(cls: Type[SqlDatabase]) -> Callable:
     return decorator
 
 
-def managed_session(cls: Type["SqlDatabase"]) -> Callable:
+def managed_session(db_impl_or_name: str) -> Callable:
 
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
             db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                cls.__name__, None
+                db_impl_or_name, None
             )
             if db_extension is None:
                 raise ValueError(
-                    f"Database extension with name {cls.__name__} is not registered"
+                    f"Database extension with name {db_impl_or_name} is not registered"
                 )
             existing_session = current_request.session(db_extension.session_name)
 
@@ -386,17 +385,17 @@ def managed_session(cls: Type["SqlDatabase"]) -> Callable:
     return decorator
 
 
-def managed_cli_session(cls: Type["SqlDatabase"]) -> Callable:
+def managed_cli_session(db_impl_or_name: str) -> Callable:
 
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
             db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                cls.__name__, None
+                db_impl_or_name, None
             )
             if db_extension is None:
                 raise ValueError(
-                    f"Database extension with name {cls.__name__} is not registered"
+                    f"Database extension with name {db_impl_or_name} is not registered"
                 )
 
             await db_extension.connect()  # connects to db

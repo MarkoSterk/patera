@@ -21,6 +21,7 @@ class BaseExtension(Injectable, Generic[AppT, ConfT]):
     def __init__(self, app: AppT) -> None:
         self._app = app
         self._resolve_injections()
+        self._app.add_extension(self)
         self.init()
 
     def init(self) -> None:

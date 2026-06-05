@@ -1,6 +1,6 @@
 [project]
 name = "patera"
-version = "0.113.0"
+version = "0.114.16"
 description = "A modular async-first python webframework"
 readme = "README.md"
 authors = [
@@ -29,6 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aiinterface = ["patera-aiinterface"]
+apiinterface = ["patera-apiinterface"]
 auth = ["patera-auth"]
 caching = ["patera-caching"]
 caching-redis = ["patera-caching[redis]"]
@@ -36,21 +37,26 @@ caching-sqlite = ["patera-caching[sqlite]"]
 database = ["patera-database"]
 email = ["patera-email"]
 taskmanager = ["patera-taskmanager"]
-testing = ["httpx", "anyio", "pytest", "pytest-cov"]
+testing = ["anyio", "pytest", "pytest-cov"]
 dev = ["uvicorn", "watchfiles"]
+admin = ["patera-admin"]
 all = [
     "patera-database",
     "patera-migrate",
     "patera-email",
     "patera-aiinterface",
+    "patera-apiinterface",
     "patera-auth",
     "patera-caching",
-    "patera-taskmanager"
+    "patera-taskmanager",
+    "patera-admin"
 ]
 
 [tool.uv.workspace]
 members = [
+    "packages/patera-admin",
     "packages/patera-aiinterface",
+    "packages/patera-apiinterface",
     "packages/patera-auth",
     "packages/patera-caching",
     "packages/patera-database",
@@ -60,7 +66,9 @@ members = [
 ]
 
 [tool.uv.sources]
+patera-admin = { workspace = true }
 patera-aiinterface = { workspace = true }
+patera-apiinterface = { workspace = true }
 patera-auth = { workspace = true }
 patera-database = { workspace = true }
 patera-taskmanager = { workspace = true }

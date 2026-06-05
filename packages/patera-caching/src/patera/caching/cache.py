@@ -8,7 +8,6 @@ from typing import (
     Callable,
     Generic,
     Optional,
-    Type,
     TypeVar,
 )
 from pydantic import BaseModel, Field
@@ -103,14 +102,14 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
 
 
 def cache(
-    cls: Type[Caching], duration: Optional[int] = None, key: Optional[str] = None
+    cache_name: str, duration: Optional[int] = None, key: Optional[str] = None
 ) -> Callable:
     """Decorator for caching route handler results using the Caching extension."""
 
     def decorator(handler: Callable) -> Callable:
         @wraps(handler)
-        async def wrapper(self, *args, **kwargs) -> Response:
-            cache_extension: Caching = self.app._extensions.get(cls.__name__, None)  # type: ignore
+        async def wrapper(self, *args, **kwargs) -> "Response":
+            cache_extension: Caching = self.app._extensions.get(cache_name, None)  # type: ignore
             if cache_extension is None:
                 raise RuntimeError("Caching extension not found in the app.")
             req: Request = args[0]

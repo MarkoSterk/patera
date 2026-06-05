@@ -13,12 +13,12 @@ if TYPE_CHECKING:
 
 from patera import Request
 
-from .base_service_provider import (
-    BaseServiceProvider,
+from .chat_response import (
     ChatResponse,
     ChatMessage,
     UsageStats,
 )
+from .base_service_provider import BaseServiceProvider
 
 
 def from_openai(data: dict[str, Any]) -> ChatResponse:
@@ -84,38 +84,55 @@ def from_openai_chunk(data: dict[str, Any]) -> Optional[ChatResponse]:
 
 
 class OpenAIServiceProvider(BaseServiceProvider):
-    async def chat(self, req: Request, msg: str, ext: AiService) -> ChatResponse:
+    async def chat(
+        self,
+        req: Request,
+        system_prompt: str,
+        user_prompt: str,
+        use_history: bool,
+        use_augmentation: bool,
+        ext: AiService,
+        **kwargs,
+    ) -> ChatResponse:
         """
         Builds and sends chat prompt with chat service configs
         to the OpenAI Chat Completions API.
         """
-        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
-        api_key = ext.configs.API_KEY
+        if (
+            use_augmentation
+            and hasattr(ext, "augmentation_provider")
+            and ext.augmentation_provider is None
+        ):
+            raise ValueError(
+                f"If you wish to use chat augmentation please implement the Augmentation Provider ({ext.__class__.__name__})"
+            )
 
+        if (
+            use_history
+            and hasattr(ext, "history_provider")
+            and ext.history_provider is None
+        ):
+            raise ValueError(
+                f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
+            )
+
+        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
+        url = base_url.rstrip("/") + "/chat/completions"
+        api_key = ext.configs.API_KEY
         if not api_key:
             raise ValueError(
                 "API_KEY is required in AiServiceConfig for OpenAIServiceProvider."
             )
 
-        url = base_url.rstrip("/") + "/chat/completions"
+        msg: str = self.format_message(user_prompt, **kwargs)
 
         messages: list[dict[str, str]] = []
-        session_id = req.route_parameters.get("session_id", None)
-
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
+        if use_history:
             messages = await ext.history_provider.get_history_messages(req)  # type: ignore
 
-        if (
-            hasattr(ext, "augmentation_provider")
-            and ext.augmentation_provider is not None
-        ):
-            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)
-            if augmenting_info:
-                msg = (
-                    msg
-                    + "\n\nAdditional Information:\n\n"
-                    + "\n\n".join(augmenting_info)
-                )
+        if use_augmentation:
+            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
+            msg = msg + "\n\n----AUGMENTATION---:\n\n" + "\n\n".join(augmenting_info)
 
         headers = {
             "Content-Type": "application/json",
@@ -123,22 +140,12 @@ class OpenAIServiceProvider(BaseServiceProvider):
         }
 
         if len(messages) == 0:
-            sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
-            if sys_prompt is None:
-                raise ValueError(
-                    "System prompt is required for OpenAIServiceProvider. "
-                    "Set it using the @system_prompt decorator on the chat service "
-                    "or provide SYSTEM_PROMPT in configs."
-                )
-
-            sys_message = {"role": "system", "content": sys_prompt}
+            sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
+            if use_history:
+                ext.history_provider.save_message(sys_message, 0)  # type: ignore
 
-            if hasattr(ext, "history_provider") and ext.history_provider is not None:
-                ext.history_provider.save_message(sys_message, session_id, 0)  # type: ignore
-
-        user_message = {"role": "user", "content": msg}
-        messages.append(user_message)
+        messages.append({"role": "user", "content": msg})
 
         payload: Dict[str, Any] = {
             "model": ext.configs.MODEL,
@@ -156,77 +163,82 @@ class OpenAIServiceProvider(BaseServiceProvider):
             response.raise_for_status()
             json_response = response.json()
 
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            ext.history_provider.save_message(
-                user_message, session_id, len(messages) - 1
+        if use_history:
+            ext.history_provider.save_message(  # type: ignore
+                messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
         openai_response = from_openai(json_response)
 
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            ext.history_provider.save_message(
-                openai_response.message.to_dict(), session_id, len(messages)
+        if use_history:
+            ext.history_provider.save_message(  # type: ignore
+                openai_response.message.to_dict(), len(messages)
             )  # type: ignore
 
         return openai_response
 
     async def stream(
-        self, req: Request, msg: str, ext: AiService
+        self,
+        req: Request,
+        system_prompt: str,
+        user_prompt: str,
+        use_history: bool,
+        use_augmentation: bool,
+        ext: AiService,
+        **kwargs,
     ) -> AsyncIterator[ChatResponse]:
         """
         Builds and sends chat prompt with chat service configs
         and yields a streaming response from the OpenAI Chat Completions API.
         """
-        messages: list[dict[str, str]] = []
-        session_id = req.route_parameters.get("session_id", None)
-
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
-
         if (
-            hasattr(ext, "augmentation_provider")
-            and ext.augmentation_provider is not None
+            use_augmentation
+            and hasattr(ext, "augmentation_provider")
+            and ext.augmentation_provider is None
         ):
-            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)
-            if augmenting_info:
-                msg = (
-                    msg
-                    + "\n\nAdditional Information:\n\n"
-                    + "\n\n".join(augmenting_info)
-                )
-
-        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
-        api_key = ext.configs.API_KEY
-
-        if not api_key:
             raise ValueError(
-                "API_KEY is required in AiServiceConfig for OpenAIServiceProvider."
+                f"If you wish to use chat augmentation please implement the Augmentation Provider ({ext.__class__.__name__})"
             )
 
+        if (
+            use_history
+            and hasattr(ext, "history_provider")
+            and ext.history_provider is None
+        ):
+            raise ValueError(
+                f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
+            )
+
+        messages: list[dict[str, str]] = []
+        if use_history:
+            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
+
+        base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
         url = base_url.rstrip("/") + "/chat/completions"
+        api_key = ext.configs.API_KEY
 
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
 
-        if len(messages) == 0:
-            sys_prompt: Optional[str] = getattr(ext, "__system_prompt__", None)
-            if sys_prompt is None:
-                raise ValueError(
-                    "System prompt is required for OpenAIServiceProvider. "
-                    "Set it using the @system_prompt decorator on the chat service "
-                    "or provide SYSTEM_PROMPT in configs."
-                )
+        if not api_key:
+            raise ValueError(f"API_KEY is required in for {ext.__class__.__name__}")
 
-            sys_message = {"role": "system", "content": sys_prompt}
+        msg: str = self.format_message(user_prompt, **kwargs)
+
+        if use_augmentation:
+            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
+            msg = msg + "\n\n----AUGMENTATION---:\n\n" + "\n\n".join(augmenting_info)
+
+        if len(messages) == 0:
+            sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
 
-            if hasattr(ext, "history_provider") and ext.history_provider is not None:
-                ext.history_provider.save_message(sys_message, session_id, 0)  # type: ignore
+            if use_history:
+                ext.history_provider.save_message(sys_message, 0)  # type: ignore
 
-        user_message = {"role": "user", "content": msg}
-        messages.append(user_message)
+        messages.append({"role": "user", "content": msg})
 
         payload: Dict[str, Any] = {
             "model": ext.configs.MODEL,
@@ -273,16 +285,21 @@ class OpenAIServiceProvider(BaseServiceProvider):
 
                     yield chunk_response
 
-        if hasattr(ext, "history_provider") and ext.history_provider is not None:
-            ext.history_provider.save_message(
-                user_message, session_id, len(messages) - 1
+        if use_history:
+            ext.history_provider.save_message(  # type: ignore
+                messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
-            ext.history_provider.save_message(
+            ext.history_provider.save_message(  # type: ignore
                 {
                     "role": "assistant",
                     "content": "".join(accumulated_content),
                 },
-                session_id,
                 len(messages),
             )  # type: ignore
+
+    def format_message(self, user_prompt: str, **kwargs) -> str:
+        if kwargs:
+            for key, value in kwargs.items():
+                user_prompt = user_prompt.replace(f"<:{key}>", value)
+        return user_prompt

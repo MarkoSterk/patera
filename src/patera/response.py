@@ -18,7 +18,6 @@ from typing import (
 )
 
 from .media_types import MediaType
-from .utilities import run_sync_or_async
 from .http_statuses import HttpStatus
 
 if TYPE_CHECKING:
@@ -220,14 +219,6 @@ class Response(Generic[U]):
         if context is None:
             context = {}
 
-        for method in self.app.global_context_methods:
-            additional_context = await run_sync_or_async(method)
-            if not isinstance(additional_context, dict):
-                raise ValueError(
-                    "Return of global context method must be of type dictionary."
-                )
-            context.update(additional_context)
-
         context["app"] = self.app
         context["url_for"] = self.app.url_for
         context["request"] = self._request
@@ -255,14 +246,6 @@ class Response(Generic[U]):
         """
         if context is None:
             context = {}
-
-        for method in self.app.global_context_methods:
-            additional_context = await run_sync_or_async(method)
-            if not isinstance(additional_context, dict):
-                raise ValueError(
-                    "Return of global context method must be of type dictionary."
-                )
-            context = {**context, **additional_context}
 
         context["app"] = self.app
         context["url_for"] = self.app.url_for
@@ -415,6 +398,37 @@ class Response(Generic[U]):
         Removes all queued cookies from the response.
         """
         self._cookies.clear()
+        return self
+
+    def reset(
+        self,
+        *,
+        keep_expected_body_type: bool = False,
+    ) -> Self:
+        """
+        Resets all outgoing response state.
+
+        This is useful before building an error response after a handler or
+        serializer failure. It prevents partially prepared headers, cookies,
+        body data, streams, redirects, and file-send metadata from leaking into
+        the final error response.
+
+        The app and request references are intentionally preserved.
+        """
+        self.status_code = HttpStatus.OK
+        self.headers.clear()
+        self.body = None
+
+        self.media_type = None
+        self.charset = None
+
+        self._zero_copy = None
+        self._stream = None
+        self._cookies.clear()
+
+        if not keep_expected_body_type:
+            self._expected_body_type = None
+
         return self
 
     @property
