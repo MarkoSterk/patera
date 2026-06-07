@@ -15,6 +15,7 @@ from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
 from .exceptions import UnsupportedLanguage
+from .schemas.dashboard_schemas import LogsQuerySchema
 
 
 class _AdminController(Controller[Patera]):
@@ -54,9 +55,55 @@ class _AdminController(Controller[Patera]):
         """
         Admin dashboard page
         """
+        query_schema = LogsQuerySchema(**req.query_parameters)  # type: ignore
+
+        logs: list[dict[str, Any]] = list(self.app.log_buffer.get_all())
+
+        if query_schema.query is not None and query_schema.query.strip():
+            logs = [
+                log for log in logs if self.filter_log_messages(log, query_schema.query)
+            ]
+
+        reverse: bool = query_schema.order_by.startswith("-")
+        order_by: str = (
+            query_schema.order_by[1:]
+            if query_schema.order_by.startswith("-")
+            else query_schema.order_by
+        )
+
+        logs = sorted(
+            logs,
+            key=lambda log: self.get_order_value(log, order_by),
+            reverse=reverse,
+        )
+
+        total_logs = len(logs)
+        page = max(query_schema.page, 1)
+        count = max(query_schema.count, 1)
+
+        total_pages = max((total_logs + count - 1) // count, 1)
+
+        if page > total_pages:
+            page = total_pages
+
+        paginated_logs = self.paginate_logs(
+            logs=logs,
+            page=page,
+            count=count,
+        )
+
         return await req.res.html(
             "_admin/dashboard.html",
-            {**self.context_variables, "logs": self.app.log_buffer},
+            {
+                **self.context_variables,
+                "log_entries": paginated_logs,
+                "logs_total": total_logs,
+                "logs_page": page,
+                "logs_count": count,
+                "logs_total_pages": total_pages,
+                "logs_order_by": query_schema.order_by,
+                "logs_query": query_schema.query or "",
+            },
         )
 
     @get("/_static/<path:filename>")
@@ -86,6 +133,51 @@ class _AdminController(Controller[Patera]):
 
         return await get_range_file(req.res, file_path, range_header, content_type)
 
+    def filter_log_messages(self, log: dict[str, Any], query: str) -> bool:
+        msg: str = str(log.get("message", "")).lower()
+        logger_name: str = str(log.get("logger_name", "")).lower()
+        name: str = str(log.get("name", "")).lower()
+        file: str = str(log.get("file", "")).lower()
+        function: str = str(log.get("function", "")).lower()
+        level: str = str(log.get("level", "")).lower()
+        line: str = str(log.get("line", "")).lower()
+        time: str = str(log.get("time", "")).lower()
+
+        query = query.lower()
+
+        return (
+            query in msg
+            or query in logger_name
+            or query in name
+            or query in file
+            or query in function
+            or query in level
+            or query in line
+            or query in time
+        )
+
+    def get_order_value(self, log: dict[str, Any], order_by: str) -> Any:
+        value = log.get(order_by)
+
+        if value is None:
+            return ""
+
+        return value
+
+    def paginate_logs(
+        self,
+        logs: list[dict[str, Any]],
+        page: int,
+        count: int,
+    ) -> list[dict[str, Any]]:
+        page = max(page, 1)
+        count = max(count, 1)
+
+        start = (page - 1) * count
+        end = start + count
+
+        return logs[start:end]
+
     @property
     def context_variables(self) -> dict[str, Any]:
         return {
@@ -96,7 +188,9 @@ class _AdminController(Controller[Patera]):
             "admin_url_for": self.admin_interface.url_for,
             "url_for_for_login": self.admin_interface.configs.URL_FOR_FOR_LOGIN,
             "url_for_for_logut": self.admin_interface.configs.URL_FOR_FOR_LOGOUT,
-            "url_for_for_logut_redirect": self.admin_interface.configs.URL_FOR_FOR_LOGOUT_REDIRECT,
+            "show_remember_me": self.admin_interface.configs.SHOW_REMEMBER_ME,
+            "show_forgot_password": self.admin_interface.configs.SHOW_FORGOT_PASSWORD,
+            "available_langs": self.admin_interface.supported_languages,
         }
 
     @property

@@ -1,231 +1,45 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dashboard</title>
+{% extends '_admin/layout/base.html' %}
 
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  >
+{% block content %}
+<main class="app-main py-4">
+  <div class="container-fluid px-3 px-md-4">
 
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
-  >
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+      <div>
+        <h1 class="h3 mb-1">System Logs</h1>
+        <p class="text-muted mb-0">
+          Recent application events and diagnostic messages.
+        </p>
+      </div>
 
-  <style>
-    body {
-      min-height: 100vh;
-      background: #f8f9fa;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .app-header {
-      background: #ffffff;
-    }
-
-    .app-main {
-      flex: 1;
-    }
-
-    .navbar-brand img {
-      width: 36px;
-      height: 36px;
-      object-fit: contain;
-    }
-
-    .content-card {
-      border: 0;
-    }
-
-    .log-level {
-      min-width: 72px;
-    }
-
-    .app-footer {
-      background: #ffffff;
-      color: #6c757d;
-      border-top: 1px solid #dee2e6;
-    }
-  </style>
-</head>
-<body>
-
-  <header class="app-header border-bottom shadow-sm">
-    <nav class="navbar navbar-expand-lg bg-white">
-      <div class="container-fluid px-3 px-md-4">
-
-        <a class="navbar-brand d-flex align-items-center gap-2" href="{{ admin_interface.url_for('_AdminController.dashboard') }}">
-          <img
-            src="{{ logo_url }}"
-            alt="{{ translate('logo') }}"
-          >
-          <span class="fw-semibold">{{ translate('dashboard') }}</span>
-        </a>
-
-        <button
-          class="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#mainNavbar"
-          aria-controls="mainNavbar"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
+      <div class="mt-3 mt-md-0">
+        <a
+          href="{{ admin_interface.url_for('_AdminController.dashboard') }}"
+          class="btn btn-primary"
         >
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="mainNavbar">
-          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-
-            <li class="nav-item">
-              <a class="nav-link active" aria-current="page" href="#">
-                <i class="bi bi-speedometer2 me-1"></i>
-                Overview
-              </a>
-            </li>
-
-            <li class="nav-item">
-              <a class="nav-link" href="#">
-                <i class="bi bi-activity me-1"></i>
-                Logs
-              </a>
-            </li>
-
-            <li class="nav-item dropdown">
-              <a
-                class="nav-link dropdown-toggle"
-                href="#"
-                role="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                <i class="bi bi-folder me-1"></i>
-                Reports
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Daily report
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Weekly report
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Monthly report
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Export reports
-                  </a>
-                </li>
-              </ul>
-            </li>
-
-            <li class="nav-item dropdown">
-              <a
-                class="nav-link dropdown-toggle"
-                href="#"
-                role="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                <i class="bi bi-gear me-1"></i>
-                Settings
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Application settings
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="#">
-                    User management
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="#">
-                    Notification settings
-                  </a>
-                </li>
-              </ul>
-            </li>
-
-          </ul>
-
-          <div class="dropdown">
-            <a
-              class="btn btn-outline-secondary dropdown-toggle"
-              href="#"
-              role="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <i class="bi bi-person-circle me-1"></i>
-              Admin User
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li>
-                <a class="dropdown-item" href="#">
-                  <i class="bi bi-person me-2"></i>
-                  Profile
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item" href="#">
-                  <i class="bi bi-shield-lock me-2"></i>
-                  Security
-                </a>
-              </li>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item" href="#">
-                  <i class="bi bi-box-arrow-right me-2"></i>
-                  Logout
-                </a>
-              </li>
-            </ul>
-          </div>
-
-        </div>
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          Refresh
+        </a>
       </div>
-    </nav>
-  </header>
+    </div>
 
-  <main class="app-main py-4">
-    <div class="container-fluid px-3 px-md-4">
-
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+    <div class="card content-card shadow-sm">
+      <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
-          <h1 class="h3 mb-1">System Logs</h1>
-          <p class="text-muted mb-0">
-            Recent application events and diagnostic messages.
-          </p>
+          <h2 class="h5 mb-0">Latest Log Messages</h2>
+          <small class="text-muted">
+            Showing {{ log_entries|length }} of {{ logs_total }} log message{% if logs_total != 1 %}s{% endif %}
+          </small>
         </div>
 
-        <div class="mt-3 mt-md-0">
-          <button type="button" class="btn btn-primary">
-            <i class="bi bi-arrow-clockwise me-1"></i>
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      <div class="card content-card shadow-sm">
-        <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-          <div>
-            <h2 class="h5 mb-0">Latest Log Messages</h2>
-          </div>
+        <form
+          method="get"
+          action="{{ admin_interface.url_for('_AdminController.dashboard') }}"
+          class="d-flex gap-2"
+        >
+          <input type="hidden" name="page" value="1">
+          <input type="hidden" name="count" value="{{ logs_count }}">
+          <input type="hidden" name="order_by" value="{{ logs_order_by }}">
 
           <div class="input-group input-group-sm" style="max-width: 280px;">
             <span class="input-group-text">
@@ -233,145 +47,268 @@
             </span>
             <input
               type="search"
+              name="query"
               class="form-control"
               placeholder="Search logs"
               aria-label="Search logs"
+              value="{{ logs_query }}"
             >
           </div>
-        </div>
 
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">
+            Search
+          </button>
+        </form>
+      </div>
+
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-time' if logs_order_by == 'time' else 'time') }}"
+                  >
+                    Time
+                    {% if logs_order_by == 'time' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-time' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-level' if logs_order_by == 'level' else 'level') }}"
+                  >
+                    Level
+                    {% if logs_order_by == 'level' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-level' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-logger_name' if logs_order_by == 'logger_name' else 'logger_name') }}"
+                  >
+                    Logger
+                    {% if logs_order_by == 'logger_name' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-logger_name' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-name' if logs_order_by == 'name' else 'name') }}"
+                  >
+                    Module
+                    {% if logs_order_by == 'name' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-name' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-file' if logs_order_by == 'file' else 'file') }}"
+                  >
+                    File
+                    {% if logs_order_by == 'file' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-file' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-line' if logs_order_by == 'line' else 'line') }}"
+                  >
+                    Line
+                    {% if logs_order_by == 'line' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-line' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-function' if logs_order_by == 'function' else 'function') }}"
+                  >
+                    Function
+                    {% if logs_order_by == 'function' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-function' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+
+                <th scope="col">
+                  <a
+                    class="text-decoration-none text-dark"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-message' if logs_order_by == 'message' else 'message') }}"
+                  >
+                    Message
+                    {% if logs_order_by == 'message' %}
+                      <i class="bi bi-sort-up ms-1"></i>
+                    {% elif logs_order_by == '-message' %}
+                      <i class="bi bi-sort-down ms-1"></i>
+                    {% endif %}
+                  </a>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for log in log_entries %}
                 <tr>
-                  <th scope="col">Time</th>
-                  <th scope="col">Level</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">User</th>
-                  <th scope="col">Message</th>
-                  <th scope="col">Request ID</th>
+                  <td class="text-muted log-meta">
+                    {{ log.time }}
+                  </td>
+
+                  <td>
+                    {% if log.level == 'ERROR' or log.level == 'CRITICAL' %}
+                      <span class="badge text-bg-danger log-level">{{ log.level }}</span>
+                    {% elif log.level == 'WARNING' or log.level == 'WARN' %}
+                      <span class="badge text-bg-warning log-level">{{ log.level }}</span>
+                    {% elif log.level == 'DEBUG' %}
+                      <span class="badge text-bg-primary log-level">{{ log.level }}</span>
+                    {% elif log.level == 'INFO' %}
+                      <span class="badge text-bg-success log-level">{{ log.level }}</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary log-level">{{ log.level }}</span>
+                    {% endif %}
+                  </td>
+
+                  <td class="log-meta">
+                    {{ log.logger_name }}
+                  </td>
+
+                  <td class="log-meta">
+                    <code>{{ log.name }}</code>
+                  </td>
+
+                  <td class="log-meta">
+                    {{ log.file }}
+                  </td>
+
+                  <td class="text-muted">
+                    {{ log.line }}
+                  </td>
+
+                  <td class="log-meta">
+                    <code>{{ log.function }}</code>
+                  </td>
+
+                  <td class="log-message">
+                    {{ log.message }}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
+              {% else %}
                 <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:14:22</td>
-                  <td>
-                    <span class="badge text-bg-success log-level">INFO</span>
-                  </td>
-                  <td>AuthService</td>
-                  <td>admin@example.com</td>
-                  <td>User login completed successfully.</td>
-                  <td>
-                    <code>REQ-10001</code>
+                  <td colspan="8" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox me-1"></i>
+                    No log messages available.
                   </td>
                 </tr>
-
-                <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:12:47</td>
-                  <td>
-                    <span class="badge text-bg-warning log-level">WARN</span>
-                  </td>
-                  <td>SessionManager</td>
-                  <td>user@example.com</td>
-                  <td>Session is close to expiration and will require renewal.</td>
-                  <td>
-                    <code>REQ-10000</code>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:10:03</td>
-                  <td>
-                    <span class="badge text-bg-danger log-level">ERROR</span>
-                  </td>
-                  <td>ReportWorker</td>
-                  <td>system</td>
-                  <td>Report generation failed because the data source was unavailable.</td>
-                  <td>
-                    <code>REQ-09999</code>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:08:31</td>
-                  <td>
-                    <span class="badge text-bg-primary log-level">DEBUG</span>
-                  </td>
-                  <td>ApiController</td>
-                  <td>developer@example.com</td>
-                  <td>Received request payload and started validation.</td>
-                  <td>
-                    <code>REQ-09998</code>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:05:16</td>
-                  <td>
-                    <span class="badge text-bg-success log-level">INFO</span>
-                  </td>
-                  <td>NotificationService</td>
-                  <td>system</td>
-                  <td>Email notification was queued for delivery.</td>
-                  <td>
-                    <code>REQ-09997</code>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td class="text-muted text-nowrap">2026-06-05 09:02:59</td>
-                  <td>
-                    <span class="badge text-bg-secondary log-level">TRACE</span>
-                  </td>
-                  <td>Database</td>
-                  <td>system</td>
-                  <td>Connection pool checkout completed.</td>
-                  <td>
-                    <code>REQ-09996</code>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Showing 6 of 128 log messages</span>
-
-          <nav aria-label="Log table pagination">
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item disabled">
-                <a class="page-link" href="#">Previous</a>
-              </li>
-              <li class="page-item active">
-                <a class="page-link" href="#">1</a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="#">2</a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="#">3</a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="#">Next</a>
-              </li>
-            </ul>
-          </nav>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
 
-    </div>
-  </main>
+      <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small">
+            Page {{ logs_page }} of {{ logs_total_pages }}
+          </span>
 
-  <footer class="app-footer py-3">
-    <div class="container-fluid px-3 px-md-4 text-center">
-      <span>Application version 1.0.0</span>
-    </div>
-  </footer>
+          <form
+            method="get"
+            action="{{ admin_interface.url_for('_AdminController.dashboard') }}"
+            class="d-flex align-items-center gap-2"
+          >
+            <input type="hidden" name="query" value="{{ logs_query }}">
+            <input type="hidden" name="page" value="1">
+            <input type="hidden" name="order_by" value="{{ logs_order_by }}">
 
-  <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
-  </script>
-</body>
-</html>
+            <label for="logs-count" class="text-muted small mb-0">
+              Per page
+            </label>
+
+            <select
+              id="logs-count"
+              name="count"
+              class="form-select form-select-sm"
+              style="width: auto;"
+              onchange="this.form.submit()"
+            >
+              <option value="10" {% if logs_count == 10 %}selected{% endif %}>10</option>
+              <option value="25" {% if logs_count == 25 %}selected{% endif %}>25</option>
+              <option value="50" {% if logs_count == 50 %}selected{% endif %}>50</option>
+              <option value="100" {% if logs_count == 100 %}selected{% endif %}>100</option>
+            </select>
+          </form>
+        </div>
+
+        <nav aria-label="Log table pagination">
+          <ul class="pagination pagination-sm mb-0">
+
+            <li class="page-item {% if logs_page <= 1 %}disabled{% endif %}">
+              <a
+                class="page-link"
+                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page - 1, count=logs_count, order_by=logs_order_by) }}"
+              >
+                Previous
+              </a>
+            </li>
+
+            {% for page_number in range(1, logs_total_pages + 1) %}
+              <li class="page-item {% if page_number == logs_page %}active{% endif %}">
+                <a
+                  class="page-link"
+                  href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=page_number, count=logs_count, order_by=logs_order_by) }}"
+                >
+                  {{ page_number }}
+                </a>
+              </li>
+            {% endfor %}
+
+            <li class="page-item {% if logs_page >= logs_total_pages %}disabled{% endif %}">
+              <a
+                class="page-link"
+                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page + 1, count=logs_count, order_by=logs_order_by) }}"
+              >
+                Next
+              </a>
+            </li>
+
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}

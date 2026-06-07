@@ -1,0 +1,82 @@
+<header class="app-header border-bottom shadow-sm">
+    <nav class="navbar navbar-expand-lg bg-white">
+      <div class="container-fluid px-3 px-md-4">
+
+        <a class="navbar-brand d-flex align-items-center gap-2" href="{{ admin_interface.url_for('_AdminController.dashboard') }}">
+          <img
+            src="{{ logo_url }}"
+            alt="{{ translate('logo') }}"
+            class="menu-logo"
+          >
+          <span class="fw-semibold">{{ translate('dashboard') }}</span>
+        </a>
+
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNavbar"
+          aria-controls="mainNavbar"
+          aria-expanded="false"
+          aria-label="{{ translate('toggle_navigation') }}"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbar">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+            <li class="nav-item">
+              <a class="nav-link" href="{{ admin_interface.url_for('_AdminController.dashboard') }}">
+                <i class="bi bi-activity me-1"></i>
+                {{ translate('logs') }}
+              </a>
+            </li>
+            <!--Other menu options-->
+          </ul>
+
+          <div class="d-flex align-items-center gap-2">
+
+            <div class="dropdown">
+              <a
+                class="btn dropdown-toggle"
+                href="#"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <i class="bi bi-globe2 me-1"></i>
+                {{ lang|upper }}
+              </a>
+
+              <ul class="dropdown-menu dropdown-menu-end">
+                {% for available_lang in available_langs %}
+                  <li>
+                    <a
+                      class="dropdown-item {% if available_lang == lang %}active{% endif %}"
+                      href="{{ admin_interface.url_for('_AdminController.dashboard', lang=available_lang) }}"
+                      aria-label="{{ available_lang|upper }} language"
+                    >
+                      {{ available_lang|upper }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+
+            <a
+              data-logout-url="{{ url_for(url_for_for_logut) }}"
+              data-login-url="{{ admin_interface.url_for('_AdminController.login') }}"
+              class="btn ms-1"
+              id="logout-btn"
+            >
+              <i class="bi bi-box-arrow-right me-1"></i>
+              {{ translate('logout') }}
+            </a>
+
+          </div>
+
+        </div>
+      </div>
+    </nav>
+  </header>

@@ -41,12 +41,14 @@ class AdminConfig(BaseModel):
     URL_FOR_FOR_LOGOUT: str = Field(
         description="URL_FOR string for the application logout"
     )
-    URL_FOR_FOR_LOGOUT_REDIRECT: str = Field(
-        "_AdminController.login",
-        description="URL_FOR string for the application logout redirect",
-    )
     LOGO_URL: Optional[str] = Field(
         None, description="URL for the logo to be displayed in the admin interface"
+    )
+    SHOW_REMEMBER_ME: bool = Field(
+        False, description="Show remember me option at login"
+    )
+    SHOW_FORGOT_PASSWORD: bool = Field(
+        False, description="Show forgot password option at login"
     )
 
 
@@ -147,12 +149,14 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             collected_models[model.__db_name__].append(model)
         return collected_models
 
-    def translate(self, key: str) -> str:
+    def translate(self, key: str, lang: Optional[str] = None) -> str:
         """
         Translates a given key based on the provided language
         """
+        if lang is None:
+            lang = self.current_language
         return (
-            self.__class__.TRANSLATIONS_MAP[key][self.current_language]
+            self.__class__.TRANSLATIONS_MAP[key][lang]
             if key in self.__class__.TRANSLATIONS_MAP
             else key
         )

@@ -26,9 +26,9 @@
       max-width: 420px;
     }
 
-    .logo-placeholder {
-      width: 80px;
-      height: 80px;
+    .logo {
+      width: 120px;
+      height: auto;
       object-fit: contain;
       display: block;
       margin: 0 auto 1rem;
@@ -73,7 +73,7 @@
           <img
             src="{{ logo_url }}"
             alt="{{ translate('logo') }}"
-            class="logo-placeholder"
+            class="logo"
           >
 
           <h1 class="h4 mb-1">{{ translate('dashboard') }}</h1>
@@ -116,19 +116,22 @@
           </div>
 
           <div class="d-flex justify-content-between align-items-center mb-4">
-            <div class="form-check">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                id="remember"
-                name="remember"
-              >
-              <label class="form-check-label" for="remember">
-                {{ translate('remember_me') }}
-              </label>
-            </div>
-
-            <a href="#" class="text-decoration-none">{{ translate('forgot_password') }}?</a>
+            {% if show_remember_me %}
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="remember"
+                  name="remember"
+                >
+                <label class="form-check-label" for="remember">
+                  {{ translate('remember_me') }}
+                </label>
+              </div>
+            {% endif %}
+            {% if show_forgot_password %}
+              <a href="#" class="text-decoration-none">{{ translate('forgot_password') }}?</a>
+            {% endif %}
           </div>
 
           <div id="error-container" class="p-2 text-center">
@@ -144,23 +147,15 @@
         </form>
 
         <div class="language-switcher" aria-label="{{ translate('change_language') }}">
-            <a href="{{ admin_url_for('_AdminController.login', lang='en') }}"
-                aria-label="English"
-                class="{% if lang == 'en' %}active{% endif %}">
-                🇬🇧
-            </a>
-
-            <a href="{{ admin_url_for('_AdminController.login', lang='de') }}"
-                aria-label="Deutsch"
-                class="{% if lang == 'de' %}active{% endif %}">
-                🇩🇪
-            </a>
-
-            <a href="{{ admin_url_for('_AdminController.login', lang='si') }}"
-                aria-label="Slovenščina"
-                class="{% if lang == 'si' %}active{% endif %}">
-                🇸🇮
-            </a>
+            {% for available_lang in available_langs %}
+              <a
+                class="{% if available_lang == lang %}active{% endif %}"
+                href="{{ admin_interface.url_for('_AdminController.login', lang=available_lang) }}"
+                aria-label="{{ translate(available_lang|lower + '_language', lang=available_lang) }}"
+              >
+                {{ available_lang|upper }}
+              </a>
+            {% endfor %}
         </div>
 
       </div>
@@ -192,11 +187,14 @@
     }
 
     function getInputData(){
-        return {
+        const data = {
             email: emailInput.value,
-            password: passwordInput.value,
-            remember: rememberMe?.checked || false
+            password: passwordInput.value
         }
+        if(rememberMe){
+          data.rememberMe = rememberMe?.checked || false
+        }
+        return data;
     }
 
     function getFormData(inputData){

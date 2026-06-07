@@ -62,4 +62,20 @@ TRANSLATIONS_MAP: dict[str, dict[str, str]] = {
     },
     "next": {"en": "Next", "de": "Nächste", "si": "Naslednja"},
     "previous": {"en": "Previous", "de": "Lätzte", "si": "Prejšnja"},
+    "language": {"en": "Language", "de": "Sprache", "si": "Jezik"},
+    "si_language": {
+        "en": "Slovenian language",
+        "de": "Slowenische sprache",
+        "si": "Slovenski jezik",
+    },
+    "en_language": {
+        "en": "English language",
+        "de": "Englische sprache",
+        "si": "Angleški jezik",
+    },
+    "de_language": {
+        "en": "German language",
+        "de": "Deutsche sprache",
+        "si": "Nemški jezik",
+    },
 }
