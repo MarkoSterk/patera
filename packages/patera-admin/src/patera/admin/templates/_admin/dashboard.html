@@ -177,13 +177,16 @@
                     {% endif %}
                   </a>
                 </th>
+                <th>
+                  View
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {% for log in log_entries %}
                 <tr>
-                  <td class="text-muted log-meta">
+                  <td class="text-muted log-meta log-time">
                     {{ log.time }}
                   </td>
 
@@ -201,33 +204,38 @@
                     {% endif %}
                   </td>
 
-                  <td class="log-meta">
+                  <td class="log-meta log-logger-name">
                     {{ log.logger_name }}
                   </td>
 
-                  <td class="log-meta">
+                  <td class="log-meta log-name">
                     <code>{{ log.name }}</code>
                   </td>
 
-                  <td class="log-meta">
+                  <td class="log-meta log-file">
                     {{ log.file }}
                   </td>
 
-                  <td class="text-muted">
+                  <td class="text-muted log-line">
                     {{ log.line }}
                   </td>
 
-                  <td class="log-meta">
+                  <td class="log-meta log-function">
                     <code>{{ log.function }}</code>
                   </td>
 
-                  <td class="log-message">
-                    {{ log.message }}
+                  <td class="log-message" data-message="{{ log.message|e }}">
+                    {{ log.message[:90] }}
+                  </td>
+                  <td>
+                    <button type="button" onclick="openLogDialog(event)" class="btn btn-sm" title="View log" aria-label="View log">
+                      <i class="bi bi-card-text"></i>
+                    </button>
                   </td>
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="8" class="text-center text-muted py-4">
+                  <td colspan="9" class="text-center text-muted py-4">
                     <i class="bi bi-inbox me-1"></i>
                     No log messages available.
                   </td>
@@ -311,4 +319,312 @@
 
   </div>
 </main>
+
+<dialog id="log-dialog" class="log-dialog border-0 rounded-4 p-0 shadow-lg">
+  <div class="log-dialog-content">
+    <div class="log-dialog-header d-flex justify-content-between align-items-start gap-3">
+      <div>
+        <h2 class="h5 mb-1">
+          <i class="bi bi-card-text me-1"></i>
+          Log Details
+        </h2>
+        <p class="text-muted small mb-0">
+          Full diagnostic log entry
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Close"
+        onclick="closeLogDialog()"
+      ></button>
+    </div>
+
+    <div id="log-dialog-body" class="log-dialog-body">
+      <!-- Filled by JS -->
+    </div>
+
+    <div class="log-dialog-footer d-flex justify-content-end">
+      <button
+        type="button"
+        class="btn btn-sm btn-secondary"
+        onclick="closeLogDialog()"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block js %}
+<style>
+  .log-dialog {
+    width: min(900px, calc(100vw - 2rem));
+    max-height: min(720px, calc(100vh - 2rem));
+    overflow: hidden;
+  }
+
+  .log-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+  }
+
+  .log-dialog-content {
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    max-height: min(720px, calc(100vh - 2rem));
+  }
+
+  .log-dialog-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.075);
+    background: #f8f9fa;
+  }
+
+  .log-dialog-body {
+    padding: 1.25rem;
+    overflow: auto;
+  }
+
+  .log-dialog-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.075);
+    background: #f8f9fa;
+  }
+
+  .log-detail-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0.65rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .log-detail-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .log-detail-value {
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .log-full-message {
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.075);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 576px) {
+    .log-detail-grid {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+
+    .log-detail-label {
+      margin-top: 0.5rem;
+    }
+  }
+</style>
+
+<script>
+  function textFrom(row, selector) {
+    return row.querySelector(selector)?.textContent.trim() || "";
+  }
+
+  function messageFrom(row) {
+    return row.querySelector(".log-message")?.getAttribute("data-message") || "";
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function openLogDialog(event) {
+    const btn = event.target.closest("button");
+    const tableRow = btn.closest("tr");
+
+    const log = {
+      time: textFrom(tableRow, ".log-time"),
+      level: textFrom(tableRow, ".log-level"),
+      loggerName: textFrom(tableRow, ".log-logger-name"),
+      name: textFrom(tableRow, ".log-name"),
+      file: textFrom(tableRow, ".log-file"),
+      line: textFrom(tableRow, ".log-line"),
+      functionName: textFrom(tableRow, ".log-function"),
+      message: messageFrom(tableRow)
+    };
+
+    const dialog = document.getElementById("log-dialog");
+    const body = document.getElementById("log-dialog-body");
+
+    body.innerHTML = `
+      <div class="log-detail-grid">
+        <div class="log-detail-label">Time</div>
+        <div class="log-detail-value">${escapeHtml(log.time)}</div>
+
+        <div class="log-detail-label">Level</div>
+        <div class="log-detail-value">
+          <span class="badge ${badgeClassForLevel(log.level)}">
+            ${escapeHtml(log.level)}
+          </span>
+        </div>
+
+        <div class="log-detail-label">Logger</div>
+        <div class="log-detail-value">${escapeHtml(log.loggerName)}</div>
+
+        <div class="log-detail-label">Module</div>
+        <div class="log-detail-value">
+          <code>${escapeHtml(log.name)}</code>
+        </div>
+
+        <div class="log-detail-label">File</div>
+        <div class="log-detail-value">${escapeHtml(log.file)}</div>
+
+        <div class="log-detail-label">Line</div>
+        <div class="log-detail-value">${escapeHtml(log.line)}</div>
+
+        <div class="log-detail-label">Function</div>
+        <div class="log-detail-value">
+          <code>${escapeHtml(log.functionName)}</code>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+        <h3 class="h6 mb-0">Message</h3>
+
+        <button
+          type="button"
+          id="copy-log-message-btn"
+          class="btn btn-sm btn-outline-secondary"
+          onclick="copyLogMessage()"
+          title="Copy message to clipboard"
+          aria-label="Copy message to clipboard"
+        >
+          <i class="bi bi-clipboard me-1"></i>
+          Copy
+        </button>
+      </div>
+
+      <pre id="log-full-message" class="log-full-message">${escapeHtml(log.message)}</pre>
+    `;
+
+    dialog.showModal();
+  }
+
+  function closeLogDialog() {
+    const dialog = document.getElementById("log-dialog");
+    const body = document.getElementById("log-dialog-body");
+
+    body.innerHTML = "";
+
+    if (dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function badgeClassForLevel(level) {
+    switch (level) {
+      case "ERROR":
+      case "CRITICAL":
+        return "text-bg-danger";
+      case "WARNING":
+      case "WARN":
+        return "text-bg-warning";
+      case "DEBUG":
+        return "text-bg-primary";
+      case "INFO":
+        return "text-bg-success";
+      default:
+        return "text-bg-secondary";
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const dialog = document.getElementById("log-dialog");
+    const body = document.getElementById("log-dialog-body");
+
+    dialog.addEventListener("close", function () {
+      body.innerHTML = "";
+    });
+
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) {
+        closeLogDialog();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && dialog.open) {
+        closeLogDialog();
+      }
+    });
+  });
+
+  async function copyLogMessage() {
+    const messageElement = document.getElementById("log-full-message");
+    const copyButton = document.getElementById("copy-log-message-btn");
+
+    if (!messageElement || !copyButton) {
+      return;
+    }
+
+    const message = messageElement.textContent || "";
+
+    try {
+      await navigator.clipboard.writeText(message);
+
+      copyButton.innerHTML = `
+        <i class="bi bi-check2 me-1"></i>
+        Copied
+      `;
+
+      copyButton.classList.remove("btn-outline-secondary");
+      copyButton.classList.add("btn-success");
+
+      setTimeout(function () {
+        copyButton.innerHTML = `
+          <i class="bi bi-clipboard me-1"></i>
+          Copy
+        `;
+
+        copyButton.classList.remove("btn-success");
+        copyButton.classList.add("btn-outline-secondary");
+      }, 1500);
+    } catch (error) {
+      copyButton.innerHTML = `
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Failed
+      `;
+
+      copyButton.classList.remove("btn-outline-secondary");
+      copyButton.classList.add("btn-danger");
+
+      setTimeout(function () {
+        copyButton.innerHTML = `
+          <i class="bi bi-clipboard me-1"></i>
+          Copy
+        `;
+
+        copyButton.classList.remove("btn-danger");
+        copyButton.classList.add("btn-outline-secondary");
+      }, 1500);
+    }
+  }
+</script>
 {% endblock %}

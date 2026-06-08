@@ -201,7 +201,7 @@ def inherits_from(class_obj_or_instance, base_name: str) -> bool:
 class Patera(Injectable, Generic[ConfT]):
     """Patera class implementation. Used to create a new application instance"""
 
-    app_extensions: list[Type[BaseExtension[Any]]] = []
+    app_extensions: list[Type[BaseExtension[Any, Any]]] = []
 
     def __init__(self, cli_mode: bool = False):
         """Init function"""

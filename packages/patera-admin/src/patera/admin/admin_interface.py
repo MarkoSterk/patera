@@ -64,8 +64,10 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     TRANSLATIONS_MAP = TRANSLATIONS_MAP
 
     _admin_menu: list[dict[str, str]] = []
+    _databases_menu: list[dict[str, str]] = []
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si"]
+    _supported_extensions: list[str] = ["sqldatabase"]
 
     def init(self):
         """
@@ -109,6 +111,9 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         ctrl_instance: _AdminController = self._app._controllers.get(ctrl_path)  # type: ignore
         ctrl_instance.admin_interface = self
 
+    def _register_db_controller(self) -> None:
+        pass
+
     def _register_models_controller(self) -> None:
         if self.managed_models is None or len(self.managed_models) == 0:
             return
@@ -120,10 +125,25 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         menu = [
             {
                 "name": "dashboard",
-                "url_for": "AdminController.dashboard",
+                "url_for": "_AdminController.dashboard",
             }
         ]
-        # other menu items based on managed models and injected extensions
+        databases = []
+        for ext in self.app.app_extensions:
+            extMro = [cl.__name__.lower() for cl in ext.mro()]
+            if "admininterface" in extMro or "sqldatabase" not in extMro:
+                continue
+            if len(set(extMro).intersection(self.__class__._supported_extensions)) > 0:
+                extInst = self.app.extensions[ext.__name__]
+                databases.append(
+                    {
+                        "name": extInst.nice_name,  # type: ignore, # type: ignore
+                        "url_for": "_AdminDbController.dashboard",
+                    }
+                )
+        if len(databases) > 0:
+            self._register_db_controller()
+
         menu.append(
             {
                 "name": "logout",
@@ -131,6 +151,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             }
         )
         self._admin_menu = menu
+        self._databases_menu = databases
 
     def _find_injected_extensions(self) -> dict[str, list[BaseExtension]]:
         """
@@ -168,6 +189,10 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     @property
     def admin_menu(self) -> list[dict[str, str]]:
         return self._admin_menu
+
+    @property
+    def databases_menu(self) -> list[dict[str, str]]:
+        return self._databases_menu
 
     @property
     def supported_languages(self) -> list[str]:

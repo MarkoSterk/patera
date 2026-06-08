@@ -32,6 +32,38 @@
                 {{ translate('logs') }}
               </a>
             </li>
+            {% if admin_interface.databases_menu %}
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle"
+                  href="#"
+                  id="databasesDropdown"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i class="bi bi-database me-1"></i>
+                  {{ translate('databases') }}
+                </a>
+
+                <ul
+                  class="dropdown-menu"
+                  aria-labelledby="databasesDropdown"
+                >
+                  {% for database_item in admin_interface.databases_menu %}
+                    <li>
+                      <a
+                        class="dropdown-item"
+                        href="{{ admin_interface.url_for(database_item.url_for) }}"
+                      >
+                        <i class="bi bi-table me-1"></i>
+                        {{ database_item.name }}
+                      </a>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </li>
+            {% endif %}
             <!--Other menu options-->
           </ul>
 
