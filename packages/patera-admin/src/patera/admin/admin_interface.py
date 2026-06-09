@@ -18,6 +18,7 @@ class Permissions(StrEnum):
     ADMIN_CAN_VIEW = "admin_can_view"
     ADMIN_CAN_EDIT = "admin_can_edit"
     ADMIN_CAN_DELETE = "admin_can_delete"
+    ADMIN_CAN_CREATE = "admin_can_create"
 
 
 class AdminConfig(BaseModel):
@@ -64,7 +65,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     TRANSLATIONS_MAP = TRANSLATIONS_MAP
 
     _admin_menu: list[dict[str, str]] = []
-    _databases_menu: list[dict[str, str]] = []
+    _databases_menu: list[dict[str, str | Any]] = []
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si"]
     _supported_extensions: list[str] = ["sqldatabase"]
@@ -76,11 +77,10 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._admin_root_path: str = os.path.dirname(__file__)
         templates_path = os.path.join(self._admin_root_path, "templates")
         self._app.add_template_path(templates_path)
-        self._construct_menu()
         self._create_models_map()
         self._register_admin_exception_handler()
         self._register_admin_controller()
-        self._register_models_controller()
+        self._construct_menu()
 
     def _register_admin_exception_handler(self) -> None:
         """
@@ -112,7 +112,15 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         ctrl_instance.admin_interface = self
 
     def _register_db_controller(self) -> None:
-        pass
+        from .admin_db_controller import _AdminDbController
+
+        base_url = f"{self.configs.ADMIN_BASE_URL}/<string:lang>/databases"
+        admin_db_controller_dec = path(base_url, open_api_spec=False)
+        admin_db_controller = admin_db_controller_dec(_AdminDbController)
+        self._app.register_controller(admin_db_controller)
+        ctrl_path = getattr(admin_db_controller, "_controller_path")
+        ctrl_instance: _AdminDbController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance.admin_interface = self
 
     def _register_models_controller(self) -> None:
         if self.managed_models is None or len(self.managed_models) == 0:
@@ -128,6 +136,16 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
                 "url_for": "_AdminController.dashboard",
             }
         ]
+        menu.append(
+            {
+                "name": "logout",
+                "url_for": self.configs.URL_FOR_FOR_LOGOUT,
+            }
+        )
+        self._admin_menu = menu
+        self._databases_menu = self._find_database_extensions()
+
+    def _find_database_extensions(self) -> list[dict[str, str | Any]]:
         databases = []
         for ext in self.app.app_extensions:
             extMro = [cl.__name__.lower() for cl in ext.mro()]
@@ -137,21 +155,15 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
                 extInst = self.app.extensions[ext.__name__]
                 databases.append(
                     {
+                        "extension": extInst,
+                        "db_name": extInst.__db_name__,  # type: ignore
                         "name": extInst.nice_name,  # type: ignore, # type: ignore
-                        "url_for": "_AdminDbController.dashboard",
+                        "url_for": "_AdminDbController.database_overview",
                     }
                 )
         if len(databases) > 0:
             self._register_db_controller()
-
-        menu.append(
-            {
-                "name": "logout",
-                "url_for": self.configs.URL_FOR_FOR_LOGOUT,
-            }
-        )
-        self._admin_menu = menu
-        self._databases_menu = databases
+        return databases
 
     def _find_injected_extensions(self) -> dict[str, list[BaseExtension]]:
         """
@@ -170,17 +182,26 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             collected_models[model.__db_name__].append(model)
         return collected_models
 
-    def translate(self, key: str, lang: Optional[str] = None) -> str:
+    def translate(
+        self,
+        key: str,
+        lang: Optional[str] = None,
+        values: Optional[list[str | int | float]] = None,
+    ) -> str:
         """
         Translates a given key based on the provided language
         """
         if lang is None:
             lang = self.current_language
-        return (
+        translated_value = (
             self.__class__.TRANSLATIONS_MAP[key][lang]
             if key in self.__class__.TRANSLATIONS_MAP
             else key
         )
+        if values is not None and isinstance(values, list):
+            for i, val in enumerate(values):
+                translated_value = translated_value.replace(f"%{i}", str(val))
+        return translated_value
 
     def _create_models_map(self) -> None:
         for model in self.managed_models:
@@ -220,6 +241,21 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         if self.configs.LOGO_URL:
             return self.configs.LOGO_URL
         return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/patera_logo.png"
+
+    @property
+    def context_variables(self) -> dict[str, Any]:
+        return {
+            "translate": self.translate,
+            "lang": self.current_language,
+            "logo_url": self.logo_url,
+            "admin_interface": self,
+            "admin_url_for": self.url_for,
+            "url_for_for_login": self.configs.URL_FOR_FOR_LOGIN,
+            "url_for_for_logut": self.configs.URL_FOR_FOR_LOGOUT,
+            "show_remember_me": self.configs.SHOW_REMEMBER_ME,
+            "show_forgot_password": self.configs.SHOW_FORGOT_PASSWORD,
+            "available_langs": self.supported_languages,
+        }
 
     def url_for(self, target: str, **kwargs) -> str:
         return self.app.url_for(target, **{"lang": self.current_language, **kwargs})

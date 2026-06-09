@@ -1,0 +1,271 @@
+{% extends '_admin/layout/base.html' %}
+
+{% block content %}
+<main class="app-main py-4">
+  <div class="container-fluid px-3 px-md-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+      <div>
+        <h1 class="h3 mb-1">Database Overview</h1>
+        <p class="text-muted mb-0">
+          Summary of database structure, storage, and available record tables.
+        </p>
+      </div>
+
+      <div class="mt-3 mt-md-0">
+        <button type="button" class="btn btn-primary">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body d-flex align-items-center gap-3">
+            <div class="fs-2 text-primary">
+              <i class="bi bi-diagram-3"></i>
+            </div>
+            <div>
+              <div class="text-muted small">Schemas</div>
+              <div class="h4 mb-0">{{ db_overview.schemas_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body d-flex align-items-center gap-3">
+            <div class="fs-2 text-primary">
+              <i class="bi bi-table"></i>
+            </div>
+            <div>
+              <div class="text-muted small">Tables</div>
+              <div class="h4 mb-0">{{ db_overview.tables_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body d-flex align-items-center gap-3">
+            <div class="fs-2 text-primary">
+              <i class="bi bi-eye"></i>
+            </div>
+            <div>
+              <div class="text-muted small">Views</div>
+              <div class="h4 mb-0">{{ db_overview.views_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body d-flex align-items-center gap-3">
+            <div class="fs-2 text-primary">
+              <i class="bi bi-list-columns"></i>
+            </div>
+            <div>
+              <div class="text-muted small">Columns</div>
+              <div class="h4 mb-0">{{ db_overview.columns_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="row g-4">
+
+      <div class="col-12 col-xl-8">
+        <div class="card content-card shadow-sm">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0">
+              <i class="bi bi-database me-1"></i>
+              Database Statistics
+            </h2>
+          </div>
+
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <tbody>
+                  <tr>
+                    <th scope="row" class="text-muted" style="width: 260px;">
+                      <i class="bi bi-diagram-3 me-2"></i>
+                      Schemas
+                    </th>
+                    <td>{{ db_overview.schemas_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-table me-2"></i>
+                      Tables
+                    </th>
+                    <td>{{ db_overview.tables_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-eye me-2"></i>
+                      Views
+                    </th>
+                    <td>{{ db_overview.views_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-lightning-charge me-2"></i>
+                      Indexes
+                    </th>
+                    <td>{{ db_overview.indexes_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-link-45deg me-2"></i>
+                      Foreign Keys
+                    </th>
+                    <td>{{ db_overview.foreign_keys_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-list-columns me-2"></i>
+                      Columns
+                    </th>
+                    <td>{{ db_overview.columns_count }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-bar-chart me-2"></i>
+                      Average Columns per Table
+                    </th>
+                    <td>{{ db_overview.avg_columns_per_table }}</td>
+                  </tr>
+
+                  <tr>
+                    <th scope="row" class="text-muted">
+                      <i class="bi bi-exclamation-triangle me-2"></i>
+                      Unindexed Foreign Keys
+                    </th>
+                    <td>
+                      {% if db_overview.unindexed_foreign_keys > 0 %}
+                        <span class="badge text-bg-warning">
+                          {{ db_overview.unindexed_foreign_keys }}
+                        </span>
+                      {% else %}
+                        <span class="badge text-bg-success">
+                          {{ db_overview.unindexed_foreign_keys }}
+                        </span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <div class="card content-card shadow-sm h-100">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0">
+              <i class="bi bi-hdd me-1"></i>
+              {{ db.nice_name }} ({{db.__db_name__}}) Storage
+            </h2>
+          </div>
+
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="text-muted small">Database Size</div>
+              <div class="h4 mb-0">
+                {{ db_overview.extras.db_size_bytes }} bytes
+              </div>
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted">
+                <i class="bi bi-file-earmark-binary me-1"></i>
+                Page Size
+              </span>
+              <strong>{{ db_overview.extras.sqlite_page_size }}</strong>
+            </div>
+
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted">
+                <i class="bi bi-files me-1"></i>
+                Page Count
+              </span>
+              <strong>{{ db_overview.extras.sqlite_page_count }}</strong>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">
+                <i class="bi bi-trash3 me-1"></i>
+                Freelist Pages
+              </span>
+              <strong>{{ db_overview.extras.sqlite_freelist_pages }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card content-card shadow-sm mt-4">
+      <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h2 class="h5 mb-0">
+            <i class="bi bi-table me-1"></i>
+            Managed Database Tables
+          </h2>
+          <small class="text-muted">
+            Open table records and inspect stored data.
+          </small>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- Dynamic version, if you later pass db_tables -->
+          {% for table in db_tables %}
+            <div class="col-12 col-md-6 col-xl-4">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                  <div>
+                    <h3 class="h6 mb-1">
+                      <i class="bi bi-table me-1"></i>
+                      {{ table.__name__ }}
+                    </h3>
+                    <p class="text-muted small mb-0">
+                      {{ table.__doc__ or table.__name__ + ' table records.' }}
+                    </p>
+                  </div>
+
+                  <a href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=table.__db_name__,  model_name=table.__name__) }}" class="btn btn-sm btn-outline-primary">
+                    Open
+                    <i class="bi bi-arrow-right ms-1"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}

@@ -41,7 +41,7 @@ class _AdminController(Controller[Patera]):
         return await req.res.html(
             "_admin/login.html",
             {
-                **self.context_variables,
+                **self.admin_interface.context_variables,
                 "login_media_type": self.admin_interface.configs.LOGIN_MEDIA_TYPE.lower(),
                 "dashboard_url": self.admin_interface.url_for(
                     "_AdminController.dashboard"
@@ -95,7 +95,7 @@ class _AdminController(Controller[Patera]):
         return await req.res.html(
             "_admin/dashboard.html",
             {
-                **self.context_variables,
+                **self.admin_interface.context_variables,
                 "log_entries": paginated_logs,
                 "logs_total": total_logs,
                 "logs_page": page,
@@ -177,21 +177,6 @@ class _AdminController(Controller[Patera]):
         end = start + count
 
         return logs[start:end]
-
-    @property
-    def context_variables(self) -> dict[str, Any]:
-        return {
-            "translate": self.admin_interface.translate,
-            "lang": self.admin_interface.current_language,
-            "logo_url": self.admin_interface.logo_url,
-            "admin_interface": self.admin_interface,
-            "admin_url_for": self.admin_interface.url_for,
-            "url_for_for_login": self.admin_interface.configs.URL_FOR_FOR_LOGIN,
-            "url_for_for_logut": self.admin_interface.configs.URL_FOR_FOR_LOGOUT,
-            "show_remember_me": self.admin_interface.configs.SHOW_REMEMBER_ME,
-            "show_forgot_password": self.admin_interface.configs.SHOW_FORGOT_PASSWORD,
-            "available_langs": self.admin_interface.supported_languages,
-        }
 
     @property
     def admin_interface(self) -> AdminInterface:

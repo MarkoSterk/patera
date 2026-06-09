@@ -1,0 +1,314 @@
+{% extends '_admin/layout/base.html' %}
+
+{% block css %}
+<style>
+  .admin-dialog {
+    width: min(900px, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    padding: 0;
+    border: 0;
+    border-radius: var(--bs-border-radius-lg);
+    box-shadow: var(--bs-box-shadow-lg);
+    background: transparent;
+  }
+
+  .admin-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .admin-dialog .card {
+    max-height: calc(100vh - 2rem);
+  }
+
+  .admin-dialog .card-body {
+    overflow-y: auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="app-main py-4">
+  <div class="container-fluid px-3 px-md-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+      <div>
+        <h1 class="h3 mb-1">
+          <i class="bi bi-table me-1"></i>
+          {{ table_name }}
+        </h1>
+
+        <p class="text-muted mb-0">
+          Records from model <code>{{ model_name }}</code> in database <code>{{db.nice_name}} ({{ db_name }})</code>.
+        </p>
+      </div>
+
+      <div class="mt-3 mt-md-0 d-flex gap-2">
+        <a
+          href="{{ admin_interface.url_for('_AdminDbController.database_overview', db_name=db_name) }}"
+          class="btn btn-outline-secondary"
+        >
+          <i class="bi bi-arrow-left me-1"></i>
+          Back
+        </a>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          id="open-create-record-dialog"
+        >
+          <i class="bi bi-plus-lg me-1"></i>
+          Create Record
+        </button>
+      </div>
+    </div>
+
+    <div class="card content-card shadow-sm">
+      <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h2 class="h5 mb-0">Table Records</h2>
+          <small class="text-muted">
+            Showing {{ records.items|length }} of {{ records.total }} record{% if records.total != 1 %}s{% endif %}
+          </small>
+        </div>
+
+        <form
+          method="get"
+          action="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name) }}"
+          class="d-flex align-items-center gap-2"
+        >
+          <input type="hidden" name="page" value="1">
+
+          <label for="records-count-top" class="text-muted small mb-0">
+            Per page
+          </label>
+
+          <select
+            id="records-count-top"
+            name="count"
+            class="form-select form-select-sm"
+            style="width: auto;"
+            onchange="this.form.submit()"
+          >
+            <option value="10" {% if records.per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if records.per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if records.per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if records.per_page == 100 %}selected{% endif %}>100</option>
+          </select>
+        </form>
+      </div>
+
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                {% for column in table_columns %}
+                  <th scope="col" class="text-nowrap">
+                    {{ column.label }}
+                  </th>
+                {% endfor %}
+
+                <th scope="col" class="text-end text-nowrap">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for record in records.items %}
+                {% set record_pk = get_record_primary_key_value(record, model) %}
+
+                <tr>
+                  {% for column in table_columns %}
+                    <td>
+                      {% set value = get_record_value(record, column.name) %}
+
+                      {% if value is sameas true %}
+                        <span class="badge text-bg-success">
+                          <i class="bi bi-check-lg me-1"></i>
+                          True
+                        </span>
+                      {% elif value is sameas false %}
+                        <span class="badge text-bg-secondary">
+                          <i class="bi bi-x-lg me-1"></i>
+                          False
+                        </span>
+                      {% elif value == "" %}
+                        <span class="text-muted">—</span>
+                      {% else %}
+                        {{ value }}
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+
+                  <td class="text-end text-nowrap">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Record actions">
+                      <a
+                        href="#"
+                        class="btn btn-outline-primary"
+                        data-record-id="{{ record_pk }}"
+                      >
+                        <i class="bi bi-eye me-1"></i>
+                        View
+                      </a>
+
+                      <a
+                        href="#"
+                        class="btn btn-outline-secondary"
+                        data-record-id="{{ record_pk }}"
+                      >
+                        <i class="bi bi-pencil-square me-1"></i>
+                        Edit
+                      </a>
+
+                      <a
+                        href="#"
+                        class="btn btn-outline-danger"
+                        data-record-id="{{ record_pk }}"
+                      >
+                        <i class="bi bi-trash3 me-1"></i>
+                        Delete
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="{{ table_columns|length + 1 }}" class="text-center text-muted py-5">
+                    <div class="mb-2">
+                      <i class="bi bi-inbox fs-2"></i>
+                    </div>
+                    No records available.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+          <span class="text-muted small">
+            Page {{ records.page }} of {{ records.pages if records.pages > 0 else 1 }}
+          </span>
+
+          <span class="text-muted small d-none d-md-inline">
+            ·
+          </span>
+
+          <span class="text-muted small">
+            {{ records.total }} total record{% if records.total != 1 %}s{% endif %}
+          </span>
+        </div>
+
+        <nav aria-label="Records table pagination">
+          <ul class="pagination pagination-sm mb-0">
+
+            <li class="page-item {% if not records.has_prev %}disabled{% endif %}">
+              <a
+                class="page-link"
+                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page - 1, count=records.per_page) }}"
+              >
+                Previous
+              </a>
+            </li>
+
+            {% if records.page > 3 %}
+              <li class="page-item">
+                <a
+                  class="page-link"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=1, count=records.per_page) }}"
+                >
+                  1
+                </a>
+              </li>
+
+              {% if records.page > 4 %}
+                <li class="page-item disabled">
+                  <span class="page-link">…</span>
+                </li>
+              {% endif %}
+            {% endif %}
+
+            {% for page_number in pagination_pages %}
+              <li class="page-item {% if page_number == records.page %}active{% endif %}">
+                <a
+                  class="page-link"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=page_number, count=records.per_page) }}"
+                >
+                  {{ page_number }}
+                </a>
+              </li>
+            {% endfor %}
+
+            {% if records.page < records.pages - 2 %}
+              {% if records.page < records.pages - 3 %}
+                <li class="page-item disabled">
+                  <span class="page-link">…</span>
+                </li>
+              {% endif %}
+
+              <li class="page-item">
+                <a
+                  class="page-link"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.pages, count=records.per_page) }}"
+                >
+                  {{ records.pages }}
+                </a>
+              </li>
+            {% endif %}
+
+            <li class="page-item {% if not records.has_next %}disabled{% endif %}">
+              <a
+                class="page-link"
+                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page + 1, count=records.per_page) }}"
+              >
+                Next
+              </a>
+            </li>
+
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% include "_admin/databases/db_create_record.html" %}
+{% endblock %}
+
+{% block js %}
+<script>
+  const createRecordDialog = document.getElementById("create-record-dialog");
+  const openCreateRecordDialogBtn = document.getElementById("open-create-record-dialog");
+  const closeCreateRecordDialogBtn = document.getElementById("close-create-record-dialog");
+  const cancelCreateRecordDialogBtn = document.getElementById("cancel-create-record-dialog");
+
+  openCreateRecordDialogBtn?.addEventListener("click", () => {
+    createRecordDialog.showModal();
+  });
+
+  closeCreateRecordDialogBtn?.addEventListener("click", () => {
+    createRecordDialog.close();
+  });
+
+  cancelCreateRecordDialogBtn?.addEventListener("click", () => {
+    createRecordDialog.close();
+  });
+
+  createRecordDialog?.addEventListener("click", (event) => {
+    const dialogRect = createRecordDialog.getBoundingClientRect();
+
+    const clickedOutside =
+      event.clientX < dialogRect.left ||
+      event.clientX > dialogRect.right ||
+      event.clientY < dialogRect.top ||
+      event.clientY > dialogRect.bottom;
+
+    if (clickedOutside) {
+      createRecordDialog.close();
+    }
+  });
+</script>
+{% endblock %}
