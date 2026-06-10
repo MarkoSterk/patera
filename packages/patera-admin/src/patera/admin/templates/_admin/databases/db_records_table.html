@@ -285,7 +285,43 @@
   const closeCreateRecordDialogBtn = document.getElementById("close-create-record-dialog");
   const cancelCreateRecordDialogBtn = document.getElementById("cancel-create-record-dialog");
 
+  const createRecordForm = document.getElementById("create-record-form");
+  const createRecordError = document.getElementById("create-record-error");
+
+  function clearCreateRecordError() {
+    if (!createRecordError) {
+      return;
+    }
+
+    createRecordError.textContent = "";
+    createRecordError.classList.add("d-none");
+  }
+
+  function showCreateRecordError(message) {
+    if (!createRecordError) {
+      return;
+    }
+
+    createRecordError.textContent = message || "Failed to create record.";
+    createRecordError.classList.remove("d-none");
+  }
+
+  async function getErrorMessage(response) {
+    try {
+      const data = await response.json();
+
+      return (
+        data.message ||
+        data.error ||
+        "Failed to create record."
+      );
+    } catch {
+      return "Failed to create record.";
+    }
+  }
+
   openCreateRecordDialogBtn?.addEventListener("click", () => {
+    clearCreateRecordError();
     createRecordDialog.showModal();
   });
 
@@ -308,6 +344,57 @@
 
     if (clickedOutside) {
       createRecordDialog.close();
+    }
+  });
+
+  createRecordForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearCreateRecordError();
+
+    if (!createRecordForm.checkValidity()) {
+      createRecordForm.reportValidity();
+      return;
+    }
+
+    const submitBtn = createRecordForm.querySelector('button[type="submit"]');
+    const originalSubmitText = submitBtn?.innerHTML;
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+        Creating...
+      `;
+    }
+
+    try {
+      const formData = new FormData(createRecordForm);
+
+      const response = await fetch(createRecordForm.action, {
+        method: createRecordForm.method || "POST",
+        body: formData,
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response);
+        showCreateRecordError(message);
+        return;
+      }
+
+      if (response.redirected) {
+        window.location.href = response.url;
+        return;
+      }
+
+      window.location.reload();
+    } catch (error) {
+      showCreateRecordError("Network error. Failed to create record.");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalSubmitText;
+      }
     }
   });
 </script>

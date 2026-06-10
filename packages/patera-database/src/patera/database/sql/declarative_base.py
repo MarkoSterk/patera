@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import DeclarativeBase
 
-from patera import Request, Patera
+from patera import Patera
 from patera.ctx import current_request
 
 if TYPE_CHECKING:
@@ -78,26 +78,20 @@ class DeclarativeBaseModel(DeclarativeBase):
 
     async def admin_create(
         self,
-        req: Request,
         new_data: dict[str, Any],
-        session: AsyncSession,
     ) -> None:
         for key, value in new_data.items():
             setattr(self, key, value)
-        session.add(self)
 
-    async def admin_delete(self, req: Request, session: AsyncSession) -> None:
-        await session.delete(self)
+    async def admin_delete(self) -> None:
+        pass
 
     async def admin_update(
         self,
-        req: Request,
         new_data: dict[str, Any],
-        session: AsyncSession,
     ) -> None:
         for key, value in new_data.items():
             setattr(self, key, value)
-        session.add(self)
 
     @classmethod
     def query(
