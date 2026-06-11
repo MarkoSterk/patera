@@ -1,0 +1,96 @@
+{% extends '_admin/layout/base.html' %}
+
+{% block content %}
+<main class="app-main py-4">
+  <div class="container-fluid px-3 px-md-4">
+
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-10 col-lg-8 col-xl-6">
+
+        <div class="card content-card shadow-sm border-0">
+          <div class="card-body p-4 p-md-5 text-center">
+
+            <div class="mb-4">
+              <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger"
+                   style="width: 72px; height: 72px;">
+                <i class="bi bi-exclamation-triangle fs-1"></i>
+              </div>
+            </div>
+
+            <h1 class="h3 mb-2">
+              {{ error_title or translate('error') }}
+            </h1>
+
+            <p class="text-muted mb-4">
+              {{ error_message or translate('something_went_wrong') }}
+            </p>
+
+            {% if error_status %}
+              <div class="mb-4">
+                <span class="badge text-bg-light border">
+                  {{ translate('status_code') }}: {{ error_status }}
+                </span>
+              </div>
+            {% endif %}
+
+            {% if error_details %}
+              <div class="text-start mb-4">
+                <div class="accordion" id="errorDetailsAccordion">
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="errorDetailsHeading">
+                      <button
+                        class="accordion-button collapsed"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#errorDetailsCollapse"
+                        aria-expanded="false"
+                        aria-controls="errorDetailsCollapse"
+                      >
+                        <i class="bi bi-bug me-2"></i>
+                        {{ translate('error_details') }}
+                      </button>
+                    </h2>
+
+                    <div
+                      id="errorDetailsCollapse"
+                      class="accordion-collapse collapse"
+                      aria-labelledby="errorDetailsHeading"
+                      data-bs-parent="#errorDetailsAccordion"
+                    >
+                      <div class="accordion-body">
+                        <pre class="mb-0 small text-muted"><code>{{ error_details }}</code></pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+
+            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+              <a
+                href="{{ admin_interface.url_for('_AdminController.dashboard') }}"
+                class="btn btn-primary"
+              >
+                <i class="bi bi-speedometer2 me-1"></i>
+                {{ translate('back_to_dashboard') }}
+              </a>
+
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                onclick="history.back()"
+              >
+                <i class="bi bi-arrow-left me-1"></i>
+                {{ translate('go_back') }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}

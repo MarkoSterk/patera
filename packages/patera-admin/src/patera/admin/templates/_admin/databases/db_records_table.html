@@ -143,32 +143,36 @@
 
                   <td class="text-end text-nowrap">
                     <div class="btn-group btn-group-sm" role="group" aria-label="Record actions">
-                      <a
-                        href="#"
-                        class="btn btn-outline-primary"
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary view-record-btn"
                         data-record-id="{{ record_pk }}"
+                        data-get-url="{{ admin_interface.url_for('_AdminDbController.get_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-eye me-1"></i>
                         View
-                      </a>
+                      </button>
 
-                      <a
-                        href="#"
-                        class="btn btn-outline-secondary"
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary edit-record-btn"
                         data-record-id="{{ record_pk }}"
+                        data-get-url="{{ admin_interface.url_for('_AdminDbController.get_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
+                        data-update-url="{{ admin_interface.url_for('_AdminDbController.update_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-pencil-square me-1"></i>
                         Edit
-                      </a>
+                      </button>
 
-                      <a
-                        href="#"
-                        class="btn btn-outline-danger"
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger delete-record-btn"
                         data-record-id="{{ record_pk }}"
+                        data-delete-url="{{ admin_interface.url_for('_AdminDbController.delete_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-trash3 me-1"></i>
                         Delete
-                      </a>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -208,7 +212,7 @@
             <li class="page-item {% if not records.has_prev %}disabled{% endif %}">
               <a
                 class="page-link"
-                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page - 1, count=records.per_page) }}"
+                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page - 1, per_page=records.per_page) }}"
               >
                 Previous
               </a>
@@ -218,7 +222,7 @@
               <li class="page-item">
                 <a
                   class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=1, count=records.per_page) }}"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=1, per_page=records.per_page) }}"
                 >
                   1
                 </a>
@@ -235,7 +239,7 @@
               <li class="page-item {% if page_number == records.page %}active{% endif %}">
                 <a
                   class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=page_number, count=records.per_page) }}"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=page_number, per_page=records.per_page) }}"
                 >
                   {{ page_number }}
                 </a>
@@ -252,7 +256,7 @@
               <li class="page-item">
                 <a
                   class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.pages, count=records.per_page) }}"
+                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.pages, per_page=records.per_page) }}"
                 >
                   {{ records.pages }}
                 </a>
@@ -262,7 +266,7 @@
             <li class="page-item {% if not records.has_next %}disabled{% endif %}">
               <a
                 class="page-link"
-                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page + 1, count=records.per_page) }}"
+                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page + 1, per_page=records.per_page) }}"
               >
                 Next
               </a>
@@ -276,6 +280,9 @@
   </div>
 </main>
 {% include "_admin/databases/db_create_record.html" %}
+{% include "_admin/databases/db_update_record.html" %}
+{% include "_admin/databases/db_delete_record.html" %}
+{% include "_admin/databases/db_view_record.html" %}
 {% endblock %}
 
 {% block js %}
@@ -288,97 +295,235 @@
   const createRecordForm = document.getElementById("create-record-form");
   const createRecordError = document.getElementById("create-record-error");
 
-  function clearCreateRecordError() {
-    if (!createRecordError) {
+  const updateRecordDialog = document.getElementById("update-record-dialog");
+  const updateRecordForm = document.getElementById("update-record-form");
+  const updateRecordError = document.getElementById("update-record-error");
+  const closeUpdateRecordDialogBtn = document.getElementById("close-update-record-dialog");
+  const cancelUpdateRecordDialogBtn = document.getElementById("cancel-update-record-dialog");
+
+  const deleteRecordDialog = document.getElementById("delete-record-dialog");
+  const deleteRecordError = document.getElementById("delete-record-error");
+  const closeDeleteRecordDialogBtn = document.getElementById("close-delete-record-dialog");
+  const cancelDeleteRecordDialogBtn = document.getElementById("cancel-delete-record-dialog");
+  const confirmDeleteRecordBtn = document.getElementById("confirm-delete-record-btn");
+
+  const viewRecordDialog = document.getElementById("view-record-dialog");
+  const viewRecordError = document.getElementById("view-record-error");
+  const viewRecordLoading = document.getElementById("view-record-loading");
+  const viewRecordContent = document.getElementById("view-record-content");
+  const viewRecordTableBody = document.getElementById("view-record-table-body");
+  const closeViewRecordDialogBtn = document.getElementById("close-view-record-dialog");
+  const closeViewRecordFooterBtn = document.getElementById("close-view-record-footer-btn");
+
+  let pendingDeleteUrl = null;
+  let pendingDeleteButton = null;
+
+  function clearError(errorContainer) {
+    if (!errorContainer) {
       return;
     }
 
-    createRecordError.textContent = "";
-    createRecordError.classList.add("d-none");
+    errorContainer.textContent = "";
+    errorContainer.classList.add("d-none");
   }
 
-  function showCreateRecordError(message) {
-    if (!createRecordError) {
+  function showError(errorContainer, message) {
+    if (!errorContainer) {
       return;
     }
 
-    createRecordError.textContent = message || "Failed to create record.";
-    createRecordError.classList.remove("d-none");
+    errorContainer.textContent = message || "Something went wrong.";
+    errorContainer.classList.remove("d-none");
   }
 
-  async function getErrorMessage(response) {
+  async function getErrorMessage(response, fallbackMessage = "Something went wrong.") {
     try {
       const data = await response.json();
 
       return (
         data.message ||
         data.error ||
-        "Failed to create record."
+        fallbackMessage
       );
     } catch {
-      return "Failed to create record.";
+      return fallbackMessage;
     }
   }
 
-  openCreateRecordDialogBtn?.addEventListener("click", () => {
-    clearCreateRecordError();
-    createRecordDialog.showModal();
-  });
+  function closeDialogOnBackdropClick(dialog) {
+    dialog?.addEventListener("click", (event) => {
+      const dialogRect = dialog.getBoundingClientRect();
 
-  closeCreateRecordDialogBtn?.addEventListener("click", () => {
-    createRecordDialog.close();
-  });
+      const clickedOutside =
+        event.clientX < dialogRect.left ||
+        event.clientX > dialogRect.right ||
+        event.clientY < dialogRect.top ||
+        event.clientY > dialogRect.bottom;
 
-  cancelCreateRecordDialogBtn?.addEventListener("click", () => {
-    createRecordDialog.close();
-  });
+      if (clickedOutside) {
+        dialog.close();
+      }
+    });
+  }
 
-  createRecordDialog?.addEventListener("click", (event) => {
-    const dialogRect = createRecordDialog.getBoundingClientRect();
-
-    const clickedOutside =
-      event.clientX < dialogRect.left ||
-      event.clientX > dialogRect.right ||
-      event.clientY < dialogRect.top ||
-      event.clientY > dialogRect.bottom;
-
-    if (clickedOutside) {
-      createRecordDialog.close();
+  function normalizeDateTimeLocalValue(value) {
+    if (!value || typeof value !== "string") {
+      return value || "";
     }
-  });
 
-  createRecordForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    clearCreateRecordError();
+    if (value.includes("T")) {
+      return value.slice(0, 16);
+    }
 
-    if (!createRecordForm.checkValidity()) {
-      createRecordForm.reportValidity();
+    return value;
+  }
+
+  function formatRecordValue(value) {
+    if (value === null || value === undefined || value === "") {
+      return "—";
+    }
+
+    if (value === true) {
+      return "True";
+    }
+
+    if (value === false) {
+      return "False";
+    }
+
+    if (typeof value === "object") {
+      return JSON.stringify(value, null, 2);
+    }
+
+    return String(value);
+  }
+
+  function formatRecordLabel(key) {
+    return key
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function renderReadonlyRecord(recordData) {
+    if (!viewRecordTableBody) {
       return;
     }
 
-    const submitBtn = createRecordForm.querySelector('button[type="submit"]');
+    viewRecordTableBody.innerHTML = "";
+
+    for (const [key, value] of Object.entries(recordData)) {
+      const tr = document.createElement("tr");
+
+      const th = document.createElement("th");
+      th.scope = "row";
+      th.className = "text-muted text-nowrap";
+      th.style.width = "220px";
+      th.textContent = formatRecordLabel(key);
+
+      const td = document.createElement("td");
+
+      if (value === null || value === undefined || value === "") {
+        const span = document.createElement("span");
+        span.className = "text-muted";
+        span.textContent = "—";
+        td.appendChild(span);
+      } else if (typeof value === "object") {
+        const pre = document.createElement("pre");
+        pre.className = "mb-0 small";
+        pre.textContent = JSON.stringify(value, null, 2);
+        td.appendChild(pre);
+      } else if (value === true || value === false) {
+        const span = document.createElement("span");
+        span.className = value ? "badge text-bg-success" : "badge text-bg-secondary";
+        span.textContent = value ? "True" : "False";
+        td.appendChild(span);
+      } else {
+        td.textContent = String(value);
+      }
+
+      tr.appendChild(th);
+      tr.appendChild(td);
+      viewRecordTableBody.appendChild(tr);
+    }
+  }
+
+  function setViewDialogLoading(isLoading) {
+    viewRecordLoading?.classList.toggle("d-none", !isLoading);
+    viewRecordContent?.classList.toggle("d-none", isLoading);
+  }
+
+  function setUpdateFormValues(recordData) {
+    if (!updateRecordForm) {
+      return;
+    }
+
+    const fields = updateRecordForm.querySelectorAll("[data-field-name]");
+
+    fields.forEach((field) => {
+      const fieldName = field.dataset.fieldName;
+      const value = recordData[fieldName];
+
+      if (field.type === "checkbox") {
+        field.checked =
+          value === true ||
+          value === "true" ||
+          value === 1 ||
+          value === "1";
+
+        return;
+      }
+
+      if (field.type === "datetime-local") {
+        field.value = normalizeDateTimeLocalValue(value);
+        return;
+      }
+
+      if (field.type === "date") {
+        field.value = value ? String(value).slice(0, 10) : "";
+        return;
+      }
+
+      field.value = value ?? "";
+    });
+  }
+
+  async function submitFormWithFetch({
+    form,
+    errorContainer,
+    loadingText,
+    fallbackErrorMessage,
+    methodOverride = null
+  }) {
+    clearError(errorContainer);
+
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
     const originalSubmitText = submitBtn?.innerHTML;
 
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = `
         <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-        Creating...
+        ${loadingText}
       `;
     }
 
     try {
-      const formData = new FormData(createRecordForm);
+      const formData = new FormData(form);
 
-      const response = await fetch(createRecordForm.action, {
-        method: createRecordForm.method || "POST",
+      const response = await fetch(form.action, {
+        method: methodOverride || form.method || "POST",
         body: formData,
         redirect: "follow"
       });
 
       if (!response.ok) {
-        const message = await getErrorMessage(response);
-        showCreateRecordError(message);
+        const message = await getErrorMessage(response, fallbackErrorMessage);
+        showError(errorContainer, message);
         return;
       }
 
@@ -388,12 +533,208 @@
       }
 
       window.location.reload();
-    } catch (error) {
-      showCreateRecordError("Network error. Failed to create record.");
+    } catch {
+      showError(errorContainer, fallbackErrorMessage);
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalSubmitText;
+      }
+    }
+  }
+
+  openCreateRecordDialogBtn?.addEventListener("click", () => {
+    clearError(createRecordError);
+    createRecordForm?.reset();
+    createRecordDialog?.showModal();
+  });
+
+  closeCreateRecordDialogBtn?.addEventListener("click", () => {
+    createRecordDialog?.close();
+  });
+
+  cancelCreateRecordDialogBtn?.addEventListener("click", () => {
+    createRecordDialog?.close();
+  });
+
+  closeUpdateRecordDialogBtn?.addEventListener("click", () => {
+    updateRecordDialog?.close();
+  });
+
+  cancelUpdateRecordDialogBtn?.addEventListener("click", () => {
+    updateRecordDialog?.close();
+  });
+
+  closeDeleteRecordDialogBtn?.addEventListener("click", () => {
+    deleteRecordDialog?.close();
+  });
+
+  cancelDeleteRecordDialogBtn?.addEventListener("click", () => {
+    deleteRecordDialog?.close();
+  });
+
+  closeViewRecordDialogBtn?.addEventListener("click", () => {
+    viewRecordDialog?.close();
+  });
+
+  closeViewRecordFooterBtn?.addEventListener("click", () => {
+    viewRecordDialog?.close();
+  });
+
+  closeDialogOnBackdropClick(createRecordDialog);
+  closeDialogOnBackdropClick(updateRecordDialog);
+  closeDialogOnBackdropClick(deleteRecordDialog);
+  closeDialogOnBackdropClick(viewRecordDialog);
+
+  createRecordForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    await submitFormWithFetch({
+      form: createRecordForm,
+      errorContainer: createRecordError,
+      loadingText: "Creating...",
+      fallbackErrorMessage: "Failed to create record."
+    });
+  });
+
+  document.querySelectorAll(".view-record-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const getUrl = button.dataset.getUrl;
+
+      clearError(viewRecordError);
+
+      if (viewRecordTableBody) {
+        viewRecordTableBody.innerHTML = "";
+      }
+
+      setViewDialogLoading(true);
+      viewRecordDialog?.showModal();
+
+      try {
+        const response = await fetch(getUrl, {
+          method: "GET"
+        });
+
+        if (!response.ok) {
+          const message = await getErrorMessage(response, "Failed to fetch record.");
+          showError(viewRecordError, message);
+          setViewDialogLoading(false);
+          return;
+        }
+
+        const payload = await response.json();
+
+        renderReadonlyRecord(payload.data || {});
+        setViewDialogLoading(false);
+      } catch {
+        showError(viewRecordError, "Network error. Failed to fetch record.");
+        setViewDialogLoading(false);
+      }
+    });
+  });
+
+  document.querySelectorAll(".edit-record-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const getUrl = button.dataset.getUrl;
+      const updateUrl = button.dataset.updateUrl;
+
+      clearError(updateRecordError);
+      updateRecordForm?.reset();
+
+      if (updateRecordForm) {
+        updateRecordForm.action = updateUrl;
+      }
+
+      try {
+        const response = await fetch(getUrl, {
+          method: "GET"
+        });
+
+        if (!response.ok) {
+          const message = await getErrorMessage(response, "Failed to fetch record.");
+          showError(updateRecordError, message);
+          updateRecordDialog?.showModal();
+          return;
+        }
+
+        const payload = await response.json();
+
+        setUpdateFormValues(payload.data || {});
+        updateRecordDialog?.showModal();
+      } catch {
+        showError(updateRecordError, "Network error. Failed to fetch record.");
+        updateRecordDialog?.showModal();
+      }
+    });
+  });
+
+  updateRecordForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    await submitFormWithFetch({
+      form: updateRecordForm,
+      errorContainer: updateRecordError,
+      loadingText: "Updating...",
+      fallbackErrorMessage: "Failed to update record.",
+      methodOverride: "PUT"
+    });
+  });
+
+  document.querySelectorAll(".delete-record-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      pendingDeleteUrl = button.dataset.deleteUrl;
+      pendingDeleteButton = button;
+
+      clearError(deleteRecordError);
+
+      deleteRecordDialog?.showModal();
+    });
+  });
+
+  confirmDeleteRecordBtn?.addEventListener("click", async () => {
+    if (!pendingDeleteUrl) {
+      showError(deleteRecordError, "Missing delete URL.");
+      return;
+    }
+
+    const originalConfirmText = confirmDeleteRecordBtn.innerHTML;
+
+    confirmDeleteRecordBtn.disabled = true;
+    confirmDeleteRecordBtn.innerHTML = `
+      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      Deleting...
+    `;
+
+    if (pendingDeleteButton) {
+      pendingDeleteButton.disabled = true;
+    }
+
+    try {
+      const response = await fetch(pendingDeleteUrl, {
+        method: "DELETE",
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, "Failed to delete record.");
+        showError(deleteRecordError, message);
+        return;
+      }
+
+      if (response.redirected) {
+        window.location.href = response.url;
+        return;
+      }
+
+      window.location.reload();
+    } catch {
+      showError(deleteRecordError, "Network error. Failed to delete record.");
+    } finally {
+      confirmDeleteRecordBtn.disabled = false;
+      confirmDeleteRecordBtn.innerHTML = originalConfirmText;
+
+      if (pendingDeleteButton) {
+        pendingDeleteButton.disabled = false;
       }
     }
   });

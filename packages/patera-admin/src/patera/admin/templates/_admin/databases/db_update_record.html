@@ -1,0 +1,163 @@
+<dialog class="admin-dialog" id="update-record-dialog">
+  <div class="card border-0 shadow-lg">
+
+    <form id="update-record-form" method="post" action="">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">
+          <i class="bi bi-pencil-square me-1"></i>
+          Update {{ model_name }}
+        </h2>
+
+        <button
+          type="button"
+          class="btn-close"
+          id="close-update-record-dialog"
+          aria-label="Close"
+        ></button>
+      </div>
+
+      <div class="card-body">
+
+        <div
+          id="update-record-error"
+          class="alert alert-danger d-none"
+          role="alert"
+        ></div>
+
+        {% if update_fields %}
+          <div class="row g-3">
+
+            {% for field in update_fields %}
+              <div class="col-12">
+
+                {% if field.custom_field %}
+                  {{ render_custom_form_field(field)|safe }}
+
+                {% elif field.input_type == "checkbox" %}
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="update-field-{{ field.name }}"
+                      name="{{ field.name }}"
+                      value="true"
+                      data-field-name="{{ field.name }}"
+                    >
+
+                    <label class="form-check-label" for="update-field-{{ field.name }}">
+                      {{ field.label }}
+                    </label>
+                  </div>
+
+                {% elif field.input_type == "textarea" %}
+                  <label for="update-field-{{ field.name }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.required %}
+                      <span class="text-danger">*</span>
+                    {% endif %}
+                  </label>
+
+                  <textarea
+                    class="form-control"
+                    id="update-field-{{ field.name }}"
+                    name="{{ field.name }}"
+                    data-field-name="{{ field.name }}"
+                    rows="4"
+                    {% if field.required %}required{% endif %}
+                  ></textarea>
+
+                {% elif field.input_type == "select" %}
+                  <label for="update-field-{{ field.name }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.required %}
+                      <span class="text-danger">*</span>
+                    {% endif %}
+                  </label>
+
+                  <select
+                    class="form-select"
+                    id="update-field-{{ field.name }}"
+                    name="{{ field.name }}"
+                    data-field-name="{{ field.name }}"
+                    {% if field.required %}required{% endif %}
+                  >
+                    <option value="">Select {{ field.label }}</option>
+
+                    {% for choice in field.choices %}
+                      <option value="{{ choice.value }}">
+                        {{ choice.label }}
+                      </option>
+                    {% endfor %}
+                  </select>
+
+                {% elif field.input_type == "number-decimal" %}
+                  <label for="update-field-{{ field.name }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.required %}
+                      <span class="text-danger">*</span>
+                    {% endif %}
+                  </label>
+
+                  <input
+                    class="form-control"
+                    type="number"
+                    step="any"
+                    id="update-field-{{ field.name }}"
+                    name="{{ field.name }}"
+                    data-field-name="{{ field.name }}"
+                    {% if field.required %}required{% endif %}
+                  >
+
+                {% else %}
+                  <label for="update-field-{{ field.name }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.required %}
+                      <span class="text-danger">*</span>
+                    {% endif %}
+                  </label>
+
+                  <input
+                    class="form-control"
+                    type="{{ field.input_type }}"
+                    id="update-field-{{ field.name }}"
+                    name="{{ field.name }}"
+                    data-field-name="{{ field.name }}"
+                    {% if field.required %}required{% endif %}
+                  >
+                {% endif %}
+
+              </div>
+            {% endfor %}
+
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            No update fields available for this model.
+          </div>
+        {% endif %}
+
+      </div>
+
+      <div class="card-footer bg-white d-flex justify-content-end gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          id="cancel-update-record-dialog"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+          {% if not update_fields %}disabled{% endif %}
+        >
+          <i class="bi bi-check-lg me-1"></i>
+          Update
+        </button>
+      </div>
+    </form>
+
+  </div>
+</dialog>

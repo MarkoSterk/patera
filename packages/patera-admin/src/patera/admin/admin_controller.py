@@ -14,7 +14,11 @@ from patera import Patera, Request, Response, HttpStatus
 from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
-from .exceptions import UnsupportedLanguage
+from .exceptions import (
+    UnsupportedLanguage,
+    AdminLoginRequiredException,
+    AdminAuthorizationRequiredException,
+)
 from .schemas.dashboard_schemas import LogsQuerySchema
 
 
@@ -50,7 +54,11 @@ class _AdminController(Controller[Patera]):
         )
 
     @get("/dashboard")
-    @role_required(Permissions.ADMIN_CAN_ENTER)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def dashboard(self, req: Request) -> Response:
         """
         Admin dashboard page

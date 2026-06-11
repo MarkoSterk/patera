@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Optional, Type, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import (
     Boolean,
     Date,
@@ -20,12 +20,23 @@ from sqlalchemy import (
 from sqlalchemy.inspection import inspect
 
 from patera import Patera, Request, Response, MediaType, HttpStatus
-from patera.controller import Controller, get, post, consumes
+from patera.controller import Controller, get, post, consumes, delete, put
 from patera.database.sql import DeclarativeBaseModel, SqlDatabase
 from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
-from .exceptions import UnknownModelException, UnknownDatabaseException
+from .exceptions import (
+    UnknownModelException,
+    UnknownDatabaseException,
+    RecordNotFound,
+    AdminLoginRequiredException,
+    AdminAuthorizationRequiredException,
+)
+
+
+class RecordQuery(BaseModel):
+    page: int = 1
+    per_page: int = 20
 
 
 class _AdminDbController(Controller[Patera]):
@@ -34,7 +45,11 @@ class _AdminDbController(Controller[Patera]):
         super().__init__(*args, **kwargs)
 
     @get("/<string:db_name>")
-    @role_required(Permissions.ADMIN_CAN_VIEW)
+    @role_required(
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def database_overview(self, req: Request, db_name: str) -> Response:
         """
         Database overview page.
@@ -63,55 +78,141 @@ class _AdminDbController(Controller[Patera]):
         )
 
     @get("/<string:db_name>/model/<string:model_name>")
-    @role_required(Permissions.ADMIN_CAN_VIEW)
+    @role_required(
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def get_list(self, req: Request, db_name: str, model_name: str) -> Response:
         """
         Gets paginated list of model records.
         """
-        db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
+        try:
+            db: SqlDatabase = self.get_db(db_name)
+            model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
 
-        if db is None:
-            raise UnknownDatabaseException(db_name)
+            query_params = RecordQuery(**req.query_parameters)  # type: ignore
 
-        model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
+            async with db.create_session() as session:
+                records = await model.query(session).paginate(
+                    page=query_params.page,
+                    per_page=query_params.per_page,
+                )
 
-        page = self.get_positive_int_query_param(req, "page", 1)
-        count = self.get_positive_int_query_param(req, "count", 10)
+            table_columns = self.get_admin_table_columns(model)
+            create_fields = self.get_admin_create_form_fields(model)
+            update_fields = self.get_admin_update_form_fields(model)
 
-        async with db.create_session() as session:
-            records = await model.query(session).paginate(
-                page=page,
-                per_page=count,
+            return await req.res.html(
+                "_admin/databases/db_records_table.html",
+                {
+                    **self.admin_interface.context_variables,
+                    "db_name": db_name,
+                    "model_name": model_name,
+                    "table_name": model.__tablename__,
+                    "records": records,
+                    "table_columns": table_columns,
+                    "create_fields": create_fields,
+                    "update_fields": update_fields,
+                    "pagination_pages": self.get_pagination_pages(
+                        records.page,
+                        records.pages,
+                    ),
+                    "get_record_value": self.get_record_value,
+                    "get_record_primary_key_value": self.get_record_primary_key_value,
+                    "render_custom_form_field": self.render_custom_form_field,
+                    "model": model,
+                    "db": db,
+                },
             )
+        except (UnknownModelException, UnknownDatabaseException):
+            return (
+                await req.res.html(
+                    "_admin/error.html",
+                    {
+                        "error_message": "Unknown database or model",
+                        "error_title": "Invalid action",
+                    },
+                )
+            ).status(HttpStatus.BAD_REQUEST)
+        except ValidationError:
+            return (
+                await req.res.html(
+                    "_admin/error.html",
+                    {
+                        "error_message": "Invalid query parameters. Please provide page[int] and per_page[int]",
+                        "error_title": "Invalid record query",
+                    },
+                )
+            ).status(HttpStatus.BAD_REQUEST)
+        except Exception as e:
+            self.app.logger.exception(e)
+            return (
+                await req.res.html(
+                    "_admin/error.html",
+                    {
+                        "error_message": "Faile to load table records.",
+                        "error_title": "Internal server error",
+                    },
+                )
+            ).status(HttpStatus.INTERNAL_SERVER_ERROR)
 
-        table_columns = self.get_admin_table_columns(model)
-        create_fields = self.get_admin_create_form_fields(model)
+    @get("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
+    @role_required(
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def get_record(
+        self,
+        req: Request,
+        db_name: str,
+        model_name: str,
+        pk_values_str: str,
+    ) -> Response:
+        try:
+            pk_values = self.path_pairs_to_dict(pk_values_str)
+            db: SqlDatabase = self.get_db(db_name)
+            model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
 
-        return await req.res.html(
-            "_admin/databases/db_records_table.html",
-            {
-                **self.admin_interface.context_variables,
-                "db_name": db_name,
-                "model_name": model_name,
-                "table_name": model.__tablename__,
-                "records": records,
-                "table_columns": table_columns,
-                "create_fields": create_fields,
-                "pagination_pages": self.get_pagination_pages(
-                    records.page,
-                    records.pages,
-                ),
-                "get_record_value": self.get_record_value,
-                "get_record_primary_key_value": self.get_record_primary_key_value,
-                "render_custom_form_field": self.render_custom_form_field,
-                "model": model,
-                "db": db,
-            },
-        )
+            async with db.create_session() as session:
+                record = await model.query(session).filter_by(**pk_values).first()
+
+            if record is None:
+                raise RecordNotFound(db_name, model_name)
+
+            return req.res.json(
+                {
+                    "message": "Record fetched successfully.",
+                    "status": "success",
+                    "data": self.serialize_record(record, model),
+                }
+            ).status(HttpStatus.OK)
+
+        except RecordNotFound:
+            return req.res.json(
+                {
+                    "message": "Record not found.",
+                    "status": "error",
+                }
+            ).status(HttpStatus.NOT_FOUND)
+
+        except Exception as e:
+            self.app.logger.exception(e)
+            return req.res.json(
+                {
+                    "message": f"Failed to fetch record from database {db_name} and table {model_name}",
+                    "status": "error",
+                }
+            ).status(HttpStatus.INTERNAL_SERVER_ERROR)
 
     @post("/<string:db_name>/model/<string:model_name>/create")
     @consumes(MediaType.MULTIPART_FORM_DATA)
-    @role_required(Permissions.ADMIN_CAN_CREATE)
+    @role_required(
+        Permissions.ADMIN_CAN_CREATE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def create_record(
         self,
         req: Request,
@@ -145,6 +246,14 @@ class _AdminDbController(Controller[Patera]):
                     model_name=model_name,
                 )
             )
+        except ValidationError as e:
+            return req.res.json(
+                {
+                    "message": "Invalid record data.",
+                    "status": "error",
+                    "details": e.errors(),
+                }
+            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
@@ -154,24 +263,136 @@ class _AdminDbController(Controller[Patera]):
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
 
-    def get_positive_int_query_param(
-        self,
-        req: Request,
-        name: str,
-        default: int,
-    ) -> int:
-        """
-        Reads a positive integer query parameter.
-        Falls back to default if the value is missing or invalid.
-        """
-        raw_value = req.query_parameters.get(name, default)
-
+    @delete("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
+    @role_required(
+        Permissions.ADMIN_CAN_DELETE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def delete_record(
+        self, req: Request, db_name: str, model_name: str, pk_values_str: str
+    ) -> Response:
         try:
-            value = int(raw_value)
-        except (TypeError, ValueError):
-            return default
+            pk_values = self.path_pairs_to_dict(pk_values_str)
+            db: SqlDatabase = self.get_db(db_name)
+            model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
 
-        return max(value, 1)
+            async with db.create_session() as session:
+                async with session.begin():
+                    record = await model.query(session).filter_by(**pk_values).first()
+                    if record is None:
+                        raise RecordNotFound(db_name, model_name)
+                    await record.admin_delete()
+                    await session.delete(record)
+
+            return req.res.redirect(
+                self.admin_interface.url_for(
+                    "_AdminDbController.get_list",
+                    db_name=db_name,
+                    model_name=model_name,
+                )
+            )
+        except RecordNotFound:
+            return req.res.json(
+                {
+                    "message": "Record not found.",
+                    "status": "error",
+                }
+            ).status(HttpStatus.NOT_FOUND)
+        except Exception as e:
+            self.app.logger.exception(e)
+            return req.res.json(
+                {
+                    "message": f"Failed to delete record in database {db_name} and table {model_name}",
+                    "status": "error",
+                }
+            ).status(HttpStatus.INTERNAL_SERVER_ERROR)
+
+    @put("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
+    @role_required(
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def update_record(
+        self, req: Request, db_name: str, model_name: str, pk_values_str: str
+    ) -> Response:
+        try:
+            pk_values = self.path_pairs_to_dict(pk_values_str)
+            db: SqlDatabase = self.get_db(db_name)
+            model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
+            validation_schema: Optional[Type[BaseModel]] = (
+                model.update_validation_schema()
+            )
+
+            form_data = await req.form_and_files()
+            if validation_schema:
+                form_data = validation_schema.model_validate(form_data).model_dump()
+
+            async with db.create_session() as session:
+                async with session.begin():
+                    record = await model.query(session).filter_by(**pk_values).first()
+                    if record is None:
+                        raise RecordNotFound(db_name, model_name)
+                    await record.admin_update(form_data)
+                    session.add(record)
+
+            return req.res.redirect(
+                self.admin_interface.url_for(
+                    "_AdminDbController.get_list",
+                    db_name=db_name,
+                    model_name=model_name,
+                )
+            )
+        except ValidationError as e:
+            return req.res.json(
+                {
+                    "message": "Invalid record data.",
+                    "status": "error",
+                    "details": e.errors(),
+                }
+            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
+
+        except RecordNotFound:
+            return req.res.json(
+                {
+                    "message": "Record not found.",
+                    "status": "error",
+                }
+            ).status(HttpStatus.NOT_FOUND)
+        except Exception as e:
+            self.app.logger.exception(e)
+            return req.res.json(
+                {
+                    "message": f"Failed to delete record in database {db_name} and table {model_name} with PK {pk_values_str}",
+                    "status": "error",
+                }
+            ).status(HttpStatus.INTERNAL_SERVER_ERROR)
+
+    def path_pairs_to_dict(self, value: str) -> dict[str, str]:
+        """
+        Converts a slash-separated key/value path into a dictionary.
+
+        Example:
+            "name1/value1/name2/value2"
+
+        Returns:
+            {
+                "name1": "value1",
+                "name2": "value2",
+            }
+        """
+        value = value.strip("/")
+
+        if not value:
+            return {}
+
+        parts = value.split("/")
+
+        if len(parts) % 2 != 0:
+            raise ValueError("Input must contain an even number of path parts")
+
+        return {parts[i]: parts[i + 1] for i in range(0, len(parts), 2)}
 
     def get_pagination_pages(
         self,
@@ -330,6 +551,107 @@ class _AdminDbController(Controller[Patera]):
         )
 
         return [fields[field_name] for field_name in ordered_field_names]
+
+    def get_admin_update_form_fields(
+        self,
+        model: Type[DeclarativeBaseModel],
+    ) -> list[dict[str, Any]]:
+        """
+        Returns update-form field metadata for the admin update dialog.
+
+        Uses:
+        - model.Meta.exclude_from_update_form
+        - model.Meta.form_fields_order
+        - model.Meta.custom_labels
+        - model.Meta.custom_form_fields
+        - model.Meta.add_to_form
+
+        Primary keys are always excluded because they identify the record
+        and should not be edited through the form.
+        """
+        mapper = inspect(model)
+
+        excluded_fields = set(model.exclude_from_update_form())
+        excluded_fields.update(
+            pk_name for pk_name in (model.primary_key_names() or []) if pk_name
+        )
+
+        labels_map = model.form_labels_map()
+        preferred_order = model.form_fields_order() or []
+        custom_form_fields = model.custom_form_fields()
+        additional_fields = model.add_to_form()
+
+        fields: dict[str, dict[str, Any]] = {}
+
+        for column in mapper.columns:
+            field_name = column.key
+
+            if field_name in excluded_fields:
+                continue
+
+            fields[field_name] = {
+                "name": field_name,
+                "label": labels_map.get(
+                    field_name,
+                    field_name.replace("_", " ").title(),
+                ),
+                "input_type": self.get_input_type_for_column(column),
+                "required": self.is_required_column(column),
+                "custom_field": custom_form_fields.get(field_name),
+                "choices": self.get_column_choices(column),
+                "is_column": True,
+            }
+
+        for field_name, field_type in additional_fields.items():
+            if field_name in excluded_fields:
+                continue
+
+            fields[field_name] = {
+                "name": field_name,
+                "label": labels_map.get(
+                    field_name,
+                    field_name.replace("_", " ").title(),
+                ),
+                "input_type": self.get_input_type_for_python_type(field_type),
+                "required": False,
+                "custom_field": custom_form_fields.get(field_name),
+                "choices": self.get_python_type_choices(field_type),
+                "is_column": False,
+            }
+
+        ordered_field_names = self.order_field_names(
+            available_field_names=list(fields.keys()),
+            preferred_order=preferred_order,
+        )
+
+        return [fields[field_name] for field_name in ordered_field_names]
+
+    def serialize_record(
+        self,
+        record: DeclarativeBaseModel,
+        model: Type[DeclarativeBaseModel],
+    ) -> dict[str, Any]:
+        """
+        Serializes only mapped SQLAlchemy columns.
+        """
+        mapper = inspect(model)
+        data: dict[str, Any] = {}
+
+        for column in mapper.columns:
+            value = getattr(record, column.key)
+
+            if isinstance(value, datetime):
+                data[column.key] = value.isoformat()
+            elif isinstance(value, date):
+                data[column.key] = value.isoformat()
+            elif isinstance(value, Decimal):
+                data[column.key] = str(value)
+            elif isinstance(value, Enum):
+                data[column.key] = value.value
+            else:
+                data[column.key] = value
+
+        return data
 
     def order_field_names(
         self,
@@ -521,10 +843,12 @@ class _AdminDbController(Controller[Patera]):
         pk_names = model.primary_key_names() or []
 
         values = [
-            str(getattr(record, pk_name)) for pk_name in pk_names if pk_name is not None
+            f"{pk_name}/{str(getattr(record, pk_name))}"
+            for pk_name in pk_names
+            if pk_name is not None
         ]
 
-        return "|".join(values)
+        return "/".join(values)
 
     @property
     def admin_interface(self) -> AdminInterface:

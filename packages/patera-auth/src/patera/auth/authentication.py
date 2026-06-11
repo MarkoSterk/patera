@@ -220,16 +220,27 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
             and controller_authentication_attributes is None
         ):
             return await self.next(req)
-        if (
-            controller_authentication_attributes is not None
-            or handler_authentication_attributes is not None
-        ):  # type: ignore
-            user: Optional[Any] = await self.user_loader(req)
-            if user is None:
-                # not Authenticated
-                raise AuthenticationException(self.authentication_error)
-            req.set_user(user)
-            current_request.user = user
+
+        combined_attr = {}
+        if controller_authentication_attributes is not None:
+            combined_attr.update(controller_authentication_attributes)
+        if handler_authentication_attributes is not None:
+            combined_attr.update(handler_authentication_attributes)
+
+        authentication_exc = combined_attr.get(
+            "authentication_exception", AuthenticationException
+        )
+        authorization_exc = combined_attr.get(
+            "authorization_exception", AuthorizationException
+        )
+
+        user: Optional[Any] = await self.user_loader(req)
+        if user is None:
+            # not Authenticated
+            raise authentication_exc(self.authentication_error)
+
+        req.set_user(user)
+        current_request.user = user
         controller_roles: list[Any] = (
             controller_authentication_attributes.get("roles", [])
             if controller_authentication_attributes
@@ -247,7 +258,7 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         authorized: bool = await self.role_check(req.user, list(roles))
         if not authorized:
             # not authorized
-            raise AuthorizationException(self.authorization_error, list(roles))
+            raise authorization_exc(self.authorization_error, list(roles))
         # user is authenticated and authorized - calls next middleware in chain
         return await self.next(req)
 
@@ -267,18 +278,29 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         """
 
 
-def login_required(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
+def login_required(
+    handler: "Callable|Type[Controller]",
+    *,
+    raise_authentication_exception=AuthenticationException,
+) -> "Callable|Type[Controller]":
     """
     Decorator for login required
     """
-    attributes: dict[str, Any] = getattr(handler, "_authentication", {})
-    attributes["required"] = True
-    setattr(handler, "_authentication", attributes)
-    return handler
+
+    def decorator(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
+        attributes: dict[str, Any] = getattr(handler, "_authentication", {})
+        attributes["required"] = True
+        attributes["authentication_exception"] = raise_authentication_exception
+        setattr(handler, "_authentication", attributes)
+        return handler
+
+    return decorator
 
 
 def role_required(
     *roles,
+    raise_authentication_exception=AuthorizationException,
+    raise_authorization_exception=AuthorizationException,
 ) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
     Decorator for role required
@@ -288,6 +310,8 @@ def role_required(
         attributes: dict[str, Any] = getattr(handler, "_authentication", {})
         attributes["roles"] = list(roles)
         attributes["required"] = True
+        attributes["authentication_exception"] = raise_authentication_exception
+        attributes["authorization_exception"] = raise_authorization_exception
         setattr(handler, "_authentication", attributes)
         return handler
 
