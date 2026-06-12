@@ -279,10 +279,9 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
 
 
 def login_required(
-    handler: "Callable|Type[Controller]",
     *,
-    raise_authentication_exception=AuthenticationException,
-) -> "Callable|Type[Controller]":
+    raise_authentication_exception: Type[Exception] = AuthenticationException,
+) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
     Decorator for login required
     """
@@ -299,8 +298,8 @@ def login_required(
 
 def role_required(
     *roles,
-    raise_authentication_exception=AuthorizationException,
-    raise_authorization_exception=AuthorizationException,
+    raise_authentication_exception: Type[Exception] = AuthorizationException,
+    raise_authorization_exception: Type[Exception] = AuthorizationException,
 ) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
     Decorator for role required

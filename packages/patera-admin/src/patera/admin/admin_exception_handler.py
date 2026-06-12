@@ -5,8 +5,13 @@ from typing import cast
 from patera.exceptions import ExceptionHandler, handles
 from patera import Patera, Request, Response, HttpStatus
 
-from .exceptions import UnsupportedLanguage, MissingPermission
-from .admin_interface import AdminInterface
+from .exceptions import (
+    AdminUnsupportedLanguage,
+    AdminMissingPermission,
+    AdminLoginRequiredException,
+    AdminAuthorizationRequiredException,
+)
+from .admin_interface import AdminInterface, Permissions
 
 
 class _AdminExceptionHandler(ExceptionHandler[Patera]):
@@ -14,9 +19,9 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
         self._admin_interface: AdminInterface = cast(AdminInterface, None)
         super().__init__(*args, **kwargs)
 
-    @handles(UnsupportedLanguage)
+    @handles(AdminUnsupportedLanguage)
     async def unsupported_lang_exc(
-        self, req: Request, exc: UnsupportedLanguage
+        self, req: Request, exc: AdminUnsupportedLanguage
     ) -> Response:
         return req.res.json(
             {
@@ -25,15 +30,51 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
             }
         ).status(HttpStatus.BAD_REQUEST)
 
-    @handles(MissingPermission)
+    @handles(AdminMissingPermission)
     async def missing_permission_exc(
-        self, req: Request, exc: MissingPermission
+        self, req: Request, exc: AdminMissingPermission
     ) -> Response:
         return req.res.json(
             {
                 "message": f"Missing required permission for '{exc.permission}'",
                 "status": "error",
             }
+        ).status(HttpStatus.UNAUTHORIZED)
+
+    @handles(AdminLoginRequiredException)
+    async def login_required_exc(
+        self, req: Request, exc: AdminLoginRequiredException
+    ) -> Response:
+        return req.res.redirect(
+            self.admin_interface.url_for(
+                "_AdminController.login", lang=self.admin_interface.current_language
+            )
+        )
+
+    @handles(AdminAuthorizationRequiredException)
+    async def authorization_required_exc(
+        self, req: Request, exc: AdminAuthorizationRequiredException
+    ) -> Response:
+        if req.headers.get("content-type", "text/html").lower() == "text/html":
+            if Permissions.ADMIN_CAN_ENTER in exc.roles:
+                return req.res.redirect(
+                    self.admin_interface.url_for("_AdminController.unauthorized_entry")
+                )
+            return (
+                await req.res.html(
+                    "_admin/error.html",
+                    {
+                        **self.admin_interface.context_variables,
+                        "error_title": "Unauthorized",
+                        "error_message": "Missing authorization for action.",
+                        "error_status": exc.msg,
+                        "status_code": HttpStatus.UNAUTHORIZED,
+                        "error_details": None,
+                    },
+                )
+            ).status(HttpStatus.UNAUTHORIZED)
+        return req.res.json(
+            {"message": "Missing required role", "status": "success"}
         ).status(HttpStatus.UNAUTHORIZED)
 
     @property

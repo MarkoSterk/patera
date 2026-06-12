@@ -11,11 +11,11 @@ from werkzeug.security import safe_join
 from patera.utilities import get_file, get_range_file
 from patera.controller import Controller, get, before_request
 from patera import Patera, Request, Response, HttpStatus
-from patera.auth import role_required
+from patera.auth import role_required, login_required
 
 from .admin_interface import AdminInterface, Permissions
 from .exceptions import (
-    UnsupportedLanguage,
+    AdminUnsupportedLanguage,
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
 )
@@ -35,7 +35,7 @@ class _AdminController(Controller[Patera]):
     async def check_language(self, req: Request):
         lang = cast(str, req.route_parameters.get("lang"))
         if lang not in self.admin_interface.supported_languages:
-            raise UnsupportedLanguage(lang)
+            raise AdminUnsupportedLanguage(lang)
 
     @get("/")
     async def login(self, req: Request) -> Response:
@@ -112,6 +112,13 @@ class _AdminController(Controller[Patera]):
                 "logs_order_by": query_schema.order_by,
                 "logs_query": query_schema.query or "",
             },
+        )
+
+    @get("/unauthorized")
+    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    async def unauthorized_entry(self, req: Request) -> Response:
+        return await req.res.html(
+            "_admin/unauthorized_entry.html", {**self.admin_interface.context_variables}
         )
 
     @get("/_static/<path:filename>")

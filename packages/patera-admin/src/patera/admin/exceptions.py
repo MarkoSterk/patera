@@ -1,29 +1,29 @@
-class UnsupportedLanguage(RuntimeError):
+class AdminUnsupportedLanguage(RuntimeError):
     def __init__(self, lang: str):
         self.lang = lang
         super().__init__(f"Unsupported language: {lang}")
 
 
-class MissingPermission(RuntimeError):
+class AdminMissingPermission(RuntimeError):
     def __init__(self, permission: str):
         self.permission = permission
         super().__init__(f"Missing user permission for: {permission}")
 
 
-class UnknownModelException(RuntimeError):
+class AdminUnknownModelException(RuntimeError):
     def __init__(self, model_name: str, db_name):
         self.model_name = model_name
         self.db_name = db_name
         super().__init__(f"Model {model_name} in database {db_name} not found.")
 
 
-class UnknownDatabaseException(RuntimeError):
+class AdminUnknownDatabaseException(RuntimeError):
     def __init__(self, db_name: str):
         self.db_name = db_name
         super().__init__(f"Database with name {db_name} not found.")
 
 
-class RecordNotFound(RuntimeError):
+class AdminRecordNotFound(RuntimeError):
     def __init__(self, db_name: str, model_name, **pk_values):
         self.db_name = db_name
         self.model_name = model_name
@@ -40,6 +40,7 @@ class AdminLoginRequiredException(RuntimeError):
 
 
 class AdminAuthorizationRequiredException(RuntimeError):
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, roles: list[str]):
         self.msg = msg
+        self.roles = roles
         super().__init__(msg)

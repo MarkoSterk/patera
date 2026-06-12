@@ -26,9 +26,9 @@ from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
 from .exceptions import (
-    UnknownModelException,
-    UnknownDatabaseException,
-    RecordNotFound,
+    AdminUnknownModelException,
+    AdminUnknownDatabaseException,
+    AdminRecordNotFound,
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
 )
@@ -46,6 +46,7 @@ class _AdminDbController(Controller[Patera]):
 
     @get("/<string:db_name>")
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -57,7 +58,7 @@ class _AdminDbController(Controller[Patera]):
         db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
 
         if db is None:
-            raise UnknownDatabaseException(db_name)
+            raise AdminUnknownDatabaseException(db_name)
 
         db_models = [
             model
@@ -79,6 +80,7 @@ class _AdminDbController(Controller[Patera]):
 
     @get("/<string:db_name>/model/<string:model_name>")
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -125,7 +127,7 @@ class _AdminDbController(Controller[Patera]):
                     "db": db,
                 },
             )
-        except (UnknownModelException, UnknownDatabaseException):
+        except (AdminUnknownModelException, AdminUnknownDatabaseException):
             return (
                 await req.res.html(
                     "_admin/error.html",
@@ -159,6 +161,7 @@ class _AdminDbController(Controller[Patera]):
 
     @get("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -179,7 +182,7 @@ class _AdminDbController(Controller[Patera]):
                 record = await model.query(session).filter_by(**pk_values).first()
 
             if record is None:
-                raise RecordNotFound(db_name, model_name)
+                raise AdminRecordNotFound(db_name, model_name)
 
             return req.res.json(
                 {
@@ -189,7 +192,7 @@ class _AdminDbController(Controller[Patera]):
                 }
             ).status(HttpStatus.OK)
 
-        except RecordNotFound:
+        except AdminRecordNotFound:
             return req.res.json(
                 {
                     "message": "Record not found.",
@@ -209,6 +212,7 @@ class _AdminDbController(Controller[Patera]):
     @post("/<string:db_name>/model/<string:model_name>/create")
     @consumes(MediaType.MULTIPART_FORM_DATA)
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_CREATE,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -265,6 +269,7 @@ class _AdminDbController(Controller[Patera]):
 
     @delete("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_DELETE,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -281,7 +286,7 @@ class _AdminDbController(Controller[Patera]):
                 async with session.begin():
                     record = await model.query(session).filter_by(**pk_values).first()
                     if record is None:
-                        raise RecordNotFound(db_name, model_name)
+                        raise AdminRecordNotFound(db_name, model_name)
                     await record.admin_delete()
                     await session.delete(record)
 
@@ -292,7 +297,7 @@ class _AdminDbController(Controller[Patera]):
                     model_name=model_name,
                 )
             )
-        except RecordNotFound:
+        except AdminRecordNotFound:
             return req.res.json(
                 {
                     "message": "Record not found.",
@@ -310,6 +315,7 @@ class _AdminDbController(Controller[Patera]):
 
     @put("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
     @role_required(
+        Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_EDIT,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
@@ -333,7 +339,7 @@ class _AdminDbController(Controller[Patera]):
                 async with session.begin():
                     record = await model.query(session).filter_by(**pk_values).first()
                     if record is None:
-                        raise RecordNotFound(db_name, model_name)
+                        raise AdminRecordNotFound(db_name, model_name)
                     await record.admin_update(form_data)
                     session.add(record)
 
@@ -353,7 +359,7 @@ class _AdminDbController(Controller[Patera]):
                 }
             ).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
-        except RecordNotFound:
+        except AdminRecordNotFound:
             return req.res.json(
                 {
                     "message": "Record not found.",
@@ -417,7 +423,7 @@ class _AdminDbController(Controller[Patera]):
     def get_db(self, db_name) -> SqlDatabase:
         db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
         if db is None:
-            raise UnknownDatabaseException(db_name)
+            raise AdminUnknownDatabaseException(db_name)
         return db
 
     def get_model(
@@ -435,7 +441,7 @@ class _AdminDbController(Controller[Patera]):
             ):
                 return model
 
-        raise UnknownModelException(model_name, db_name)
+        raise AdminUnknownModelException(model_name, db_name)
 
     def get_admin_table_columns(
         self,
