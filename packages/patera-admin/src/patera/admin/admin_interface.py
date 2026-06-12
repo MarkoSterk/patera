@@ -81,6 +81,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._create_models_map()
         self._register_admin_exception_handler()
         self._register_admin_controller()
+        self._find_injected_extensions()
         self._construct_menu()
 
     def _register_admin_exception_handler(self) -> None:
@@ -187,7 +188,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
             if "EmailClient" in ext_cls_mro:
                 self._email_services[name] = ext
-                self._register_email_controller()
+        if len(self._email_services) > 0:
+            self._register_email_controller()
 
     def _collect_models(self) -> dict[str, list[Any]]:
         """

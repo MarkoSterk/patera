@@ -44,7 +44,8 @@ class _AdminEmailClientController(Controller[Patera]):
     )
     async def email_client(self, req: Request) -> Response:
         return await req.res.html(
-            "_admin/email_client.html", {**self.admin_interface.context_variables}
+            "_admin/email_clients/email_client.html",
+            {**self.admin_interface.context_variables},
         )
 
     @post("/")

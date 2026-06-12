@@ -46,6 +46,7 @@ class EmailClient(BaseExtension[AppT, EmailConfig], Generic[AppT]):
 
     def init(self) -> None:
         """Initilizes the extension with the Patera app"""
+        self.configs
         self.render_engine = self._app.jinja_environment
 
     def get_client(self) -> smtplib.SMTP:

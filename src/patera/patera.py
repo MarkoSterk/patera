@@ -290,9 +290,9 @@ class Patera(Injectable, Generic[ConfT]):
         self.register_static_controller(self.configs.STATIC_URL)
         self.register_openapi_controller()
 
+        self._load_controllers_exc_handlers_middleware(cli_mode)
         self._register_app_extensions()
         self._resolve_injections()
-        self._load_controllers_exc_handlers_middleware(cli_mode)
         if not cli_mode:
             self._enable_cors()
 
