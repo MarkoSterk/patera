@@ -44,3 +44,9 @@ class AdminAuthorizationRequiredException(RuntimeError):
         self.msg = msg
         self.roles = roles
         super().__init__(msg)
+
+
+class AdminUnknownEmailClientException(RuntimeError):
+    def __init__(self, email: str):
+        self.email = email
+        super().__init__(f"Email client with sender email {email} does not exist.")

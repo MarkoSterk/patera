@@ -10,6 +10,7 @@ from .exceptions import (
     AdminMissingPermission,
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
+    AdminUnknownEmailClientException,
 )
 from .admin_interface import AdminInterface, Permissions
 
@@ -76,6 +77,18 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
         return req.res.json(
             {"message": "Missing required role", "status": "success"}
         ).status(HttpStatus.UNAUTHORIZED)
+
+    @handles(AdminUnknownEmailClientException)
+    async def unknown_email_client(
+        self, req: Request, exc: AdminUnknownEmailClientException
+    ) -> Response:
+
+        return req.res.json(
+            {
+                "message": f"Email Client with sender email {exc.email} does not exist.",
+                "status": "error",
+            }
+        ).status(HttpStatus.BAD_REQUEST)
 
     @property
     def admin_interface(self) -> AdminInterface:

@@ -66,6 +66,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     _admin_menu: list[dict[str, str]] = []
     _databases_menu: list[dict[str, str | Any]] = []
+    _email_services: dict[str, Any] = {}
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si"]
     _supported_extensions: list[str] = ["sqldatabase"]
@@ -122,6 +123,19 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         ctrl_instance: _AdminDbController = self._app._controllers.get(ctrl_path)  # type: ignore
         ctrl_instance.admin_interface = self
 
+    def _register_email_controller(self) -> None:
+        from .admin_email_controller import _AdminEmailClientController
+
+        base_url = f"{self.configs.ADMIN_BASE_URL}/<string:lang>/email-clients"
+        admin_email_controller_dec = path(base_url, open_api_spec=False)
+        admin_email_controller = admin_email_controller_dec(_AdminEmailClientController)
+        self._app.register_controller(admin_email_controller)
+        ctrl_path = getattr(admin_email_controller, "_controller_path")
+        ctrl_instance: _AdminEmailClientController = self._app._controllers.get(
+            ctrl_path
+        )  # type: ignore
+        ctrl_instance.admin_interface = self
+
     def _register_models_controller(self) -> None:
         if self.managed_models is None or len(self.managed_models) == 0:
             return
@@ -165,11 +179,15 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             self._register_db_controller()
         return databases
 
-    def _find_injected_extensions(self) -> dict[str, list[BaseExtension]]:
+    def _find_injected_extensions(self) -> None:
         """
         Finds injected extensions available for use in the dashboard
         """
-        return {}
+        for name, ext in self.app.extensions.items():
+            ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
+            if "EmailClient" in ext_cls_mro:
+                self._email_services[name] = ext
+                self._register_email_controller()
 
     def _collect_models(self) -> dict[str, list[Any]]:
         """

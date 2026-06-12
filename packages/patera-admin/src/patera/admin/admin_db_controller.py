@@ -20,7 +20,15 @@ from sqlalchemy import (
 from sqlalchemy.inspection import inspect
 
 from patera import Patera, Request, Response, MediaType, HttpStatus
-from patera.controller import Controller, get, post, consumes, delete, put
+from patera.controller import (
+    Controller,
+    get,
+    post,
+    consumes,
+    delete,
+    put,
+    before_request,
+)
 from patera.database.sql import DeclarativeBaseModel, SqlDatabase
 from patera.auth import role_required
 
@@ -31,6 +39,7 @@ from .exceptions import (
     AdminRecordNotFound,
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
+    AdminUnsupportedLanguage,
 )
 
 
@@ -43,6 +52,12 @@ class _AdminDbController(Controller[Patera]):
     def __init__(self, *args, **kwargs):
         self._admin_interface: AdminInterface = cast(AdminInterface, None)
         super().__init__(*args, **kwargs)
+
+    @before_request
+    async def check_language(self, req: Request):
+        lang = cast(str, req.route_parameters.get("lang"))
+        if lang not in self.admin_interface.supported_languages:
+            raise AdminUnsupportedLanguage(lang)
 
     @get("/<string:db_name>")
     @role_required(
