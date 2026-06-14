@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable, cast, TypeVar, Generic, Any
 from functools import wraps
 
 from ..injectable import Injectable
-from ..utilities import run_sync_or_async
+from ..utilities import run_sync_or_async, pascal_to_upper_snake
 
 if TYPE_CHECKING:
     from ..patera import Patera
@@ -33,13 +33,12 @@ class CLIController(Injectable, Generic[AppT]):
         self._resolve_injections()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        key = f"{target_type.__module__}.{target_type.__qualname__}"
-        value = self.app._extensions.get(key)
-
+        name: str = pascal_to_upper_snake(target_type.__name__)
+        value = self.app._extensions.get(name, None)
         if value is None:
-            value = target_type(self._app)
-            self.app._extensions[key] = value
-
+            value = target_type(self.app)
+            self.app._extensions[name] = value
+            # self.app._extensions[target_type.__name__] = value
         return value
 
     def _resolve_config_var(

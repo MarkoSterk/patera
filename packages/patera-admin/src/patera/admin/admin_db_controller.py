@@ -128,6 +128,8 @@ class _AdminDbController(Controller[Patera]):
                     "model_name": model_name,
                     "table_name": model.__tablename__,
                     "records": records,
+                    "current_page": query_params.page,
+                    "current_per_page": query_params.per_page,
                     "table_columns": table_columns,
                     "create_fields": create_fields,
                     "update_fields": update_fields,

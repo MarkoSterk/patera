@@ -47,6 +47,7 @@ from .utilities import (
     _extract_response_type,
     find_python_files_by_name,
     encode_response_headers,
+    pascal_to_upper_snake,
 )
 from .router import Router
 from .static import Static
@@ -464,12 +465,12 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        value = self._extensions.get(target_type.__name__, None)
+        name: str = pascal_to_upper_snake(target_type.__name__)
+        value = self.app._extensions.get(name, None)
         if value is None:
-            value = target_type(self)
-            self._extensions[value.configs_name] = value
-            self._extensions[target_type.__name__] = value
-
+            value = target_type(self.app)
+            self.app._extensions[name] = value
+            # self.app._extensions[target_type.__name__] = value
         return value
 
     def _resolve_config_var(
@@ -890,10 +891,11 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Adds extension to extension map
         """
-        if self._extensions.get(extension.__class__.__name__, None) is not None:
+        name = pascal_to_upper_snake(extension.__class__.__name__)
+        if self._extensions.get(name, None) is not None:
             return
-        self._extensions[extension.configs_name] = extension
-        self._extensions[extension.__class__.__name__] = extension
+        self._extensions[name] = extension
+        # self._extensions[extension.__class__.__name__] = extension
 
     def _add_route_function(
         self, method: str, url_path: str, func: Callable, endpoint_name: str

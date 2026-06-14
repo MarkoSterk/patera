@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from ..media_types import MediaType
 from ..http_statuses import HttpStatus
 from ..injectable import Injectable
-from ..utilities import run_sync_or_async
+from ..utilities import run_sync_or_async, pascal_to_upper_snake
 
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
@@ -60,11 +60,12 @@ class Controller(Injectable, Generic[AppT]):
         self._after_init_methods()
 
     def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        value = self.app._extensions.get(target_type.__name__, None)
+        name: str = pascal_to_upper_snake(target_type.__name__)
+        value = self.app._extensions.get(name, None)
         if value is None:
             value = target_type(self.app)
-            self.app._extensions[value.configs_name] = value
-            self.app._extensions[target_type.__name__] = value
+            self.app._extensions[name] = value
+            # self.app._extensions[target_type.__name__] = value
         return value
 
     def _resolve_config_var(

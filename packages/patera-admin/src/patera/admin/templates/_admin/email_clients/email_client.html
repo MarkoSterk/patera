@@ -8,12 +8,8 @@
       <div>
         <h1 class="h3 mb-1">
           <i class="bi bi-envelope-paper me-1"></i>
-          Send Email
+          Email Client
         </h1>
-
-        <p class="text-muted mb-0">
-          Compose and send an email message with an optional file attachment.
-        </p>
       </div>
 
       <div class="mt-3 mt-md-0">
@@ -42,7 +38,7 @@
             <form
               id="email-form"
               method="post"
-              action="#"
+              action="{{ admin_interface.url_for('_AdminEmailClientController.send_email') }}"
               enctype="multipart/form-data"
             >
 
@@ -77,9 +73,9 @@
                   >
                     <option value="">Select sender email</option>
 
-                    {% for sender_email in sender_emails %}
-                      <option value="{{ sender_email }}">
-                        {{ sender_email }}
+                    {% for client in clients %}
+                      <option value="{{ client.configs.SENDER_NAME_OR_ADDRESS }}">
+                        {{ client.configs.SENDER_NAME_OR_ADDRESS }}
                       </option>
                     {% else %}
                       <option value="" disabled>
@@ -87,6 +83,28 @@
                       </option>
                     {% endfor %}
                   </select>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="recipients" class="form-label">
+                  Recipient(s)
+                  <span class="text-danger">*</span>
+                </label>
+
+                <div class="input-group">
+                  <span class="input-group-text">
+                    <i class="bi bi-type"></i>
+                  </span>
+
+                  <input
+                    type="text"
+                    id="recipients"
+                    name="recipients"
+                    class="form-control"
+                    placeholder="Enter recipients"
+                    required
+                  >
                 </div>
               </div>
 
@@ -127,6 +145,7 @@
                     id="email-attachment"
                     name="attachment"
                     class="form-control"
+                    multiple
                   >
                 </div>
 
@@ -178,4 +197,249 @@
 
   </div>
 </main>
+{% endblock %}
+
+{% block js %}
+<script>
+  const emailForm = document.getElementById("email-form");
+  const senderEmailInput = document.getElementById("sender-email");
+  const recipientsInput = document.getElementById("recipients");
+  const subjectInput = document.getElementById("email-subject");
+  const attachmentInput = document.getElementById("email-attachment");
+  const messageInput = document.getElementById("email-message");
+
+  const emailErrorContainer = document.getElementById("email-error-container");
+  const emailSuccessContainer = document.getElementById("email-success-container");
+
+  const recipientsQueryUrl = "{{ admin_url_for('_AdminEmailClientController.email_query_recipients') }}";
+
+  const recipientsSuggestions = document.createElement("div");
+  recipientsSuggestions.className = "list-group position-absolute shadow-sm d-none";
+  recipientsSuggestions.style.zIndex = "1000";
+  recipientsSuggestions.style.width = "100%";
+
+  const recipientsInputGroup = recipientsInput.closest(".input-group");
+  recipientsInputGroup.parentElement.style.position = "relative";
+  recipientsInputGroup.parentElement.appendChild(recipientsSuggestions);
+
+  let recipientsQueryTimeout = null;
+
+  function clearEmailMessages() {
+    emailErrorContainer.textContent = "";
+    emailErrorContainer.classList.add("d-none");
+
+    emailSuccessContainer.textContent = "";
+    emailSuccessContainer.classList.add("d-none");
+  }
+
+  function showEmailError(message) {
+    emailErrorContainer.textContent = message || "Something went wrong.";
+    emailErrorContainer.classList.remove("d-none");
+    emailSuccessContainer.classList.add("d-none");
+  }
+
+  function showEmailSuccess(message) {
+    emailSuccessContainer.textContent = message || "Email sent successfully.";
+    emailSuccessContainer.classList.remove("d-none");
+    emailErrorContainer.classList.add("d-none");
+  }
+
+  async function getErrorMessage(response, fallbackMessage = "Something went wrong.") {
+    try {
+      const data = await response.json();
+
+      if (data.data && Array.isArray(data.data)) {
+        return `${data.message || fallbackMessage}: ${JSON.stringify(data.data)}`;
+      }
+
+      return data.message || data.error || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  function parseRecipients(value) {
+    return value
+      .split(/[;,]/)
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+
+  function getCurrentRecipientQuery() {
+    const parts = recipientsInput.value.split(/[;,]/);
+    return parts[parts.length - 1].trim();
+  }
+
+  function replaceCurrentRecipient(value) {
+    const parts = recipientsInput.value.split(/[;,]/);
+    parts[parts.length - 1] = ` ${value}`;
+
+    recipientsInput.value = parts
+      .map(item => item.trim())
+      .filter(Boolean)
+      .join(", ") + ", ";
+
+    recipientsInput.focus();
+  }
+
+  function hideRecipientSuggestions() {
+    recipientsSuggestions.innerHTML = "";
+    recipientsSuggestions.classList.add("d-none");
+  }
+
+  function showRecipientSuggestions(items) {
+    recipientsSuggestions.innerHTML = "";
+
+    if (!items || items.length === 0) {
+      hideRecipientSuggestions();
+      return;
+    }
+
+    items.forEach(item => {
+      const email = typeof item === "string"
+        ? item
+        : item.email || item.address || item.value || "";
+
+      const label = typeof item === "string"
+        ? item
+        : item.label || item.name || email;
+
+      if (!email) {
+        return;
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "list-group-item list-group-item-action";
+      button.innerHTML = `
+        <div class="fw-semibold">${label}</div>
+        <div class="small text-muted">${email}</div>
+      `;
+
+      button.addEventListener("click", () => {
+        replaceCurrentRecipient(email);
+        hideRecipientSuggestions();
+      });
+
+      recipientsSuggestions.appendChild(button);
+    });
+
+    recipientsSuggestions.classList.remove("d-none");
+  }
+
+  async function queryRecipients() {
+    const senderEmail = senderEmailInput.value;
+    const query = getCurrentRecipientQuery();
+
+    if (!senderEmail || query.length < 2) {
+      hideRecipientSuggestions();
+      return;
+    }
+
+    try {
+      const response = await fetch(recipientsQueryUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client: senderEmail,
+          query: query
+        })
+      });
+
+      if (!response.ok) {
+        hideRecipientSuggestions();
+        return;
+      }
+
+      const payload = await response.json();
+      showRecipientSuggestions(payload.data || []);
+    } catch {
+      hideRecipientSuggestions();
+    }
+  }
+
+  recipientsInput.addEventListener("input", () => {
+    clearTimeout(recipientsQueryTimeout);
+
+    recipientsQueryTimeout = setTimeout(() => {
+      queryRecipients();
+    }, 300);
+  });
+
+  recipientsInput.addEventListener("blur", () => {
+    setTimeout(() => {
+      hideRecipientSuggestions();
+    }, 150);
+  });
+
+  senderEmailInput.addEventListener("change", () => {
+    hideRecipientSuggestions();
+  });
+
+  emailForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearEmailMessages();
+
+    if (!emailForm.checkValidity()) {
+      emailForm.reportValidity();
+      return;
+    }
+
+    const recipients = parseRecipients(recipientsInput.value);
+
+    if (recipients.length === 0) {
+      showEmailError("Please enter at least one recipient.");
+      return;
+    }
+
+    const submitBtn = emailForm.querySelector('button[type="submit"]');
+    const originalSubmitText = submitBtn.innerHTML;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      Sending...
+    `;
+
+    try {
+      const formData = new FormData();
+
+      formData.append("sender_email", senderEmailInput.value);
+      formData.append("subject", subjectInput.value);
+      formData.append("message", messageInput.value);
+      formData.append("recipients", recipients);
+
+
+      for (const file of attachmentInput.files) {
+        formData.append("attachment", file);
+      }
+
+      const response = await fetch(emailForm.action && emailForm.action !== "#"
+        ? emailForm.action
+        : window.location.href, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, "Failed to send email.");
+        showEmailError(message);
+        return;
+      }
+
+      const payload = await response.json();
+
+      showEmailSuccess(payload.message || "Email sent successfully.");
+      emailForm.reset();
+      hideRecipientSuggestions();
+    } catch {
+      showEmailError("Network error. Failed to send email.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalSubmitText;
+    }
+  });
+</script>
 {% endblock %}

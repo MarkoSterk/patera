@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
+from patera.utilities import pascal_to_upper_snake
 
 from .translations import TRANSLATIONS_MAP
 
@@ -167,7 +168,11 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             if "admininterface" in extMro or "sqldatabase" not in extMro:
                 continue
             if len(set(extMro).intersection(self.__class__._supported_extensions)) > 0:
-                extInst = self.app.extensions[ext.__name__]
+                extInst = self.app.extensions.get(
+                    pascal_to_upper_snake(ext.__name__), None
+                )
+                if extInst is None:
+                    continue
                 databases.append(
                     {
                         "extension": extInst,
@@ -184,6 +189,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         """
         Finds injected extensions available for use in the dashboard
         """
+        # print("Injected extensions: ", self.app.extensions)
         for name, ext in self.app.extensions.items():
             ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
             if "EmailClient" in ext_cls_mro:
@@ -242,6 +248,10 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     @property
     def admin_root_path(self) -> str:
         return self._admin_root_path
+
+    @property
+    def has_email_services(self) -> bool:
+        return len(self._email_services.keys()) > 0
 
     @property
     def managed_models(self) -> list[Type]:

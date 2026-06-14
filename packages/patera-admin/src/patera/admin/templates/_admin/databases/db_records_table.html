@@ -84,15 +84,15 @@
 
           <select
             id="records-count-top"
-            name="count"
+            name="per_page"
             class="form-select form-select-sm"
             style="width: auto;"
             onchange="this.form.submit()"
           >
-            <option value="10" {% if records.per_page == 10 %}selected{% endif %}>10</option>
-            <option value="25" {% if records.per_page == 25 %}selected{% endif %}>25</option>
-            <option value="50" {% if records.per_page == 50 %}selected{% endif %}>50</option>
-            <option value="100" {% if records.per_page == 100 %}selected{% endif %}>100</option>
+            <option value="10" {% if current_per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if current_per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if current_per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if current_per_page == 100 %}selected{% endif %}>100</option>
           </select>
         </form>
       </div>

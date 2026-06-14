@@ -64,7 +64,14 @@
                 </ul>
               </li>
             {% endif %}
-            <!--Other menu options-->
+            {% if admin_interface.has_email_services %}
+              <li class="nav-item">
+                <a class="nav-link" href="{{ admin_interface.url_for('_AdminEmailClientController.email_client') }}">
+                  <i class="bi bi-envelope-paper me-1"></i>
+                  {{ translate('email_client') }}
+                </a>
+              </li>
+            {% endif %}
           </ul>
 
           <div class="d-flex align-items-center gap-2">
