@@ -38,7 +38,7 @@
         </h1>
 
         <p class="text-muted mb-0">
-          Records from model <code>{{ model_name }}</code> in database <code>{{db.nice_name}} ({{ db_name }})</code>.
+          {{ translate('records_from_model_in_database') }} <code>{{ model_name }}</code> {{ translate('in_database') }} <code>{{db.nice_name}} ({{ db_name }})</code>.
         </p>
       </div>
 
@@ -48,7 +48,7 @@
           class="btn btn-outline-secondary"
         >
           <i class="bi bi-arrow-left me-1"></i>
-          Back
+          {{ translate('back') }}
         </a>
 
         <button
@@ -57,7 +57,7 @@
           id="open-create-record-dialog"
         >
           <i class="bi bi-plus-lg me-1"></i>
-          Create Record
+          {{ translate('create_record') }}
         </button>
       </div>
     </div>
@@ -65,9 +65,9 @@
     <div class="card content-card shadow-sm">
       <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
-          <h2 class="h5 mb-0">Table Records</h2>
+          <h2 class="h5 mb-0">{{ translate('table_records') }}</h2>
           <small class="text-muted">
-            Showing {{ records.items|length }} of {{ records.total }} record{% if records.total != 1 %}s{% endif %}
+            {{ translate('showing_x_of_y_records').format(shown=records.items|length, total=records.total) }}
           </small>
         </div>
 
@@ -79,7 +79,7 @@
           <input type="hidden" name="page" value="1">
 
           <label for="records-count-top" class="text-muted small mb-0">
-            Per page
+            {{ translate('per_page') }}
           </label>
 
           <select
@@ -109,7 +109,7 @@
                 {% endfor %}
 
                 <th scope="col" class="text-end text-nowrap">
-                  Actions
+                  {{ translate('actions') }}
                 </th>
               </tr>
             </thead>
@@ -126,12 +126,12 @@
                       {% if value is sameas true %}
                         <span class="badge text-bg-success">
                           <i class="bi bi-check-lg me-1"></i>
-                          True
+                          {{ translate('true') }}
                         </span>
                       {% elif value is sameas false %}
                         <span class="badge text-bg-secondary">
                           <i class="bi bi-x-lg me-1"></i>
-                          False
+                          {{ translate('false') }}
                         </span>
                       {% elif value == "" %}
                         <span class="text-muted">—</span>
@@ -142,7 +142,7 @@
                   {% endfor %}
 
                   <td class="text-end text-nowrap">
-                    <div class="btn-group btn-group-sm" role="group" aria-label="Record actions">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ translate('record_actions') }}">
                       <button
                         type="button"
                         class="btn btn-outline-primary view-record-btn"
@@ -150,7 +150,7 @@
                         data-get-url="{{ admin_interface.url_for('_AdminDbController.get_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-eye me-1"></i>
-                        View
+                        {{ translate('view') }}
                       </button>
 
                       <button
@@ -161,7 +161,7 @@
                         data-update-url="{{ admin_interface.url_for('_AdminDbController.update_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-pencil-square me-1"></i>
-                        Edit
+                        {{ translate('edit') }}
                       </button>
 
                       <button
@@ -171,7 +171,7 @@
                         data-delete-url="{{ admin_interface.url_for('_AdminDbController.delete_record', db_name=db_name, model_name=model_name, pk_values_str=record_pk) }}"
                       >
                         <i class="bi bi-trash3 me-1"></i>
-                        Delete
+                        {{ translate('delete') }}
                       </button>
                     </div>
                   </td>
@@ -182,7 +182,7 @@
                     <div class="mb-2">
                       <i class="bi bi-inbox fs-2"></i>
                     </div>
-                    No records available.
+                    {{ translate('no_records_available') }}
                   </td>
                 </tr>
               {% endfor %}
@@ -194,7 +194,7 @@
       <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
         <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
           <span class="text-muted small">
-            Page {{ records.page }} of {{ records.pages if records.pages > 0 else 1 }}
+            {{ translate('page_x_of_y').format(page=records.page, pages=records.pages if records.pages > 0 else 1) }}
           </span>
 
           <span class="text-muted small d-none d-md-inline">
@@ -202,11 +202,11 @@
           </span>
 
           <span class="text-muted small">
-            {{ records.total }} total record{% if records.total != 1 %}s{% endif %}
+            {{ translate('total_records').format(total=records.total) }}
           </span>
         </div>
 
-        <nav aria-label="Records table pagination">
+        <nav aria-label="{{ translate('records_table_pagination') }}">
           <ul class="pagination pagination-sm mb-0">
 
             <li class="page-item {% if not records.has_prev %}disabled{% endif %}">
@@ -214,7 +214,7 @@
                 class="page-link"
                 href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page - 1, per_page=records.per_page) }}"
               >
-                Previous
+                {{ translate('previous') }}
               </a>
             </li>
 
@@ -268,7 +268,7 @@
                 class="page-link"
                 href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page + 1, per_page=records.per_page) }}"
               >
-                Next
+                {{ translate('next') }}
               </a>
             </li>
 
@@ -332,11 +332,11 @@
       return;
     }
 
-    errorContainer.textContent = message || "Something went wrong.";
+    errorContainer.textContent = message || "{{ translate('something_went_wrong') }}";
     errorContainer.classList.remove("d-none");
   }
 
-  async function getErrorMessage(response, fallbackMessage = "Something went wrong.") {
+  async function getErrorMessage(response, fallbackMessage = "{{ translate('something_went_wrong') }}") {
     try {
       const data = await response.json();
 
@@ -384,11 +384,11 @@
     }
 
     if (value === true) {
-      return "True";
+      return "{{ translate('true') }}";
     }
 
     if (value === false) {
-      return "False";
+      return "{{ translate('false') }}";
     }
 
     if (typeof value === "object") {
@@ -435,7 +435,7 @@
       } else if (value === true || value === false) {
         const span = document.createElement("span");
         span.className = value ? "badge text-bg-success" : "badge text-bg-secondary";
-        span.textContent = value ? "True" : "False";
+        span.textContent = value ? "{{ translate('true') }}" : "{{ translate('false') }}";
         td.appendChild(span);
       } else {
         td.textContent = String(value);

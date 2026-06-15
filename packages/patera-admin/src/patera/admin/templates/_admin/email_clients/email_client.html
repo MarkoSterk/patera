@@ -8,7 +8,7 @@
       <div>
         <h1 class="h3 mb-1">
           <i class="bi bi-envelope-paper me-1"></i>
-          Email Client
+          {{ translate('email_client') }}
         </h1>
       </div>
 
@@ -18,7 +18,7 @@
           class="btn btn-outline-secondary"
         >
           <i class="bi bi-arrow-left me-1"></i>
-          Back to Dashboard
+          {{ translate('back_to_dashboard') }}
         </a>
       </div>
     </div>
@@ -30,7 +30,7 @@
           <div class="card-header bg-white">
             <h2 class="h5 mb-0">
               <i class="bi bi-pencil-square me-1"></i>
-              Email Message
+              {{ translate('email_message') }}
             </h2>
           </div>
 
@@ -56,7 +56,7 @@
 
               <div class="mb-3">
                 <label for="sender-email" class="form-label">
-                  Sender Email
+                  {{ translate('sender_email') }}
                   <span class="text-danger">*</span>
                 </label>
 
@@ -71,7 +71,7 @@
                     class="form-select"
                     required
                   >
-                    <option value="">Select sender email</option>
+                    <option value="">{{ translate('select_sender_email') }}</option>
 
                     {% for client in clients %}
                       <option value="{{ client.configs.SENDER_NAME_OR_ADDRESS }}">
@@ -79,7 +79,7 @@
                       </option>
                     {% else %}
                       <option value="" disabled>
-                        No sender emails available
+                        {{ translate('no_sender_emails_available') }}
                       </option>
                     {% endfor %}
                   </select>
@@ -88,7 +88,7 @@
 
               <div class="mb-3">
                 <label for="recipients" class="form-label">
-                  Recipient(s)
+                  {{ translate('recipients') }}
                   <span class="text-danger">*</span>
                 </label>
 
@@ -102,7 +102,7 @@
                     id="recipients"
                     name="recipients"
                     class="form-control"
-                    placeholder="Enter recipients"
+                    placeholder="{{ translate('enter_recipients') }}"
                     required
                   >
                 </div>
@@ -110,7 +110,7 @@
 
               <div class="mb-3">
                 <label for="email-subject" class="form-label">
-                  Subject
+                  {{ translate('subject') }}
                   <span class="text-danger">*</span>
                 </label>
 
@@ -124,7 +124,7 @@
                     id="email-subject"
                     name="subject"
                     class="form-control"
-                    placeholder="Enter email subject"
+                    placeholder="{{ translate('enter_email_subject') }}"
                     required
                   >
                 </div>
@@ -132,7 +132,7 @@
 
               <div class="mb-3">
                 <label for="email-attachment" class="form-label">
-                  Attachment
+                  {{ translate('attachment') }}
                 </label>
 
                 <div class="input-group">
@@ -150,13 +150,13 @@
                 </div>
 
                 <div class="form-text">
-                  Optional file attachment.
+                  {{ translate('optional_file_attachment') }}
                 </div>
               </div>
 
               <div class="mb-4">
                 <label for="email-message" class="form-label">
-                  Message
+                  {{ translate('message') }}
                   <span class="text-danger">*</span>
                 </label>
 
@@ -165,7 +165,7 @@
                   name="message"
                   class="form-control"
                   rows="10"
-                  placeholder="Write your email message here..."
+                  placeholder="{{ translate('write_email_message_here') }}"
                   required
                 ></textarea>
               </div>
@@ -176,7 +176,7 @@
                   class="btn btn-outline-secondary"
                 >
                   <i class="bi bi-x-circle me-1"></i>
-                  Clear
+                  {{ translate('clear') }}
                 </button>
 
                 <button
@@ -184,7 +184,7 @@
                   class="btn btn-primary"
                 >
                   <i class="bi bi-send me-1"></i>
-                  Send Email
+                  {{ translate('send_email') }}
                 </button>
               </div>
 
@@ -233,18 +233,18 @@
   }
 
   function showEmailError(message) {
-    emailErrorContainer.textContent = message || "Something went wrong.";
+    emailErrorContainer.textContent = message || "{{ translate('something_went_wrong') }}";
     emailErrorContainer.classList.remove("d-none");
     emailSuccessContainer.classList.add("d-none");
   }
 
   function showEmailSuccess(message) {
-    emailSuccessContainer.textContent = message || "Email sent successfully.";
+    emailSuccessContainer.textContent = message || "{{ translate('email_sent_successfully') }}";
     emailSuccessContainer.classList.remove("d-none");
     emailErrorContainer.classList.add("d-none");
   }
 
-  async function getErrorMessage(response, fallbackMessage = "Something went wrong.") {
+  async function getErrorMessage(response, fallbackMessage = "{{ translate('something_went_wrong') }}") {
     try {
       const data = await response.json();
 
@@ -290,29 +290,17 @@
   function showRecipientSuggestions(items) {
     recipientsSuggestions.innerHTML = "";
 
-    if (!items || items.length === 0) {
+    if (!items || Object.keys(items).length === 0) {
       hideRecipientSuggestions();
       return;
     }
 
-    items.forEach(item => {
-      const email = typeof item === "string"
-        ? item
-        : item.email || item.address || item.value || "";
-
-      const label = typeof item === "string"
-        ? item
-        : item.label || item.name || email;
-
-      if (!email) {
-        return;
-      }
-
+    for(const [name, email] of Object.entries(items)){
       const button = document.createElement("button");
       button.type = "button";
       button.className = "list-group-item list-group-item-action";
       button.innerHTML = `
-        <div class="fw-semibold">${label}</div>
+        <div class="fw-semibold">${name}</div>
         <div class="small text-muted">${email}</div>
       `;
 
@@ -320,9 +308,8 @@
         replaceCurrentRecipient(email);
         hideRecipientSuggestions();
       });
-
       recipientsSuggestions.appendChild(button);
-    });
+    }
 
     recipientsSuggestions.classList.remove("d-none");
   }
@@ -354,7 +341,7 @@
       }
 
       const payload = await response.json();
-      showRecipientSuggestions(payload.data || []);
+      showRecipientSuggestions(payload.data || {});
     } catch {
       hideRecipientSuggestions();
     }
@@ -390,7 +377,7 @@
     const recipients = parseRecipients(recipientsInput.value);
 
     if (recipients.length === 0) {
-      showEmailError("Please enter at least one recipient.");
+      showEmailError("{{ translate('please_enter_at_least_one_recipient') }}");
       return;
     }
 
@@ -400,7 +387,7 @@
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
       <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-      Sending...
+      {{ translate('sending') }}
     `;
 
     try {
@@ -424,18 +411,18 @@
       });
 
       if (!response.ok) {
-        const message = await getErrorMessage(response, "Failed to send email.");
+        const message = await getErrorMessage(response, "{{ translate('failed_to_send_email') }}");
         showEmailError(message);
         return;
       }
 
       const payload = await response.json();
 
-      showEmailSuccess(payload.message || "Email sent successfully.");
+      showEmailSuccess(payload.message || "{{ translate('email_sent_successfully') }}");
       emailForm.reset();
       hideRecipientSuggestions();
     } catch {
-      showEmailError("Network error. Failed to send email.");
+      showEmailError("{{ translate('network_error_failed_to_send_email') }}");
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalSubmitText;

@@ -69,7 +69,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     _databases_menu: list[dict[str, str | Any]] = []
     _email_services: dict[str, Any] = {}
     _models_map: dict[str, Type] = {}
-    _supported_languages: list[str] = ["en", "de", "si"]
+    _supported_languages: list[str] = ["en", "de", "si", "es"]
     _supported_extensions: list[str] = ["sqldatabase"]
 
     def init(self):

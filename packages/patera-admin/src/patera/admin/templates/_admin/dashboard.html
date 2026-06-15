@@ -6,9 +6,9 @@
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
       <div>
-        <h1 class="h3 mb-1">System Logs</h1>
+        <h1 class="h3 mb-1">{{ translate('system_logs') }}</h1>
         <p class="text-muted mb-0">
-          Recent application events and diagnostic messages.
+          {{ translate('recent_application_events_and_diagnostic_messages') }}
         </p>
       </div>
 
@@ -18,7 +18,7 @@
           class="btn btn-primary"
         >
           <i class="bi bi-arrow-clockwise me-1"></i>
-          Refresh
+          {{ translate('refresh') }}
         </a>
       </div>
     </div>
@@ -26,9 +26,9 @@
     <div class="card content-card shadow-sm">
       <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
-          <h2 class="h5 mb-0">Latest Log Messages</h2>
+          <h2 class="h5 mb-0">{{ translate('latest_log_messages') }}</h2>
           <small class="text-muted">
-            Showing {{ log_entries|length }} of {{ logs_total }} log message{% if logs_total != 1 %}s{% endif %}
+            {{ translate('showing_x_of_y_log_messages').format(shown=log_entries|length, total=logs_total) }}
           </small>
         </div>
 
@@ -49,14 +49,14 @@
               type="search"
               name="query"
               class="form-control"
-              placeholder="Search logs"
-              aria-label="Search logs"
+              placeholder="{{ translate('search_logs') }}"
+              aria-label="{{ translate('search_logs') }}"
               value="{{ logs_query }}"
             >
           </div>
 
           <button type="submit" class="btn btn-sm btn-outline-secondary">
-            Search
+            {{ translate('search') }}
           </button>
         </form>
       </div>
@@ -71,7 +71,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-time' if logs_order_by == 'time' else 'time') }}"
                   >
-                    Time
+                    {{ translate('time') }}
                     {% if logs_order_by == 'time' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-time' %}
@@ -85,7 +85,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-level' if logs_order_by == 'level' else 'level') }}"
                   >
-                    Level
+                    {{ translate('level') }}
                     {% if logs_order_by == 'level' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-level' %}
@@ -99,7 +99,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-logger_name' if logs_order_by == 'logger_name' else 'logger_name') }}"
                   >
-                    Logger
+                    {{ translate('logger') }}
                     {% if logs_order_by == 'logger_name' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-logger_name' %}
@@ -113,7 +113,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-name' if logs_order_by == 'name' else 'name') }}"
                   >
-                    Module
+                    {{ translate('module') }}
                     {% if logs_order_by == 'name' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-name' %}
@@ -127,7 +127,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-file' if logs_order_by == 'file' else 'file') }}"
                   >
-                    File
+                    {{ translate('file') }}
                     {% if logs_order_by == 'file' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-file' %}
@@ -141,7 +141,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-line' if logs_order_by == 'line' else 'line') }}"
                   >
-                    Line
+                    {{ translate('line') }}
                     {% if logs_order_by == 'line' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-line' %}
@@ -155,7 +155,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-function' if logs_order_by == 'function' else 'function') }}"
                   >
-                    Function
+                    {{ translate('function') }}
                     {% if logs_order_by == 'function' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-function' %}
@@ -169,7 +169,7 @@
                     class="text-decoration-none text-dark"
                     href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-message' if logs_order_by == 'message' else 'message') }}"
                   >
-                    Message
+                    {{ translate('message') }}
                     {% if logs_order_by == 'message' %}
                       <i class="bi bi-sort-up ms-1"></i>
                     {% elif logs_order_by == '-message' %}
@@ -178,7 +178,7 @@
                   </a>
                 </th>
                 <th>
-                  View
+                  {{ translate('view') }}
                 </th>
               </tr>
             </thead>
@@ -228,7 +228,7 @@
                     {{ log.message[:90] }}
                   </td>
                   <td>
-                    <button type="button" onclick="openLogDialog(event)" class="btn btn-sm" title="View log" aria-label="View log">
+                    <button type="button" onclick="openLogDialog(event)" class="btn btn-sm" title="{{ translate('view_log') }}" aria-label="{{ translate('view_log') }}">
                       <i class="bi bi-card-text"></i>
                     </button>
                   </td>
@@ -237,7 +237,7 @@
                 <tr>
                   <td colspan="9" class="text-center text-muted py-4">
                     <i class="bi bi-inbox me-1"></i>
-                    No log messages available.
+                    {{ translate('no_log_messages_available') }}
                   </td>
                 </tr>
               {% endfor %}
@@ -249,7 +249,7 @@
       <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
         <div class="d-flex align-items-center gap-2">
           <span class="text-muted small">
-            Page {{ logs_page }} of {{ logs_total_pages }}
+            {{ translate('page_x_of_y').format(page=logs_page, pages=logs_total_pages) }}
           </span>
 
           <form
@@ -262,7 +262,7 @@
             <input type="hidden" name="order_by" value="{{ logs_order_by }}">
 
             <label for="logs-count" class="text-muted small mb-0">
-              Per page
+              {{ translate('per_page') }}
             </label>
 
             <select
@@ -280,7 +280,7 @@
           </form>
         </div>
 
-        <nav aria-label="Log table pagination">
+        <nav aria-label="{{ translate('log_table_pagination') }}">
           <ul class="pagination pagination-sm mb-0">
 
             <li class="page-item {% if logs_page <= 1 %}disabled{% endif %}">
@@ -288,7 +288,7 @@
                 class="page-link"
                 href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page - 1, count=logs_count, order_by=logs_order_by) }}"
               >
-                Previous
+                {{ translate('previous') }}
               </a>
             </li>
 
@@ -308,7 +308,7 @@
                 class="page-link"
                 href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page + 1, count=logs_count, order_by=logs_order_by) }}"
               >
-                Next
+                {{ translate('next') }}
               </a>
             </li>
 
@@ -326,17 +326,17 @@
       <div>
         <h2 class="h5 mb-1">
           <i class="bi bi-card-text me-1"></i>
-          Log Details
+          {{ translate('log_details') }}
         </h2>
         <p class="text-muted small mb-0">
-          Full diagnostic log entry
+          {{ translate('full_diagnostic_log_entry') }}
         </p>
       </div>
 
       <button
         type="button"
         class="btn-close"
-        aria-label="Close"
+        aria-label="{{ translate('close') }}"
         onclick="closeLogDialog()"
       ></button>
     </div>
@@ -351,7 +351,7 @@
         class="btn btn-sm btn-secondary"
         onclick="closeLogDialog()"
       >
-        Close
+        {{ translate('close') }}
       </button>
     </div>
   </div>
@@ -475,49 +475,49 @@
 
     body.innerHTML = `
       <div class="log-detail-grid">
-        <div class="log-detail-label">Time</div>
+        <div class="log-detail-label">{{ translate('time') }}</div>
         <div class="log-detail-value">${escapeHtml(log.time)}</div>
 
-        <div class="log-detail-label">Level</div>
+        <div class="log-detail-label">{{ translate('level') }}</div>
         <div class="log-detail-value">
           <span class="badge ${badgeClassForLevel(log.level)}">
             ${escapeHtml(log.level)}
           </span>
         </div>
 
-        <div class="log-detail-label">Logger</div>
+        <div class="log-detail-label">{{ translate('logger') }}</div>
         <div class="log-detail-value">${escapeHtml(log.loggerName)}</div>
 
-        <div class="log-detail-label">Module</div>
+        <div class="log-detail-label">{{ translate('module') }}</div>
         <div class="log-detail-value">
           <code>${escapeHtml(log.name)}</code>
         </div>
 
-        <div class="log-detail-label">File</div>
+        <div class="log-detail-label">{{ translate('file') }}</div>
         <div class="log-detail-value">${escapeHtml(log.file)}</div>
 
-        <div class="log-detail-label">Line</div>
+        <div class="log-detail-label">{{ translate('line') }}</div>
         <div class="log-detail-value">${escapeHtml(log.line)}</div>
 
-        <div class="log-detail-label">Function</div>
+        <div class="log-detail-label">{{ translate('function') }}</div>
         <div class="log-detail-value">
           <code>${escapeHtml(log.functionName)}</code>
         </div>
       </div>
 
       <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-        <h3 class="h6 mb-0">Message</h3>
+        <h3 class="h6 mb-0">{{ translate('message') }}</h3>
 
         <button
           type="button"
           id="copy-log-message-btn"
           class="btn btn-sm btn-outline-secondary"
           onclick="copyLogMessage()"
-          title="Copy message to clipboard"
-          aria-label="Copy message to clipboard"
+          title="{{ translate('copy_message_to_clipboard') }}"
+          aria-label="{{ translate('copy_message_to_clipboard') }}"
         >
           <i class="bi bi-clipboard me-1"></i>
-          Copy
+          {{ translate('copy') }}
         </button>
       </div>
 

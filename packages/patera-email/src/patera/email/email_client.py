@@ -127,6 +127,6 @@ class EmailClient(BaseExtension[AppT, EmailConfig], Generic[AppT]):
                 )
             await client.send_message(msg)
 
-    async def query_email_addresses(self, req: Request, query: str) -> list[Any]:
+    async def query_email_addresses(self, req: Request, query: str) -> dict[str, str]:
         """Query method for admin interface to query for available recipient email addresses"""
         raise NotImplementedError()

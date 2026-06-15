@@ -6,16 +6,16 @@
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
       <div>
-        <h1 class="h3 mb-1">Database Overview</h1>
+        <h1 class="h3 mb-1">{{ translate('database_overview') }}</h1>
         <p class="text-muted mb-0">
-          Summary of database structure, storage, and available record tables.
+          {{ translate('database_overview_description') }}
         </p>
       </div>
 
       <div class="mt-3 mt-md-0">
         <button type="button" class="btn btn-primary">
           <i class="bi bi-arrow-clockwise me-1"></i>
-          Refresh
+          {{ translate('refresh') }}
         </button>
       </div>
     </div>
@@ -29,7 +29,7 @@
               <i class="bi bi-diagram-3"></i>
             </div>
             <div>
-              <div class="text-muted small">Schemas</div>
+              <div class="text-muted small">{{ translate('schemas') }}</div>
               <div class="h4 mb-0">{{ db_overview.schemas_count }}</div>
             </div>
           </div>
@@ -43,7 +43,7 @@
               <i class="bi bi-table"></i>
             </div>
             <div>
-              <div class="text-muted small">Tables</div>
+              <div class="text-muted small">{{ translate('tables') }}</div>
               <div class="h4 mb-0">{{ db_overview.tables_count }}</div>
             </div>
           </div>
@@ -57,7 +57,7 @@
               <i class="bi bi-eye"></i>
             </div>
             <div>
-              <div class="text-muted small">Views</div>
+              <div class="text-muted small">{{ translate('views') }}</div>
               <div class="h4 mb-0">{{ db_overview.views_count }}</div>
             </div>
           </div>
@@ -71,7 +71,7 @@
               <i class="bi bi-list-columns"></i>
             </div>
             <div>
-              <div class="text-muted small">Columns</div>
+              <div class="text-muted small">{{ translate('columns') }}</div>
               <div class="h4 mb-0">{{ db_overview.columns_count }}</div>
             </div>
           </div>
@@ -87,7 +87,7 @@
           <div class="card-header bg-white">
             <h2 class="h5 mb-0">
               <i class="bi bi-database me-1"></i>
-              Database Statistics
+              {{ translate('database_statistics') }}
             </h2>
           </div>
 
@@ -122,7 +122,7 @@
                   <tr>
                     <th scope="row" class="text-muted">
                       <i class="bi bi-lightning-charge me-2"></i>
-                      Indexes
+                      {{ translate('indexes') }}
                     </th>
                     <td>{{ db_overview.indexes_count }}</td>
                   </tr>
@@ -130,7 +130,7 @@
                   <tr>
                     <th scope="row" class="text-muted">
                       <i class="bi bi-link-45deg me-2"></i>
-                      Foreign Keys
+                      {{ translate('foreign_keys') }}
                     </th>
                     <td>{{ db_overview.foreign_keys_count }}</td>
                   </tr>
@@ -146,7 +146,7 @@
                   <tr>
                     <th scope="row" class="text-muted">
                       <i class="bi bi-bar-chart me-2"></i>
-                      Average Columns per Table
+                      {{ translate('average_columns_per_table') }}
                     </th>
                     <td>{{ db_overview.avg_columns_per_table }}</td>
                   </tr>
@@ -154,7 +154,7 @@
                   <tr>
                     <th scope="row" class="text-muted">
                       <i class="bi bi-exclamation-triangle me-2"></i>
-                      Unindexed Foreign Keys
+                      {{ translate('unindexed_foreign_keys') }}
                     </th>
                     <td>
                       {% if db_overview.unindexed_foreign_keys > 0 %}
@@ -180,15 +180,15 @@
           <div class="card-header bg-white">
             <h2 class="h5 mb-0">
               <i class="bi bi-hdd me-1"></i>
-              {{ db.nice_name }} ({{db.__db_name__}}) Storage
+              {{ db.nice_name }} ({{db.__db_name__}}) {{ translate('storage') }}
             </h2>
           </div>
 
           <div class="card-body">
             <div class="mb-3">
-              <div class="text-muted small">Database Size</div>
+              <div class="text-muted small">{{ translate('database_size') }}</div>
               <div class="h4 mb-0">
-                {{ db_overview.extras.db_size_bytes }} bytes
+                {{ db_overview.extras.db_size_bytes }} {{ translate('bytes') }}
               </div>
             </div>
 
@@ -197,7 +197,7 @@
             <div class="d-flex justify-content-between mb-2">
               <span class="text-muted">
                 <i class="bi bi-file-earmark-binary me-1"></i>
-                Page Size
+                {{ translate('page_size') }}
               </span>
               <strong>{{ db_overview.extras.sqlite_page_size }}</strong>
             </div>
@@ -205,7 +205,7 @@
             <div class="d-flex justify-content-between mb-2">
               <span class="text-muted">
                 <i class="bi bi-files me-1"></i>
-                Page Count
+                {{ translate('page_count') }}
               </span>
               <strong>{{ db_overview.extras.sqlite_page_count }}</strong>
             </div>
@@ -213,7 +213,7 @@
             <div class="d-flex justify-content-between">
               <span class="text-muted">
                 <i class="bi bi-trash3 me-1"></i>
-                Freelist Pages
+                {{ translate('freelist_pages') }}
               </span>
               <strong>{{ db_overview.extras.sqlite_freelist_pages }}</strong>
             </div>
@@ -228,10 +228,10 @@
         <div>
           <h2 class="h5 mb-0">
             <i class="bi bi-table me-1"></i>
-            Managed Database Tables
+            {{ translate('managed_database_tables') }}
           </h2>
           <small class="text-muted">
-            Open table records and inspect stored data.
+            {{ translate('managed_database_tables_description') }}
           </small>
         </div>
       </div>
@@ -249,12 +249,12 @@
                       {{ table.__name__ }}
                     </h3>
                     <p class="text-muted small mb-0">
-                      {{ table.__doc__ or table.__name__ + ' table records.' }}
+                      {{ table.__doc__ or table.__name__ + ' ' + translate('table_records_description_suffix') }}
                     </p>
                   </div>
 
                   <a href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=table.__db_name__,  model_name=table.__name__) }}" class="btn btn-sm btn-outline-primary">
-                    Open
+                    {{ translate('open') }}
                     <i class="bi bi-arrow-right ms-1"></i>
                   </a>
                 </div>

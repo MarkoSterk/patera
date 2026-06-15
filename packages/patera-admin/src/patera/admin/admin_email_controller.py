@@ -102,7 +102,7 @@ class _AdminEmailClientController(Controller[Patera]):
         query = payload.get("query", "")
         email_client = self.get_email_client(client)
         try:
-            results = await email_client.query_email_addresses(req, query) or []
+            results = await email_client.query_email_addresses(req, query) or {}
             return req.res.json(
                 {"message": "Query successful", "status": "success", "data": results}
             ).status(HttpStatus.OK)

@@ -94,7 +94,7 @@
                     <a
                       class="dropdown-item {% if available_lang == lang %}active{% endif %}"
                       href="{{ admin_interface.url_for('_AdminController.dashboard', lang=available_lang) }}"
-                      aria-label="{{ available_lang|upper }} language"
+                      aria-label="{{ translate(available_lang|lower + '_language', lang=available_lang) }}"
                     >
                       {{ available_lang|upper }}
                     </a>
