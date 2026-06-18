@@ -28,10 +28,10 @@ class SqlDatabaseManager(MiddlewareBase[AppT]):
         - sessions are rolled back on errors or unsuccessful response
         - sessions are always closed
 
-    Default middleware order for SqlDatabaseManager is -98
+    Default middleware order for SqlDatabaseManager is -100
     """
 
-    _order: int = -98
+    _order: int = -100
 
     databases: list[Type["SqlDatabase[Any]"]] = []
 

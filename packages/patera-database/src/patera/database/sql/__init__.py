@@ -17,6 +17,7 @@ from .sql_database import (
 from .sqlalchemy_async_query import AsyncQuery
 from .declarative_base import DeclarativeBaseModel
 from .repository import Repository, query
+from .sql_database_manager import SqlDatabaseManager
 
 __all__ = [
     "SqlDatabase",
@@ -31,4 +32,5 @@ __all__ = [
     "managed_session",
     "managed_cli_session",
     "readonly_session",
+    "SqlDatabaseManager",
 ]
