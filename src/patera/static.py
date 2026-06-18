@@ -7,6 +7,7 @@ as Nginx. This reverse proxy server approach is more efficient.
 from __future__ import annotations
 import os
 import mimetypes
+from typing import Callable, Type
 
 from werkzeug.security import safe_join
 
@@ -18,6 +19,21 @@ from .request import Request
 from .response import Response
 
 
+def static_resource(
+    func_or_cls: "Callable|Type[Controller]",
+) -> "Callable|Type[Controller]":
+    """
+    Mark a controller or handler as a static resource endpoint. Bypasses middleware and calls
+    the endpoint handler directly.
+
+    Useful for serving static assets that don't need any middleware. Used by the built-in
+    Static controller
+    """
+    setattr(func_or_cls, "_static_resource", True)
+    return func_or_cls
+
+
+@static_resource
 class Static(Controller):
     @get("/<path:filename>")
     async def get(self, req: Request, filename: str) -> Response:

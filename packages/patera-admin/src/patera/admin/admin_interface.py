@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
+from patera.injectable import Injectable
 
 from .translations import TRANSLATIONS_MAP
 
@@ -19,6 +20,14 @@ class Permissions(StrEnum):
     ADMIN_CAN_EDIT = "admin_can_edit"
     ADMIN_CAN_DELETE = "admin_can_delete"
     ADMIN_CAN_CREATE = "admin_can_create"
+
+
+def admin_ignore(cls: Type[Injectable]):
+    """
+    Mark an injectable type as ignored by the admin interface
+    """
+    setattr(cls, "_admin_ignore", True)
+    return cls
 
 
 class AdminConfig(BaseModel):
@@ -148,6 +157,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             extMro = [cl.__name__.lower() for cl in extInst.__class__.mro()]
             if "admininterface" in extMro or "sqldatabase" not in extMro:
                 continue
+            if getattr(extInst, "_admin_ignore", False):
+                continue
             if (
                 len(set(extMro).intersection(self.__class__._supported_extensions)) > 0
                 and extInst.__class__.__name__ not in doubled
@@ -171,6 +182,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         """
         # print("Injected extensions: ", self.app.extensions)
         for name, ext in self.app.extensions.items():
+            if getattr(ext, "_admin_ignore", False):
+                continue
             ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
             if "EmailClient" in ext_cls_mro:
                 self._email_services[name] = ext

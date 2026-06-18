@@ -12,6 +12,7 @@ from patera.utilities import get_file, get_range_file
 from patera.controller import Controller, get, before_request
 from patera import Patera, Request, Response, HttpStatus
 from patera.auth import role_required, login_required
+from patera.static import static_resource
 
 from .admin_interface import AdminInterface, Permissions
 from .exceptions import (
@@ -122,6 +123,7 @@ class _AdminController(Controller[Patera]):
         )
 
     @get("/_static/<path:filename>")
+    @static_resource
     async def static(self, req: Request, filename: str) -> Response:
         """
         Endpoint for static files with HTTP Range support,

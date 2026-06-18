@@ -98,18 +98,27 @@ class SqlDatabaseManager(MiddlewareBase[AppT]):
         is_transactional = self.is_transactional(req)
 
         try:
+            self.app.logger.debug("Database manager before...")
             res = await self.next(req)
             if is_transactional:
+                self.app.logger.debug(
+                    "Database manager transactional, commiting sessions"
+                )
                 await self.commit_all_sessions(ctx.sessions)
             else:
                 # Defensive rollback for non-transactional routes.
                 # This discards accidental pending changes.
+                self.app.logger.debug(
+                    "Database manager defensive rollback (non-transactional)"
+                )
                 await self.rollback_all_sessions(ctx.sessions)
             return res
         except Exception:
+            self.app.logger.debug("Database manager exception block rollback")
             await self.rollback_all_sessions(ctx.sessions)
             raise
         finally:
+            self.app.logger.debug("Database manager finally block session closure")
             await self.close_all_sessions(ctx)
 
 

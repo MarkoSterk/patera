@@ -781,16 +781,23 @@ class Patera(Injectable, Generic[ConfT]):
                 controller=route_handler.__self__,  # type: ignore
             ):  # type: ignore
                 try:
-                    res: Response = await self._app(req)
-                    if not isinstance(res, Response):
-                        # pylint: disable-next=W0719
-                        raise Exception(
-                            "Return object of request handlers must be an instance of Response"
+                    if bool(
+                        getattr(route_handler.__self__, "_static_resource", False)  # type: ignore
+                        or getattr(route_handler, "_static_resource", False)
+                    ):
+                        res: Response = await self._base_app(req)
+                        return await self.send_response(res, send)
+                    else:
+                        res: Response = await self._app(req)
+                        if not isinstance(res, Response):
+                            # pylint: disable-next=W0719
+                            raise Exception(
+                                "Return object of request handlers must be an instance of Response"
+                            )
+                        response_type: Optional[Type[Any]] = (
+                            req.response.expected_body_type()
                         )
-                    response_type: Optional[Type[Any]] = (
-                        req.response.expected_body_type()
-                    )
-                    return await self.send_response(res, send, response_type)
+                        return await self.send_response(res, send, response_type)
                 except ResponseRendererException as exc:  # noqa: F841
                     req.res.reset()
                     raise
