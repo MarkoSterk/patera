@@ -103,6 +103,13 @@ class DeclarativeBaseModel(DeclarativeBase):
         cls: type[ModelT],
         session: AsyncSession | None = None,
     ) -> AsyncQuery[ModelT]:
+        """
+        Creates an AsyncQuery object with provided session or
+        with a created session. Requires an active request context.
+        If a session already exists in the request context it is used to
+        create the AsyncQuery object. If not, a new session is created, added
+        to the request context and used in the AsyncQuery object.
+        """
         from .sqlalchemy_async_query import AsyncQuery
 
         if session is not None:
@@ -141,6 +148,38 @@ class DeclarativeBaseModel(DeclarativeBase):
         if database is None:
             raise ValueError(f"Failed to find database {cls.db_name()}")
         return database  # type: ignore
+
+    @classmethod
+    def get_session(cls) -> AsyncSession:
+        """
+        Requires active request context
+        Return active session from request context or creates a new one
+        and stores it on the request context
+        """
+        if not has_request_context():
+            raise RuntimeError(
+                f"{cls.__name__}.get_session() requires an active request context "
+                "when no explicit AsyncSession is provided."
+            )
+        database = cls.get_database()
+        ctx = get_request_context()
+        if ctx.sessions is None:
+            ctx.sessions = ActiveSessions()
+        session = ctx.sessions.get_session(database.session_name)
+        if session is None:
+            session = database.create_session()
+            ctx.sessions.set_session(database.session_name, session)
+        return session
+
+    @classmethod
+    def get_standalone_session(cls) -> AsyncSession:
+        """
+        Creates and returns an AsyncSession object.
+        This is a standalone session object which is not taken from
+        or stored to the request context
+        """
+        database = cls.get_database()
+        return database.create_session()
 
     @classmethod
     def db_name(cls) -> str:

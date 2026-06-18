@@ -57,6 +57,8 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     Base class for middleware
     """
 
+    __ignore__: bool = True
+
     def __init__(
         self, app: AppT, next_app: "Callable[[Request], Awaitable[Response]]"
     ) -> None:

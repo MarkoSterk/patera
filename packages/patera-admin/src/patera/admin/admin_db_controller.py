@@ -259,6 +259,7 @@ class _AdminDbController(Controller[Patera]):
                     record = model()
                     await record.admin_create(form_data)
                     session.add(record)
+                    await session.flush()
 
             return req.res.redirect(
                 self.admin_interface.url_for(
@@ -359,6 +360,7 @@ class _AdminDbController(Controller[Patera]):
                         raise AdminRecordNotFound(db_name, model_name)
                     await record.admin_update(form_data)
                     session.add(record)
+                    await session.flush()
 
             return req.res.redirect(
                 self.admin_interface.url_for(

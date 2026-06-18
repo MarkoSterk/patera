@@ -31,6 +31,8 @@ class SqlDatabaseManager(MiddlewareBase[AppT]):
     Default middleware order for SqlDatabaseManager is -100
     """
 
+    __ignore__: bool = True
+
     _order: int = -100
 
     databases: list[Type["SqlDatabase[Any]"]] = []
@@ -39,6 +41,7 @@ class SqlDatabaseManager(MiddlewareBase[AppT]):
         super().__init__(app, next_app)
         self._db_instances: dict[str, "SqlDatabase[Any]"] = {}
         for db in self.databases:
+            self.app.logger.info(f"Initializing database {db.__name__}")
             db_inst = db(self.app)
             self._db_instances[db_inst.db_name] = db_inst
 

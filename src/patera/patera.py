@@ -444,8 +444,13 @@ class Patera(Injectable, Generic[ConfT]):
                     self.register_cli_controller(obj_inst)
                     continue
                 elif issubclass(obj, MiddlewareBase) and obj is not MiddlewareBase:
-                    self.logger.info(f"Registering middleware: {obj.__name__}")
+                    ignore: bool = obj.__dict__.get("__ignore__", False)
+                    if ignore:
+                        continue
                     order = getattr(obj, "_order", 0)
+                    self.logger.info(
+                        f"Registering middleware: {obj.__name__} ({order=})"
+                    )
                     order_keys = self._middleware_classes.keys()
                     if order in order_keys:
                         order = max(order_keys) + 1

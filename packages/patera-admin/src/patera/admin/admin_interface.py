@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
-from patera.utilities import pascal_to_upper_snake
 
 from .translations import TRANSLATIONS_MAP
 
@@ -67,6 +66,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     _admin_menu: list[dict[str, str]] = []
     _databases_menu: list[dict[str, str | Any]] = []
+    _database_menu_built: bool = False
     _email_services: dict[str, Any] = {}
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si", "es"]
@@ -83,7 +83,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._register_admin_exception_handler()
         self._register_admin_controller()
         self._find_injected_extensions()
-        self._construct_menu()
 
     def _register_admin_exception_handler(self) -> None:
         """
@@ -142,37 +141,17 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         if self.managed_models is None or len(self.managed_models) == 0:
             return
 
-    def _construct_menu(self) -> None:
-        """
-        Constructs the admin menu based on the managed models and injected extensions
-        """
-        menu = [
-            {
-                "name": "dashboard",
-                "url_for": "_AdminController.dashboard",
-            }
-        ]
-        menu.append(
-            {
-                "name": "logout",
-                "url_for": self.configs.URL_FOR_FOR_LOGOUT,
-            }
-        )
-        self._admin_menu = menu
-        self._databases_menu = self._find_database_extensions()
-
     def _find_database_extensions(self) -> list[dict[str, str | Any]]:
         databases = []
-        for ext in self.app.app_extensions:
-            extMro = [cl.__name__.lower() for cl in ext.mro()]
+        doubled = []
+        for extInst in list(self.app.extensions.values()):
+            extMro = [cl.__name__.lower() for cl in extInst.__class__.mro()]
             if "admininterface" in extMro or "sqldatabase" not in extMro:
                 continue
-            if len(set(extMro).intersection(self.__class__._supported_extensions)) > 0:
-                extInst = self.app.extensions.get(
-                    pascal_to_upper_snake(ext.__name__), None
-                )
-                if extInst is None:
-                    continue
+            if (
+                len(set(extMro).intersection(self.__class__._supported_extensions)) > 0
+                and extInst.__class__.__name__ not in doubled
+            ):
                 databases.append(
                     {
                         "extension": extInst,
@@ -181,6 +160,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
                         "url_for": "_AdminDbController.database_overview",
                     }
                 )
+                doubled.append(extInst.__class__.__name__)
         if len(databases) > 0:
             self._register_db_controller()
         return databases
@@ -239,6 +219,9 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     @property
     def databases_menu(self) -> list[dict[str, str]]:
+        if self._database_menu_built is False:
+            self._databases_menu = self._find_database_extensions()
+            self._database_menu_built = True
         return self._databases_menu
 
     @property

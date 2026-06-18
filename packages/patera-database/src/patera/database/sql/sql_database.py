@@ -38,7 +38,7 @@ from .dialect_overview_extras import (
 
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
-from patera.ctx import bind_session, request_context, current_request
+from patera.ctx import bind_session, request_context
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
@@ -293,99 +293,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         return [model for model in self._models.values()]
 
 
-def readonly_session(db_impl_or_name: str) -> Callable:
-    def wrap_handler(func: Callable) -> Callable:
-        @wraps(func)
-        async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                db_impl_or_name, None
-            )
-            if db_extension is None:
-                raise ValueError(
-                    f"Database extension with name {db_impl_or_name} is not registered"
-                )
-            if current_request.session(db_extension.session_name) is not None:
-                # session already exists.
-                return await run_sync_or_async(func, self, *args, **kwargs)
-
-            async with db_extension.create_session() as session:
-                with bind_session(db_extension.session_name, session):
-                    return await run_sync_or_async(func, self, *args, **kwargs)
-
-        wrapper.__managed_session_wrapped__ = True  # type: ignore
-
-        return wrapper
-
-    def decorator(target: Any) -> Any:
-        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
-            return wrap_handler(target)
-        if py_inspect.isclass(target) and "Controller" in [
-            c.__name__ for c in target.mro()
-        ]:
-            for name, attr in vars(target).items():
-                if not py_inspect.isfunction(attr):
-                    continue
-                if getattr(attr, "_handler", False):
-                    if not getattr(attr, "__managed_session_wrapped__", False):
-                        setattr(target, name, wrap_handler(attr))
-            return target
-        raise TypeError(
-            "@readonly_session can only be applied to a function or a controller class"
-        )
-
-    return decorator
-
-
-def managed_session(db_impl_or_name: str) -> Callable:
-
-    def wrap_handler(func: Callable) -> Callable:
-        @wraps(func)
-        async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                db_impl_or_name, None
-            )
-            if db_extension is None:
-                raise ValueError(
-                    f"Database extension with name {db_impl_or_name} is not registered"
-                )
-            existing_session = current_request.session(db_extension.session_name)
-
-            if existing_session is not None:
-                if existing_session.in_transaction():
-                    return await run_sync_or_async(func, self, *args, **kwargs)
-
-                async with existing_session.begin():
-                    return await run_sync_or_async(func, self, *args, **kwargs)
-
-            async with db_extension.create_session() as session:
-                async with session.begin():
-                    with bind_session(db_extension.session_name, session):
-                        return await run_sync_or_async(func, self, *args, **kwargs)
-
-        wrapper.__managed_session_wrapped__ = True  # type: ignore
-        return wrapper
-
-    def decorator(target: Any) -> Any:
-        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
-            return wrap_handler(target)
-        if py_inspect.isclass(target) and "Controller" in [
-            c.__name__ for c in target.mro()
-        ]:
-            for name, attr in vars(target).items():
-                if not py_inspect.isfunction(attr):
-                    continue
-                if getattr(attr, "_handler", False):
-                    if not getattr(attr, "__managed_session_wrapped__", False):
-                        setattr(target, name, wrap_handler(attr))
-            return target
-        raise TypeError(
-            "@managed_session can only be applied to a function or a controller class"
-        )
-
-    return decorator
-
-
-def managed_cli_session(db_impl_or_name: str) -> Callable:
+def cli_session(db_impl_or_name: str) -> Callable:
 
     def wrap_handler(func: Callable) -> Callable:
         @wraps(func)
