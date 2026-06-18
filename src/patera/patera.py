@@ -305,6 +305,15 @@ class Patera(Injectable, Generic[ConfT]):
         self._jinja_environment.loader = FileSystemLoader(self._all_templates_paths)
 
     def _load_controllers_exc_handlers_middleware(self, cli_mode: bool = False) -> None:
+        logger_folders: list[str] = ["logging", "loggers"]
+        logger_folders.extend(self._configs.LOGGER_FOLDERS or [])
+
+        self._load_detected_modules_once(
+            logger_folders,
+            ["logger", "log_sink"],
+            LoggerBase,
+        )
+
         cli_controller_folders: list[str] = ["cli", "cli_controllers"]
         cli_controller_folders.extend(self._configs.CLI_CONTROLLER_FOLDERS or [])
 
@@ -316,15 +325,6 @@ class Patera(Injectable, Generic[ConfT]):
 
         if cli_mode:
             return
-
-        logger_folders: list[str] = ["logging", "loggers"]
-        logger_folders.extend(self._configs.LOGGER_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            logger_folders,
-            ["logger", "log_sink"],
-            LoggerBase,
-        )
 
         controller_folders: list[str] = [
             "api",

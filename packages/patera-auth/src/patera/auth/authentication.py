@@ -189,7 +189,11 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
     3. Decorators:
         - login_required: to mark route handlers/controllers that require authentication
         - role_required: to mark route handlers/controllers that require specific roles
+
+    Default middleware order for Authentication is -99
     """
+
+    _order: int = -99
 
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         """
@@ -197,7 +201,8 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         """
         super().__init__(app, next_app)  # type: ignore
         self._configs = app.get_conf(
-            self.configs_name, app.get_conf(self.__class__.__name__, {})
+            self.configs_name,
+            app.get_conf(self.__class__.__name__, AuthenticationConfig()),
         )
         self.authentication_error = self.configs.AUTHENTICATION_ERROR_MSG
         self.authorization_error = self.configs.AUTHORIZATION_ERROR_MSG

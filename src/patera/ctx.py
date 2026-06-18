@@ -4,7 +4,7 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -14,24 +14,19 @@ if TYPE_CHECKING:
 
 @dataclass
 class ActiveSessions:
-    sessions: Optional[Dict[str, "AsyncSession"]] = None
+    sessions: dict[str, "AsyncSession"] = field(default_factory=dict)
 
     def get_session(self, session_name: str) -> "AsyncSession | None":
-        if self.sessions is None:
-            return None
-        return self.sessions.get(session_name, None)
+        return self.sessions.get(session_name)
 
     def set_session(self, session_name: str, session: "AsyncSession") -> None:
-        if self.sessions is None:
-            self.sessions = {}
         self.sessions[session_name] = session
 
     def remove_session(self, session_name: str) -> None:
-        if self.sessions is None:
-            return
         self.sessions.pop(session_name, None)
-        if not self.sessions:
-            self.sessions = None
+
+    def is_empty(self) -> bool:
+        return not self.sessions
 
 
 @dataclass

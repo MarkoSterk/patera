@@ -12,7 +12,12 @@ from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import DeclarativeBase
 
 from patera import Patera
-from patera.ctx import current_request
+from patera.ctx import (
+    current_request,
+    get_request_context,
+    ActiveSessions,
+    has_request_context,
+)
 
 if TYPE_CHECKING:
     from .sqlalchemy_async_query import AsyncQuery
@@ -95,15 +100,37 @@ class DeclarativeBaseModel(DeclarativeBase):
 
     @classmethod
     def query(
-        cls: type[ModelT], session: AsyncSession | None = None
+        cls: type[ModelT],
+        session: AsyncSession | None = None,
     ) -> AsyncQuery[ModelT]:
         from .sqlalchemy_async_query import AsyncQuery
 
+        if session is not None:
+            return AsyncQuery(
+                session=session,
+                model=cls,
+            )
+
+        if not has_request_context():
+            raise RuntimeError(
+                f"{cls.__name__}.query() requires an active request context "
+                "when no explicit AsyncSession is provided."
+            )
+
+        database = cls.get_database()
+        ctx = get_request_context()
+
+        if ctx.sessions is None:
+            ctx.sessions = ActiveSessions()
+
+        session = ctx.sessions.get_session(database.session_name)
+
         if session is None:
-            database: SqlDatabase = cls.get_database()
-            session = current_request.session(database.session_name)
+            session = database.create_session()
+            ctx.sessions.set_session(database.session_name, session)
+
         return AsyncQuery(
-            session=session,  # type: ignore
+            session=session,
             model=cls,
         )
 
