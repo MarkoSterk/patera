@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
 from sqlalchemy import Column
@@ -23,24 +23,6 @@ if TYPE_CHECKING:
     from .sqlalchemy_async_query import AsyncQuery
     from .sql_database import SqlDatabase
 
-
-class MetaProtocol(Protocol):
-    exclude_from_create_form: list[str]
-    exclude_from_update_form: list[str]
-    exclude_from_table: list[str]
-
-    add_to_form: dict[str, type[Any]]
-
-    custom_labels: dict[str, str]
-    custom_form_fields: list[type[Any]]
-
-    form_fields_order: list[str]
-    order_table_by: list[str]
-
-    create_validation_shema: type[BaseModel]
-    update_validation_shema: type[BaseModel]
-
-
 ModelT = TypeVar("ModelT", bound="DeclarativeBaseModel")
 
 
@@ -53,7 +35,7 @@ class DeclarativeBaseModel(DeclarativeBase):
     __db_configs_name__: str
     __abstract__ = True
 
-    class Meta(MetaProtocol):
+    class Meta:
         exclude_from_create_form: list[str]
         exclude_from_update_form: list[str]
         exclude_from_table: list[str]
