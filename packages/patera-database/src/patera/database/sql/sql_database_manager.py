@@ -36,8 +36,6 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
         - register SqlDatabaseManagerMiddleware automatically
         - provide request-session commit/rollback/close helpers
 
-    This class is an extension, not middleware.
-
     Therefore:
         - it is available in HTTP mode
         - it is available in CLI mode
