@@ -106,6 +106,7 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     async def __call__(self, req: "Request") -> "Response":
         """
         Middleware call method
+        Must call next middleware in chain with self.next(req)
         """
         return await run_sync_or_async(self.middleware, req)
 

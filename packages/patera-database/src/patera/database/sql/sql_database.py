@@ -39,6 +39,7 @@ from .dialect_overview_extras import (
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
 from patera.ctx import bind_session, request_context
+from patera.cli import CLIController
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
@@ -137,7 +138,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
                 pool_pre_ping=True,
                 pool_recycle=1800,
             )
-
+        self.app.logger.info(f"Connecting to database {self.__class__.__name__}")
         self._session_factory = async_sessionmaker(
             bind=self._engine,
             expire_on_commit=self.configs.EXPIRE_ON_COMMIT,
@@ -149,6 +150,9 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         Runs automatically when the lifespan.shutdown signal is received
         """
         if self._engine:
+            self.app.logger.info(
+                f"Disconnecting from database {self.__class__.__name__}"
+            )
             await self._engine.dispose()
             self._engine = None
 
@@ -293,53 +297,78 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         return [model for model in self._models.values()]
 
 
-def cli_session(db_impl_or_name: str) -> Callable:
+def cli_session(
+    db_impl_or_name: str,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Opens a managed SQL database session for a CLI command method.
 
-    def wrap_handler(func: Callable) -> Callable:
-        @wraps(func)
-        async def wrapper(self, *args, **kwargs) -> Any:
-            db_extension: Optional["SqlDatabase"] = self.app._extensions.get(
-                db_impl_or_name, None
+    This decorator may only be applied to methods inside a CLIController
+    implementation.
+
+    The wrapped CLI method runs inside:
+        - a lightweight request_context
+        - an AsyncSession
+        - a transaction block
+        - a bind_session(...) context
+
+    Example:
+        class MyCliController(CLIController):
+
+            @handler("seed")
+            @cli_session("main")
+            async def seed(self) -> None:
+                ...
+    """
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if py_inspect.isclass(func):
+            raise TypeError(
+                "@cli_session can only be applied to CLIController methods, "
+                "not to classes."
             )
-            if db_extension is None:
-                raise ValueError(
-                    f"Database extension with name {db_impl_or_name} is not registered"
+
+        if not py_inspect.isfunction(func) and not py_inspect.ismethod(func):
+            raise TypeError(
+                "@cli_session can only be applied to CLIController methods."
+            )
+
+        @wraps(func)
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            if not isinstance(self, CLIController):
+                raise TypeError(
+                    "@cli_session can only be used on methods of a CLIController "
+                    "implementation."
                 )
 
-            await db_extension.connect()  # connects to db
-            assert db_extension._session_factory is not None
+            db_extension: Optional["SqlDatabase[Any]"] = cast(
+                Optional["SqlDatabase[Any]"],
+                self.app.extensions.get(db_impl_or_name),
+            )
 
-            with request_context(
-                app=self,
-            ):
-                async with db_extension.create_session() as session:
-                    async with session.begin():
-                        with bind_session(db_extension.session_name, session):
-                            result = await run_sync_or_async(
-                                func, self, *args, **kwargs
-                            )
+            if db_extension is None:
+                raise ValueError(
+                    f"Database extension with name {db_impl_or_name!r} "
+                    "is not registered."
+                )
 
-            await db_extension.disconnect()  # disconnects from db
-            wrapper.__managed_cli_session_wrapped__ = True  # type: ignore
-            return result
+            await db_extension.connect()
+
+            try:
+                with request_context(app=self.app):
+                    async with db_extension.create_session() as session:
+                        async with session.begin():
+                            with bind_session(db_extension.session_name, session):
+                                return await run_sync_or_async(
+                                    func,
+                                    self,
+                                    *args,
+                                    **kwargs,
+                                )
+
+            finally:
+                await db_extension.disconnect()
 
         return wrapper
-
-    def decorator(target: Any) -> Any:
-        if py_inspect.isfunction(target) or py_inspect.ismethod(target):
-            return wrap_handler(target)
-        if py_inspect.isclass(target) and "CLIController" in [
-            c.__name__ for c in target.mro()
-        ]:
-            for name, attr in vars(target).items():
-                if not py_inspect.isfunction(attr):
-                    continue
-                if getattr(attr, "_handler", False):
-                    if not getattr(attr, "__managed_cli_session_wrapped__", False):
-                        setattr(target, name, wrap_handler(attr))
-            return target
-        raise TypeError(
-            "@managed_cli_session can only be applied to a function or a cli controller class"
-        )
 
     return decorator
