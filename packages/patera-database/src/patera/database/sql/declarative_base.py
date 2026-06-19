@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydantic import BaseModel
 from sqlalchemy import Column
@@ -13,9 +13,9 @@ from sqlalchemy.orm import DeclarativeBase
 
 from patera import Patera
 from patera.ctx import (
+    ActiveSessions,
     current_request,
     get_request_context,
-    ActiveSessions,
     has_request_context,
 )
 
@@ -23,7 +23,37 @@ if TYPE_CHECKING:
     from .sqlalchemy_async_query import AsyncQuery
     from .sql_database import SqlDatabase
 
+
 ModelT = TypeVar("ModelT", bound="DeclarativeBaseModel")
+
+
+class ModelMeta:
+    """
+    Default metadata/configuration class for admin/model behavior.
+
+    Individual models may override this by defining:
+
+        class Meta(ModelMeta):
+            exclude_from_create_form = ["some_field"]
+
+    Do not mutate the default class-level lists/dicts directly.
+    Override them in subclasses instead.
+    """
+
+    exclude_from_create_form: list[str] = []
+    exclude_from_update_form: list[str] = []
+    exclude_from_table: list[str] = []
+
+    add_to_form: dict[str, type[Any]] = {}
+
+    custom_labels: dict[str, str] = {}
+    custom_form_fields: list[type[Any]] = []
+
+    form_fields_order: list[str] = []
+    order_table_by: list[str] = []
+
+    create_validation_schema: type[BaseModel] | None = None
+    update_validation_schema: type[BaseModel] | None = None
 
 
 class DeclarativeBaseModel(DeclarativeBase):
@@ -31,25 +61,12 @@ class DeclarativeBaseModel(DeclarativeBase):
     Base class for framework ORM models.
     """
 
-    __db_name__: str
-    __db_configs_name__: str
     __abstract__ = True
 
-    class Meta:
-        exclude_from_create_form: list[str]
-        exclude_from_update_form: list[str]
-        exclude_from_table: list[str]
+    __db_name__: str
+    __db_configs_name__: str
 
-        add_to_form: dict[str, type[Any]]
-
-        custom_labels: dict[str, str]
-        custom_form_fields: list[type[Any]]
-
-        form_fields_order: list[str]
-        order_table_by: list[str]
-
-        create_validation_shema: type[BaseModel]
-        update_validation_shema: type[BaseModel]
+    Meta: ClassVar[type[ModelMeta]] = ModelMeta
 
     def __init__(self, **kwargs: Any) -> None:
         for key, value in kwargs.items():
@@ -86,11 +103,13 @@ class DeclarativeBaseModel(DeclarativeBase):
         session: AsyncSession | None = None,
     ) -> AsyncQuery[ModelT]:
         """
-        Creates an AsyncQuery object with provided session or
-        with a created session. Requires an active request context.
-        If a session already exists in the request context it is used to
-        create the AsyncQuery object. If not, a new session is created, added
-        to the request context and used in the AsyncQuery object.
+        Creates an AsyncQuery object.
+
+        If an explicit session is provided, it is used directly.
+
+        If no session is provided, this method requires an active request
+        context. It then uses the existing request-bound session for this
+        database or creates a new one and stores it in the request context.
         """
         from .sqlalchemy_async_query import AsyncQuery
 
@@ -125,40 +144,54 @@ class DeclarativeBaseModel(DeclarativeBase):
 
     @classmethod
     def get_database(cls) -> SqlDatabase:
+        """
+        Returns the SqlDatabase extension instance for this model.
+        Requires an active request context.
+        """
         app: Patera = current_request.app
+
         database = app._extensions.get(cls.db_name(), None)
+
         if database is None:
             raise ValueError(f"Failed to find database {cls.db_name()}")
-        return database  # type: ignore
+
+        return database  # type: ignore[return-value]
 
     @classmethod
     def get_session(cls) -> AsyncSession:
         """
-        Requires active request context
-        Return active session from request context or creates a new one
-        and stores it on the request context
+        Requires active request context.
+
+        Returns the active request-bound session for this model's database,
+        or creates a new one and stores it on the request context.
         """
         if not has_request_context():
             raise RuntimeError(
                 f"{cls.__name__}.get_session() requires an active request context "
                 "when no explicit AsyncSession is provided."
             )
+
         database = cls.get_database()
         ctx = get_request_context()
+
         if ctx.sessions is None:
             ctx.sessions = ActiveSessions()
+
         session = ctx.sessions.get_session(database.session_name)
+
         if session is None:
             session = database.create_session()
             ctx.sessions.set_session(database.session_name, session)
+
         return session
 
     @classmethod
     def get_standalone_session(cls) -> AsyncSession:
         """
-        Creates and returns an AsyncSession object.
-        This is a standalone session object which is not taken from
-        or stored to the request context
+        Creates and returns a standalone AsyncSession.
+
+        This session is not taken from and not stored to the request context.
+        The caller is responsible for closing it.
         """
         database = cls.get_database()
         return database.create_session()
@@ -179,7 +212,7 @@ class DeclarativeBaseModel(DeclarativeBase):
         if not pks:
             return None
 
-        return [pk.key for pk in pks] if pks else None
+        return [pk.key for pk in pks]
 
     @classmethod
     def primary_keys(cls) -> tuple[Column[Any], ...] | None:
@@ -193,60 +226,46 @@ class DeclarativeBaseModel(DeclarativeBase):
 
     @classmethod
     def exclude_from_create_form(cls) -> list[str]:
-        if not hasattr(cls.Meta, "exclude_from_create_form"):
-            return []
-        return cls.Meta.exclude_from_create_form
+        return list(cls.Meta.exclude_from_create_form)
 
     @classmethod
     def exclude_from_update_form(cls) -> list[str]:
-        if not hasattr(cls.Meta, "exclude_from_update_form"):
-            return []
-        return cls.Meta.exclude_from_update_form
+        return list(cls.Meta.exclude_from_update_form)
 
     @classmethod
     def exclude_from_table(cls) -> list[str]:
-        if not hasattr(cls.Meta, "exclude_from_table"):
-            return []
-        return cls.Meta.exclude_from_table
+        return list(cls.Meta.exclude_from_table)
 
     @classmethod
     def form_labels_map(cls) -> dict[str, str]:
-        if not hasattr(cls.Meta, "custom_labels"):
-            return {}
-        return cls.Meta.custom_labels
+        return dict(cls.Meta.custom_labels)
 
     @classmethod
     def custom_form_fields(cls) -> dict[str, type[Any]]:
-        if not hasattr(cls.Meta, "custom_form_fields"):
-            return {}
         return {field.id: field for field in cls.Meta.custom_form_fields}
 
     @classmethod
     def add_to_form(cls) -> dict[str, Any]:
-        if not hasattr(cls.Meta, "add_to_form"):
-            return {}
-        return cls.Meta.add_to_form
+        return dict(cls.Meta.add_to_form)
 
     @classmethod
     def create_validation_schema(cls) -> type[BaseModel] | None:
-        if not hasattr(cls.Meta, "create_validation_shema"):
-            return None
-        return cls.Meta.create_validation_shema
+        return cls.Meta.create_validation_schema
 
     @classmethod
     def update_validation_schema(cls) -> type[BaseModel] | None:
-        if not hasattr(cls.Meta, "update_validation_shema"):
-            return None
-        return cls.Meta.update_validation_shema
+        return cls.Meta.update_validation_schema
 
     @classmethod
     def order_table_by(cls) -> list[str] | None:
-        if not hasattr(cls.Meta, "order_table_by"):
+        if not cls.Meta.order_table_by:
             return None
-        return cls.Meta.order_table_by
+
+        return list(cls.Meta.order_table_by)
 
     @classmethod
     def form_fields_order(cls) -> list[str] | None:
-        if not hasattr(cls.Meta, "form_fields_order"):
+        if not cls.Meta.form_fields_order:
             return None
-        return cls.Meta.form_fields_order
+
+        return list(cls.Meta.form_fields_order)
