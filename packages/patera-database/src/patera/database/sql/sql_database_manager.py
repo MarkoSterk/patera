@@ -31,7 +31,7 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
 
     Responsibilities:
         - initialize configured SqlDatabase extensions
-        - store database instances by db_name
+        - store database instances by db_name and class name
         - expose get_database(...)
         - register SqlDatabaseManagerMiddleware automatically
         - provide request-session commit/rollback/close helpers
