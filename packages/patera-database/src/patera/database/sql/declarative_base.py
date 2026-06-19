@@ -50,6 +50,7 @@ class ModelMeta:
     custom_form_fields: list[type[Any]] = []
 
     form_fields_order: list[str] = []
+    table_fields_order: list[str] = []
     order_table_by: list[str] = []
 
     create_validation_schema: type[BaseModel] | None = None
@@ -75,9 +76,11 @@ class DeclarativeBaseModel(DeclarativeBase):
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
 
-        if not cls.__abstract__ and "__db_name__" not in cls.__dict__:
+        is_abstract = cls.__dict__.get("__abstract__", False)
+
+        if not is_abstract and not hasattr(cls, "__db_name__"):
             raise TypeError(
-                f"{cls.__name__} must define a class attribute '__db_name__'"
+                f"{cls.__name__} must define or inherit a class attribute '__db_name__'"
             )
 
     async def admin_create(
@@ -257,15 +260,13 @@ class DeclarativeBaseModel(DeclarativeBase):
         return cls.Meta.update_validation_schema
 
     @classmethod
-    def order_table_by(cls) -> list[str] | None:
-        if not cls.Meta.order_table_by:
-            return None
-
+    def order_table_by(cls) -> list[str]:
         return list(cls.Meta.order_table_by)
 
     @classmethod
-    def form_fields_order(cls) -> list[str] | None:
-        if not cls.Meta.form_fields_order:
-            return None
-
+    def form_fields_order(cls) -> list[str]:
         return list(cls.Meta.form_fields_order)
+
+    @classmethod
+    def table_fields_order(cls) -> list[str]:
+        return list(cls.Meta.table_fields_order)
