@@ -404,23 +404,32 @@
       .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
-  function renderReadonlyRecord(recordData) {
+  function renderReadonlyRecord(recordFields, fallbackRecordData = {}) {
     if (!viewRecordTableBody) {
       return;
     }
 
     viewRecordTableBody.innerHTML = "";
 
-    for (const [key, value] of Object.entries(recordData)) {
+    const fields = Array.isArray(recordFields) && recordFields.length > 0
+      ? recordFields
+      : Object.entries(fallbackRecordData).map(([key, value]) => ({
+          name: key,
+          label: formatRecordLabel(key),
+          value
+        }));
+
+    fields.forEach((field) => {
       const tr = document.createElement("tr");
 
       const th = document.createElement("th");
       th.scope = "row";
       th.className = "text-muted text-nowrap";
       th.style.width = "220px";
-      th.textContent = formatRecordLabel(key);
+      th.textContent = field.label || formatRecordLabel(field.name);
 
       const td = document.createElement("td");
+      const value = field.value;
 
       if (value === null || value === undefined || value === "") {
         const span = document.createElement("span");
@@ -444,7 +453,7 @@
       tr.appendChild(th);
       tr.appendChild(td);
       viewRecordTableBody.appendChild(tr);
-    }
+    });
   }
 
   function setViewDialogLoading(isLoading) {

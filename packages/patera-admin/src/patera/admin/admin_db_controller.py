@@ -16,6 +16,8 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    asc,
+    desc,
 )
 from sqlalchemy.inspection import inspect
 
@@ -103,15 +105,24 @@ class _AdminDbController(Controller[Patera]):
     async def get_list(self, req: Request, db_name: str, model_name: str) -> Response:
         """
         Gets paginated list of model records.
+
+        Uses:
+        - model.Meta.order_table_by for SQL ordering
+        - model.Meta.table_fields_order for table column order
+        - model.Meta.exclude_from_table for visible table/view fields
+        - model.Meta.form_fields_order for create/update form field order
         """
         try:
             db: SqlDatabase = self.get_db(db_name)
             model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
 
-            query_params = RecordQuery(**req.query_parameters)  # type: ignore
+            query_params = RecordQuery(**req.query_parameters)  # type: ignore[arg-type]
 
             async with db.create_session() as session:
-                records = await model.query(session).paginate(
+                query = model.query(session)
+                query = self.apply_meta_table_ordering(query, model)
+
+                records = await query.paginate(
                     page=query_params.page,
                     per_page=query_params.per_page,
                 )
@@ -119,6 +130,7 @@ class _AdminDbController(Controller[Patera]):
             table_columns = self.get_admin_table_columns(model)
             create_fields = self.get_admin_create_form_fields(model)
             update_fields = self.get_admin_update_form_fields(model)
+            view_fields = self.get_admin_view_fields(model)
 
             return await req.res.html(
                 "_admin/databases/db_records_table.html",
@@ -133,6 +145,7 @@ class _AdminDbController(Controller[Patera]):
                     "table_columns": table_columns,
                     "create_fields": create_fields,
                     "update_fields": update_fields,
+                    "view_fields": view_fields,
                     "pagination_pages": self.get_pagination_pages(
                         records.page,
                         records.pages,
@@ -159,7 +172,10 @@ class _AdminDbController(Controller[Patera]):
                 await req.res.html(
                     "_admin/error.html",
                     {
-                        "error_message": "Invalid query parameters. Please provide page[int] and per_page[int]",
+                        "error_message": (
+                            "Invalid query parameters. Please provide "
+                            "page[int] and per_page[int]"
+                        ),
                         "error_title": "Invalid record query",
                     },
                 )
@@ -170,7 +186,7 @@ class _AdminDbController(Controller[Patera]):
                 await req.res.html(
                     "_admin/error.html",
                     {
-                        "error_message": "Faile to load table records.",
+                        "error_message": "Failed to load table records.",
                         "error_title": "Internal server error",
                     },
                 )
@@ -190,6 +206,13 @@ class _AdminDbController(Controller[Patera]):
         model_name: str,
         pk_values_str: str,
     ) -> Response:
+        """
+        Fetches a single record.
+
+        Returns:
+        - data: raw serialized column data for update forms
+        - fields: ordered/labeled readonly field list for the view dialog
+        """
         try:
             pk_values = self.path_pairs_to_dict(pk_values_str)
             db: SqlDatabase = self.get_db(db_name)
@@ -201,11 +224,17 @@ class _AdminDbController(Controller[Patera]):
             if record is None:
                 raise AdminRecordNotFound(db_name, model_name)
 
+            serialized_record = self.serialize_record(record, model)
+
             return req.res.json(
                 {
                     "message": "Record fetched successfully.",
                     "status": "success",
-                    "data": self.serialize_record(record, model),
+                    "data": serialized_record,
+                    "fields": self.serialize_record_view_fields(
+                        serialized_record,
+                        model,
+                    ),
                 }
             ).status(HttpStatus.OK)
 
@@ -221,7 +250,10 @@ class _AdminDbController(Controller[Patera]):
             self.app.logger.exception(e)
             return req.res.json(
                 {
-                    "message": f"Failed to fetch record from database {db_name} and table {model_name}",
+                    "message": (
+                        f"Failed to fetch record from database {db_name} "
+                        f"and table {model_name}"
+                    ),
                     "status": "error",
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -242,15 +274,20 @@ class _AdminDbController(Controller[Patera]):
     ) -> Response:
         """
         Creates a new database record from the admin create form.
+
+        Uses:
+        - model.Meta.create_validation_schema
         """
         try:
             db: SqlDatabase = self.get_db(db_name)
             model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
+
             validation_schema: Optional[Type[BaseModel]] = (
                 model.create_validation_schema()
             )
 
             form_data = await req.form_and_files()
+
             if validation_schema:
                 form_data = validation_schema.model_validate(form_data).model_dump()
 
@@ -280,7 +317,10 @@ class _AdminDbController(Controller[Patera]):
             self.app.logger.exception(e)
             return req.res.json(
                 {
-                    "message": f"Failed to create record in database {db_name} and table {model_name}",
+                    "message": (
+                        f"Failed to create record in database {db_name} "
+                        f"and table {model_name}"
+                    ),
                     "status": "error",
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -293,7 +333,11 @@ class _AdminDbController(Controller[Patera]):
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
     async def delete_record(
-        self, req: Request, db_name: str, model_name: str, pk_values_str: str
+        self,
+        req: Request,
+        db_name: str,
+        model_name: str,
+        pk_values_str: str,
     ) -> Response:
         try:
             pk_values = self.path_pairs_to_dict(pk_values_str)
@@ -303,8 +347,10 @@ class _AdminDbController(Controller[Patera]):
             async with db.create_session() as session:
                 async with session.begin():
                     record = await model.query(session).filter_by(**pk_values).first()
+
                     if record is None:
                         raise AdminRecordNotFound(db_name, model_name)
+
                     await record.admin_delete()
                     await session.delete(record)
 
@@ -326,7 +372,10 @@ class _AdminDbController(Controller[Patera]):
             self.app.logger.exception(e)
             return req.res.json(
                 {
-                    "message": f"Failed to delete record in database {db_name} and table {model_name}",
+                    "message": (
+                        f"Failed to delete record in database {db_name} "
+                        f"and table {model_name}"
+                    ),
                     "status": "error",
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -339,25 +388,39 @@ class _AdminDbController(Controller[Patera]):
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
     async def update_record(
-        self, req: Request, db_name: str, model_name: str, pk_values_str: str
+        self,
+        req: Request,
+        db_name: str,
+        model_name: str,
+        pk_values_str: str,
     ) -> Response:
+        """
+        Updates an existing database record.
+
+        Uses:
+        - model.Meta.update_validation_schema
+        """
         try:
             pk_values = self.path_pairs_to_dict(pk_values_str)
             db: SqlDatabase = self.get_db(db_name)
             model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
+
             validation_schema: Optional[Type[BaseModel]] = (
                 model.update_validation_schema()
             )
 
             form_data = await req.form_and_files()
+
             if validation_schema:
                 form_data = validation_schema.model_validate(form_data).model_dump()
 
             async with db.create_session() as session:
                 async with session.begin():
                     record = await model.query(session).filter_by(**pk_values).first()
+
                     if record is None:
                         raise AdminRecordNotFound(db_name, model_name)
+
                     await record.admin_update(form_data)
                     session.add(record)
                     await session.flush()
@@ -385,11 +448,15 @@ class _AdminDbController(Controller[Patera]):
                     "status": "error",
                 }
             ).status(HttpStatus.NOT_FOUND)
+
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
                 {
-                    "message": f"Failed to delete record in database {db_name} and table {model_name} with PK {pk_values_str}",
+                    "message": (
+                        f"Failed to update record in database {db_name} "
+                        f"and table {model_name} with PK {pk_values_str}"
+                    ),
                     "status": "error",
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -429,7 +496,7 @@ class _AdminDbController(Controller[Patera]):
         Returns a small page window around the current page.
 
         Example:
-        current_page=5, total_pages=10 -> [3, 4, 5, 6, 7]
+            current_page=5, total_pages=10 -> [3, 4, 5, 6, 7]
         """
         if total_pages <= 0:
             return []
@@ -439,10 +506,12 @@ class _AdminDbController(Controller[Patera]):
 
         return list(range(start, end + 1))
 
-    def get_db(self, db_name) -> SqlDatabase:
+    def get_db(self, db_name: str) -> SqlDatabase:
         db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
+
         if db is None:
             raise AdminUnknownDatabaseException(db_name)
+
         return db
 
     def get_model(
@@ -471,8 +540,11 @@ class _AdminDbController(Controller[Patera]):
 
         Uses:
         - model.Meta.exclude_from_table
-        - model.Meta.form_fields_order
+        - model.Meta.table_fields_order
         - model.Meta.custom_labels
+
+        If table_fields_order is empty, the SQLAlchemy mapper column order
+        is preserved.
         """
         mapper = inspect(model)
 
@@ -480,7 +552,7 @@ class _AdminDbController(Controller[Patera]):
 
         excluded_columns = set(model.exclude_from_table())
         labels_map = model.form_labels_map()
-        preferred_order = model.form_fields_order() or []
+        preferred_order = model.table_fields_order()
 
         visible_columns = [
             column_name
@@ -496,9 +568,54 @@ class _AdminDbController(Controller[Patera]):
         return [
             {
                 "name": column_name,
-                "label": labels_map.get(
+                "label": self.get_field_label(
                     column_name,
-                    column_name.replace("_", " ").title(),
+                    labels_map,
+                ),
+            }
+            for column_name in ordered_columns
+        ]
+
+    def get_admin_view_fields(
+        self,
+        model: Type[DeclarativeBaseModel],
+    ) -> list[dict[str, str]]:
+        """
+        Returns readonly view-field metadata.
+
+        Uses:
+        - model.Meta.exclude_from_table
+        - model.Meta.table_fields_order
+        - model.Meta.custom_labels
+
+        The readonly view dialog follows the same field visibility and ordering
+        as the records table.
+        """
+        mapper = inspect(model)
+
+        model_columns: list[str] = [column.key for column in mapper.columns]
+
+        excluded_columns = set(model.exclude_from_table())
+        labels_map = model.form_labels_map()
+        preferred_order = model.table_fields_order()
+
+        visible_columns = [
+            column_name
+            for column_name in model_columns
+            if column_name not in excluded_columns
+        ]
+
+        ordered_columns = self.order_field_names(
+            available_field_names=visible_columns,
+            preferred_order=preferred_order,
+        )
+
+        return [
+            {
+                "name": column_name,
+                "label": self.get_field_label(
+                    column_name,
+                    labels_map,
                 ),
             }
             for column_name in ordered_columns
@@ -518,7 +635,8 @@ class _AdminDbController(Controller[Patera]):
         - model.Meta.custom_form_fields
         - model.Meta.add_to_form
 
-        Primary keys are always excluded because they are generated by the database.
+        Primary keys are always excluded because they are usually generated
+        by the database.
         """
         mapper = inspect(model)
 
@@ -528,7 +646,7 @@ class _AdminDbController(Controller[Patera]):
         )
 
         labels_map = model.form_labels_map()
-        preferred_order = model.form_fields_order() or []
+        preferred_order = model.form_fields_order()
         custom_form_fields = model.custom_form_fields()
         additional_fields = model.add_to_form()
 
@@ -542,10 +660,7 @@ class _AdminDbController(Controller[Patera]):
 
             fields[field_name] = {
                 "name": field_name,
-                "label": labels_map.get(
-                    field_name,
-                    field_name.replace("_", " ").title(),
-                ),
+                "label": self.get_field_label(field_name, labels_map),
                 "input_type": self.get_input_type_for_column(column),
                 "required": self.is_required_column(column),
                 "custom_field": custom_form_fields.get(field_name),
@@ -559,10 +674,7 @@ class _AdminDbController(Controller[Patera]):
 
             fields[field_name] = {
                 "name": field_name,
-                "label": labels_map.get(
-                    field_name,
-                    field_name.replace("_", " ").title(),
-                ),
+                "label": self.get_field_label(field_name, labels_map),
                 "input_type": self.get_input_type_for_python_type(field_type),
                 "required": False,
                 "custom_field": custom_form_fields.get(field_name),
@@ -602,7 +714,7 @@ class _AdminDbController(Controller[Patera]):
         )
 
         labels_map = model.form_labels_map()
-        preferred_order = model.form_fields_order() or []
+        preferred_order = model.form_fields_order()
         custom_form_fields = model.custom_form_fields()
         additional_fields = model.add_to_form()
 
@@ -616,10 +728,7 @@ class _AdminDbController(Controller[Patera]):
 
             fields[field_name] = {
                 "name": field_name,
-                "label": labels_map.get(
-                    field_name,
-                    field_name.replace("_", " ").title(),
-                ),
+                "label": self.get_field_label(field_name, labels_map),
                 "input_type": self.get_input_type_for_column(column),
                 "required": self.is_required_column(column),
                 "custom_field": custom_form_fields.get(field_name),
@@ -633,10 +742,7 @@ class _AdminDbController(Controller[Patera]):
 
             fields[field_name] = {
                 "name": field_name,
-                "label": labels_map.get(
-                    field_name,
-                    field_name.replace("_", " ").title(),
-                ),
+                "label": self.get_field_label(field_name, labels_map),
                 "input_type": self.get_input_type_for_python_type(field_type),
                 "required": False,
                 "custom_field": custom_form_fields.get(field_name),
@@ -657,7 +763,10 @@ class _AdminDbController(Controller[Patera]):
         model: Type[DeclarativeBaseModel],
     ) -> dict[str, Any]:
         """
-        Serializes only mapped SQLAlchemy columns.
+        Serializes all mapped SQLAlchemy columns.
+
+        This is intentionally not filtered by exclude_from_table because update
+        dialogs may need values for fields that are not displayed in the table.
         """
         mapper = inspect(model)
         data: dict[str, Any] = {}
@@ -678,6 +787,70 @@ class _AdminDbController(Controller[Patera]):
 
         return data
 
+    def serialize_record_view_fields(
+        self,
+        serialized_record: dict[str, Any],
+        model: Type[DeclarativeBaseModel],
+    ) -> list[dict[str, Any]]:
+        """
+        Serializes a record into ordered/labeled readonly fields for the view dialog.
+
+        Uses:
+        - model.Meta.exclude_from_table
+        - model.Meta.table_fields_order
+        - model.Meta.custom_labels
+        """
+        view_fields = self.get_admin_view_fields(model)
+
+        return [
+            {
+                "name": field["name"],
+                "label": field["label"],
+                "value": serialized_record.get(field["name"]),
+            }
+            for field in view_fields
+        ]
+
+    def apply_meta_table_ordering(
+        self,
+        query: Any,
+        model: Type[DeclarativeBaseModel],
+    ) -> Any:
+        """
+        Applies model.Meta.order_table_by to the records query.
+
+        Supports:
+        - "created_at"  -> ascending
+        - "-created_at" -> descending
+
+        Unknown field names are ignored.
+        """
+        order_fields = model.order_table_by()
+
+        if not order_fields:
+            return query
+
+        order_expressions: list[Any] = []
+
+        for field_name in order_fields:
+            descending = field_name.startswith("-")
+            clean_field_name = field_name[1:] if descending else field_name
+
+            if not hasattr(model, clean_field_name):
+                continue
+
+            column = getattr(model, clean_field_name)
+
+            if descending:
+                order_expressions.append(desc(column))
+            else:
+                order_expressions.append(asc(column))
+
+        if not order_expressions:
+            return query
+
+        return query.order_by(*order_expressions)
+
     def order_field_names(
         self,
         available_field_names: list[str],
@@ -685,6 +858,9 @@ class _AdminDbController(Controller[Patera]):
     ) -> list[str]:
         """
         Orders fields using preferred_order first, then appends the remaining fields.
+
+        If preferred_order is empty, the original available_field_names order is
+        preserved.
         """
         ordered_field_names: list[str] = []
 
@@ -700,6 +876,19 @@ class _AdminDbController(Controller[Patera]):
                 ordered_field_names.append(field_name)
 
         return ordered_field_names
+
+    def get_field_label(
+        self,
+        field_name: str,
+        labels_map: dict[str, str],
+    ) -> str:
+        """
+        Returns a human-readable label for a model/admin field.
+        """
+        return labels_map.get(
+            field_name,
+            field_name.replace("_", " ").title(),
+        )
 
     def is_required_column(self, column: Any) -> bool:
         """
@@ -821,8 +1010,6 @@ class _AdminDbController(Controller[Patera]):
         - field.render(field_metadata)
         - field.markup(field_metadata)
         - field.html(field_metadata)
-
-        Adjust this method if your custom field classes use a different API.
         """
         custom_field = field.get("custom_field")
 

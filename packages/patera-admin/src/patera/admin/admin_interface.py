@@ -225,6 +225,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     def _create_models_map(self) -> None:
         for model in self.managed_models:
             self._models_map[model.__name__] = model
+        if len(self._models_map) > 0:
+            self._databases_menu = self._find_database_extensions()
 
     @property
     def admin_menu(self) -> list[dict[str, str]]:
@@ -232,9 +234,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     @property
     def databases_menu(self) -> list[dict[str, str]]:
-        if self._database_menu_built is False:
-            self._databases_menu = self._find_database_extensions()
-            self._database_menu_built = True
         return self._databases_menu
 
     @property
