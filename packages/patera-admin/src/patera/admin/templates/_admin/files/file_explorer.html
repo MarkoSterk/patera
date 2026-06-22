@@ -13,16 +13,6 @@
           {{ translate('browse_upload_and_manage_application_files') }}
         </p>
       </div>
-
-      <div class="mt-3 mt-md-0 d-flex gap-2">
-        <a
-          href="{{ admin_interface.url_for('_AdminFileController.explorer') }}"
-          class="btn btn-primary"
-        >
-          <i class="bi bi-arrow-clockwise me-1"></i>
-          {{ translate('refresh') }}
-        </a>
-      </div>
     </div>
 
     <div class="card content-card shadow-sm">
@@ -45,13 +35,13 @@
 
       <div class="card-body p-0">
         <file-explorer
-          root="{{ file_explorer_root|default('static') }}"
+          root="{{ file_explorer_root }}"
           path="{{ file_explorer_path|default('') }}"
-          list-url="{{ file_explorer_list_url|default(admin_interface.url_for('_AdminFileController.list_root')) }}"
-          create-url="{{ file_explorer_create_url|default(admin_interface.url_for('_AdminFileController.upload')) }}"
-          rename-url="{{ file_explorer_rename_url|default(admin_interface.url_for('_AdminFileController.rename')) }}"
-          delete-url="{{ file_explorer_delete_url|default(admin_interface.url_for('_AdminFileController.delete')) }}"
-          move-url="{{ file_explorer_move_url|default('') }}"
+          list-url="{{ admin_interface.url_for('_AdminFileController.list_root') }}"
+          create-url="{{ admin_interface.url_for('_AdminFileController.upload') }}"
+          rename-url="{{ admin_interface.url_for('_AdminFileController.rename') }}"
+          delete-url="{{ admin_interface.url_for('_AdminFileController.delete') }}"
+          move-url=""
         ></file-explorer>
       </div>
 

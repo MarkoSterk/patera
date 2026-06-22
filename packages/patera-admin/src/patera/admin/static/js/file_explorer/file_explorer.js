@@ -14,217 +14,56 @@ class FileExplorer extends HTMLElement {
   constructor() {
     super();
 
-    this.attachShadow({ mode: "open" });
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          font-family: inherit;
-        }
-
-        .file-explorer {
-          border: 1px solid #dee2e6;
-          border-radius: 0.5rem;
-          background: #fff;
-          overflow: hidden;
-        }
-
-        .file-explorer-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          border-bottom: 1px solid #dee2e6;
-          background: #f8f9fa;
-        }
-
-        .title {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-weight: 600;
-        }
-
-        .breadcrumbs {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 0.25rem;
-          padding: 0.75rem 1rem;
-          border-bottom: 1px solid #dee2e6;
-          background: #fff;
-          font-size: 0.925rem;
-        }
-
-        .breadcrumb-button {
-          border: 0;
-          background: transparent;
-          color: #0d6efd;
-          padding: 0.125rem 0.25rem;
-          cursor: pointer;
-          font: inherit;
-        }
-
-        .breadcrumb-button:hover {
-          text-decoration: underline;
-        }
-
-        .breadcrumb-separator {
-          color: #6c757d;
-        }
-
-        .actions {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        button {
-          font: inherit;
-        }
-
-        .btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.35rem;
-          border: 1px solid #ced4da;
-          background: #fff;
-          border-radius: 0.375rem;
-          padding: 0.375rem 0.625rem;
-          cursor: pointer;
-          color: #212529;
-        }
-
-        .btn:hover {
-          background: #f8f9fa;
-        }
-
-        .btn-primary {
-          border-color: #0d6efd;
-          background: #0d6efd;
-          color: #fff;
-        }
-
-        .btn-primary:hover {
-          background: #0b5ed7;
-        }
-
-        .drop-zone {
-          min-height: 240px;
-          padding: 1rem;
-          transition: background 0.15s ease, outline 0.15s ease;
-        }
-
-        .drop-zone.drag-over {
-          background: rgba(13, 110, 253, 0.08);
-          outline: 2px dashed #0d6efd;
-          outline-offset: -0.75rem;
-        }
-
-        .items {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-          gap: 0.75rem;
-        }
-
-        .empty,
-        .loading,
-        .error {
-          padding: 2rem;
-          text-align: center;
-          color: #6c757d;
-        }
-
-        .error {
-          color: #dc3545;
-        }
-
-        .hidden {
-          display: none;
-        }
-
-        .bi {
-          line-height: 1;
-        }
-      </style>
-
-      <div class="file-explorer">
-        <div class="file-explorer-header">
-          <div class="title">
-            <i class="bi bi-folder2-open"></i>
-            <span part="title">File Explorer</span>
-          </div>
-
-          <div class="actions">
-            <button type="button" class="btn" id="refresh-btn">
-              <i class="bi bi-arrow-clockwise"></i>
-              Refresh
-            </button>
-
-            <button type="button" class="btn btn-primary" id="upload-btn">
-              <i class="bi bi-upload"></i>
-              Upload
-            </button>
-
-            <input id="file-input" type="file" multiple class="hidden">
-          </div>
-        </div>
-
-        <nav class="breadcrumbs" part="breadcrumbs"></nav>
-
-        <div class="drop-zone" part="drop-zone">
-          <div class="loading hidden">Loading...</div>
-          <div class="error hidden"></div>
-          <div class="empty hidden">
-            <i class="bi bi-folder-x"></i>
-            <div>This folder is empty.</div>
-          </div>
-          <div class="items" part="items"></div>
-        </div>
-      </div>
-    `;
-
     this._currentPath = "";
     this._items = [];
+    this._selectedPaths = new Set();
+    this._lastSelectedIndex = null;
+    this._initialized = false;
   }
 
   connectedCallback() {
+    if (!this._initialized) {
+      this.#renderShell();
+      this._initialized = true;
+    }
+
     this._currentPath = this.getAttribute("path") || "";
 
     this.refreshButton.addEventListener("click", this.#handleRefreshClick);
     this.uploadButton.addEventListener("click", this.#handleUploadClick);
+    this.renameButton.addEventListener("click", this.#handleRenameSelectedClick);
+    this.deleteButton.addEventListener("click", this.#handleDeleteSelectedClick);
     this.fileInput.addEventListener("change", this.#handleFileInputChange);
 
     this.dropZone.addEventListener("dragenter", this.#handleDragEnter);
     this.dropZone.addEventListener("dragover", this.#handleDragOver);
     this.dropZone.addEventListener("dragleave", this.#handleDragLeave);
-    this.dropZone.addEventListener("drop", this.#handleDrop);
+    this.dropZone.addEventListener("drop", this.#handleUploadDrop);
 
+    this.addEventListener("file-explorer-item-selected", this.#handleItemSelected);
     this.addEventListener("file-explorer-open-folder", this.#handleOpenFolder);
-    this.addEventListener("file-explorer-delete", this.#handleDeleteItem);
-    this.addEventListener("file-explorer-rename", this.#handleRenameItem);
-    this.addEventListener("file-explorer-move", this.#handleMoveItem);
+    this.addEventListener("file-explorer-move-to-folder", this.#handleMoveToFolder);
+    this.dropZone.addEventListener("click", this.#handleEmptySpaceClick);
 
     this.load();
   }
 
   disconnectedCallback() {
-    this.refreshButton.removeEventListener("click", this.#handleRefreshClick);
-    this.uploadButton.removeEventListener("click", this.#handleUploadClick);
-    this.fileInput.removeEventListener("change", this.#handleFileInputChange);
+    this.refreshButton?.removeEventListener("click", this.#handleRefreshClick);
+    this.uploadButton?.removeEventListener("click", this.#handleUploadClick);
+    this.renameButton?.removeEventListener("click", this.#handleRenameSelectedClick);
+    this.deleteButton?.removeEventListener("click", this.#handleDeleteSelectedClick);
+    this.fileInput?.removeEventListener("change", this.#handleFileInputChange);
 
-    this.dropZone.removeEventListener("dragenter", this.#handleDragEnter);
-    this.dropZone.removeEventListener("dragover", this.#handleDragOver);
-    this.dropZone.removeEventListener("dragleave", this.#handleDragLeave);
-    this.dropZone.removeEventListener("drop", this.#handleDrop);
+    this.dropZone?.removeEventListener("dragenter", this.#handleDragEnter);
+    this.dropZone?.removeEventListener("dragover", this.#handleDragOver);
+    this.dropZone?.removeEventListener("dragleave", this.#handleDragLeave);
+    this.dropZone?.removeEventListener("drop", this.#handleUploadDrop);
+    this.dropZone?.removeEventListener("click", this.#handleEmptySpaceClick);
 
+    this.removeEventListener("file-explorer-item-selected", this.#handleItemSelected);
     this.removeEventListener("file-explorer-open-folder", this.#handleOpenFolder);
-    this.removeEventListener("file-explorer-delete", this.#handleDeleteItem);
-    this.removeEventListener("file-explorer-rename", this.#handleRenameItem);
-    this.removeEventListener("file-explorer-move", this.#handleMoveItem);
+    this.removeEventListener("file-explorer-move-to-folder", this.#handleMoveToFolder);
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -235,7 +74,7 @@ class FileExplorer extends HTMLElement {
     if (name === "path") {
       this._currentPath = newValue || "";
 
-      if (this.isConnected) {
+      if (this.isConnected && this._initialized) {
         this.load();
       }
     }
@@ -274,40 +113,56 @@ class FileExplorer extends HTMLElement {
     this.setAttribute("path", this._currentPath);
   }
 
+  get selectedPaths() {
+    return Array.from(this._selectedPaths);
+  }
+
   get refreshButton() {
-    return this.shadowRoot.getElementById("refresh-btn");
+    return this.querySelector("#file-explorer-refresh-btn");
   }
 
   get uploadButton() {
-    return this.shadowRoot.getElementById("upload-btn");
+    return this.querySelector("#file-explorer-upload-btn");
+  }
+
+  get renameButton() {
+    return this.querySelector("#file-explorer-rename-btn");
+  }
+
+  get deleteButton() {
+    return this.querySelector("#file-explorer-delete-btn");
   }
 
   get fileInput() {
-    return this.shadowRoot.getElementById("file-input");
+    return this.querySelector("#file-explorer-file-input");
   }
 
   get breadcrumbsElement() {
-    return this.shadowRoot.querySelector(".breadcrumbs");
+    return this.querySelector(".file-explorer-breadcrumbs");
   }
 
   get dropZone() {
-    return this.shadowRoot.querySelector(".drop-zone");
+    return this.querySelector(".file-explorer-drop-zone");
   }
 
   get itemsElement() {
-    return this.shadowRoot.querySelector(".items");
+    return this.querySelector(".file-explorer-items");
   }
 
   get loadingElement() {
-    return this.shadowRoot.querySelector(".loading");
+    return this.querySelector(".file-explorer-loading");
   }
 
   get errorElement() {
-    return this.shadowRoot.querySelector(".error");
+    return this.querySelector(".file-explorer-error");
   }
 
   get emptyElement() {
-    return this.shadowRoot.querySelector(".empty");
+    return this.querySelector(".file-explorer-empty");
+  }
+
+  get selectedCountElement() {
+    return this.querySelector(".file-explorer-selected-count");
   }
 
   async load() {
@@ -334,11 +189,16 @@ class FileExplorer extends HTMLElement {
       }
 
       const payload = await response.json();
+      const data = payload.data || payload;
 
-      this._currentPath = this.#normalizePath(payload.path ?? this.currentPath);
-      this._items = Array.isArray(payload.items) ? payload.items : [];
+      this._currentPath = this.#normalizePath(
+        data.path ?? data.current_relative_path ?? this.currentPath
+      );
 
+      this._items = Array.isArray(data.items) ? data.items : [];
+      this.#clearSelection();
       this.#render();
+
       this.#emit("file-explorer-loaded", {
         path: this.currentPath,
         items: this._items
@@ -416,45 +276,129 @@ class FileExplorer extends HTMLElement {
     });
   }
 
-  async deleteItem(path) {
+  async deleteItems(paths) {
     if (!this.deleteUrl) {
       this.#showError("Missing delete-url attribute.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("root", this.root);
-    formData.append("path", path);
+    const selectedPaths = Array.from(paths || []);
 
-    await this.#postFormAndReload(this.deleteUrl, formData, "Delete failed.");
-
-    this.#emit("file-explorer-deleted", {
-      path
-    });
-  }
-
-  async moveItem(path, destinationPath) {
-    if (!this.moveUrl) {
-      this.#showError("Missing move-url attribute.");
+    if (selectedPaths.length === 0) {
       return;
     }
 
     const formData = new FormData();
     formData.append("root", this.root);
-    formData.append("path", path);
+
+    for (const path of selectedPaths) {
+      formData.append("paths", path);
+      formData.append("files", path);
+    }
+
+    await this.#postFormAndReload(this.deleteUrl, formData, "Delete failed.");
+
+    this.#emit("file-explorer-deleted", {
+      paths: selectedPaths
+    });
+  }
+
+  async moveItems(paths, destinationPath) {
+    if (!this.moveUrl) {
+      this.#showError("Missing move-url attribute.");
+      return;
+    }
+
+    const selectedPaths = Array.from(paths || []);
+
+    if (selectedPaths.length === 0 || !destinationPath) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("root", this.root);
     formData.append("destination_path", destinationPath);
+
+    for (const path of selectedPaths) {
+      formData.append("paths", path);
+      formData.append("files", path);
+    }
 
     await this.#postFormAndReload(this.moveUrl, formData, "Move failed.");
 
     this.#emit("file-explorer-moved", {
-      path,
+      paths: selectedPaths,
       destinationPath
     });
+  }
+
+  #renderShell() {
+    this.classList.add("file-explorer-element");
+
+    this.innerHTML = `
+      <div class="file-explorer border rounded bg-white overflow-hidden">
+        <div class="file-explorer-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 p-3 border-bottom bg-light">
+          <div class="d-flex align-items-center gap-2 fw-semibold">
+            <i class="bi bi-folder2-open"></i>
+            <span>File Explorer</span>
+          </div>
+
+          <div class="file-explorer-controls d-flex align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="file-explorer-refresh-btn">
+              <i class="bi bi-arrow-clockwise me-1"></i>
+              Refresh
+            </button>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="file-explorer-rename-btn" disabled>
+              <i class="bi bi-pencil me-1"></i>
+              Rename
+            </button>
+
+            <button type="button" class="btn btn-outline-danger btn-sm" id="file-explorer-delete-btn" disabled>
+              <i class="bi bi-trash me-1"></i>
+              Delete
+            </button>
+
+            <button type="button" class="btn btn-primary btn-sm" id="file-explorer-upload-btn">
+              <i class="bi bi-upload me-1"></i>
+              Upload
+            </button>
+
+            <input id="file-explorer-file-input" type="file" multiple class="d-none">
+          </div>
+        </div>
+
+        <div class="file-explorer-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 px-3 py-2 border-bottom bg-white">
+          <nav class="file-explorer-breadcrumbs d-flex align-items-center flex-wrap gap-1 small"></nav>
+
+          <div class="file-explorer-selected-count text-muted small">
+            0 selected
+          </div>
+        </div>
+
+        <div class="file-explorer-drop-zone p-3">
+          <div class="file-explorer-loading text-center text-muted py-5 d-none">
+            <div class="spinner-border spinner-border-sm me-1" aria-hidden="true"></div>
+            Loading...
+          </div>
+
+          <div class="file-explorer-error alert alert-danger d-none mb-3"></div>
+
+          <div class="file-explorer-empty text-center text-muted py-5 d-none">
+            <i class="bi bi-folder-x fs-1 d-block mb-2"></i>
+            <div class="fw-semibold">This folder is empty.</div>
+          </div>
+
+          <div class="file-explorer-items"></div>
+        </div>
+      </div>
+    `;
   }
 
   #render() {
     this.#renderBreadcrumbs();
     this.#renderItems();
+    this.#syncSelectionUi();
   }
 
   #renderBreadcrumbs() {
@@ -465,14 +409,14 @@ class FileExplorer extends HTMLElement {
     breadcrumbs.forEach((breadcrumb, index) => {
       if (index > 0) {
         const separator = document.createElement("span");
-        separator.className = "breadcrumb-separator";
+        separator.className = "text-muted";
         separator.textContent = "/";
         this.breadcrumbsElement.appendChild(separator);
       }
 
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "breadcrumb-button";
+      button.className = "btn btn-link btn-sm p-0 text-decoration-none";
       button.textContent = breadcrumb.label;
       button.addEventListener("click", () => {
         this.currentPath = breadcrumb.path;
@@ -486,28 +430,31 @@ class FileExplorer extends HTMLElement {
     this.itemsElement.innerHTML = "";
 
     const folders = this._items
-      .filter((item) => item.type === "folder")
+      .filter((item) => item.type === "folder" || item.is_folder === true)
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const files = this._items
-      .filter((item) => item.type !== "folder")
+      .filter((item) => item.type !== "folder" && item.is_folder !== true)
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const sortedItems = [...folders, ...files];
 
-    this.emptyElement.classList.toggle("hidden", sortedItems.length > 0);
+    this.emptyElement.classList.toggle("d-none", sortedItems.length > 0);
+    this.itemsElement.className = "file-explorer-items d-flex flex-wrap align-content-start gap-2";
 
-    for (const item of sortedItems) {
-      const element = item.type === "folder"
+    sortedItems.forEach((item, index) => {
+      const element = item.type === "folder" || item.is_folder === true
         ? document.createElement("file-explorer-folder")
         : document.createElement("file-explorer-file");
 
       element.item = item;
+      element.index = index;
       element.root = this.root;
       element.currentPath = this.currentPath;
+      element.selected = this._selectedPaths.has(item.path);
 
       this.itemsElement.appendChild(element);
-    }
+    });
   }
 
   #getBreadcrumbs() {
@@ -535,6 +482,89 @@ class FileExplorer extends HTMLElement {
     }
 
     return breadcrumbs;
+  }
+
+  #selectSingle(path, index) {
+    this._selectedPaths.clear();
+    this._selectedPaths.add(path);
+    this._lastSelectedIndex = index;
+    this.#syncSelectionUi();
+  }
+
+  #toggleSelection(path, index) {
+    if (this._selectedPaths.has(path)) {
+      this._selectedPaths.delete(path);
+    } else {
+      this._selectedPaths.add(path);
+    }
+
+    this._lastSelectedIndex = index;
+    this.#syncSelectionUi();
+  }
+
+  #selectRange(index) {
+    if (this._lastSelectedIndex === null) {
+      const item = this.#itemAt(index);
+
+      if (item) {
+        this.#selectSingle(item.path, index);
+      }
+
+      return;
+    }
+
+    const start = Math.min(this._lastSelectedIndex, index);
+    const end = Math.max(this._lastSelectedIndex, index);
+
+    this._selectedPaths.clear();
+
+    for (let i = start; i <= end; i += 1) {
+      const item = this.#itemAt(i);
+
+      if (item) {
+        this._selectedPaths.add(item.path);
+      }
+    }
+
+    this.#syncSelectionUi();
+  }
+
+  #clearSelection() {
+    this._selectedPaths.clear();
+    this._lastSelectedIndex = null;
+    this.#syncSelectionUi();
+  }
+
+  #syncSelectionUi() {
+    const selectedCount = this._selectedPaths.size;
+
+    this.renameButton.disabled = selectedCount !== 1;
+    this.deleteButton.disabled = selectedCount < 1;
+
+    if (this.selectedCountElement) {
+      this.selectedCountElement.textContent =
+        selectedCount === 1
+          ? "1 selected"
+          : `${selectedCount} selected`;
+    }
+
+    this.querySelectorAll("file-explorer-file, file-explorer-folder").forEach((element) => {
+      element.selected = this._selectedPaths.has(element.item.path);
+    });
+  }
+
+  #itemAt(index) {
+    const elements = Array.from(
+      this.querySelectorAll("file-explorer-folder, file-explorer-file")
+    );
+
+    const element = elements[index];
+
+    return element?.item || null;
+  }
+
+  #getSelectedItems() {
+    return this._items.filter((item) => this._selectedPaths.has(item.path));
   }
 
   async #postFormAndReload(url, formData, fallbackErrorMessage) {
@@ -569,17 +599,17 @@ class FileExplorer extends HTMLElement {
   }
 
   #setLoading(isLoading) {
-    this.loadingElement.classList.toggle("hidden", !isLoading);
+    this.loadingElement.classList.toggle("d-none", !isLoading);
   }
 
   #showError(message) {
     this.errorElement.textContent = message;
-    this.errorElement.classList.remove("hidden");
+    this.errorElement.classList.remove("d-none");
   }
 
   #clearError() {
     this.errorElement.textContent = "";
-    this.errorElement.classList.add("hidden");
+    this.errorElement.classList.add("d-none");
   }
 
   #normalizePath(path) {
@@ -609,29 +639,65 @@ class FileExplorer extends HTMLElement {
     this.fileInput.click();
   };
 
+  #handleRenameSelectedClick = async () => {
+    const selectedItems = this.#getSelectedItems();
+
+    if (selectedItems.length !== 1) {
+      return;
+    }
+
+    const selectedItem = selectedItems[0];
+    const newName = prompt("New name:", selectedItem.name);
+
+    if (!newName || newName === selectedItem.name) {
+      return;
+    }
+
+    await this.renameItem(selectedItem.path, newName);
+  };
+
+  #handleDeleteSelectedClick = async () => {
+    const selectedItems = this.#getSelectedItems();
+
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    const message =
+      selectedItems.length === 1
+        ? `Delete "${selectedItems[0].name}"?`
+        : `Delete ${selectedItems.length} selected items?`;
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    await this.deleteItems(selectedItems.map((item) => item.path));
+  };
+
   #handleFileInputChange = () => {
     this.uploadFiles(this.fileInput.files);
   };
 
   #handleDragEnter = (event) => {
     event.preventDefault();
-    this.dropZone.classList.add("drag-over");
+    this.dropZone.classList.add("file-explorer-drag-over");
   };
 
   #handleDragOver = (event) => {
     event.preventDefault();
-    this.dropZone.classList.add("drag-over");
+    this.dropZone.classList.add("file-explorer-drag-over");
   };
 
   #handleDragLeave = (event) => {
     if (!this.dropZone.contains(event.relatedTarget)) {
-      this.dropZone.classList.remove("drag-over");
+      this.dropZone.classList.remove("file-explorer-drag-over");
     }
   };
 
-  #handleDrop = (event) => {
+  #handleUploadDrop = (event) => {
     event.preventDefault();
-    this.dropZone.classList.remove("drag-over");
+    this.dropZone.classList.remove("file-explorer-drag-over");
 
     const files = event.dataTransfer?.files;
 
@@ -640,48 +706,60 @@ class FileExplorer extends HTMLElement {
     }
   };
 
+  #handleItemSelected = (event) => {
+    event.stopPropagation();
+
+    const { path, index, ctrlKey, metaKey, shiftKey } = event.detail;
+
+    if (shiftKey) {
+      this.#selectRange(index);
+      return;
+    }
+
+    if (ctrlKey || metaKey) {
+      this.#toggleSelection(path, index);
+      return;
+    }
+
+    this.#selectSingle(path, index);
+  };
+
   #handleOpenFolder = (event) => {
     event.stopPropagation();
     this.currentPath = event.detail.path;
   };
 
-  #handleDeleteItem = async (event) => {
+  #handleMoveToFolder = async (event) => {
     event.stopPropagation();
 
-    const { path, name } = event.detail;
+    const destinationPath = event.detail.destinationPath;
+    const draggedPaths = event.detail.paths || [];
 
-    if (!confirm(`Delete "${name}"?`)) {
+    const pathsToMove = draggedPaths.length > 0
+      ? draggedPaths
+      : this.selectedPaths;
+
+    const filteredPaths = pathsToMove.filter((path) => path !== destinationPath);
+
+    if (filteredPaths.length === 0) {
       return;
     }
 
-    await this.deleteItem(path);
+    await this.moveItems(filteredPaths, destinationPath);
   };
 
-  #handleRenameItem = async (event) => {
-    event.stopPropagation();
 
-    const { path, name } = event.detail;
-    const newName = prompt("New name:", name);
+  #handleEmptySpaceClick = (event) => {
+    const clickedItem = event.target.closest?.(
+        "file-explorer-file, file-explorer-folder, .file-explorer-item-button"
+    );
 
-    if (!newName || newName === name) {
-      return;
+    if (clickedItem) {
+        return;
     }
 
-    await this.renameItem(path, newName);
-  };
-
-  #handleMoveItem = async (event) => {
-    event.stopPropagation();
-
-    const { path } = event.detail;
-    const destinationPath = prompt("Move to folder path:");
-
-    if (!destinationPath) {
-      return;
-    }
-
-    await this.moveItem(path, destinationPath);
-  };
+    this.#clearSelection();
+};
 }
 
 
@@ -689,114 +767,18 @@ class FileExplorerItemBase extends HTMLElement {
   constructor() {
     super();
 
-    this.attachShadow({ mode: "open" });
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-        }
-
-        .item {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          border: 1px solid #dee2e6;
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          background: #fff;
-          min-height: 132px;
-          cursor: default;
-        }
-
-        .item:hover {
-          background: #f8f9fa;
-        }
-
-        .main {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          flex: 1;
-          text-align: center;
-          min-width: 0;
-        }
-
-        .icon {
-          font-size: 2rem;
-          line-height: 1;
-        }
-
-        .name {
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          font-size: 0.925rem;
-        }
-
-        .meta {
-          color: #6c757d;
-          font-size: 0.775rem;
-          text-align: center;
-        }
-
-        .actions {
-          display: flex;
-          justify-content: center;
-          flex-wrap: wrap;
-          gap: 0.25rem;
-        }
-
-        button,
-        a {
-          font: inherit;
-        }
-
-        .action {
-          border: 1px solid #ced4da;
-          border-radius: 0.25rem;
-          background: #fff;
-          color: #212529;
-          padding: 0.2rem 0.35rem;
-          cursor: pointer;
-          text-decoration: none;
-          font-size: 0.8rem;
-        }
-
-        .action:hover {
-          background: #f8f9fa;
-        }
-
-        .danger {
-          color: #dc3545;
-          border-color: #dc3545;
-        }
-
-        .primary {
-          color: #0d6efd;
-          border-color: #0d6efd;
-        }
-      </style>
-
-      <div class="item">
-        <div class="main">
-          <i class="icon"></i>
-          <div class="name"></div>
-          <div class="meta"></div>
-        </div>
-
-        <div class="actions"></div>
-      </div>
-    `;
-
     this._item = null;
+    this._index = 0;
+    this._selected = false;
+    this._initialized = false;
   }
 
   connectedCallback() {
+    if (!this._initialized) {
+      this.#renderShell();
+      this._initialized = true;
+    }
+
     this.render();
   }
 
@@ -807,6 +789,23 @@ class FileExplorerItemBase extends HTMLElement {
 
   get item() {
     return this._item || {};
+  }
+
+  set index(value) {
+    this._index = Number(value) || 0;
+  }
+
+  get index() {
+    return this._index;
+  }
+
+  set selected(value) {
+    this._selected = Boolean(value);
+    this.#syncSelectedState();
+  }
+
+  get selected() {
+    return this._selected;
   }
 
   set root(value) {
@@ -825,160 +824,217 @@ class FileExplorerItemBase extends HTMLElement {
     return this.getAttribute("current-path") || "";
   }
 
+  get itemButton() {
+    return this.querySelector(".file-explorer-item-button");
+  }
+
   get iconElement() {
-    return this.shadowRoot.querySelector(".icon");
+    return this.querySelector(".file-explorer-item-icon");
   }
 
   get nameElement() {
-    return this.shadowRoot.querySelector(".name");
+    return this.querySelector(".file-explorer-item-name");
   }
 
   get metaElement() {
-    return this.shadowRoot.querySelector(".meta");
-  }
-
-  get actionsElement() {
-    return this.shadowRoot.querySelector(".actions");
+    return this.querySelector(".file-explorer-item-meta");
   }
 
   render() {
-    if (!this.isConnected || !this._item) {
-      return;
+    if (!this.isConnected || !this._item || !this._initialized) {
+        return;
     }
 
-    this.iconElement.className = `icon bi ${this.getIconClass()}`;
+    this.iconElement.className = `file-explorer-item-icon bi ${this.getIconClass()}`;
     this.nameElement.textContent = this.item.name || "";
     this.nameElement.title = this.item.name || "";
-
     this.metaElement.textContent = this.getMetaText();
 
-    this.actionsElement.innerHTML = "";
-    this.renderActions();
-  }
+    this.itemButton.draggable = true;
+    this.itemButton.dataset.path = this.item.path || "";
+    this.itemButton.dataset.name = this.item.name || "";
+    this.itemButton.dataset.type = this.item.type || "";
+    this.itemButton.title = this.getTooltipText();
 
-  renderActions() {
-    this.actionsElement.appendChild(
-      this.createActionButton({
-        label: "Rename",
-        icon: "bi-pencil",
-        className: "action",
-        onClick: () => this.emitRename()
-      })
-    );
+    this.#syncSelectedState();
+    }
 
-    this.actionsElement.appendChild(
-      this.createActionButton({
-        label: "Move",
-        icon: "bi-arrows-move",
-        className: "action",
-        onClick: () => this.emitMove()
-      })
-    );
+    getTooltipText() {
+        const parts = [];
 
-    this.actionsElement.appendChild(
-      this.createActionButton({
-        label: "Delete",
-        icon: "bi-trash",
-        className: "action danger",
-        onClick: () => this.emitDelete()
-      })
-    );
-  }
+        if (this.item.name) {
+            parts.push(this.item.name);
+        }
 
-  createActionButton({ label, icon, className, onClick }) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = className || "action";
-    button.title = label;
-    button.innerHTML = `<i class="bi ${icon}"></i>`;
-    button.addEventListener("click", onClick);
-    return button;
-  }
+        if (this.item.is_folder || this.item.type === "folder") {
+            parts.push("Type: Folder");
+        } else {
+            parts.push("Type: File");
+        }
 
-  createActionLink({ label, icon, href, className }) {
-    const link = document.createElement("a");
-    link.className = className || "action";
-    link.title = label;
-    link.href = href;
-    link.innerHTML = `<i class="bi ${icon}"></i>`;
-    return link;
-  }
+        if (this.item.size) {
+            parts.push(`Size: ${this.#formatSize(this.item.size)}`);
+        }
+
+        if (this.item.modified) {
+            parts.push(`Modified: ${this.item.modified}`);
+        } else if (this.item.last_modified) {
+            parts.push(`Modified: ${this.#formatDate(this.item.last_modified)}`);
+        }
+
+        if (this.item.path) {
+            parts.push(`Path: ${this.item.path}`);
+        }
+
+        return parts.join("\n");
+    }
 
   getMetaText() {
+    if (this.item.is_folder || this.item.type === "folder") {
+      return "Folder";
+    }
+
     const parts = [];
 
     if (this.item.size) {
-      parts.push(this.item.size);
+      parts.push(this.#formatSize(this.item.size));
     }
 
     if (this.item.modified) {
       parts.push(this.item.modified);
+    } else if (this.item.last_modified) {
+      parts.push(this.#formatDate(this.item.last_modified));
     }
 
     return parts.join(" · ");
   }
 
   getIconClass() {
-    return "bi-file-earmark";
+    return "bi-file-earmark text-muted";
   }
 
-  emitRename() {
-    this.#emit("file-explorer-rename", {
-      path: this.item.path,
-      name: this.item.name,
-      type: this.item.type
-    });
+  #renderShell() {
+    this.classList.add("file-explorer-item-element");
+
+    this.innerHTML = `
+      <button type="button" class="file-explorer-item-button">
+        <span class="file-explorer-item-icon-wrap">
+          <i class="file-explorer-item-icon bi bi-file-earmark text-muted"></i>
+        </span>
+
+        <span class="file-explorer-item-name text-truncate"></span>
+        <span class="file-explorer-item-meta text-truncate"></span>
+      </button>
+    `;
+
+    this.itemButton.addEventListener("click", this.#handleClick);
+    this.itemButton.addEventListener("dblclick", this.handleDoubleClick);
+    this.itemButton.addEventListener("dragstart", this.#handleDragStart);
+    this.itemButton.addEventListener("dragend", this.#handleDragEnd);
   }
 
-  emitMove() {
-    this.#emit("file-explorer-move", {
-      path: this.item.path,
-      name: this.item.name,
-      type: this.item.type
-    });
+  #syncSelectedState() {
+    if (!this._initialized) {
+      return;
+    }
+
+    this.itemButton.classList.toggle("selected", this.selected);
+    this.itemButton.setAttribute("aria-selected", this.selected ? "true" : "false");
   }
 
-  emitDelete() {
-    this.#emit("file-explorer-delete", {
-      path: this.item.path,
-      name: this.item.name,
-      type: this.item.type
-    });
-  }
-
-  #emit(name, detail = {}) {
+  #handleClick = (event) => {
     this.dispatchEvent(
-      new CustomEvent(name, {
+      new CustomEvent("file-explorer-item-selected", {
         bubbles: true,
         composed: true,
-        detail
+        detail: {
+          path: this.item.path,
+          name: this.item.name,
+          type: this.item.type,
+          index: this.index,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey
+        }
       })
     );
+  };
+
+  handleDoubleClick = () => {
+    // Files do nothing by default. Folders override this.
+  };
+
+  #handleDragStart = (event) => {
+    const explorer = this.closest("file-explorer");
+    const selectedPaths = explorer?.selectedPaths || [];
+    const paths = selectedPaths.includes(this.item.path)
+      ? selectedPaths
+      : [this.item.path];
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(
+      "application/x-file-explorer-paths",
+      JSON.stringify(paths)
+    );
+    event.dataTransfer.setData("text/plain", paths.join("\n"));
+
+    this.itemButton.classList.add("dragging");
+  };
+
+  #handleDragEnd = () => {
+    this.itemButton.classList.remove("dragging");
+  };
+
+  #formatSize(size) {
+    const numericSize = Number(size);
+
+    if (Number.isNaN(numericSize)) {
+      return String(size);
+    }
+
+    if (numericSize < 1024) {
+      return `${numericSize} B`;
+    }
+
+    if (numericSize < 1024 * 1024) {
+      return `${(numericSize / 1024).toFixed(1)} KB`;
+    }
+
+    if (numericSize < 1024 * 1024 * 1024) {
+      return `${(numericSize / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    return `${(numericSize / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  }
+
+  #formatDate(timestamp) {
+    const numericTimestamp = Number(timestamp);
+
+    if (Number.isNaN(numericTimestamp)) {
+      return String(timestamp);
+    }
+
+    return new Date(numericTimestamp * 1000).toLocaleString();
   }
 }
 
 
 class FileExplorerFolder extends FileExplorerItemBase {
+  getIconClass() {
+    return "bi-folder-fill text-warning";
+  }
+
   connectedCallback() {
     super.connectedCallback();
 
-    this.shadowRoot.querySelector(".main").addEventListener("dblclick", () => {
-      this.open();
-    });
+    this.itemButton.addEventListener("dragenter", this.#handleFolderDragEnter);
+    this.itemButton.addEventListener("dragover", this.#handleFolderDragOver);
+    this.itemButton.addEventListener("dragleave", this.#handleFolderDragLeave);
+    this.itemButton.addEventListener("drop", this.#handleFolderDrop);
   }
 
-  renderActions() {
-    this.actionsElement.appendChild(
-      this.createActionButton({
-        label: "Open",
-        icon: "bi-folder2-open",
-        className: "action primary",
-        onClick: () => this.open()
-      })
-    );
-
-    super.renderActions();
-  }
+  handleDoubleClick = () => {
+    this.open();};
 
   open() {
     this.dispatchEvent(
@@ -993,88 +1049,109 @@ class FileExplorerFolder extends FileExplorerItemBase {
     );
   }
 
-  getIconClass() {
-    return "bi-folder-fill";
-  }
+  #handleFolderDragEnter = (event) => {
+    event.preventDefault();
+    this.itemButton.classList.add("drop-target");
+  };
+
+  #handleFolderDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    this.itemButton.classList.add("drop-target");
+  };
+
+  #handleFolderDragLeave = () => {
+    this.itemButton.classList.remove("drop-target");
+  };
+
+  #handleFolderDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.itemButton.classList.remove("drop-target");
+
+    const rawPaths = event.dataTransfer.getData("application/x-file-explorer-paths");
+
+    if (!rawPaths) {
+      return;
+    }
+
+    let paths = [];
+
+    try {
+      paths = JSON.parse(rawPaths);
+    } catch {
+      paths = [];
+    }
+
+    this.dispatchEvent(
+      new CustomEvent("file-explorer-move-to-folder", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          destinationPath: this.item.path,
+          paths
+        }
+      })
+    );
+  };
 }
 
 
 class FileExplorerFile extends FileExplorerItemBase {
-  renderActions() {
-    if (this.item.url) {
-      this.actionsElement.appendChild(
-        this.createActionLink({
-          label: "Open",
-          icon: "bi-eye",
-          href: this.item.url,
-          className: "action primary"
-        })
-      );
-    }
-
-    if (this.item.download_url) {
-      this.actionsElement.appendChild(
-        this.createActionLink({
-          label: "Download",
-          icon: "bi-download",
-          href: this.item.download_url,
-          className: "action"
-        })
-      );
-    }
-
-    super.renderActions();
-  }
-
   getIconClass() {
     const extension = this.#getExtension();
 
     if (["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff"].includes(extension)) {
-      return "bi-file-earmark-image";
+      return "bi-file-earmark-image text-success";
     }
 
     if (extension === "pdf") {
-      return "bi-file-earmark-pdf";
+      return "bi-file-earmark-pdf text-danger";
     }
 
     if (["doc", "docx", "odt", "rtf"].includes(extension)) {
-      return "bi-file-earmark-word";
+      return "bi-file-earmark-word text-primary";
     }
 
     if (["xls", "xlsx", "ods", "csv"].includes(extension)) {
-      return "bi-file-earmark-spreadsheet";
+      return "bi-file-earmark-spreadsheet text-success";
     }
 
     if (["ppt", "pptx", "odp"].includes(extension)) {
-      return "bi-file-earmark-slides";
+      return "bi-file-earmark-slides text-warning";
     }
 
     if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) {
-      return "bi-file-earmark-zip";
+      return "bi-file-earmark-zip text-secondary";
     }
 
     if (["py", "js", "ts", "html", "css", "java", "c", "cpp", "cs", "json", "xml", "yaml", "yml", "sql"].includes(extension)) {
-      return "bi-file-earmark-code";
+      return "bi-file-earmark-code text-info";
     }
 
     if (["mp4", "mov", "avi", "mkv", "webm"].includes(extension)) {
-      return "bi-file-earmark-play";
+      return "bi-file-earmark-play text-danger";
     }
 
     if (["mp3", "wav", "ogg", "flac"].includes(extension)) {
-      return "bi-file-earmark-music";
+      return "bi-file-earmark-music text-primary";
     }
 
     if (["txt", "md", "log"].includes(extension)) {
-      return "bi-file-earmark-text";
+      return "bi-file-earmark-text text-secondary";
     }
 
-    return "bi-file-earmark";
+    return "bi-file-earmark text-muted";
   }
 
   #getExtension() {
     if (this.item.extension) {
       return String(this.item.extension).toLowerCase();
+    }
+
+    if (this.item.ext) {
+      return String(this.item.ext).replace(".", "").toLowerCase();
     }
 
     const name = this.item.name || "";
@@ -1087,6 +1164,7 @@ class FileExplorerFile extends FileExplorerItemBase {
     return parts.pop().toLowerCase();
   }
 }
+
 
 customElements.define("file-explorer", FileExplorer);
 customElements.define("file-explorer-folder", FileExplorerFolder);

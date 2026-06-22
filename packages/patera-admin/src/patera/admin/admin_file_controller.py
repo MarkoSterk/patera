@@ -60,7 +60,10 @@ class _AdminFileController(Controller[Patera]):
     async def explorer(self, req: Request) -> Response:
         return await req.res.html(
             "_admin/files/file_explorer.html",
-            {**self.admin_interface.context_variables},
+            {
+                **self.admin_interface.context_variables,
+                "file_explorer_root": self.app_static_path,
+            },
         )
 
     @get("/")
@@ -104,7 +107,6 @@ class _AdminFileController(Controller[Patera]):
     def list_directory_response(self, req: Request, directory: str) -> Response:
         try:
             target_dir = self.resolve_inside_static_root(directory)
-
             if not target_dir.exists():
                 return req.res.json(
                     {
