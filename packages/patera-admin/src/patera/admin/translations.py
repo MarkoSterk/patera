@@ -569,4 +569,10 @@ TRANSLATIONS_MAP: dict[str, dict[str, str]] = {
         "si": "Španski jezik",
         "es": "Idioma español",
     },
+    "file_explorer": {
+        "en": "Files",
+        "de": "Dateien",
+        "si": "Datoteke",
+        "es": "Archivos",
+    },
 }

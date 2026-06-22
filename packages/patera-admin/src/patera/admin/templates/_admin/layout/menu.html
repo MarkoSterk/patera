@@ -32,6 +32,12 @@
                 {{ translate('logs') }}
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ admin_interface.url_for('_AdminFileController.explorer') }}">
+                <i class="bi bi-activity me-1"></i>
+                {{ translate('file_explorer') }}
+              </a>
+            </li>
             {% if admin_interface.databases_menu %}
               <li class="nav-item dropdown">
                 <a

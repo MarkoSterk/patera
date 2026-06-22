@@ -91,6 +91,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._create_models_map()
         self._register_admin_exception_handler()
         self._register_admin_controller()
+        self._register_admin_file_explorer()
         self._find_injected_extensions()
 
     def _register_admin_exception_handler(self) -> None:
@@ -120,6 +121,23 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._app.register_controller(admin_controller)
         ctrl_path = getattr(admin_controller, "_controller_path")
         ctrl_instance: _AdminController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance.admin_interface = self
+
+    def _register_admin_file_explorer(self) -> None:
+        """
+        Registers the admin controller
+        """
+        from .admin_file_controller import _AdminFileController
+
+        base_url = f"{self.configs.ADMIN_BASE_URL}/<string:lang>/files"
+
+        # Decorators to be applied to the admin controller
+        admin_controller_dec = path(base_url, open_api_spec=False)  # path decorator
+        # decorated admin controller
+        admin_controller = admin_controller_dec(_AdminFileController)
+        self._app.register_controller(admin_controller)
+        ctrl_path = getattr(admin_controller, "_controller_path")
+        ctrl_instance: _AdminFileController = self._app._controllers.get(ctrl_path)  # type: ignore
         ctrl_instance.admin_interface = self
 
     def _register_db_controller(self) -> None:

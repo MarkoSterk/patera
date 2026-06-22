@@ -1,7 +1,11 @@
 <dialog class="admin-dialog" id="update-record-dialog">
   <div class="card border-0 shadow-lg">
 
-    <form id="update-record-form" method="post" action="">
+    <form
+      id="update-record-form"
+      method="post"
+      novalidate
+      action="">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0">
           <i class="bi bi-pencil-square me-1"></i>
@@ -31,6 +35,12 @@
               <div class="col-12">
 
                 {% if field.custom_field %}
+                  <label for="create-field-{{ field.name }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.required %}
+                      <span class="text-danger">*</span>
+                    {% endif %}
+                  </label>
                   {{ render_custom_form_field(field)|safe }}
 
                 {% elif field.input_type == "checkbox" %}

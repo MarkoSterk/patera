@@ -136,7 +136,7 @@
                       {% elif value == "" %}
                         <span class="text-muted">—</span>
                       {% else %}
-                        {{ value }}
+                        {{ value|default('', true)|string|truncate(80) }}
                       {% endif %}
                     </td>
                   {% endfor %}
@@ -352,6 +352,10 @@
 
   function closeDialogOnBackdropClick(dialog) {
     dialog?.addEventListener("click", (event) => {
+      if (event.target !== dialog) {
+        return;
+      }
+
       const dialogRect = dialog.getBoundingClientRect();
 
       const clickedOutside =
@@ -363,6 +367,36 @@
       if (clickedOutside) {
         dialog.close();
       }
+    });
+  }
+
+  function preventImplicitSubmitOnEnter(form) {
+    form?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!target) {
+        return;
+      }
+
+      const tagName = target.tagName?.toLowerCase();
+
+      if (tagName === "textarea") {
+        return;
+      }
+
+      if (tagName === "button") {
+        return;
+      }
+
+      if (target.closest?.("tags-input")) {
+        return;
+      }
+
+      event.preventDefault();
     });
   }
 
@@ -402,6 +436,94 @@
     return key
       .replaceAll("_", " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function getFieldValue(field) {
+    const tagName = field.tagName?.toLowerCase();
+
+    if (field.disabled) {
+      return "";
+    }
+
+    if (field.type === "checkbox") {
+      return field.checked ? "true" : "";
+    }
+
+    if (tagName === "tags-input") {
+      const value = field.value;
+
+      if (Array.isArray(value)) {
+        return value.length > 0 ? JSON.stringify(value) : "";
+      }
+
+      return value || "";
+    }
+
+    if (typeof field.value === "string") {
+      return field.value.trim();
+    }
+
+    return field.value ?? "";
+  }
+
+  function getFieldLabel(form, field) {
+    if (field.id) {
+      const label = form.querySelector(`label[for="${CSS.escape(field.id)}"]`);
+
+      if (label) {
+        return label.textContent.replace("*", "").trim();
+      }
+    }
+
+    return (
+      field.getAttribute("aria-label") ||
+      field.getAttribute("placeholder") ||
+      field.getAttribute("name") ||
+      "Field"
+    );
+  }
+
+  function focusField(field) {
+    if (typeof field.focus === "function") {
+      field.focus();
+      return;
+    }
+
+    const innerInput = field.shadowRoot?.querySelector?.("input, textarea, select");
+
+    if (innerInput && typeof innerInput.focus === "function") {
+      innerInput.focus();
+    }
+  }
+
+  function validateForm(form) {
+    const fields = form.querySelectorAll("input, textarea, select, tags-input");
+
+    for (const field of fields) {
+      if (field.disabled) {
+        continue;
+      }
+
+      if (field.type === "hidden") {
+        continue;
+      }
+
+      if (!field.hasAttribute("required")) {
+        continue;
+      }
+
+      const value = getFieldValue(field);
+
+      if (value === null || value === undefined || value === "") {
+        const label = getFieldLabel(form, field);
+
+        focusField(field);
+
+        return `${label} is required.`;
+      }
+    }
+
+    return null;
   }
 
   function renderReadonlyRecord(recordFields, fallbackRecordData = {}) {
@@ -461,6 +583,52 @@
     viewRecordContent?.classList.toggle("d-none", isLoading);
   }
 
+  function setCustomElementValue(field, value) {
+    const tagName = field.tagName?.toLowerCase();
+
+    if (tagName === "tags-input") {
+      if (Array.isArray(value)) {
+        field.value = value;
+        return;
+      }
+
+      if (typeof value === "string") {
+        try {
+          const parsed = JSON.parse(value);
+
+          if (Array.isArray(parsed)) {
+            field.value = parsed.map((item) => String(item));
+            return;
+          }
+        } catch {
+          // Fall back to comma-separated values below.
+        }
+
+        field.value = value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+        return;
+      }
+
+      field.value = [];
+      return;
+    }
+
+    if (tagName === "summernote-editor") {
+      field.value = value ?? "";
+
+      if (typeof field.refresh === "function") {
+        field.refresh();
+      }
+
+      return;
+    }
+
+    field.value = value ?? "";
+  }
+
   function setUpdateFormValues(recordData) {
     if (!updateRecordForm) {
       return;
@@ -471,6 +639,12 @@
     fields.forEach((field) => {
       const fieldName = field.dataset.fieldName;
       const value = recordData[fieldName];
+      const tagName = field.tagName?.toLowerCase();
+
+      if (tagName && tagName.includes("-")) {
+        setCustomElementValue(field, value);
+        return;
+      }
 
       if (field.type === "checkbox") {
         field.checked =
@@ -505,8 +679,10 @@
   }) {
     clearError(errorContainer);
 
-    if (!form.checkValidity()) {
-      form.reportValidity();
+    const validationMessage = validateForm(form);
+
+    if (validationMessage) {
+      showError(errorContainer, validationMessage);
       return;
     }
 
@@ -555,6 +731,13 @@
   openCreateRecordDialogBtn?.addEventListener("click", () => {
     clearError(createRecordError);
     createRecordForm?.reset();
+
+    createRecordForm
+      ?.querySelectorAll("tags-input")
+      .forEach((field) => {
+        field.value = [];
+      });
+
     createRecordDialog?.showModal();
   });
 
@@ -595,6 +778,9 @@
   closeDialogOnBackdropClick(deleteRecordDialog);
   closeDialogOnBackdropClick(viewRecordDialog);
 
+  preventImplicitSubmitOnEnter(createRecordForm);
+  preventImplicitSubmitOnEnter(updateRecordForm);
+
   createRecordForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -633,7 +819,7 @@
 
         const payload = await response.json();
 
-        renderReadonlyRecord(payload.data || {});
+        renderReadonlyRecord(payload.fields || [], payload.data || {});
         setViewDialogLoading(false);
       } catch {
         showError(viewRecordError, "Network error. Failed to fetch record.");
@@ -649,6 +835,18 @@
 
       clearError(updateRecordError);
       updateRecordForm?.reset();
+
+      updateRecordForm
+        ?.querySelectorAll("tags-input")
+        .forEach((field) => {
+          field.value = [];
+        });
+
+      updateRecordForm
+        ?.querySelectorAll("summernote-editor")
+        .forEach((field) => {
+          field.value = "";
+        });
 
       if (updateRecordForm) {
         updateRecordForm.action = updateUrl;
@@ -668,8 +866,11 @@
 
         const payload = await response.json();
 
-        setUpdateFormValues(payload.data || {});
         updateRecordDialog?.showModal();
+
+        requestAnimationFrame(() => {
+          setUpdateFormValues(payload.data || {});
+        });
       } catch {
         showError(updateRecordError, "Network error. Failed to fetch record.");
         updateRecordDialog?.showModal();

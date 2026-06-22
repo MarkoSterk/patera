@@ -1017,13 +1017,13 @@ class _AdminDbController(Controller[Patera]):
             return ""
 
         if hasattr(custom_field, "render"):
-            return custom_field.render(field)
+            return str(custom_field.render(field))
 
         if hasattr(custom_field, "markup"):
-            return custom_field.markup(field)
+            return str(custom_field.markup(field))
 
         if hasattr(custom_field, "html"):
-            return custom_field.html(field)
+            return str(custom_field.html(field))
 
         return ""
 

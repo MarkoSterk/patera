@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from .sqlalchemy_async_query import AsyncQuery
     from .sql_database import SqlDatabase
 
-
 ModelT = TypeVar("ModelT", bound="DeclarativeBaseModel")
 
 
@@ -47,7 +46,7 @@ class ModelMeta:
     add_to_form: dict[str, type[Any]] = {}
 
     custom_labels: dict[str, str] = {}
-    custom_form_fields: list[type[Any]] = []
+    custom_form_fields: list[Any] = []
 
     form_fields_order: list[str] = []
     table_fields_order: list[str] = []
@@ -244,8 +243,8 @@ class DeclarativeBaseModel(DeclarativeBase):
         return dict(cls.Meta.custom_labels)
 
     @classmethod
-    def custom_form_fields(cls) -> dict[str, type[Any]]:
-        return {field.id: field for field in cls.Meta.custom_form_fields}
+    def custom_form_fields(cls) -> dict[str, Any]:
+        return {field.name: field for field in cls.Meta.custom_form_fields}
 
     @classmethod
     def add_to_form(cls) -> dict[str, Any]:

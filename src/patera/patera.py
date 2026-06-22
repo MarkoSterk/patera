@@ -1254,6 +1254,7 @@ class Patera(Injectable, Generic[ConfT]):
         app_extensions = getattr(self.__class__, "app_extensions", [])
 
         for extension in app_extensions:
+            self.app.logger.info(f"Registering app extension: {extension.__name__}")
             if not inspect.isclass(extension):
                 raise TypeError(
                     "Items in 'app_extensions' must be extension classes, "
