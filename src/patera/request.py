@@ -356,17 +356,17 @@ class Request:
 
     @property
     def user(self) -> Any:
-        return self._user
+        return current_request.user
 
     @property
     def app(self) -> "Patera":
         return self._app
 
     def set_user(self, user: Any) -> None:
-        self._user = user
+        current_request.user = user
 
     def remove_user(self) -> None:
-        self._user = None
+        current_request.user = None
 
     async def body(self) -> bytes:
         if self._body is not None:

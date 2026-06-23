@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from patera import Patera, Response, Request
 
-from patera.ctx import current_request
 from patera.controller import Controller
 from patera.middleware import AppCallableType, MiddlewareBase
 
@@ -242,32 +241,36 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         )
 
         user: Optional[Any] = await self.user_loader(req)
+
         if user is None:
-            # not Authenticated
+            req.remove_user()
             raise authentication_exc(self.authentication_error)
 
         req.set_user(user)
-        current_request.user = user
+
         controller_roles: list[Any] = (
             controller_authentication_attributes.get("roles", [])
             if controller_authentication_attributes
             else []
         )
+
         handler_roles: list[Any] = (
             handler_authentication_attributes.get("roles", [])
             if handler_authentication_attributes
             else []
         )
+
         roles: list[Any] = list(set(controller_roles + handler_roles))
-        if len(roles) == 0:  # roles not are specified
-            # user is authenticated
-            return await self.next(req)
-        authorized: bool = await self.role_check(req.user, list(roles))
-        if not authorized:
-            # not authorized
-            raise authorization_exc(self.authorization_error, list(roles))
-        # user is authenticated and authorized - calls next middleware in chain
-        return await self.next(req)
+
+        if len(roles) > 0:
+            authorized: bool = await self.role_check(req.user, list(roles))
+
+            if not authorized:
+                raise authorization_exc(self.authorization_error, list(roles))
+
+        res: "Response" = await self.next(req)
+        await self.refresh_credentials(res)
+        return res
 
     @abstractmethod
     async def user_loader(self, req: "Request") -> Any:
@@ -283,6 +286,13 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         True -> user has role(s)
         False -> user doesn't have role(s)
         """
+
+    async def refresh_credentials(self, res: "Response") -> None:
+        """
+        Refresh credentials (cookies/jwt etc) if near expiration.
+        Should return None
+        """
+        pass
 
 
 def login_required(
@@ -305,7 +315,7 @@ def login_required(
 
 def role_required(
     *roles,
-    raise_authentication_exception: Type[Exception] = AuthorizationException,
+    raise_authentication_exception: Type[Exception] = AuthenticationException,
     raise_authorization_exception: Type[Exception] = AuthorizationException,
 ) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
