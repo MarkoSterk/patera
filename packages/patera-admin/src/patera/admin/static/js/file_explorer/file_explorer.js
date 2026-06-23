@@ -4,10 +4,12 @@ class FileExplorer extends HTMLElement {
       "root",
       "list-url",
       "create-url",
+      "create-folder-url",
       "rename-url",
       "delete-url",
       "move-url",
-      "path"
+      "path",
+      "download-url"
     ];
   }
 
@@ -30,10 +32,14 @@ class FileExplorer extends HTMLElement {
     this._currentPath = this.getAttribute("path") || "";
 
     this.refreshButton.addEventListener("click", this.#handleRefreshClick);
-    this.uploadButton.addEventListener("click", this.#handleUploadClick);
+    this.createFolderButton.addEventListener("click", this.#handleCreateFolderClick);
+    this.uploadFilesButton.addEventListener("click", this.#handleUploadClick);
+    this.uploadFolderButton.addEventListener("click", this.#handleFolderUploadClick);
+    this.downloadButton.addEventListener("click", this.#handleDownloadSelectedClick);
     this.renameButton.addEventListener("click", this.#handleRenameSelectedClick);
     this.deleteButton.addEventListener("click", this.#handleDeleteSelectedClick);
     this.fileInput.addEventListener("change", this.#handleFileInputChange);
+    this.folderInput.addEventListener("change", this.#handleFolderInputChange);
 
     this.dropZone.addEventListener("dragenter", this.#handleDragEnter);
     this.dropZone.addEventListener("dragover", this.#handleDragOver);
@@ -43,6 +49,7 @@ class FileExplorer extends HTMLElement {
     this.addEventListener("file-explorer-item-selected", this.#handleItemSelected);
     this.addEventListener("file-explorer-open-folder", this.#handleOpenFolder);
     this.addEventListener("file-explorer-move-to-folder", this.#handleMoveToFolder);
+    this.addEventListener("file-explorer-download-item", this.#handleDownloadItem);
     this.dropZone.addEventListener("click", this.#handleEmptySpaceClick);
 
     this.load();
@@ -50,10 +57,14 @@ class FileExplorer extends HTMLElement {
 
   disconnectedCallback() {
     this.refreshButton?.removeEventListener("click", this.#handleRefreshClick);
-    this.uploadButton?.removeEventListener("click", this.#handleUploadClick);
+    this.createFolderButton?.removeEventListener("click", this.#handleCreateFolderClick);
+    this.uploadFilesButton?.removeEventListener("click", this.#handleUploadClick);
+    this.uploadFolderButton?.removeEventListener("click", this.#handleFolderUploadClick);
     this.renameButton?.removeEventListener("click", this.#handleRenameSelectedClick);
     this.deleteButton?.removeEventListener("click", this.#handleDeleteSelectedClick);
     this.fileInput?.removeEventListener("change", this.#handleFileInputChange);
+    this.folderInput?.removeEventListener("change", this.#handleFolderInputChange);
+    this.downloadButton?.removeEventListener("click", this.#handleDownloadSelectedClick);
 
     this.dropZone?.removeEventListener("dragenter", this.#handleDragEnter);
     this.dropZone?.removeEventListener("dragover", this.#handleDragOver);
@@ -64,6 +75,7 @@ class FileExplorer extends HTMLElement {
     this.removeEventListener("file-explorer-item-selected", this.#handleItemSelected);
     this.removeEventListener("file-explorer-open-folder", this.#handleOpenFolder);
     this.removeEventListener("file-explorer-move-to-folder", this.#handleMoveToFolder);
+    this.removeEventListener("file-explorer-download-item", this.#handleDownloadItem);
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -80,6 +92,14 @@ class FileExplorer extends HTMLElement {
     }
   }
 
+  get downloadUrl() {
+    return this.getAttribute("download-url") || "";
+  }
+
+  get downloadButton() {
+    return this.querySelector("#file-explorer-download-btn");
+  }
+
   get root() {
     return this.getAttribute("root") || "";
   }
@@ -90,6 +110,10 @@ class FileExplorer extends HTMLElement {
 
   get createUrl() {
     return this.getAttribute("create-url") || "";
+  }
+
+  get createFolderUrl() {
+    return this.getAttribute("create-folder-url") || "";
   }
 
   get renameUrl() {
@@ -121,8 +145,20 @@ class FileExplorer extends HTMLElement {
     return this.querySelector("#file-explorer-refresh-btn");
   }
 
+  get createFolderButton() {
+    return this.querySelector("#file-explorer-create-folder-btn");
+  }
+
   get uploadButton() {
     return this.querySelector("#file-explorer-upload-btn");
+  }
+
+  get uploadFilesButton() {
+    return this.querySelector("#file-explorer-upload-files-btn");
+  }
+
+  get uploadFolderButton() {
+    return this.querySelector("#file-explorer-upload-folder-btn");
   }
 
   get renameButton() {
@@ -135,6 +171,10 @@ class FileExplorer extends HTMLElement {
 
   get fileInput() {
     return this.querySelector("#file-explorer-file-input");
+  }
+
+  get folderInput() {
+    return this.querySelector("#file-explorer-folder-input");
   }
 
   get breadcrumbsElement() {
@@ -175,10 +215,7 @@ class FileExplorer extends HTMLElement {
     this.#clearError();
 
     try {
-      const url = new URL(this.listUrl, window.location.origin);
-
-      url.searchParams.set("root", this.root);
-      url.searchParams.set("path", this.currentPath);
+      const url = this.#buildListUrl(this.currentPath);
 
       const response = await fetch(url.toString(), {
         method: "GET"
@@ -196,6 +233,7 @@ class FileExplorer extends HTMLElement {
       );
 
       this._items = Array.isArray(data.items) ? data.items : [];
+
       this.#clearSelection();
       this.#render();
 
@@ -210,15 +248,88 @@ class FileExplorer extends HTMLElement {
     }
   }
 
+  #buildListUrl(path) {
+    const url = new URL(this.listUrl, window.location.origin);
+    const normalizedPath = this.#normalizePath(path || "");
+
+    url.searchParams.delete("path");
+
+    if (this.root) {
+      url.searchParams.set("root", this.root);
+    }
+
+    if (!normalizedPath) {
+      return url;
+    }
+
+    const basePath = url.pathname.endsWith("/")
+      ? url.pathname
+      : `${url.pathname}/`;
+
+    const encodedPath = normalizedPath
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/");
+
+    url.pathname = `${basePath}${encodedPath}`;
+
+    return url;
+  }
+
+  async createFolder(folderName) {
+    if (!this.createFolderUrl) {
+      this.#showError("Missing create-folder-url attribute.");
+      return;
+    }
+
+    const normalizedFolderName = this.#normalizeFolderName(folderName);
+
+    if (!normalizedFolderName) {
+      this.#showError("Folder name is required.");
+      return;
+    }
+
+    if (!this.#isValidFolderName(normalizedFolderName)) {
+      this.#showError("Folder name cannot contain /, \\, .., or be .");
+      return;
+    }
+
+    await this.#sendJsonAndReload(
+      this.createFolderUrl,
+      "POST",
+      {
+        root: this.root,
+        path: this.currentPath,
+        folder_name: normalizedFolderName
+      },
+      "Create folder failed."
+    );
+
+    this.#emit("file-explorer-folder-created", {
+      path: this.currentPath,
+      folderName: normalizedFolderName
+    });
+  }
+
   async uploadFiles(files) {
+    const fileList = Array.from(files || []).map((file) => ({
+      file,
+      relativePath: file.webkitRelativePath || file.name
+    }));
+
+    await this.uploadFilesWithRelativePaths(fileList, []);
+  }
+
+  async uploadFilesWithRelativePaths(fileEntries, directories = []) {
     if (!this.createUrl) {
       this.#showError("Missing create-url attribute.");
       return;
     }
 
-    const fileList = Array.from(files || []);
+    const entries = Array.from(fileEntries || []);
+    const directoryList = Array.from(directories || []);
 
-    if (fileList.length === 0) {
+    if (entries.length === 0 && directoryList.length === 0) {
       return;
     }
 
@@ -226,8 +337,16 @@ class FileExplorer extends HTMLElement {
     formData.append("root", this.root);
     formData.append("path", this.currentPath);
 
-    for (const file of fileList) {
-      formData.append("files", file);
+    for (const directory of directoryList) {
+      formData.append("directories", this.#normalizePath(directory));
+    }
+
+    for (const entry of entries) {
+      formData.append("files", entry.file, entry.file.name);
+      formData.append(
+        "relative_paths",
+        this.#normalizePath(entry.relativePath || entry.file.name)
+      );
     }
 
     this.#setLoading(true);
@@ -247,13 +366,21 @@ class FileExplorer extends HTMLElement {
 
       this.#emit("file-explorer-uploaded", {
         path: this.currentPath,
-        count: fileList.length
+        count: entries.length,
+        directories: directoryList.length
       });
     } catch (error) {
       this.#showError(error.message || "Upload failed.");
     } finally {
       this.#setLoading(false);
-      this.fileInput.value = "";
+
+      if (this.fileInput) {
+        this.fileInput.value = "";
+      }
+
+      if (this.folderInput) {
+        this.folderInput.value = "";
+      }
     }
   }
 
@@ -263,12 +390,16 @@ class FileExplorer extends HTMLElement {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("root", this.root);
-    formData.append("path", path);
-    formData.append("new_name", newName);
-
-    await this.#postFormAndReload(this.renameUrl, formData, "Rename failed.");
+    await this.#sendJsonAndReload(
+      this.renameUrl,
+      "PATCH",
+      {
+        root: this.root,
+        path,
+        new_name: newName
+      },
+      "Rename failed."
+    );
 
     this.#emit("file-explorer-renamed", {
       path,
@@ -288,15 +419,16 @@ class FileExplorer extends HTMLElement {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("root", this.root);
-
-    for (const path of selectedPaths) {
-      formData.append("paths", path);
-      formData.append("files", path);
-    }
-
-    await this.#postFormAndReload(this.deleteUrl, formData, "Delete failed.");
+    await this.#sendJsonAndReload(
+      this.deleteUrl,
+      "DELETE",
+      {
+        root: this.root,
+        path: this.currentPath,
+        files: selectedPaths
+      },
+      "Delete failed."
+    );
 
     this.#emit("file-explorer-deleted", {
       paths: selectedPaths
@@ -315,21 +447,48 @@ class FileExplorer extends HTMLElement {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("root", this.root);
-    formData.append("destination_path", destinationPath);
-
-    for (const path of selectedPaths) {
-      formData.append("paths", path);
-      formData.append("files", path);
-    }
-
-    await this.#postFormAndReload(this.moveUrl, formData, "Move failed.");
+    await this.#sendJsonAndReload(
+      this.moveUrl,
+      "PATCH",
+      {
+        root: this.root,
+        path: this.currentPath,
+        files: selectedPaths,
+        destination_path: destinationPath
+      },
+      "Move failed."
+    );
 
     this.#emit("file-explorer-moved", {
       paths: selectedPaths,
       destinationPath
     });
+  }
+
+  async #sendJsonAndReload(url, method, payload, fallbackErrorMessage) {
+    this.#setLoading(true);
+    this.#clearError();
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(await this.#readError(response, fallbackErrorMessage));
+      }
+
+      await this.load();
+    } catch (error) {
+      this.#showError(error.message || fallbackErrorMessage);
+    } finally {
+      this.#setLoading(false);
+    }
   }
 
   #renderShell() {
@@ -338,33 +497,64 @@ class FileExplorer extends HTMLElement {
     this.innerHTML = `
       <div class="file-explorer border rounded bg-white overflow-hidden">
         <div class="file-explorer-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 p-3 border-bottom bg-light">
-          <div class="d-flex align-items-center gap-2 fw-semibold">
-            <i class="bi bi-folder2-open"></i>
-            <span>File Explorer</span>
-          </div>
 
           <div class="file-explorer-controls d-flex align-items-center flex-wrap gap-2">
             <button type="button" class="btn btn-outline-secondary btn-sm" id="file-explorer-refresh-btn">
               <i class="bi bi-arrow-clockwise me-1"></i>
-              Refresh
+              ${translate('refresh')}
+            </button>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="file-explorer-create-folder-btn">
+              <i class="bi bi-folder-plus me-1"></i>
+              ${translate('create_folder')}
             </button>
 
             <button type="button" class="btn btn-outline-secondary btn-sm" id="file-explorer-rename-btn" disabled>
               <i class="bi bi-pencil me-1"></i>
-              Rename
+              ${translate('rename')}
             </button>
 
             <button type="button" class="btn btn-outline-danger btn-sm" id="file-explorer-delete-btn" disabled>
               <i class="bi bi-trash me-1"></i>
-              Delete
+              ${translate('delete')}
             </button>
 
-            <button type="button" class="btn btn-primary btn-sm" id="file-explorer-upload-btn">
-              <i class="bi bi-upload me-1"></i>
-              Upload
+            <button type="button" class="btn btn-outline-primary btn-sm" id="file-explorer-download-btn" disabled>
+              <i class="bi bi-download me-1"></i>
+              ${translate('download')}
             </button>
+
+            <div class="dropdown">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm dropdown-toggle"
+                id="file-explorer-upload-btn"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <i class="bi bi-upload me-1"></i>
+                ${translate('upload')}
+              </button>
+
+              <ul class="dropdown-menu" aria-labelledby="file-explorer-upload-btn">
+                <li>
+                  <button type="button" class="dropdown-item" id="file-explorer-upload-files-btn">
+                    <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                    ${translate('upload_file')}
+                  </button>
+                </li>
+
+                <li>
+                  <button type="button" class="dropdown-item" id="file-explorer-upload-folder-btn">
+                    <i class="bi bi-folder-plus me-2"></i>
+                    ${translate('upload_folder')}
+                  </button>
+                </li>
+              </ul>
+            </div>
 
             <input id="file-explorer-file-input" type="file" multiple class="d-none">
+            <input id="file-explorer-folder-input" type="file" multiple webkitdirectory directory class="d-none">
           </div>
         </div>
 
@@ -372,7 +562,7 @@ class FileExplorer extends HTMLElement {
           <nav class="file-explorer-breadcrumbs d-flex align-items-center flex-wrap gap-1 small"></nav>
 
           <div class="file-explorer-selected-count text-muted small">
-            0 selected
+            0 ${translate('selected')}
           </div>
         </div>
 
@@ -386,7 +576,7 @@ class FileExplorer extends HTMLElement {
 
           <div class="file-explorer-empty text-center text-muted py-5 d-none">
             <i class="bi bi-folder-x fs-1 d-block mb-2"></i>
-            <div class="fw-semibold">This folder is empty.</div>
+            <div class="fw-semibold">${translate('folder_empty')}</div>
           </div>
 
           <div class="file-explorer-items"></div>
@@ -538,14 +728,15 @@ class FileExplorer extends HTMLElement {
   #syncSelectionUi() {
     const selectedCount = this._selectedPaths.size;
 
+    this.downloadButton.disabled = selectedCount < 1;
     this.renameButton.disabled = selectedCount !== 1;
     this.deleteButton.disabled = selectedCount < 1;
 
     if (this.selectedCountElement) {
       this.selectedCountElement.textContent =
         selectedCount === 1
-          ? "1 selected"
-          : `${selectedCount} selected`;
+          ? `1 ${translate('selected')}`
+          : `${selectedCount} ${translate('selected')}`;
     }
 
     this.querySelectorAll("file-explorer-file, file-explorer-folder").forEach((element) => {
@@ -565,28 +756,6 @@ class FileExplorer extends HTMLElement {
 
   #getSelectedItems() {
     return this._items.filter((item) => this._selectedPaths.has(item.path));
-  }
-
-  async #postFormAndReload(url, formData, fallbackErrorMessage) {
-    this.#setLoading(true);
-    this.#clearError();
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(await this.#readError(response, fallbackErrorMessage));
-      }
-
-      await this.load();
-    } catch (error) {
-      this.#showError(error.message || fallbackErrorMessage);
-    } finally {
-      this.#setLoading(false);
-    }
   }
 
   async #readError(response, fallbackMessage) {
@@ -621,6 +790,30 @@ class FileExplorer extends HTMLElement {
       .join("/");
   }
 
+  #normalizeFolderName(folderName) {
+    return String(folderName || "").trim();
+  }
+
+  #isValidFolderName(folderName) {
+    if (!folderName) {
+      return false;
+    }
+
+    if (folderName === "." || folderName === "..") {
+      return false;
+    }
+
+    if (folderName.includes("/") || folderName.includes("\\")) {
+      return false;
+    }
+
+    if (folderName.includes("..")) {
+      return false;
+    }
+
+    return true;
+  }
+
   #emit(name, detail = {}) {
     this.dispatchEvent(
       new CustomEvent(name, {
@@ -635,8 +828,22 @@ class FileExplorer extends HTMLElement {
     this.load();
   };
 
+  #handleCreateFolderClick = async () => {
+    const folderName = prompt(`${translate('create_folder')}:`);
+
+    if (folderName === null) {
+      return;
+    }
+
+    await this.createFolder(folderName);
+  };
+
   #handleUploadClick = () => {
     this.fileInput.click();
+  };
+
+  #handleFolderUploadClick = () => {
+    this.folderInput.click();
   };
 
   #handleRenameSelectedClick = async () => {
@@ -665,8 +872,8 @@ class FileExplorer extends HTMLElement {
 
     const message =
       selectedItems.length === 1
-        ? `Delete "${selectedItems[0].name}"?`
-        : `Delete ${selectedItems.length} selected items?`;
+        ? `${translate('delete')} "${selectedItems[0].name}"?`
+        : `${translate('delete')} ${selectedItems.length} ${translate('selected')} ${translate('item')}?`;
 
     if (!confirm(message)) {
       return;
@@ -675,8 +882,14 @@ class FileExplorer extends HTMLElement {
     await this.deleteItems(selectedItems.map((item) => item.path));
   };
 
-  #handleFileInputChange = () => {
-    this.uploadFiles(this.fileInput.files);
+  #handleFileInputChange = async () => {
+    await this.uploadFiles(this.fileInput.files);
+    this.fileInput.value = "";
+  };
+
+  #handleFolderInputChange = async () => {
+    await this.uploadFiles(this.folderInput.files);
+    this.folderInput.value = "";
   };
 
   #handleDragEnter = (event) => {
@@ -695,16 +908,119 @@ class FileExplorer extends HTMLElement {
     }
   };
 
-  #handleUploadDrop = (event) => {
+  #handleUploadDrop = async (event) => {
     event.preventDefault();
     this.dropZone.classList.remove("file-explorer-drag-over");
 
-    const files = event.dataTransfer?.files;
+    try {
+      const dropped = await this.#getDroppedFilesAndDirectories(event.dataTransfer);
 
-    if (files && files.length > 0) {
-      this.uploadFiles(files);
+      if (dropped.files.length > 0 || dropped.directories.length > 0) {
+        await this.uploadFilesWithRelativePaths(dropped.files, dropped.directories);
+        return;
+      }
+
+      const files = event.dataTransfer?.files;
+
+      if (files && files.length > 0) {
+        await this.uploadFiles(files);
+      }
+    } catch (error) {
+      this.#showError(error.message || "Upload failed.");
     }
   };
+
+  async #getDroppedFilesAndDirectories(dataTransfer) {
+    const result = {
+      files: [],
+      directories: []
+    };
+
+    const items = Array.from(dataTransfer?.items || []);
+
+    if (items.length === 0) {
+      return result;
+    }
+
+    const entryItems = items
+      .map((item) => {
+        if (typeof item.webkitGetAsEntry !== "function") {
+          return null;
+        }
+
+        return item.webkitGetAsEntry();
+      })
+      .filter(Boolean);
+
+    if (entryItems.length === 0) {
+      return result;
+    }
+
+    for (const entry of entryItems) {
+      await this.#traverseDroppedEntry(entry, "", result);
+    }
+
+    return result;
+  }
+
+  async #traverseDroppedEntry(entry, parentPath, result) {
+    const entryPath = parentPath
+      ? `${parentPath}/${entry.name}`
+      : entry.name;
+
+    if (entry.isFile) {
+      const file = await this.#getFileFromEntry(entry);
+
+      result.files.push({
+        file,
+        relativePath: entryPath
+      });
+
+      return;
+    }
+
+    if (!entry.isDirectory) {
+      return;
+    }
+
+    result.directories.push(entryPath);
+
+    const reader = entry.createReader();
+    const children = await this.#readAllDirectoryEntries(reader);
+
+    for (const childEntry of children) {
+      await this.#traverseDroppedEntry(childEntry, entryPath, result);
+    }
+  }
+
+  #getFileFromEntry(entry) {
+    return new Promise((resolve, reject) => {
+      entry.file(resolve, reject);
+    });
+  }
+
+  #readAllDirectoryEntries(reader) {
+    return new Promise((resolve, reject) => {
+      const entries = [];
+
+      const readBatch = () => {
+        reader.readEntries(
+          (batch) => {
+            if (!batch.length) {
+              resolve(entries);
+              return;
+            }
+
+            entries.push(...batch);
+            readBatch();
+          },
+          reject
+        );
+      };
+
+      readBatch();
+    });
+  }
 
   #handleItemSelected = (event) => {
     event.stopPropagation();
@@ -726,7 +1042,7 @@ class FileExplorer extends HTMLElement {
 
   #handleOpenFolder = (event) => {
     event.stopPropagation();
-    this.currentPath = event.detail.path;
+    this.currentPath = this.#normalizePath(event.detail.path || "");
   };
 
   #handleMoveToFolder = async (event) => {
@@ -748,18 +1064,123 @@ class FileExplorer extends HTMLElement {
     await this.moveItems(filteredPaths, destinationPath);
   };
 
-
   #handleEmptySpaceClick = (event) => {
-    const clickedItem = event.target.closest?.(
+      const clickedItem = event.target.closest?.(
         "file-explorer-file, file-explorer-folder, .file-explorer-item-button"
-    );
+      );
 
-    if (clickedItem) {
+      if (clickedItem) {
         return;
+      }
+
+      this.#clearSelection();
+    };
+
+    async downloadItems(paths) {
+    if (!this.downloadUrl) {
+      this.#showError("Missing download-url attribute.");
+      return;
     }
 
-    this.#clearSelection();
-};
+    const selectedPaths = Array.from(paths || []);
+
+    if (selectedPaths.length === 0) {
+      return;
+    }
+
+    this.#setLoading(true);
+    this.#clearError();
+
+    try {
+      const response = await fetch(this.downloadUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/octet-stream"
+        },
+        body: JSON.stringify({
+          root: this.root,
+          path: this.currentPath,
+          files: selectedPaths
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(await this.#readError(response, "Download failed."));
+      }
+
+      await this.#downloadResponseBlob(response);
+
+      this.#emit("file-explorer-downloaded", {
+        paths: selectedPaths
+      });
+    } catch (error) {
+      this.#showError(error.message || "Download failed.");
+    } finally {
+      this.#setLoading(false);
+    }
+  }
+
+  async #downloadResponseBlob(response) {
+    const blob = await response.blob();
+    const fileName = this.#getDownloadFileName(response) || "download";
+    const objectUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    link.style.display = "none";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  #getDownloadFileName(response) {
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    if (!contentDisposition) {
+      return "";
+    }
+
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+    if (utf8Match) {
+      return decodeURIComponent(utf8Match[1]);
+    }
+
+    const asciiMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+
+    if (asciiMatch) {
+      return asciiMatch[1];
+    }
+
+    return "";
+  }
+
+  #handleDownloadSelectedClick = async () => {
+    const selectedItems = this.#getSelectedItems();
+
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    await this.downloadItems(selectedItems.map((item) => item.path));
+  };
+
+  #handleDownloadItem = async (event) => {
+    event.stopPropagation();
+
+    const path = event.detail?.path;
+
+    if (!path) {
+      return;
+    }
+
+    await this.downloadItems([path]);
+  };
 }
 
 
@@ -842,7 +1263,7 @@ class FileExplorerItemBase extends HTMLElement {
 
   render() {
     if (!this.isConnected || !this._item || !this._initialized) {
-        return;
+      return;
     }
 
     this.iconElement.className = `file-explorer-item-icon bi ${this.getIconClass()}`;
@@ -857,37 +1278,37 @@ class FileExplorerItemBase extends HTMLElement {
     this.itemButton.title = this.getTooltipText();
 
     this.#syncSelectedState();
+  }
+
+  getTooltipText() {
+    const parts = [];
+
+    if (this.item.name) {
+      parts.push(this.item.name);
     }
 
-    getTooltipText() {
-        const parts = [];
-
-        if (this.item.name) {
-            parts.push(this.item.name);
-        }
-
-        if (this.item.is_folder || this.item.type === "folder") {
-            parts.push("Type: Folder");
-        } else {
-            parts.push("Type: File");
-        }
-
-        if (this.item.size) {
-            parts.push(`Size: ${this.#formatSize(this.item.size)}`);
-        }
-
-        if (this.item.modified) {
-            parts.push(`Modified: ${this.item.modified}`);
-        } else if (this.item.last_modified) {
-            parts.push(`Modified: ${this.#formatDate(this.item.last_modified)}`);
-        }
-
-        if (this.item.path) {
-            parts.push(`Path: ${this.item.path}`);
-        }
-
-        return parts.join("\n");
+    if (this.item.is_folder || this.item.type === "folder") {
+      parts.push("Type: Folder");
+    } else {
+      parts.push("Type: File");
     }
+
+    if (this.item.size) {
+      parts.push(`Size: ${this.#formatSize(this.item.size)}`);
+    }
+
+    if (this.item.modified) {
+      parts.push(`Modified: ${this.item.modified}`);
+    } else if (this.item.last_modified) {
+      parts.push(`Modified: ${this.#formatDate(this.item.last_modified)}`);
+    }
+
+    if (this.item.path) {
+      parts.push(`Path: ${this.item.path}`);
+    }
+
+    return parts.join("\n");
+  }
 
   getMetaText() {
     if (this.item.is_folder || this.item.type === "folder") {
@@ -1034,7 +1455,8 @@ class FileExplorerFolder extends FileExplorerItemBase {
   }
 
   handleDoubleClick = () => {
-    this.open();};
+    this.open();
+  };
 
   open() {
     this.dispatchEvent(
@@ -1070,6 +1492,13 @@ class FileExplorerFolder extends FileExplorerItemBase {
 
     this.itemButton.classList.remove("drop-target");
 
+    const explorer = this.closest("file-explorer");
+    const dropZone = explorer?.querySelector(".file-explorer-drop-zone");
+
+    if (dropZone) {
+      dropZone.classList.remove("file-explorer-drag-over");
+    }
+
     const rawPaths = event.dataTransfer.getData("application/x-file-explorer-paths");
 
     if (!rawPaths) {
@@ -1099,6 +1528,19 @@ class FileExplorerFolder extends FileExplorerItemBase {
 
 
 class FileExplorerFile extends FileExplorerItemBase {
+  handleDoubleClick = () => {
+    this.dispatchEvent(
+      new CustomEvent("file-explorer-download-item", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          path: this.item.path,
+          name: this.item.name
+        }
+      })
+    );
+  };
+
   getIconClass() {
     const extension = this.#getExtension();
 

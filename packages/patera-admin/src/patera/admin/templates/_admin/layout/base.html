@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ translate('dashboard') }}</title>
 
+  <script>
+    window._translations_object = {{ translation_map|tojson }};
+    window._translations_map = new Map(Object.entries(window._translations_object));
+
+    window.translate = function translate(key) {
+      if (!window._translations_map || !window._translations_map.has(key)) {
+        return key;
+      }
+
+      return window._translations_map.get(key);
+    };
+  </script>
+
   <link
     href="{{ admin_interface.url_for('_AdminController.static', filename='js/vendors/bootstrap/bootstrap.min.css') }}"
     rel="stylesheet"
@@ -174,7 +187,6 @@
   {% endblock %}
 </head>
 <body>
-
     {% include '_admin/layout/menu.html' %}
 
     {% block content %}
@@ -191,7 +203,6 @@
     const logoutBtn = document.getElementById('logout-btn');
     const logoutUrl = logoutBtn.getAttribute("data-logout-url");
     const loginUrl = logoutBtn.getAttribute("data-login-url");
-
     logoutBtn.addEventListener("click", async (e) => {
         let response = await fetch(logoutUrl);
         if(response.ok){

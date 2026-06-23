@@ -4,17 +4,6 @@
 <main class="app-main py-4">
   <div class="container-fluid px-3 px-md-4">
 
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
-      <div>
-        <h1 class="h3 mb-1">
-          {{ translate('file_explorer') }}
-        </h1>
-        <p class="text-muted mb-0">
-          {{ translate('browse_upload_and_manage_application_files') }}
-        </p>
-      </div>
-    </div>
-
     <div class="card content-card shadow-sm">
       <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
@@ -36,12 +25,14 @@
       <div class="card-body p-0">
         <file-explorer
           root="{{ file_explorer_root }}"
-          path="{{ file_explorer_path|default('') }}"
+          path=""
           list-url="{{ admin_interface.url_for('_AdminFileController.list_root') }}"
           create-url="{{ admin_interface.url_for('_AdminFileController.upload') }}"
           rename-url="{{ admin_interface.url_for('_AdminFileController.rename') }}"
           delete-url="{{ admin_interface.url_for('_AdminFileController.delete') }}"
-          move-url=""
+          create-folder-url="{{ admin_interface.url_for('_AdminFileController.create_folder') }}"
+          move-url="{{ admin_interface.url_for('_AdminFileController.move') }}"
+          download-url="{{ admin_interface.url_for('_AdminFileController.download') }}"
         ></file-explorer>
       </div>
 
@@ -54,7 +45,7 @@
         <div class="text-muted small">
           <i class="bi bi-folder me-1"></i>
           {{ translate('current_root') }}:
-          <code>{{ file_explorer_root|default('static') }}</code>
+          <code>{{ file_explorer_root_indicator }}</code>
         </div>
       </div>
     </div>

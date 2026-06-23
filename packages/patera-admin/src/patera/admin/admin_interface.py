@@ -22,6 +22,9 @@ class Permissions(StrEnum):
     ADMIN_CAN_CREATE = "admin_can_create"
 
 
+ADMIN_INTERFACE_VERSION: str = "1.0.0"
+
+
 def admin_ignore(cls: Type[Injectable]):
     """
     Mark an injectable type as ignored by the admin interface
@@ -80,6 +83,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si", "es"]
     _supported_extensions: list[str] = ["sqldatabase"]
+    _translation_maps: dict[str, dict[str, str]] = {}
 
     def init(self):
         """
@@ -298,7 +302,21 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             "show_remember_me": self.configs.SHOW_REMEMBER_ME,
             "show_forgot_password": self.configs.SHOW_FORGOT_PASSWORD,
             "available_langs": self.supported_languages,
+            "translation_map": self.get_language_map(),
+            "admin_interface_version": ADMIN_INTERFACE_VERSION,
         }
 
     def url_for(self, target: str, **kwargs) -> str:
         return self.app.url_for(target, **{"lang": self.current_language, **kwargs})
+
+    def get_language_map(self) -> dict[str, str]:
+        language_map: Optional[dict[str, str]] = self._translation_maps.get(
+            self.current_language, None
+        )
+        if language_map is not None:
+            return language_map
+        language_map = {}
+        for key, value in TRANSLATIONS_MAP.items():
+            language_map[key] = TRANSLATIONS_MAP[key][self.current_language]
+        self._translation_maps[self.current_language] = language_map
+        return language_map

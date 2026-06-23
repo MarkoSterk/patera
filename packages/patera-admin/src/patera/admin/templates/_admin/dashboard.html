@@ -225,7 +225,7 @@
                   </td>
 
                   <td class="log-message" data-message="{{ log.message|e }}">
-                    {{ log.message[:90] }}
+                    {{ log.message|default('', true)|string|truncate(70) }}
                   </td>
                   <td>
                     <button type="button" onclick="openLogDialog(event)" class="btn btn-sm" title="{{ translate('view_log') }}" aria-label="{{ translate('view_log') }}">
