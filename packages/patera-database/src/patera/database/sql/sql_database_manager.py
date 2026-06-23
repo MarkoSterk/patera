@@ -17,6 +17,8 @@ from patera.ctx import ActiveSessions, RequestContextData, get_request_context
 from patera.middleware import AppCallableType, MiddlewareBase
 from patera.controller import Controller
 
+from sqlalchemy.exc import SQLAlchemyError
+
 if TYPE_CHECKING:
     from patera import Patera, Request, Response
     from .sql_database import SqlDatabase
@@ -244,12 +246,6 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
             or getattr(handler_method, "_transactional", False)
         )
 
-    def is_successful_response(self, res: "Response") -> bool:
-        """
-        Returns True for HTTP responses that should commit transactions.
-        """
-        return int(res.status_code) < 400
-
     async def middleware(self, req: "Request") -> "Response":
         """
         Handles SQLAlchemy AsyncSession lifecycle for the current request.
@@ -261,18 +257,22 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
             res = await self.next(req)
 
             if is_transactional:
-                self.app.logger.debug(
-                    "Transactional request succeeded; committing SQL sessions"
-                )
                 await self._manager.commit_all_sessions(ctx.sessions)
             else:
-                # defensive rollback of accidentally commited data
+                # Defensive rollback of any uncommitted work opened by this request.
                 await self._manager.rollback_all_sessions(ctx.sessions)
             return res
-
-        except Exception as e:
-            self.app.logger.debug("SQL database manager; rolling back SQL sessions")
+        except SQLAlchemyError as e:
+            self.app.logger.debug(
+                "Database exception occured. Rolling back SQL sessions"
+            )
             self.app.logger.exception(e)
+            await self._manager.rollback_all_sessions(ctx.sessions)
+            raise
+        except Exception:
+            self.app.logger.debug(
+                "Request exited with exception. Defensive database session rollback."
+            )
             await self._manager.rollback_all_sessions(ctx.sessions)
             raise
 
