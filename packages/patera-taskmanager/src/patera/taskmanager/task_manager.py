@@ -15,6 +15,7 @@ from typing import (
 )
 from functools import wraps
 
+from apscheduler.events import EVENT_JOB_SUBMITTED, EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.job import Job
 from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -35,7 +36,7 @@ class TaskManagerConfig(BaseModel):
     """Configuration model for TaskManager extension."""
 
     NICE_NAME: str = Field(
-        "Task manager",
+        default="Task manager",
         description="Human readable name for the task manager for the admin dashboard",
     )
     DAEMON: bool = Field(
@@ -77,6 +78,7 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         self._scheduler: BaseScheduler
         self._initial_jobs_methods_list: list[Tuple] = []
         self._active_jobs: dict[str, Job] = {}
+        self._running_jobs: dict[str, int] = {}
 
         self._daemon = self.configs.DAEMON
 
@@ -92,9 +94,27 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
             daemon=self._daemon,
         )
 
+        self.scheduler.add_listener(
+            self._handle_scheduler_event,
+            EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR,
+        )
+
         self._get_defined_jobs()
         self._app.add_on_startup_method(self._start_scheduler)
         self._app.add_on_shutdown_method(self._stop_scheduler)
+
+    def _handle_scheduler_event(self, event) -> None:
+        job_id = getattr(event, "job_id", None)
+
+        if not job_id:
+            return
+
+        if event.code == EVENT_JOB_SUBMITTED:
+            self._mark_job_running(job_id)
+            return
+
+        if event.code in (EVENT_JOB_EXECUTED, EVENT_JOB_ERROR):
+            self._mark_job_finished(job_id)
 
     def pause_scheduler(self) -> None:
         """
@@ -180,17 +200,12 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         self._remove_job(cast(str, job), job_store)
 
     def pause_job(self, job: str | Job) -> None:
-        """
-        Pauses a job.
-        """
-        if isinstance(job, Job):
-            job.pause()
-            return
+        job_id: str = job.id if isinstance(job, Job) else job
 
-        active_job: Optional[Job] = self._active_jobs.get(job, None)
+        active_job = self._active_jobs.get(job_id)
 
         if active_job is None:
-            raise JobLookupError(job)
+            raise JobLookupError(job_id)
 
         active_job.pause()
 
@@ -223,6 +238,47 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
 
         if job_id in self._active_jobs:
             del self._active_jobs[job_id]
+
+    def is_job_running(self, job: str | Job) -> bool:
+        job_id: str = job.id if isinstance(job, Job) else job
+
+        return self._running_jobs.get(job_id, 0) > 0
+
+    def _mark_job_running(self, job_id: str) -> None:
+        self._running_jobs[job_id] = self._running_jobs.get(job_id, 0) + 1
+
+    def _mark_job_finished(self, job_id: str) -> None:
+        running_count = self._running_jobs.get(job_id, 0)
+
+        if running_count <= 1:
+            self._running_jobs.pop(job_id, None)
+            return
+
+        self._running_jobs[job_id] = running_count - 1
+
+    def run_job_now(self, job: str | Job) -> None:
+        if isinstance(job, str):
+            active_job = self.get_job(job)
+
+            if active_job is None:
+                raise JobLookupError(job)
+
+            job = active_job
+
+        job_id = job.id
+
+        if self.is_job_running(job_id):
+            raise RuntimeError(f'Job "{job_id}" is already running.')
+
+        self._mark_job_running(job_id)
+
+        async def runner():
+            try:
+                await run_sync_or_async(job.func, *job.args, **job.kwargs)
+            finally:
+                self._mark_job_finished(job_id)
+
+        run_in_background(runner)
 
     @property
     def jobs(self) -> dict[str, Job]:

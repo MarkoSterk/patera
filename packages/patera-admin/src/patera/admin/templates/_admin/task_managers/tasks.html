@@ -1,0 +1,488 @@
+{% extends '_admin/layout/base.html' %}
+
+{% block content %}
+<main class="app-main py-4">
+  <div class="container-fluid px-3 px-md-4">
+
+    <div class="card content-card shadow-sm">
+      <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h2 class="h5 mb-0">
+            <i class="bi bi-list-task me-1"></i>
+            {{ task_manager.nice_name if task_manager else translate('task_managers') }}
+          </h2>
+
+          <small class="text-muted">
+            {{ translate('scheduled_tasks') }}
+          </small>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 small text-muted">
+          <i class="bi bi-info-circle"></i>
+          <span>
+            {{ translate('manage_background_tasks') }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card-body p-0">
+        <div
+          class="task-manager"
+          data-manager="{{ manager }}"
+          data-base-url="{{ admin_interface.url_for('_AdminTMController.task_list', manager=manager) }}"
+        >
+
+          <div class="task-manager-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 px-3 py-2 border-bottom bg-white">
+            <div class="d-flex align-items-center gap-2 small text-muted">
+              <i class="bi bi-cpu"></i>
+              <span>
+                {{ tasks|length }}
+                {{ translate('tasks') }}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              id="task-manager-refresh-btn"
+            >
+              <i class="bi bi-arrow-clockwise me-1"></i>
+              {{ translate('refresh') }}
+            </button>
+          </div>
+
+          <div class="task-manager-error alert alert-danger d-none m-3"></div>
+          <div class="task-manager-success alert alert-success d-none m-3"></div>
+
+          {% if tasks %}
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 task-manager-table">
+                <thead class="table-light">
+                  <tr>
+                    <th scope="col">{{ translate('task') }}</th>
+                    <th scope="col">{{ translate('trigger') }}</th>
+                    <th scope="col">{{ translate('next_run_time') }}</th>
+                    <th scope="col">{{ translate('description') }}</th>
+                    <th scope="col">{{ translate('status') }}</th>
+                    <th scope="col" class="text-end">{{ translate('actions') }}</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {% for job in tasks %}
+                    {% set is_paused = job.paused %}
+                    {% set is_running = job.running %}
+
+                    <tr data-job-id="{{ job.id }}">
+                      <td>
+                        <div class="d-flex align-items-start gap-2">
+                          <div class="task-icon rounded d-flex align-items-center justify-content-center">
+                            {% if is_running %}
+                              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                            {% else %}
+                              <i class="bi bi-gear"></i>
+                            {% endif %}
+                          </div>
+
+                          <div class="min-width-0">
+                            <div class="fw-semibold text-truncate">
+                              {{ job.name or job.id }}
+                            </div>
+
+                            <div class="small text-muted text-truncate">
+                              <code>{{ job.id }}</code>
+                            </div>
+
+                            {% if job.func_ref %}
+                              <div class="small text-muted text-truncate">
+                                {{ job.func_ref }}
+                              </div>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <span class="small">
+                          {{ job.trigger }}
+                        </span>
+                      </td>
+
+                      <td>
+                        {% if job.next_run_time %}
+                          <span class="small">
+                            {{ job.next_run_time }}
+                          </span>
+                        {% else %}
+                          <span class="badge text-bg-secondary">
+                            {{ translate('paused') }}
+                          </span>
+                        {% endif %}
+                      </td>
+
+                      <td class="task-description-cell">
+                        {% if job.description %}
+                          <span class="small text-muted">
+                            {{ job.description }}
+                          </span>
+                        {% else %}
+                          <span class="small text-muted">—</span>
+                        {% endif %}
+                      </td>
+
+                      <td>
+                        {% if is_running %}
+                          <span class="badge text-bg-info">
+                            {{ translate('running') }}
+                          </span>
+                        {% elif is_paused %}
+                          <span class="badge text-bg-warning">
+                            {{ translate('paused') }}
+                          </span>
+                        {% else %}
+                          <span class="badge text-bg-success">
+                            {{ translate('active') }}
+                          </span>
+                        {% endif %}
+                      </td>
+
+                      <td>
+                        <div class="d-flex justify-content-end align-items-center flex-wrap gap-1">
+                          <button
+                            type="button"
+                            class="btn btn-outline-success btn-sm task-action-btn"
+                            data-method="POST"
+                            data-job-id="{{ job.id }}"
+                            data-success-message="{{ translate('task_started_successfully') }}"
+                            title="{{ translate('run') }}"
+                            {% if is_running %}disabled{% endif %}
+                          >
+                            {% if is_running %}
+                              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                              {{ translate('running') }}
+                            {% else %}
+                              <i class="bi bi-play-fill me-1"></i>
+                              {{ translate('run') }}
+                            {% endif %}
+                          </button>
+
+                          {% if is_paused %}
+                            <button
+                              type="button"
+                              class="btn btn-outline-primary btn-sm task-action-btn"
+                              data-method="PUT"
+                              data-job-id="{{ job.id }}"
+                              data-success-message="{{ translate('task_resumed_successfully') }}"
+                              title="{{ translate('resume') }}"
+                            >
+                              <i class="bi bi-play-circle me-1"></i>
+                              {{ translate('resume') }}
+                            </button>
+                          {% else %}
+                            <button
+                              type="button"
+                              class="btn btn-outline-warning btn-sm task-action-btn"
+                              data-method="PATCH"
+                              data-job-id="{{ job.id }}"
+                              data-success-message="{{ translate('task_paused_successfully') }}"
+                              title="{{ translate('pause') }}"
+                            >
+                              <i class="bi bi-pause-fill me-1"></i>
+                              {{ translate('pause') }}
+                            </button>
+                          {% endif %}
+
+                          <button
+                            type="button"
+                            class="btn btn-outline-danger btn-sm task-remove-btn"
+                            data-method="DELETE"
+                            data-job-id="{{ job.id }}"
+                            data-job-name="{{ job.name or job.id }}"
+                            data-success-message="{{ translate('task_removed_from_queue') }}"
+                            title="{{ translate('remove') }}"
+                          >
+                            <i class="bi bi-trash me-1"></i>
+                            {{ translate('remove') }}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="task-manager-empty text-center text-muted py-5">
+              <i class="bi bi-list-task fs-1 d-block mb-2"></i>
+              <div class="fw-semibold">
+                {{ translate('no_tasks_available') }}
+              </div>
+              <div class="small">
+                {{ translate('this_task_manager_has_no_registered_tasks') }}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="text-muted small">
+          <i class="bi bi-shield-check me-1"></i>
+          {{ translate('task_actions_are_limited_to_the_selected_manager') }}
+        </div>
+
+        <div class="text-muted small">
+          <i class="bi bi-diagram-3 me-1"></i>
+          {{ translate('current_task_manager') }}:
+          <code>{{ manager }}</code>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}
+
+{% block css %}
+<style>
+  .task-manager {
+    display: block;
+  }
+
+  .task-manager-toolbar {
+    min-height: 52px;
+  }
+
+  .task-manager-table {
+    margin-bottom: 0;
+  }
+
+  .task-manager-table th {
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    color: #6c757d;
+    font-weight: 600;
+  }
+
+  .task-manager-table td {
+    vertical-align: middle;
+  }
+
+  .task-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 2.25rem;
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #e9ecef;
+  }
+
+  .min-width-0 {
+    min-width: 0;
+  }
+
+  .task-action-btn,
+  .task-remove-btn {
+    white-space: nowrap;
+  }
+
+  .task-description-cell {
+    max-width: 360px;
+  }
+
+  .task-description-cell .small {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .task-manager-empty {
+    min-height: 280px;
+  }
+
+  @media (max-width: 768px) {
+    .task-manager-table th:nth-child(2),
+    .task-manager-table td:nth-child(2),
+    .task-manager-table th:nth-child(3),
+    .task-manager-table td:nth-child(3),
+    .task-manager-table th:nth-child(4),
+    .task-manager-table td:nth-child(4) {
+      display: none;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block js %}
+<script>
+  const managerElement = document.querySelector(".task-manager");
+  const refreshButton = document.querySelector("#task-manager-refresh-btn");
+
+  let errorElement = null;
+  let successElement = null;
+
+  if (managerElement) {
+    errorElement = managerElement.querySelector(".task-manager-error");
+    successElement = managerElement.querySelector(".task-manager-success");
+  }
+
+  function getBaseUrl() {
+    const baseUrl = managerElement.dataset.baseUrl || window.location.pathname;
+
+    if (baseUrl.endsWith("/")) {
+      return baseUrl;
+    }
+
+    return `${baseUrl}/`;
+  }
+
+  function getJobUrl(jobId) {
+    return `${getBaseUrl()}${encodeURIComponent(jobId)}`;
+  }
+
+  function clearMessages() {
+    if (errorElement) {
+      errorElement.classList.add("d-none");
+      errorElement.textContent = "";
+    }
+
+    if (successElement) {
+      successElement.classList.add("d-none");
+      successElement.textContent = "";
+    }
+  }
+
+  function showError(message) {
+    if (successElement) {
+      successElement.classList.add("d-none");
+      successElement.textContent = "";
+    }
+
+    if (errorElement) {
+      errorElement.textContent = message || "{{ translate('task_action_failed') }}";
+      errorElement.classList.remove("d-none");
+    }
+  }
+
+  function showSuccess(message) {
+    if (errorElement) {
+      errorElement.classList.add("d-none");
+      errorElement.textContent = "";
+    }
+
+    if (successElement) {
+      successElement.textContent = message || "{{ translate('task_action_completed') }}";
+      successElement.classList.remove("d-none");
+    }
+  }
+
+  function setButtonsDisabled(disabled) {
+    if (!managerElement) {
+      return;
+    }
+
+    managerElement
+      .querySelectorAll(".task-action-btn:not([data-method='POST']), .task-remove-btn, #task-manager-refresh-btn")
+      .forEach((button) => {
+        button.disabled = disabled;
+      });
+
+    managerElement
+      .querySelectorAll(".task-action-btn[data-method='POST']")
+      .forEach((button) => {
+        const row = button.closest("tr");
+        const wasRunning = row && row.dataset.running === "true";
+
+        if (!wasRunning) {
+          button.disabled = disabled;
+        }
+      });
+  }
+
+  async function readError(response, fallbackMessage) {
+    try {
+      const payload = await response.json();
+
+      return payload.message || payload.error || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  async function sendTaskAction(button) {
+    const jobId = button.dataset.jobId;
+    const method = button.dataset.method;
+    const successMessage = button.dataset.successMessage;
+
+    if (!jobId || !method) {
+      return;
+    }
+
+    clearMessages();
+    setButtonsDisabled(true);
+
+    try {
+      const response = await fetch(getJobUrl(jobId), {
+        method,
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          job_id: jobId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(await readError(response, "{{ translate('task_action_failed') }}"));
+      }
+
+      showSuccess(successMessage);
+
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 350);
+    } catch (error) {
+      showError(error.message || "{{ translate('task_action_failed') }}");
+      setButtonsDisabled(false);
+    }
+  }
+
+  if (refreshButton) {
+    refreshButton.addEventListener("click", () => {
+      window.location.reload();
+    });
+  }
+
+  if (managerElement) {
+    managerElement.querySelectorAll("tr[data-job-id]").forEach((row) => {
+      const runButton = row.querySelector(".task-action-btn[data-method='POST']");
+
+      if (runButton && runButton.disabled) {
+        row.dataset.running = "true";
+      } else {
+        row.dataset.running = "false";
+      }
+    });
+
+    managerElement.querySelectorAll(".task-action-btn").forEach((button) => {
+      button.addEventListener("click", async () => {
+        await sendTaskAction(button);
+      });
+    });
+
+    managerElement.querySelectorAll(".task-remove-btn").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const jobName = button.dataset.jobName || button.dataset.jobId;
+
+        if (!confirm(`{{ translate('remove_task_confirm') }} "${jobName}"?`)) {
+          return;
+        }
+
+        await sendTaskAction(button);
+      });
+    });
+  }
+</script>
+{% endblock %}

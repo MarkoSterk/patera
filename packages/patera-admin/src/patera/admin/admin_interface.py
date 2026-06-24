@@ -78,7 +78,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     _admin_menu: list[dict[str, str]] = []
     _databases_menu: list[dict[str, str | Any]] = []
-    _database_menu_built: bool = False
+    _task_managers: dict[str, Any] = {}
     _email_services: dict[str, Any] = {}
     _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si", "es"]
@@ -168,6 +168,17 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         )  # type: ignore
         ctrl_instance.admin_interface = self
 
+    def _register_tm_controller(self) -> None:
+        from .admin_tm_controller import _AdminTMController
+
+        base_url = f"{self.configs.ADMIN_BASE_URL}/<string:lang>/task-managers/<string:manager>"
+        admin_email_controller_dec = path(base_url, open_api_spec=False)
+        admin_email_controller = admin_email_controller_dec(_AdminTMController)
+        self._app.register_controller(admin_email_controller)
+        ctrl_path = getattr(admin_email_controller, "_controller_path")
+        ctrl_instance: _AdminTMController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance.admin_interface = self
+
     def _register_models_controller(self) -> None:
         if self.managed_models is None or len(self.managed_models) == 0:
             return
@@ -209,8 +220,12 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
             if "EmailClient" in ext_cls_mro:
                 self._email_services[name] = ext
+            if "TaskManager" in ext_cls_mro:
+                self._task_managers[name] = ext
         if len(self._email_services) > 0:
             self._register_email_controller()
+        if len(self._task_managers) > 0:
+            self._register_tm_controller()
 
     def _collect_models(self) -> dict[str, list[Any]]:
         """
@@ -269,6 +284,14 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     @property
     def has_email_services(self) -> bool:
         return len(self._email_services.keys()) > 0
+
+    @property
+    def has_task_managers(self) -> bool:
+        return len(self._task_managers.keys()) > 0
+
+    @property
+    def task_managers(self) -> dict[str, Any]:
+        return self._task_managers
 
     @property
     def managed_models(self) -> list[Type]:

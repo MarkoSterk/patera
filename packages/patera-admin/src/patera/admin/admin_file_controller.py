@@ -20,6 +20,7 @@ from patera import (
     Request,
     Response,
     UploadedFile,
+    BaseConfig,
 )
 from patera.controller import (
     Controller,
@@ -218,7 +219,7 @@ class FilesDownloadInput(FilePathInput):
         return [str(value).strip().replace("\\", "/").strip("/")]
 
 
-class _AdminFileController(Controller[Patera]):
+class _AdminFileController(Controller[Patera[BaseConfig]]):
     def __init__(self, *args, **kwargs):
         self._admin_interface: AdminInterface = cast(AdminInterface, None)
         super().__init__(*args, **kwargs)

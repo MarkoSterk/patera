@@ -78,6 +78,38 @@
                 </a>
               </li>
             {% endif %}
+            {% if admin_interface.has_task_managers %}
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle"
+                  href="#"
+                  id="taskManagersDropdown"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i class="bi bi-database me-1"></i>
+                  {{ translate('task_managers') }}
+                </a>
+
+                <ul
+                  class="dropdown-menu"
+                  aria-labelledby="taskManagersDropdown"
+                >
+                  {% for name, ext in admin_interface.task_managers.items() %}
+                    <li>
+                      <a
+                        class="dropdown-item"
+                        href="{{ admin_interface.url_for('_AdminTMController.task_list', manager=name) }}"
+                      >
+                        <i class="bi bi-table me-1"></i>
+                        {{ ext.nice_name }}
+                      </a>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </li>
+            {% endif %}
           </ul>
 
           <div class="d-flex align-items-center gap-2">
