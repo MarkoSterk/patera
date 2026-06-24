@@ -52,7 +52,7 @@ class BaseConfig(BaseSettings):
         description="Whether to use server lifespan events/signals. Options: on, auto, off",
     )
     TEMPLATES_DIR: str = Field(
-        "/templates", description="Relative templates dir from root"
+        "templates", description="Relative templates dir from root"
     )
     AUTO_RELOAD: bool = Field(
         True,
