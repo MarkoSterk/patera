@@ -354,7 +354,7 @@ class Patera(Injectable, Generic[ConfT]):
             Controller,
         )
 
-        exception_handler_folders: list[str] = ["exceptions"]
+        exception_handler_folders: list[str] = ["exceptions", "exc_controllers"]
         exception_handler_folders.extend(self._configs.EXCEPTION_HANDLER_FOLDERS or [])
 
         self._load_detected_modules_once(
@@ -402,7 +402,9 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
                 loaded_files.add(resolved_file)
                 unique_files.append(file)
-
+            self.logger.debug(
+                f"Detecting modules in folder {folder}: {load_class.__name__}: {unique_files}"
+            )
             self._load_detected_module(unique_files, load_class)
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
@@ -416,7 +418,9 @@ class Patera(Injectable, Generic[ConfT]):
         """
         app_root = Path(self._root_path)
         root_package = app_root.name
-
+        self.logger.debug(
+            f"Loading detected modules: {file_paths} for class {load_class}"
+        )
         for file_path in file_paths:
             relative_path = file_path.relative_to(app_root)
             module_path = relative_path.with_suffix("")
@@ -428,7 +432,9 @@ class Patera(Injectable, Generic[ConfT]):
                 module,
                 lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
             ):
+                self.logger.debug(f"Trying to load: {obj.__name__}")
                 if inspect.isabstract(obj):
+                    self.logger.debug(f"Is abstract class: {obj.__name__}")
                     continue
 
                 ignore: bool = getattr(obj, "_ignore", False)
@@ -436,6 +442,8 @@ class Patera(Injectable, Generic[ConfT]):
 
                 if ignore or (dev_only and not self._configs.DEBUG):
                     continue
+
+                self.logger.debug(f"Past first ignore/dev check: {obj.__name__}")
 
                 if issubclass(obj, Controller) and obj is not Controller:
                     self.logger.info(f"Registering controller: {obj.__name__}")
@@ -449,7 +457,11 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
 
                 if issubclass(obj, MiddlewareBase) and obj is not MiddlewareBase:
+                    self.logger.debug(f"Found middleware {obj.__name__}")
                     ignore_middleware: bool = obj.__dict__.get("__ignore__", False)
+                    self.logger.debug(
+                        f"Middleware {obj.__name__} should be ignored {ignore_middleware}"
+                    )
 
                     if ignore_middleware:
                         continue
