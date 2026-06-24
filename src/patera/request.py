@@ -8,7 +8,7 @@ import json
 import base64
 from io import BytesIO
 from urllib.parse import parse_qs
-from typing import Callable, Any, TYPE_CHECKING, Mapping, cast
+from typing import Callable, Any, TYPE_CHECKING, Mapping, Optional, cast
 
 import python_multipart as pm
 from pydantic_core import core_schema
@@ -359,11 +359,18 @@ class Request:
         return current_request.user
 
     @property
+    def roles(self) -> Optional[list[Any]]:
+        return current_request.roles
+
+    @property
     def app(self) -> "Patera":
         return self._app
 
     def set_user(self, user: Any) -> None:
         current_request.user = user
+
+    def set_roles(self, roles: list[Any]) -> None:
+        current_request.roles = roles
 
     def remove_user(self) -> None:
         current_request.user = None

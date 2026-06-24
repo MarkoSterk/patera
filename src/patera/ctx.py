@@ -36,7 +36,7 @@ class RequestContextData:
     sessions: Optional[ActiveSessions] = None
     controller: Optional[Any] = None
     user: Optional[Any] = None
-    roles: Optional[Any] = None
+    roles: Optional[list[Any]] = None
     extras: dict[str, Any] = field(default_factory=dict)
 
 

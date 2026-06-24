@@ -59,6 +59,13 @@ class AuthenticationConfig(BaseModel):
         default="Missing user role(s)",
         description="Default authorization error message",
     )
+    ALWAYS_LOAD_ROLES: bool = Field(
+        default=False,
+        description=(
+            "Load user roles for every authenticated request, even when "
+            "the matched controller or endpoint does not require roles."
+        ),
+    )
 
 
 class AuthUtils:
@@ -182,12 +189,15 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
     User must implement user_loader method and optionally role_check method
     to define how users are loaded and how roles are checked.
     1. user_loader: should return a user object (or None) loaded from the cookie/jwt/header token
-    2. role_check: should check if user has required role(s) and return a boolean
-    True -> user has role(s)
-    False -> user doesn't have role(s)
+    2. roles_loader: should return a list of user roles or an empty list
+                    Returned list is compared to required roles on controller and endpoint handler.
     3. Decorators:
         - login_required: to mark route handlers/controllers that require authentication
         - role_required: to mark route handlers/controllers that require specific roles
+
+    OPTIONAL:
+    Implement an async def refresh_credentials(self, res: "Response") -> None: method to refresh credentials
+    if near expiration date.
 
     Default middleware order for Authentication is -99
     """
@@ -248,25 +258,39 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
 
         req.set_user(user)
 
-        controller_roles: list[Any] = (
+        controller_roles: set[Any] = set(
             controller_authentication_attributes.get("roles", [])
             if controller_authentication_attributes
             else []
         )
 
-        handler_roles: list[Any] = (
+        handler_roles: set[Any] = set(
             handler_authentication_attributes.get("roles", [])
             if handler_authentication_attributes
             else []
         )
 
-        roles: list[Any] = list(set(controller_roles + handler_roles))
+        required_roles: set[Any] = controller_roles | handler_roles
 
-        if len(roles) > 0:
-            authorized: bool = await self.role_check(req.user, list(roles))
+        if required_roles or self.configs.ALWAYS_LOAD_ROLES:
+            user_roles: list[Any] = await self.roles_loader(req.user)
+            req.set_roles(user_roles)
+            if required_roles:
+                user_role_set: set[Any] = set(user_roles)
 
-            if not authorized:
-                raise authorization_exc(self.authorization_error, list(roles))
+                controller_authorized = not controller_roles or bool(
+                    user_role_set.intersection(controller_roles)
+                )
+
+                handler_authorized = not handler_roles or bool(
+                    user_role_set.intersection(handler_roles)
+                )
+
+                if not controller_authorized or not handler_authorized:
+                    raise authorization_exc(
+                        self.authorization_error,
+                        list(required_roles),
+                    )
 
         res: "Response" = await self.next(req)
         await self.refresh_credentials(res)
@@ -280,17 +304,16 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         """
 
     @abstractmethod
-    async def role_check(self, user: Any, roles: list[Any]) -> bool:
+    async def roles_loader(self, user: Any) -> list[Any]:
         """
-        Should check if user has required role(s) and return a boolean
-        True -> user has role(s)
-        False -> user doesn't have role(s)
+        Should load and return a list of current users roles. If user has no assigned roles
+        return an empty list.
         """
 
     async def refresh_credentials(self, res: "Response") -> None:
         """
         Refresh credentials (cookies/jwt etc) if near expiration.
-        Should return None
+        Should modify the response object in-place and return None
         """
         pass
 
