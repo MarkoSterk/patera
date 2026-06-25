@@ -108,7 +108,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         handler: _AdminExceptionHandler = self.app._exception_handler_instances.get(
             _AdminExceptionHandler.__name__
         )  # type: ignore
-        handler.admin_interface = self
+        handler.admin_interface = self  # type: ignore
 
     def _register_admin_controller(self) -> None:
         """

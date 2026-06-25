@@ -323,7 +323,7 @@ class Patera(Injectable, Generic[ConfT]):
 
         self._load_detected_modules_once(
             logger_folders,
-            ["logger", "log_sink"],
+            ["logger", "log_sink", "logging"],
             LoggerBase,
         )
 
@@ -436,7 +436,11 @@ class Patera(Injectable, Generic[ConfT]):
                 if ignore or (dev_only and not self._configs.DEBUG):
                     continue
 
-                if issubclass(obj, Controller) and obj is not Controller:
+                if (
+                    issubclass(obj, Controller)
+                    and obj is not Controller
+                    and getattr(obj, "_controller_path", None) is not None
+                ):
                     self.register_controller(obj)
                     continue
 
@@ -457,11 +461,19 @@ class Patera(Injectable, Generic[ConfT]):
                     self.register_middleware(obj)
                     continue
 
-                if issubclass(obj, ExceptionHandler) and obj is not ExceptionHandler:
+                if (
+                    issubclass(obj, ExceptionHandler)
+                    and obj is not ExceptionHandler
+                    and getattr(obj, "_exc_handler", False)
+                ):
                     self.register_exception_handler(obj)
                     continue
 
-                if issubclass(obj, LoggerBase) and obj is not LoggerBase:
+                if (
+                    issubclass(obj, LoggerBase)
+                    and obj is not LoggerBase
+                    and getattr(obj, "_logger", False)
+                ):
                     self.logger.info(f"Registering logger sink: {obj.__name__}")
                     sink_id = obj(self).configure()
                     self._logger_sink_ids.append(sink_id)
@@ -980,6 +992,9 @@ class Patera(Injectable, Generic[ConfT]):
         if middleware_class in self._middleware_classes.values():
             return
 
+        if not getattr(middleware_class, "_middleware", False):
+            return
+
         decorator_order = cast(int | None, getattr(middleware_class, "_order", None))
         default_order = cast(int | None, getattr(middleware_class, "_order_", None))
         here_set_order = order
@@ -1111,10 +1126,15 @@ class Patera(Injectable, Generic[ConfT]):
             if ignore or (dev_only and not self.configs.DEBUG):
                 continue
 
-            ctrl_path: str = getattr(ctrl, "_controller_path")
+            ctrl_path: str | None = cast(
+                str | None, getattr(ctrl, "_controller_path", None)
+            )
             ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")
             ctrl_open_api_tags = getattr(ctrl, "_open_api_tags", None)
             ctrl_alias = getattr(ctrl, "_alias", None)
+
+            if ctrl_path is None:
+                continue
 
             ctrl_instance = ctrl(
                 self,
@@ -1158,6 +1178,8 @@ class Patera(Injectable, Generic[ConfT]):
                         )
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
+        if not getattr(ctrl, "_cli_controller", False):
+            return
         self.logger.info(
             f"Registering CLI controller: {ctrl.ctrl_name} ({ctrl.__class__.__name__})"
         )
@@ -1168,6 +1190,8 @@ class Patera(Injectable, Generic[ConfT]):
 
         for handler in handlers:
             if handler.__name__ in self._exception_handler_instances:
+                continue
+            if not getattr(handler, "_exc_handler", False):
                 continue
             self.logger.info(f"Registering exception handler: {handler.__name__}")
             handler_instance = handler(self)
@@ -1271,7 +1295,6 @@ class Patera(Injectable, Generic[ConfT]):
         app_extensions = getattr(self.__class__, "app_extensions", [])
 
         for extension in app_extensions:
-            self.app.logger.info(f"Registering app extension: {extension.__name__}")
             if not inspect.isclass(extension):
                 raise TypeError(
                     "Items in 'app_extensions' must be extension classes, "
@@ -1283,7 +1306,7 @@ class Patera(Injectable, Generic[ConfT]):
                     f"App extension {extension.__name__} must inherit from "
                     "BaseExtension."
                 )
-
+            self.app.logger.info(f"Registering app extension: {extension.__name__}")
             self._resolve_dependency(extension)
 
     @property

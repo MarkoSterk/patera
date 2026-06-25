@@ -26,7 +26,7 @@ from typing import (
 from enum import StrEnum
 from pydantic import BaseModel, field_validator, Field, ConfigDict
 
-from loguru import logger
+from loguru import logger as logoru_logger
 
 if TYPE_CHECKING:
     from ..patera import Patera
@@ -145,6 +145,16 @@ class LoggerConfigBase(BaseModel):
 
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
+
+
+def logger(name: Optional[str] = None):
+
+    def decorator(logger_cls: Type[LoggerBase]) -> Type[LoggerBase]:
+        setattr(logger_cls, "_logger_name", name)
+        setattr(logger_cls, "_logger", True)
+        return logger_cls
+
+    return decorator
 
 
 class LoggerBase(ABC, Generic[AppT]):
@@ -369,10 +379,10 @@ class LoggerBase(ABC, Generic[AppT]):
         )
 
         kwargs = self._filter_kwargs_for_sink(sink, base_kwargs)
-        logger_sink_id: int = logger.add(sink, **kwargs)
+        logger_sink_id: int = logoru_logger.add(sink, **kwargs)
 
         return logger_sink_id
 
     @property
     def logger_name(self) -> str:
-        return self.__class__.__name__
+        return getattr(self, "_logger_name", None) or self.__class__.__name__

@@ -2,7 +2,7 @@
 
 from typing import cast
 
-from patera.exceptions import ExceptionHandler, handles
+from patera.exceptions import ExceptionHandler, handles, exception_handler
 from patera import Patera, Request, Response, HttpStatus
 
 from .exceptions import (
@@ -15,6 +15,7 @@ from .exceptions import (
 from .admin_interface import AdminInterface, Permissions
 
 
+@exception_handler
 class _AdminExceptionHandler(ExceptionHandler[Patera]):
     def __init__(self, *args, **kwargs):
         self._admin_interface: AdminInterface = cast(AdminInterface, None)

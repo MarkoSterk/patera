@@ -17,11 +17,15 @@ AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="CLIController[Any]")
 
 
-def cli_controller(alias: Optional[str] = None):
+def cli_controller(name: Optional[str] = None):
+    """
+    Marks a CLI controller implementation for registration and
+    optionally adds a name alias
+    """
 
     def decorator(cli_cls: Type[T]) -> Type[T]:
         setattr(cli_cls, "_cli_controller", True)
-        setattr(cli_cls, "_alias", alias)
+        setattr(cli_cls, "_alias", name)
         return cli_cls
 
     return decorator

@@ -17,6 +17,11 @@ if TYPE_CHECKING:
 AppT = TypeVar("AppT", bound="Patera[Any]")
 
 
+def exception_handler(exc_cls: Type["ExceptionHandler"]) -> Type["ExceptionHandler"]:
+    setattr(exc_cls, "_exc_handler", True)
+    return exc_cls
+
+
 class ExceptionHandler(Injectable, Generic[AppT]):
     def __init__(self, app: AppT):
         self._exception_mapping: dict[str, Callable] = {}

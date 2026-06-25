@@ -14,6 +14,7 @@ from .logger_config_base import (
     CompressionType,
     FilterType,
     OutputSink,
+    logger,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "CompressionType",
     "FilterType",
     "OutputSink",
+    "logger",
 ]

@@ -16,7 +16,7 @@ from .runtime_exceptions import (
     UnexpectedDecorator,
 )
 
-from .exception_handler import ExceptionHandler, handles
+from .exception_handler import ExceptionHandler, handles, exception_handler
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 
 __all__ = [
@@ -32,4 +32,5 @@ __all__ = [
     "handles",
     "NotFound",
     "MethodNotAllowed",
+    "exception_handler",
 ]
