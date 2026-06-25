@@ -209,9 +209,8 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
     It delegates session lifecycle operations to SqlDatabaseManager.
     """
 
-    __ignore__: bool = True
-
     _order: int = -100
+    _middleware = True
 
     _sql_database_manager_name: str = ""
 

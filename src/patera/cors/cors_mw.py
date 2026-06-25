@@ -4,18 +4,20 @@ Handles Cross-Origin Resource Sharing (CORS) by adding appropriate headers to HT
 """
 
 from typing import Any, Callable, Optional, TYPE_CHECKING, cast
-from ..middleware import MiddlewareBase, order
+from ..middleware import MiddlewareBase
 
 if TYPE_CHECKING:
     from ..request import Request
     from ..response import Response
 
 
-@order(-100)
 class CORSMiddleware(MiddlewareBase):
     """
     Middleware to handle CORS by adding necessary headers to HTTP responses.
     """
+
+    _order = -101
+    _middleware = True
 
     async def middleware(self, req: "Request") -> "Response":
         scope = req.scope

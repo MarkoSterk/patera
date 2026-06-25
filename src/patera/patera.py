@@ -402,9 +402,6 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
                 loaded_files.add(resolved_file)
                 unique_files.append(file)
-            self.logger.debug(
-                f"Detecting modules in folder {folder}: {load_class.__name__}: {unique_files}"
-            )
             self._load_detected_module(unique_files, load_class)
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
@@ -418,9 +415,6 @@ class Patera(Injectable, Generic[ConfT]):
         """
         app_root = Path(self._root_path)
         root_package = app_root.name
-        self.logger.debug(
-            f"Loading detected modules: {file_paths} for class {load_class}"
-        )
         for file_path in file_paths:
             relative_path = file_path.relative_to(app_root)
             module_path = relative_path.with_suffix("")
@@ -432,18 +426,15 @@ class Patera(Injectable, Generic[ConfT]):
                 module,
                 lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
             ):
-                self.logger.debug(f"Trying to load: {obj.__name__}")
-                if inspect.isabstract(obj):
-                    self.logger.debug(f"Is abstract class: {obj.__name__}")
-                    continue
+                # if inspect.isabstract(obj):
+                #     self.logger.debug(f"Is abstract class: {obj.__name__}")
+                #     continue
 
                 ignore: bool = getattr(obj, "_ignore", False)
                 dev_only: bool = getattr(obj, "_development", False)
 
                 if ignore or (dev_only and not self._configs.DEBUG):
                     continue
-
-                self.logger.debug(f"Past first ignore/dev check: {obj.__name__}")
 
                 if issubclass(obj, Controller) and obj is not Controller:
                     self.logger.info(f"Registering controller: {obj.__name__}")
@@ -456,16 +447,11 @@ class Patera(Injectable, Generic[ConfT]):
                     self.register_cli_controller(obj_inst)
                     continue
 
-                if issubclass(obj, MiddlewareBase) and obj is not MiddlewareBase:
-                    self.logger.debug(f"Found middleware {obj.__name__}")
-                    ignore_middleware: bool = obj.__dict__.get("__ignore__", False)
-                    self.logger.debug(
-                        f"Middleware {obj.__name__} should be ignored {ignore_middleware}"
-                    )
-
-                    if ignore_middleware:
-                        continue
-
+                if (
+                    issubclass(obj, MiddlewareBase)
+                    and obj is not MiddlewareBase
+                    and getattr(obj, "_middleware", False)
+                ):
                     self.register_middleware(obj)
                     continue
 
@@ -993,12 +979,24 @@ class Patera(Injectable, Generic[ConfT]):
         if middleware_class in self._middleware_classes.values():
             return
 
-        resolved_order = order
+        decorator_order = cast(int | None, getattr(middleware_class, "_order", None))
+        default_order = cast(int | None, getattr(middleware_class, "_order_", None))
+        here_set_order = order
 
-        if resolved_order is None:
-            resolved_order = getattr(middleware_class, "_order", 0)
+        if default_order is not None and (
+            decorator_order is not None or here_set_order is not None
+        ):
+            self.logger.warning(f"""Middleware {middleware_class.__name__} has default order {default_order}
+                            but has set order {decorator_order or here_set_order}. This can lead to unexpected problems.
+                            It is suggested that the order on middleware with default order number is not reset.""")
 
-        original_order = resolved_order
+        original_order = here_set_order or decorator_order or default_order
+        if original_order is None:
+            raise ValueError(
+                f"Middleware {middleware_class.__name__} has no set order."
+            )
+
+        resolved_order = original_order
 
         while resolved_order in self._middleware_classes:
             resolved_order += 1

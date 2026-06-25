@@ -202,9 +202,7 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
     Default middleware order for Authentication is -99
     """
 
-    __ignore__: bool = True
-
-    _order: int = -99
+    _order_: int = -99
 
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         """

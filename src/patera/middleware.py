@@ -10,6 +10,7 @@ from typing import (
     Awaitable,
     Any,
     Generic,
+    Optional,
     Protocol,
     TypeVar,
 )
@@ -35,14 +36,21 @@ MiddlewareClsT = TypeVar(
 )
 
 
-def order(order: int = 0) -> Callable[[MiddlewareClsT], MiddlewareClsT]:
+def middleware(
+    order: Optional[int] = None,
+) -> Callable[[MiddlewareClsT], MiddlewareClsT]:
     """
     Decorator to set the order of middlewares.
     Lower values are processed first. Default order is 0.
     """
 
     def decorator(cls_type: MiddlewareClsT) -> MiddlewareClsT:
+        if order is not None and order <= 0:
+            raise ValueError(
+                f"Order number for middleware must be larger then 0. Order for {cls_type.__name__} is {order}"
+            )
         setattr(cls_type, "_order", order)
+        setattr(cls_type, "_middleware", True)
         return cls_type
 
     return decorator
