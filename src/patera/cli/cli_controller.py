@@ -4,7 +4,7 @@ CLI controller module for Patera.
 
 import inspect
 import asyncio
-from typing import TYPE_CHECKING, Callable, cast, TypeVar, Generic, Any
+from typing import TYPE_CHECKING, Callable, Optional, Type, cast, TypeVar, Generic, Any
 from functools import wraps
 
 from ..injectable import Injectable
@@ -15,6 +15,16 @@ if TYPE_CHECKING:
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="CLIController[Any]")
+
+
+def cli_controller(alias: Optional[str] = None):
+
+    def decorator(cli_cls: Type[T]) -> Type[T]:
+        setattr(cli_cls, "_cli_controller", True)
+        setattr(cli_cls, "_alias", alias)
+        return cli_cls
+
+    return decorator
 
 
 class CLIController(Injectable, Generic[AppT]):
@@ -28,7 +38,6 @@ class CLIController(Injectable, Generic[AppT]):
         self._app: AppT = app
         self._cli_commands: dict[str, Callable] = {}
         self._cli_commands_help: dict[str, str] = {}
-        self._ctrl_name: str = self.__class__.__name__
         self._register_commands()
         self._resolve_injections()
 
@@ -147,10 +156,7 @@ class CLIController(Injectable, Generic[AppT]):
 
     @property
     def ctrl_name(self) -> str:
-        return self._ctrl_name
-
-    def set_ctrl_name(self, name: str) -> None:
-        self._ctrl_name = name
+        return getattr(self, "_alias", None) or self.__class__.__name__
 
 
 def command(command_name: str, help: str = ""):

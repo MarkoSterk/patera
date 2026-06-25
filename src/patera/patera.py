@@ -437,12 +437,14 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
 
                 if issubclass(obj, Controller) and obj is not Controller:
-                    self.logger.info(f"Registering controller: {obj.__name__}")
                     self.register_controller(obj)
                     continue
 
-                if issubclass(obj, CLIController) and obj is not CLIController:
-                    self.logger.info(f"Registering CLI controller: {obj.__name__}")
+                if (
+                    issubclass(obj, CLIController)
+                    and obj is not CLIController
+                    and getattr(obj, "_cli_controller", False)
+                ):
                     obj_inst = obj(self)
                     self.register_cli_controller(obj_inst)
                     continue
@@ -456,7 +458,6 @@ class Patera(Injectable, Generic[ConfT]):
                     continue
 
                 if issubclass(obj, ExceptionHandler) and obj is not ExceptionHandler:
-                    self.logger.info(f"Registering exception handler: {obj.__name__}")
                     self.register_exception_handler(obj)
                     continue
 
@@ -1122,7 +1123,9 @@ class Patera(Injectable, Generic[ConfT]):
                 ctrl_open_api_tags,
                 ctrl_alias,
             )
-
+            if self._controllers.get(ctrl_instance.path, None) is not None:
+                continue
+            self.logger.info(f"Registering controller: {ctrl.__name__}")
             self._controllers[ctrl_instance.path] = ctrl_instance
 
             endpoint_methods: dict[str, dict[str, str | Callable]] = (
@@ -1155,14 +1158,18 @@ class Patera(Injectable, Generic[ConfT]):
                         )
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
+        self.logger.info(
+            f"Registering CLI controller: {ctrl.ctrl_name} ({ctrl.__class__.__name__})"
+        )
         self._cli_controllers[ctrl.ctrl_name] = ctrl
 
     def register_exception_handler(self, *handlers: "type[ExceptionHandler]"):
         """Registers exception controller with application."""
+
         for handler in handlers:
             if handler.__name__ in self._exception_handler_instances:
                 continue
-
+            self.logger.info(f"Registering exception handler: {handler.__name__}")
             handler_instance = handler(self)
 
             self._exception_handler_instances[handler_instance.__class__.__name__] = (
