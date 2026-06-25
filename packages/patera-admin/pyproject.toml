@@ -1,6 +1,6 @@
 [project]
 name = "patera-admin"
-version = "0.6.0"
+version = "0.6.1"
 requires-python = ">=3.13"
 dependencies = [
     "patera",
