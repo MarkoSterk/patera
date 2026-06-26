@@ -4,7 +4,17 @@ CLI controller module for Patera.
 
 import inspect
 import asyncio
-from typing import TYPE_CHECKING, Callable, Optional, Type, cast, TypeVar, Generic, Any
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Optional,
+    Type,
+    cast,
+    TypeVar,
+    Generic,
+    Any,
+    overload,
+)
 from functools import wraps
 
 from ..injectable import Injectable
@@ -17,16 +27,27 @@ AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="CLIController[Any]")
 
 
-def cli_controller(name: Optional[str] = None):
+@overload
+def cli_controller(cli_cls: Type[T]) -> Type[T]: ...
+@overload
+def cli_controller(*, name: Optional[str] = None) -> Callable[[Type[T]], Type[T]]: ...
+def cli_controller(
+    cli_cls: Type[T] | None = None,
+    *,
+    name: Optional[str] = None,
+) -> Type[T] | Callable[[Type[T]], Type[T]]:
     """
     Marks a CLI controller implementation for registration and
-    optionally adds a name alias
+    optionally adds a name alias.
     """
 
-    def decorator(cli_cls: Type[T]) -> Type[T]:
-        setattr(cli_cls, "_cli_controller", True)
-        setattr(cli_cls, "_alias", name)
-        return cli_cls
+    def decorator(target_cls: Type[T]) -> Type[T]:
+        setattr(target_cls, "_cli_controller", True)
+        setattr(target_cls, "_alias", name)
+        return target_cls
+
+    if cli_cls is not None:
+        return decorator(cli_cls)
 
     return decorator
 

@@ -199,7 +199,7 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
     Implement an async def refresh_credentials(self, res: "Response") -> None: method to refresh credentials
     if near expiration date.
 
-    Default middleware order for Authentication is -99
+    Default middleware order for Authentication is -99 and should idealy not be changed.
     """
 
     _order_: int = -99

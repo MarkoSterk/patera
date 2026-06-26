@@ -16,7 +16,7 @@ class CORSMiddleware(MiddlewareBase):
     Middleware to handle CORS by adding necessary headers to HTTP responses.
     """
 
-    _order = -101
+    _order_ = -101
     _middleware = True
 
     async def middleware(self, req: "Request") -> "Response":

@@ -10,7 +10,8 @@ from typing import (
     Awaitable,
     Any,
     Generic,
-    Optional,
+    TypeAlias,
+    overload,
     Protocol,
     TypeVar,
 )
@@ -35,30 +36,40 @@ MiddlewareClsT = TypeVar(
     bound=type["MiddlewareBase[Any, Any]"],
 )
 
+MiddlewareDecorator: TypeAlias = Callable[[MiddlewareClsT], MiddlewareClsT]
 
+
+@overload
+def middleware(cls: MiddlewareClsT) -> MiddlewareClsT: ...
+@overload
+def middleware(*, order: int | None = None) -> MiddlewareDecorator: ...
 def middleware(
-    order: Optional[int] = None,
-) -> Callable[[MiddlewareClsT], MiddlewareClsT]:
+    cls: MiddlewareClsT | None = None,
+    *,
+    order: int | None = None,
+) -> MiddlewareClsT | MiddlewareDecorator:
     """
     Decorator to mark a middleware implementation as middleware to be used by the application.
-    The order of the middleware can be set (optionally). Order number must be > 0.
 
-    If order is not set, the next available order number will be assigned at registration. Because registration order
-    depends on module discovery this can lead to unexpected behaviour. Therefore, it is recommended to set
-    the desired order number of the middleware.
+    The order of the middleware can be set optionally. If provided, the order number must be > 0.
 
-    Some middleware implementations have default internal orders. These orders should not be changed unless absolutely
-    neccessary.
+    If order is not set, the next available order number will be assigned at registration.
+    Because registration order depends on module discovery, this can lead to unexpected behavior.
+    Therefore, it is recommended to set the desired order number of the middleware.
+
+    Some middleware implementations have default internal orders. These orders should not be changed
+    unless absolutely necessary.
     """
+    if order is not None and order <= 0:
+        raise ValueError("Middleware order must be greater than 0.")
 
-    def decorator(cls_type: MiddlewareClsT) -> MiddlewareClsT:
-        if order is not None and order <= 0:
-            raise ValueError(
-                f"Order number for middleware must be larger then 0. Order for {cls_type.__name__} is {order}"
-            )
-        setattr(cls_type, "_order", order)
-        setattr(cls_type, "_middleware", True)
-        return cls_type
+    def decorator(target_cls: MiddlewareClsT) -> MiddlewareClsT:
+        setattr(target_cls, "_order", order)
+        setattr(target_cls, "_middleware", True)
+        return target_cls
+
+    if cls is not None:
+        return decorator(cls)
 
     return decorator
 
