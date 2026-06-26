@@ -74,7 +74,7 @@ class ExceptionHandler(Injectable, Generic[AppT]):
         return handlers
 
     @property
-    def app(self) -> "Patera":
+    def app(self) -> AppT:
         return self._app
 
 
