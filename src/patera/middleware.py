@@ -40,8 +40,15 @@ def middleware(
     order: Optional[int] = None,
 ) -> Callable[[MiddlewareClsT], MiddlewareClsT]:
     """
-    Decorator to set the order of middlewares.
-    Lower values are processed first. Default order is 0.
+    Decorator to mark a middleware implementation as middleware to be used by the application.
+    The order of the middleware can be set (optionally). Order number must be > 0.
+
+    If order is not set, the next available order number will be assigned at registration. Because registration order
+    depends on module discovery this can lead to unexpected behaviour. Therefore, it is recommended to set
+    the desired order number of the middleware.
+
+    Some middleware implementations have default internal orders. These orders should not be changed unless absolutely
+    neccessary.
     """
 
     def decorator(cls_type: MiddlewareClsT) -> MiddlewareClsT:
