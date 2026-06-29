@@ -40,6 +40,7 @@ taskmanager = ["patera-taskmanager"]
 testing = ["anyio", "pytest", "pytest-cov"]
 dev = ["uvicorn", "watchfiles"]
 admin = ["patera-admin"]
+desktop = ["patera-desktop"]
 all = [
     "patera-database",
     "patera-migrate",
@@ -62,7 +63,8 @@ members = [
     "packages/patera-database",
     "packages/patera-migrate",
     "packages/patera-email",
-    "packages/patera-taskmanager"
+    "packages/patera-taskmanager",
+    "packages/patera-desktop"
 ]
 
 [tool.uv.sources]
@@ -75,6 +77,7 @@ patera-taskmanager = { workspace = true }
 patera-email = { workspace = true }
 patera-caching = { workspace = true }
 patera-migrate = { workspace = true }
+patera-desktop = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

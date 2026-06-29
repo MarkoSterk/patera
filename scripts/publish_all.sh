@@ -45,6 +45,7 @@ packages=(
   patera_migrate
   patera_email
   patera_taskmanager
+  patera_desktop
 )
 
 for pkg in "${packages[@]}"; do

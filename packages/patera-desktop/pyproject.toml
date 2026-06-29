@@ -1,0 +1,19 @@
+[project]
+name = "patera-desktop"
+version = "0.7.0"
+requires-python = ">=3.13"
+dependencies = [
+    "patera",
+    "pywebview",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
+patera-auth = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.desktop"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"

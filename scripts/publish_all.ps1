@@ -23,7 +23,8 @@ $extensions = @(
     "patera_database",
     "patera_migrate",
     "patera_email",
-    "patera_taskmanager"
+    "patera_taskmanager",
+    "patera_desktop"
 )
 
 foreach ($pkg in $extensions) {
