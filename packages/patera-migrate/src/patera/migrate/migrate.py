@@ -116,7 +116,7 @@ class Migrate(Generic[AppT]):
         self._configs = _PateraPywayConfigs(**_configs)
 
         # self._cli_controller.set_ctrl_name(cast(str, self._configs.MIGRATE_CLI_NAME))
-        cli_ctrl_dec = cli_controller(self._configs.MIGRATE_CLI_NAME)
+        cli_ctrl_dec = cli_controller(name=self._configs.MIGRATE_CLI_NAME)
         migrate_cli_ctrl = cli_ctrl_dec(PywayCLIController)
         self._cli_controller = migrate_cli_ctrl(self._app, self)  # type: ignore
         self._app.register_cli_controller(self._cli_controller)
