@@ -33,16 +33,19 @@ class DesktopCLI(CLIController[Patera]):
         raise RuntimeError(f"Patera server did not start on time. Timeout: {timeout} s")
 
     def start_server_process(self) -> subprocess.Popen[Any]:
-        MODE: str = "dev" if self._desktop_ext.app.configs.DEBUG else "prod"
-
+        debug: str = self._desktop_ext.app.configs.DEBUG
+        env = None if debug else os.environ.copy()
+        mode: str = "dev" if debug else "prod"
         if sys.platform == "win32":
             return subprocess.Popen(
-                ["patera", MODE],
+                ["patera", mode],
+                env=env,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
 
         return subprocess.Popen(
-            ["patera", MODE],
+            ["patera", mode],
+            env=env,
             start_new_session=True,
         )
 
@@ -104,6 +107,7 @@ class DesktopCLI(CLIController[Patera]):
         host: str = self._desktop_ext.app.configs.HOST
         port: int = self._desktop_ext.app.configs.PORT
         window_kwargs: dict[str, Any] = self._desktop_ext.configs.window_kwargs()
+        debug: bool = self._desktop_ext.app.configs.DEBUG
 
         try:
             self.wait_for_server(host, port)
@@ -115,8 +119,17 @@ class DesktopCLI(CLIController[Patera]):
                 ),
             )
             self._desktop_ext.main_window = window
+            exposed_tools = self._desktop_ext.exposed_tools
+            self._desktop_ext.app.logger.info(
+                f"Exposed {len(exposed_tools)} tools to the frontend"
+            )
+            window.expose(*exposed_tools)
             webview.start(
                 menu=self._desktop_ext.menu(),
+                debug=debug,
+                icon=self._desktop_ext.icon()
+                if sys.platform.startswith("linux")
+                else None,
             )
         finally:
             self.stop_server_process(server)
