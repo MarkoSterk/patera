@@ -228,12 +228,12 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
                 yield file_path
 
 
-def find_pyjolt_app_import(
-    pyjolt_class: Type,
+def find_patera_app_import(
+    patera_class: Type,
     root: Path,
 ) -> Optional[str]:
     """
-    Find the first class that subclasses `pyjolt_class` and return its import string.
+    Find the first class that subclasses `patera_class` and return its import string.
 
     Example return values:
         "app:App"
@@ -262,8 +262,11 @@ def find_pyjolt_app_import(
 
         try:
             module = importlib.import_module(module_name)
-        except Exception as exc:
-            print(f"Failed to import module '{module_name}': {exc}")
+        except Exception:
+            import traceback
+
+            print(f"Failed to import module '{module_name}'")
+            traceback.print_exc()
             continue
 
         for name, obj in inspect.getmembers(module, inspect.isclass):
@@ -271,7 +274,11 @@ def find_pyjolt_app_import(
                 continue
 
             try:
-                if issubclass(obj, pyjolt_class) and obj is not pyjolt_class:
+                if (
+                    issubclass(obj, patera_class)
+                    and obj is not patera_class
+                    and getattr(obj, "_is_patera_app")
+                ):
                     return f"{module_name}:{name}"
             except TypeError:
                 continue
@@ -308,7 +315,7 @@ def _resolve_app_path(
         app_path = os.environ.get("PATERA_IMPORT", None)
 
     if app_path is None:
-        app_path = find_pyjolt_app_import(patera_class, root)
+        app_path = find_patera_app_import(patera_class, root)
 
     return app_path
 
@@ -334,7 +341,7 @@ def _start_prod(
     from granian.log import LogLevels
     from ..patera import Patera
 
-    os.environ["PATERA_DEBUG"] = "False"
+    os.environ["PATERA_DEBUG"] = "0"
 
     root = _resolve_root(cwd)
     app_path = _resolve_app_path(app, root, Patera)
