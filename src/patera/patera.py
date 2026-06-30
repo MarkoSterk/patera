@@ -127,6 +127,7 @@ def app_path(url_path: Optional[str] = None) -> Callable[[Type[T]], Type[T]]:
 def app(import_name: str, configs: Type[ConfT]) -> Callable[[Type[T]], Type[T]]:
     def decorator(cls: Type[T]) -> Type[T]:
         setattr(cls, "_app_configs", {"import_name": import_name, "configs": configs})
+        setattr(cls, "_is_patera_app", True)
         return cls
 
     return decorator
