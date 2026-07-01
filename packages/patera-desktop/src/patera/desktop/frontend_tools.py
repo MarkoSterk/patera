@@ -6,10 +6,10 @@ from .utils import make_exposed_frontend_tool, is_frontend_tool
 
 if TYPE_CHECKING:
     from patera import Patera
-    from .desktop import Desktop
+    from .frontend import Frontend
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
-DesktopT = TypeVar("DesktopT", bound="Desktop", default="Desktop")
+FrontendT = TypeVar("FrontendT", bound="Frontend", default="Frontend[Any]")
 
 T = TypeVar("T", bound=Callable[..., Any])
 
@@ -45,9 +45,9 @@ def frontend_tool(
     return decorator
 
 
-class FrontendTools(Injectable, Generic[DesktopT, AppT]):
-    def __init__(self, desktop: "DesktopT"):
-        self._desktop = desktop
+class FrontendTools(Injectable, Generic[FrontendT, AppT]):
+    def __init__(self, frontend: "FrontendT"):
+        self._frontend = frontend
         super().__init__()
         self._resolve_injections()
 
@@ -77,9 +77,9 @@ class FrontendTools(Injectable, Generic[DesktopT, AppT]):
         return value
 
     @property
-    def desktop(self) -> "DesktopT":
-        return self._desktop
+    def frontend(self) -> "FrontendT":
+        return self._frontend
 
     @property
     def app(self) -> "AppT":
-        return self._desktop.app
+        return self._frontend.app

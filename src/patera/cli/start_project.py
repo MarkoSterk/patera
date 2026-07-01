@@ -490,3 +490,52 @@ def start_testing(
         pytest_args = [cwd]
 
     return pytest.main(pytest_args)  # type: ignore
+
+
+def start_desktop(
+    cwd: str | Path,
+    command: str,
+    app: Optional[str] = None,
+    env_file: Optional[str] = None,
+    mode: str = "dev",
+) -> None:
+    """
+    Start the Patera application as a desktop application.
+
+    The desktop launcher does not instantiate the Patera app. It reads desktop
+    configuration from PATERA_DESKTOP_* environment variables and starts the
+    real app in a child server process.
+    """
+    try:
+        from patera.desktop import DesktopLauncher  # type: ignore
+    except ImportError:
+        print(
+            "patera-desktop extension is not installed. "
+            "Please install the extension with: uv add patera-desktop"
+        )
+        return
+
+    if mode not in {"dev", "prod"}:
+        raise ValueError("Desktop mode must be either 'dev' or 'prod'")
+
+    from ..patera import Patera
+
+    cwd_path = Path(cwd).resolve()
+
+    load_env_file(str(cwd_path), env_file)
+
+    root = _resolve_root(str(cwd_path))
+    app_path = _resolve_app_path(app, root, Patera)
+
+    if app_path is None:
+        _print_app_not_found()
+        return
+
+    launcher = DesktopLauncher(
+        app_path=app_path,
+        cwd=cwd_path,
+        mode=mode,
+        env_file=env_file,
+    )
+
+    launcher.start()
