@@ -6,6 +6,7 @@ from .http_exceptions import (
     BaseHttpException,
     StaticAssetNotFound,
     AborterException,
+    StaticPageNotFound,
     abort,
     html_abort,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "CustomException",
     "BaseHttpException",
     "StaticAssetNotFound",
+    "StaticPageNotFound",
     "AborterException",
     "abort",
     "html_abort",

@@ -29,6 +29,21 @@ class BaseHttpException(Exception):
         self.data = data
 
 
+class StaticPageNotFound(BaseException):
+    """
+    Static page not found error
+    """
+
+    def __init__(
+        self,
+        page: str,
+        status_code: int = 404,
+        status: str = "error",
+        data: Any = None,
+    ):
+        super().__init__(f"Static page {page} not found", status_code, status, data)
+
+
 class StaticAssetNotFound(BaseHttpException):
     """
     HTTP exception for static assets not found
