@@ -1241,7 +1241,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.118.0"
+version = "0.119.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1385,7 +1385,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "patera" },
@@ -1400,7 +1400,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "docstring-parser" },
@@ -1427,7 +1427,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-apiinterface"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-apiinterface" }
 dependencies = [
     { name = "patera" },
@@ -1438,7 +1438,7 @@ requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-auth"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -1457,7 +1457,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -1489,7 +1489,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1506,7 +1506,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -1521,7 +1521,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -1536,7 +1536,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-migrate"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -1553,7 +1553,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
