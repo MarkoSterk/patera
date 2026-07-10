@@ -81,7 +81,8 @@ class BaseConfig(BaseSettings):
         ),
     )
     STATIC_PAGES_DIR: str = Field(
-        "static_pages", description="Relative static pages dir from templates dir"
+        "static_pages",
+        description="Static pages directory relative to the application folder",
     )
     STATIC_PAGES_URL: str = Field("/", description="URL prefix for static pages")
     STATIC_PAGES_CONTROLLER_NAME: str = Field(
