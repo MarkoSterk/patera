@@ -30,8 +30,12 @@ class StaticPages(Controller["Patera[Any]"]):
         if not page.endswith(".html"):
             page += ".html"
 
-        path = self.static_pages_path / page
-        if not path.exists():
+        path = (self.static_pages_path / page).resolve()
+
+        if not path.is_relative_to(self.static_pages_path):
+            raise StaticPageNotFound(page)
+
+        if not path.is_file():
             raise StaticPageNotFound(page)
 
         return await req.res.html(page)
@@ -41,5 +45,4 @@ class StaticPages(Controller["Patera[Any]"]):
         path: Path = Path(
             self.app.root_path
         ) / self.app.configs.STATIC_PAGES_DIR.lstrip("/\\")
-        path.resolve()
-        return path
+        return path.resolve()
