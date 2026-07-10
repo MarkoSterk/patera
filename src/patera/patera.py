@@ -14,7 +14,6 @@ from typing import (
     Callable,
     Generic,
     List,
-    Mapping,
     Optional,
     Type,
     TypeVar,
@@ -26,6 +25,7 @@ import aiofiles
 from loguru import logger
 from loguru._logger import Logger
 from werkzeug.exceptions import NotFound, MethodNotAllowed
+from werkzeug.routing import WebsocketMismatch, RequestRedirect
 
 from jinja2 import (
     Environment,
@@ -36,7 +36,7 @@ from jinja2 import (
 )
 
 from .ctx import current_request, CurrentContextProxy
-from .exceptions.http_exceptions import HtmlAborterException
+from .exceptions.http_exceptions import HtmlAborterException, StaticPageNotFound
 from .http_statuses import HttpStatus
 from .http_methods import HttpMethod
 from .request import Request
@@ -594,30 +594,10 @@ class Patera(Injectable, Generic[ConfT]):
 
         return res
 
-    async def abort_route_not_found(
-        self,
-        send,
-        req: Request,
-        path_data: Mapping[str, Any],
-    ):
+    async def abort_route_not_found(self, send):
         """
         Aborts request because route was not found.
         """
-        handler: Callable | None = (
-            self._exception_handlers.get(NotFound.__name__, None) or None
-        )
-
-        if handler:
-            res: Response = await run_sync_or_async(
-                handler,
-                req,
-                NotFound("Endpoint not found", response=req.res),  # type: ignore
-            )
-            response_type = res.expected_body_type()
-            return await self.send_response(res, send, response_type)
-
-        self._log_response(req, HttpStatus.NOT_FOUND)
-
         await send(
             {
                 "type": "http.response.start",
@@ -630,6 +610,74 @@ class Patera(Injectable, Generic[ConfT]):
             {
                 "type": "http.response.body",
                 "body": b'{ "status": "error", "message": "Endpoint not found" }',
+            }
+        )
+
+    async def abort_method_not_allowed(
+        self,
+        send,
+        allowed_methods: list[str],
+    ):
+        """
+        Aborts request because method is not allowed.
+        """
+        await send(
+            {"type": "http.response.start", "status": HttpStatus.METHOD_NOT_ALLOWED}
+        )
+
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b"Method Not Allowed. Allowed methods: "
+                + ", ".join(allowed_methods).encode(),
+            }
+        )
+
+    async def abort_bad_request(self, send) -> None:
+        """
+        Send a 400 Bad Request response.
+        """
+        body = b"Bad Request"
+        await send(
+            {
+                "type": "http.response.start",
+                "status": HttpStatus.BAD_REQUEST,
+                "headers": [
+                    (b"content-type", b"text/plain; charset=utf-8"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body,
+            }
+        )
+
+    async def redirect_request(
+        self,
+        send,
+        location: str,
+        status_code: int,
+    ) -> None:
+        """
+        Send an HTTP redirect response.
+        """
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status_code,
+                "headers": [
+                    (b"location", location.encode("latin-1")),
+                    (b"content-length", b"0"),
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b"",
             }
         )
 
@@ -770,7 +818,6 @@ class Patera(Injectable, Generic[ConfT]):
                     "more_body": False,
                 }
             )
-
             return
 
         body_bytes = await self.response_renderer.render_body(res, response_type)
@@ -780,7 +827,6 @@ class Patera(Injectable, Generic[ConfT]):
             body_bytes=body_bytes,
             is_streaming=False,
         )
-
         await send(
             {
                 "type": "http.response.start",
@@ -788,7 +834,6 @@ class Patera(Injectable, Generic[ConfT]):
                 "headers": encode_response_headers(res),
             }
         )
-
         await send(
             {
                 "type": "http.response.body",
@@ -827,7 +872,40 @@ class Patera(Injectable, Generic[ConfT]):
 
         self._log_request(scope, method, url_path)
 
-        route_handler, path_kwargs = self.router.match(url_path, method)
+        route_handler, path_kwargs = None, {}
+
+        try:
+            route_handler, path_kwargs = self.router.match(
+                url_path,
+                method,
+            )
+        except NotFound:
+            self.logger.info(f"Path {url_path} does not exist")
+            return await self.abort_route_not_found(send)
+        except MethodNotAllowed as exc:
+            matching_methods = list(exc.valid_methods or [])
+            self.logger.warning(
+                f"Method {method} not allowed for path {url_path}. "
+                f"Matching methods: {matching_methods}"
+            )
+            return await self.abort_method_not_allowed(
+                send,
+                matching_methods,
+            )
+        except WebsocketMismatch:
+            self.logger.warning(
+                f"Protocol mismatch for path {url_path}: "
+                f"HTTP request matched a WebSocket route"
+            )
+            return await self.abort_bad_request(send)
+
+        except RequestRedirect as exc:
+            self.logger.debug(f"Redirecting path {url_path} to {exc.new_url}")
+            return await self.redirect_request(
+                send,
+                exc.new_url,
+                exc.code,  # type: ignore
+            )
 
         req = self.request_class(
             scope,
@@ -837,9 +915,6 @@ class Patera(Injectable, Generic[ConfT]):
             path_kwargs,
             cast(Callable, route_handler),
         )
-
-        if not route_handler:
-            return await self.abort_route_not_found(send, req, path_kwargs)
 
         try:
             with request_context(
@@ -879,7 +954,12 @@ class Patera(Injectable, Generic[ConfT]):
                         exc.status_code
                     )
                     return await self.send_response(res, send, None)
-
+                except StaticPageNotFound:
+                    # If static pages is enabled the handler may receive a request for a resource which does not exist
+                    # In this case, the handler raises StaticPageNotFound which is handled here as a normal
+                    # 404 - Not Found response
+                    req.res.reset()
+                    return await self.abort_route_not_found(send)
                 except Exception as exc:
                     req.res.reset()
 
@@ -1416,10 +1496,67 @@ class Patera(Injectable, Generic[ConfT]):
 
         self._log_request(scope, method, url_path)
 
-        route_handler, path_kwargs = self._socket_router.match(url_path, method)
+        try:
+            route_handler, path_kwargs = self._socket_router.match(
+                url_path,
+                method,
+            )
 
-        if not route_handler:
-            await send({"type": "websocket.close", "code": 1000})
+        except NotFound:
+            self.logger.info(f"Websocket path {url_path} does not exist")
+
+            await send(
+                {
+                    "type": "websocket.close",
+                    "code": 1008,
+                    "reason": "Websocket route not found",
+                }
+            )
+            return
+
+        except MethodNotAllowed as exc:
+            matching_methods = list(exc.valid_methods or [])
+
+            self.logger.warning(
+                f"Method {method} not allowed for websocket path {url_path}. "
+                f"Matching methods: {matching_methods}"
+            )
+
+            await send(
+                {
+                    "type": "websocket.close",
+                    "code": 1008,
+                    "reason": "Websocket method not allowed",
+                }
+            )
+            return
+
+        except WebsocketMismatch:
+            self.logger.warning(
+                f"Websocket request to {url_path} matched a non-websocket route"
+            )
+
+            await send(
+                {
+                    "type": "websocket.close",
+                    "code": 1008,
+                    "reason": "Websocket protocol mismatch",
+                }
+            )
+            return
+
+        except RequestRedirect as exc:
+            self.logger.warning(
+                f"Websocket path {url_path} requires redirect to {exc.new_url}"
+            )
+
+            await send(
+                {
+                    "type": "websocket.close",
+                    "code": 1008,
+                    "reason": "Websocket route requires redirect",
+                }
+            )
             return
 
         req = Request(
@@ -1437,7 +1574,11 @@ class Patera(Injectable, Generic[ConfT]):
                 request=req,
                 controller=route_handler.__self__,  # type: ignore
             ):
-                await run_sync_or_async(route_handler, req, **path_kwargs)
+                await run_sync_or_async(
+                    route_handler,  # type: ignore
+                    req,
+                    **path_kwargs,
+                )
 
         except Exception as exc:
             await send(
@@ -1454,4 +1595,4 @@ class Patera(Injectable, Generic[ConfT]):
                 f"{req.route_parameters}: {exc}"
             )
 
-            raise exc
+            raise
