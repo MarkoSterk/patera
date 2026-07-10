@@ -16,6 +16,7 @@ from typing import (
     get_type_hints,
     TypeVar,
 )
+import inspect
 import httpx
 from httpx import Response
 from functools import wraps
@@ -219,7 +220,11 @@ class ApiInterface(BaseExtension[AppT], Generic[AppT]):
             res = self._get_response_body(
                 res, configs.get("produces", MediaType.APPLICATION_JSON)
             )
-            if return_type and issubclass(return_type, BaseModel):
+            if (
+                return_type
+                and inspect.isclass(return_type)
+                and issubclass(return_type, BaseModel)
+            ):
                 return return_type.model_validate(res)
             return res
 
