@@ -4,7 +4,6 @@ Router class for application routing. Uses Wrkzeug under the hood.
 
 from typing import Callable, Any, Mapping
 from werkzeug.routing import Map, Rule
-from werkzeug.exceptions import NotFound, MethodNotAllowed
 
 
 class Router:
@@ -38,9 +37,6 @@ class Router:
         Returns (endpoint_function, path_variables_dict) if found, otherwise (None, {}).
         """
         adapter = self.url_map.bind("", path_info=path)
-        try:
-            endpoint_name, kwargs = adapter.match(method=method)
-            endpoint = self.endpoints.get(endpoint_name)
-            return endpoint, kwargs
-        except (NotFound, MethodNotAllowed) as exc:
-            return None, {"method": method, "path": path, "exc": exc}
+        endpoint_name, kwargs = adapter.match(method=method)
+        endpoint = self.endpoints.get(endpoint_name)
+        return endpoint, kwargs
