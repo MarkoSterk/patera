@@ -97,6 +97,20 @@ def main():
 
     start_testing_parser = subparsers.add_parser("test")
     start_testing_parser.add_argument(
+        "--app",
+        type=str,
+        default=None,
+        required=False,
+        help="Environment file to use with testing",
+    )
+    start_testing_parser.add_argument(
+        "--env-file",
+        type=str,
+        default=".env.test",
+        required=False,
+        help="Environment file to use with testing",
+    )
+    start_testing_parser.add_argument(
         "pytest_args",
         nargs=argparse.REMAINDER,
         help="Arguments passed to pytest",

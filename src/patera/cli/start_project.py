@@ -473,6 +473,7 @@ def start_testing(
     command: str,
     *args,
     app: Optional[str] = None,
+    env_file: str = ".env.test",
     **kwargs,
 ):
     try:
@@ -483,6 +484,8 @@ def start_testing(
             "Run: 'pip install patera[testing]'"
         )
         return
+
+    load_env_file(cwd, env_file)
 
     pytest_args = kwargs.pop("pytest_args", []) or []
 

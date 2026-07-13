@@ -47,7 +47,7 @@ class PateraTestClient:
     async def request(self, method: str, path: str, **kwargs):
         if self.client is None:
             raise RuntimeError(
-                "PyJoltTestClient must be used as an async context manager."
+                "PateraTestClient must be used as an async context manager."
             )
         return await self.client.request(method, path, **kwargs)
 
