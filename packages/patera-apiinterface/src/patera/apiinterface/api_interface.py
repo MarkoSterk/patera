@@ -1,29 +1,38 @@
 """
-Interface for API integration
+Interface for declarative external API integrations.
 """
 
 from __future__ import annotations
+
 import base64
+import inspect
+import json
+from collections.abc import Mapping
+from enum import StrEnum
+from functools import wraps
 from typing import (
-    Callable,
-    Dict,
     Any,
+    Callable,
     Generic,
     Optional,
-    Tuple,
-    Type,
+    TypeVar,
     cast,
     get_type_hints,
-    TypeVar,
 )
-import inspect
+
 import httpx
 from httpx import Response
-from functools import wraps
-from enum import StrEnum
 from pydantic import BaseModel
 
-from patera import Patera, HttpMethod, MediaType, BaseExtension, UploadedFile, Request
+from patera import (
+    BaseExtension,
+    HttpMethod,
+    MediaType,
+    Patera,
+    Request,
+    UploadedFile,
+)
+from patera.ctx import current_request
 
 
 class AuthType(StrEnum):
@@ -32,74 +41,262 @@ class AuthType(StrEnum):
     API_KEY = "api_key"
 
 
-F = TypeVar("F", bound=Callable[..., Any])
+F = TypeVar(
+    "F",
+    bound=Callable[..., Any],
+)
+
+DecoratorTargetT = TypeVar(
+    "DecoratorTargetT",
+    bound=Callable[..., Any] | type[Any],
+)
+
+ClassT = TypeVar(
+    "ClassT",
+    bound=type[Any],
+)
+
+AppT = TypeVar(
+    "AppT",
+    bound="Patera[Any]",
+)
 
 
-def service(service_url: str) -> "Callable":
-    def decorator(cls: "Type[ApiInterface]") -> "Type[ApiInterface]":
-        setattr(cls, "__service_url__", service_url)
+_NO_AUTH = object()
+_MISSING_BODY = object()
+
+
+def _set_api_interface_config(
+    target: DecoratorTargetT,
+    key: str,
+    value: Any,
+    *,
+    allow_class: bool,
+) -> DecoratorTargetT:
+    """
+    Add configuration metadata to an API interface class or method.
+
+    Class-level defaults are stored in __api_interface_defaults__.
+    Method-level configuration is stored in __api_interface__.
+    """
+    if inspect.isclass(target):
+        if not allow_class:
+            raise TypeError(f"@{key} cannot be applied to a class.")
+
+        configs: dict[str, Any] = dict(
+            getattr(
+                target,
+                "__api_interface_defaults__",
+                {},
+            )
+            or {}
+        )
+
+        attribute_name = "__api_interface_defaults__"
+
+    else:
+        configs = dict(
+            getattr(
+                target,
+                "__api_interface__",
+                {},
+            )
+            or {}
+        )
+
+        attribute_name = "__api_interface__"
+
+    if key == "custom_headers":
+        existing_headers = dict(
+            configs.get(
+                "custom_headers",
+                {},
+            )
+            or {}
+        )
+
+        configs[key] = {
+            **existing_headers,
+            **cast(
+                dict[str, Any],
+                value,
+            ),
+        }
+
+    else:
+        configs[key] = value
+
+    setattr(
+        target,
+        attribute_name,
+        configs,
+    )
+
+    return target
+
+
+def service(
+    service_url: str,
+) -> Callable[[ClassT], ClassT]:
+    """
+    Configure the base URL of an API interface.
+
+    The supplied value can be an application configuration key or a literal
+    URL. Application configuration is checked first.
+
+    The exact decorated class type is preserved for static type checking.
+    """
+
+    def decorator(
+        cls: ClassT,
+    ) -> ClassT:
+        setattr(
+            cls,
+            "__service_url__",
+            service_url,
+        )
+
         return cls
 
     return decorator
 
 
-def method(http_method: HttpMethod) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["method"] = http_method
-        setattr(func, "__api_interface__", api_int)
-        return func
+def method(
+    http_method: HttpMethod,
+) -> Callable[[F], F]:
+    """
+    Configure the HTTP method of an API interface method.
+    """
+
+    def decorator(
+        func: F,
+    ) -> F:
+        return _set_api_interface_config(
+            func,
+            "method",
+            http_method,
+            allow_class=False,
+        )
 
     return decorator
 
 
-def resource(url: str, follow_redirects: bool = True) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["target"] = url
-        api_int["follow_redirects"] = follow_redirects
-        setattr(func, "__api_interface__", api_int)
-        return func
+def resource(
+    url: str,
+    follow_redirects: bool = True,
+) -> Callable[[F], F]:
+    """
+    Configure the remote resource URL of an API interface method.
+    """
+
+    def decorator(
+        func: F,
+    ) -> F:
+        configured_func = _set_api_interface_config(
+            func,
+            "target",
+            url,
+            allow_class=False,
+        )
+
+        return _set_api_interface_config(
+            configured_func,
+            "follow_redirects",
+            follow_redirects,
+            allow_class=False,
+        )
 
     return decorator
 
 
-def consumes(media: MediaType) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["consumes"] = media
-        setattr(func, "__api_interface__", api_int)
-        return func
+def consumes(
+    media: MediaType,
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Configure the outgoing request media type.
+
+    Can be applied to an API interface class as a default or to an individual
+    method as an override.
+    """
+
+    def decorator(
+        target: DecoratorTargetT,
+    ) -> DecoratorTargetT:
+        return _set_api_interface_config(
+            target,
+            "consumes",
+            media,
+            allow_class=True,
+        )
 
     return decorator
 
 
-def produces(media: MediaType) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["produces"] = media
-        setattr(func, "__api_interface__", api_int)
-        return func
+def produces(
+    media: MediaType,
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Configure the expected response media type.
+
+    Can be applied to an API interface class as a default or to an individual
+    method as an override.
+    """
+
+    def decorator(
+        target: DecoratorTargetT,
+    ) -> DecoratorTargetT:
+        return _set_api_interface_config(
+            target,
+            "produces",
+            media,
+            allow_class=True,
+        )
 
     return decorator
 
 
-def headers(custom_headers: Dict[str, Any]) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["custom_headers"] = custom_headers
-        setattr(func, "__api_interface__", api_int)
-        return func
+def headers(
+    custom_headers: dict[str, Any],
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Configure custom request headers.
+
+    Class-level and method-level headers are merged. A method-level header
+    overrides a class-level header with the same name.
+    """
+
+    def decorator(
+        target: DecoratorTargetT,
+    ) -> DecoratorTargetT:
+        return _set_api_interface_config(
+            target,
+            "custom_headers",
+            dict(custom_headers),
+            allow_class=True,
+        )
 
     return decorator
 
 
-def timeout(timeout: int) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["timeout"] = timeout
-        setattr(func, "__api_interface__", api_int)
-        return func
+def timeout(
+    timeout_seconds: int | float,
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Configure the outgoing request timeout.
+
+    Can be applied to an API interface class as a default or to an individual
+    method as an override.
+    """
+
+    def decorator(
+        target: DecoratorTargetT,
+    ) -> DecoratorTargetT:
+        return _set_api_interface_config(
+            target,
+            "timeout",
+            timeout_seconds,
+            allow_class=True,
+        )
 
     return decorator
 
@@ -109,201 +306,613 @@ def auth(
     *,
     username: str | None = None,
     password: str | None = None,
+    token: str | None = None,
+    api_key: str | None = None,
     header_name: str = "Authorization",
-) -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        api_int: Dict[str, Any] = getattr(func, "__api_interface__", {}) or {}
-        api_int["auth"] = {
-            "type": auth_type,
-            "username": username,
-            "password": password,
-            "header_name": header_name,
-        }
-        setattr(func, "__api_interface__", api_int)
-        return func
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Configure authentication on an API interface class or method.
+
+    BASIC_AUTH requires username and password.
+    BEARER requires token.
+    API_KEY requires api_key.
+
+    Credential values can be application configuration keys or literal values.
+    Application configuration is checked first.
+    """
+    if auth_type == AuthType.BASIC_AUTH:
+        if username is None or password is None:
+            raise ValueError(
+                "Basic authentication requires both username and password."
+            )
+
+    elif auth_type == AuthType.BEARER:
+        if token is None:
+            raise ValueError("Bearer authentication requires token.")
+
+    elif auth_type == AuthType.API_KEY:
+        if api_key is None:
+            raise ValueError("API-key authentication requires api_key.")
+
+    else:
+        raise ValueError(f"Unsupported API authentication type: {auth_type!r}")
+
+    auth_config: dict[str, Any] = {
+        "type": auth_type,
+        "username": username,
+        "password": password,
+        "token": token,
+        "api_key": api_key,
+        "header_name": header_name,
+    }
+
+    def decorator(
+        target: DecoratorTargetT,
+    ) -> DecoratorTargetT:
+        return _set_api_interface_config(
+            target,
+            "auth",
+            auth_config,
+            allow_class=True,
+        )
 
     return decorator
 
 
+def no_auth(
+    func: F,
+) -> F:
+    """
+    Disable inherited class-level authentication for one method.
+    """
+    return _set_api_interface_config(
+        func,
+        "auth",
+        _NO_AUTH,
+        allow_class=False,
+    )
+
+
 class MissingApiInterfaceConfigurations(Exception):
-    def __init__(self, msg: str) -> None:
-        super().__init__(msg)
+    """
+    Raised when required API interface configuration is missing.
+    """
 
 
-AppT = TypeVar("AppT", bound="Patera[Any]")
+class ApiInterface(
+    BaseExtension[AppT],
+    Generic[AppT],
+):
+    """
+    Base extension for declarative external API integrations.
 
+    API interface methods obtain the active Patera Request through
+    patera.ctx.current_request.
+    """
 
-class ApiInterface(BaseExtension[AppT], Generic[AppT]):
     def init(self) -> None:
-        serv_url = getattr(self, "__service_url__", None)
-        if serv_url is None:
-            raise Exception(
-                "Missing service url for API Interface. Use @path from api_interface"
+        service_url = getattr(
+            self,
+            "__service_url__",
+            None,
+        )
+
+        if service_url is None:
+            raise MissingApiInterfaceConfigurations(
+                "Missing service URL for API interface. "
+                "Use @service on the interface class."
             )
-        self._service_url = self._app.get_conf(serv_url, serv_url)
+
+        self._service_url = self._app.get_conf(
+            service_url,
+            service_url,
+        )
 
     @classmethod
-    def _wrap_method(cls, func):
+    def _wrap_method(
+        cls,
+        func: F,
+    ) -> F:
         @wraps(func)
-        async def inner(self, req: Request, *args, **kwargs):
-            return await self._wrapper(func, req, *args, **kwargs)
-
-        return inner
-
-    async def _wrapper(self, func, req: Request, *args, **kwargs) -> Any:
-        raw_configs: Optional[Dict[str, Any]] = getattr(func, "__api_interface__", None)
-        if raw_configs is None:
-            raise MissingApiInterfaceConfigurations(
-                f"API Interface method {func.__name__} does not have any configurations. Please add configuration decorators."
+        async def inner(
+            self: ApiInterface[Any],
+            *args: Any,
+            **kwargs: Any,
+        ) -> Any:
+            return await self._wrapper(
+                func,
+                *args,
+                **kwargs,
             )
-        configs: Dict[str, Any] = dict(raw_configs)
-        return_type: Optional[Type[BaseModel]] = get_type_hints(func).get(
-            "return", None
+
+        return cast(
+            F,
+            inner,
         )
-        async with httpx.AsyncClient() as client:
-            url: str = cast(str, self._service_url) + cast(str, configs.get("target"))
-            url = self._format_url(req, url)
-            follow_redirects = cast(bool, configs.get("follow_redirects"))
-            method = configs.get("method", HttpMethod.GET)
-            timeout = configs.get("timeout", 10)
-            headers: Dict[str, str] = self._construct_headers(configs)
-            pydantic_data: list[BaseModel | dict] = list(
-                filter(lambda d: isinstance(d, (BaseModel, dict)), list(args))
+
+    def _get_method_configs(
+        self,
+        func: Callable[..., Any],
+    ) -> dict[str, Any]:
+        raw_method_configs: Optional[dict[str, Any]] = getattr(
+            func,
+            "__api_interface__",
+            None,
+        )
+
+        if raw_method_configs is None:
+            raise MissingApiInterfaceConfigurations(
+                f"API interface method {func.__name__} does not have any "
+                "configuration. Add at least @resource to the method."
             )
-            data: BaseModel | dict | None = None
-            if len(pydantic_data) > 0:
-                data = pydantic_data[0]
-            res: Response
-            if method == HttpMethod.GET:
-                res = await client.request(
-                    method,
-                    url,
-                    headers=headers,
-                    timeout=timeout,
-                    params=req.query_parameters,
-                    follow_redirects=follow_redirects,
-                )
-            else:
-                if data is None:
-                    raise Exception("Missing body for request.")
-                if configs.get("consumes", MediaType.APPLICATION_JSON) in [
-                    MediaType.APPLICATION_JSON,
-                    MediaType.APPLICATION_PROBLEM_JSON,
-                    MediaType.APPLICATION_X_NDJSON,
-                ]:
-                    res = await client.request(
-                        method,
-                        url,
-                        headers=headers,
-                        timeout=timeout,
-                        json=cast(BaseModel, data).model_dump(),
-                        params=req.query_parameters,
-                        follow_redirects=follow_redirects,
-                    )
-                else:
-                    if isinstance(data, BaseModel):
-                        form, files = self._get_form_and_files(data)
-                    else:
-                        form = data
-                        files = None
-                    res = await client.request(
-                        method,
-                        url,
-                        headers=headers,
-                        timeout=timeout,
-                        data=form,
-                        files=files,
-                        params=req.query_parameters,
-                        follow_redirects=follow_redirects,
-                    )
 
-            res = self._get_response_body(
-                res, configs.get("produces", MediaType.APPLICATION_JSON)
+        class_configs: dict[str, Any] = dict(
+            getattr(
+                type(self),
+                "__api_interface_defaults__",
+                {},
             )
-            if (
-                return_type
-                and inspect.isclass(return_type)
-                and issubclass(return_type, BaseModel)
-            ):
-                return return_type.model_validate(res)
-            return res
+            or {}
+        )
 
-    def _construct_headers(self, configs: Optional[Dict[str, Any]]) -> Dict[str, str]:
-        if configs is None:
-            configs = {}
+        method_configs = dict(raw_method_configs)
 
-        headers: Dict[str, str] = {
-            "Content-Type": configs.get("consumes", MediaType.APPLICATION_JSON),
-            "Accept": configs.get("produces", MediaType.APPLICATION_JSON),
-            **configs.get("custom_headers", {}),
+        configs = {
+            **class_configs,
+            **method_configs,
         }
-        auth: Optional[dict[str, Any]] = configs.get("auth", None)
-        if auth is not None:
-            header_name = cast(str, auth.get("header_name"))
-            headers[header_name] = self._create_auth_headers(auth)
-        return headers
 
-    def _format_url(self, req: Request, url: str) -> str:
+        class_headers = dict(
+            class_configs.get(
+                "custom_headers",
+                {},
+            )
+            or {}
+        )
+
+        method_headers = dict(
+            method_configs.get(
+                "custom_headers",
+                {},
+            )
+            or {}
+        )
+
+        if class_headers or method_headers:
+            configs["custom_headers"] = {
+                **class_headers,
+                **method_headers,
+            }
+
+        if method_configs.get("auth") is _NO_AUTH:
+            configs.pop(
+                "auth",
+                None,
+            )
+
+        return configs
+
+    async def _wrapper(
+        self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        configs = self._get_method_configs(func)
+
+        target = configs.get("target")
+
+        if target is None:
+            raise MissingApiInterfaceConfigurations(
+                f"API interface method {func.__name__} is missing @resource."
+            )
+
+        req = cast(
+            Request,
+            current_request.req,
+        )
+
+        return_type = get_type_hints(func).get("return")
+
+        url = cast(
+            str,
+            self._service_url,
+        ) + cast(
+            str,
+            target,
+        )
+
+        url = self._format_url(
+            req,
+            url,
+        )
+
+        follow_redirects = cast(
+            bool,
+            configs.get(
+                "follow_redirects",
+                True,
+            ),
+        )
+
+        http_method = cast(
+            HttpMethod,
+            configs.get(
+                "method",
+                HttpMethod.GET,
+            ),
+        )
+
+        request_timeout = configs.get(
+            "timeout",
+            10,
+        )
+
+        request_headers = self._construct_headers(configs)
+
+        request_body = self._extract_request_body(
+            func,
+            args,
+            kwargs,
+        )
+
+        request_options: dict[str, Any] = {
+            "headers": request_headers,
+            "timeout": request_timeout,
+            "params": req.query_parameters,
+            "follow_redirects": follow_redirects,
+        }
+
+        if http_method != HttpMethod.GET and request_body is not _MISSING_BODY:
+            consumes_media = configs.get(
+                "consumes",
+                MediaType.APPLICATION_JSON,
+            )
+
+            if consumes_media in {
+                MediaType.APPLICATION_JSON,
+                MediaType.APPLICATION_PROBLEM_JSON,
+                MediaType.APPLICATION_X_NDJSON,
+            }:
+                request_options["json"] = self._prepare_json_body(request_body)
+
+            else:
+                form_data, files = self._get_form_and_files(request_body)
+
+                request_options["data"] = form_data
+
+                if files is not None:
+                    request_options["files"] = files
+
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                http_method,
+                url,
+                **request_options,
+            )
+
+        response_body = self._get_response_body(
+            response,
+            configs.get(
+                "produces",
+                MediaType.APPLICATION_JSON,
+            ),
+        )
+
+        if (
+            return_type
+            and inspect.isclass(return_type)
+            and issubclass(
+                return_type,
+                BaseModel,
+            )
+        ):
+            return return_type.model_validate(response_body)
+
+        return response_body
+
+    def _extract_request_body(
+        self,
+        func: Callable[..., Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Any:
+        """
+        Build the outgoing body from interface method arguments.
+
+        No arguments:
+            No outgoing body.
+
+        One argument:
+            The argument value is used directly as the body.
+
+        Multiple arguments:
+            A dictionary is created using the method parameter names.
+
+        Positional and keyword arguments are both supported.
+        """
+        signature = inspect.signature(func)
+
+        bound = signature.bind_partial(
+            self,
+            *args,
+            **kwargs,
+        )
+
+        arguments = dict(bound.arguments)
+
+        arguments.pop(
+            "self",
+            None,
+        )
+
+        if not arguments:
+            return _MISSING_BODY
+
+        if len(arguments) == 1:
+            return next(iter(arguments.values()))
+
+        return arguments
+
+    def _prepare_json_body(
+        self,
+        value: Any,
+    ) -> Any:
+        """
+        Normalize Pydantic models and verify JSON serializability.
+        """
+        normalized = self._normalize_json_value(value)
+
+        try:
+            json.dumps(normalized)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(
+                "API interface request body is not JSON serializable."
+            ) from exc
+
+        return normalized
+
+    def _normalize_json_value(
+        self,
+        value: Any,
+    ) -> Any:
+        """
+        Recursively convert supported values to JSON-compatible structures.
+        """
+        if isinstance(
+            value,
+            BaseModel,
+        ):
+            return value.model_dump(mode="json")
+
+        if isinstance(
+            value,
+            Mapping,
+        ):
+            return {
+                str(key): self._normalize_json_value(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(
+            value,
+            (list, tuple),
+        ):
+            return [self._normalize_json_value(item) for item in value]
+
+        return value
+
+    def _construct_headers(
+        self,
+        configs: Optional[dict[str, Any]],
+    ) -> dict[str, str]:
+        configs = configs or {}
+
+        request_headers: dict[str, str] = {
+            "Content-Type": str(
+                configs.get(
+                    "consumes",
+                    MediaType.APPLICATION_JSON,
+                )
+            ),
+            "Accept": str(
+                configs.get(
+                    "produces",
+                    MediaType.APPLICATION_JSON,
+                )
+            ),
+            **configs.get(
+                "custom_headers",
+                {},
+            ),
+        }
+
+        auth_config: Optional[dict[str, Any]] = configs.get("auth")
+
+        if auth_config is not None:
+            header_name = cast(
+                str,
+                auth_config.get(
+                    "header_name",
+                    "Authorization",
+                ),
+            )
+
+            request_headers[header_name] = self._create_auth_header(auth_config)
+
+        return request_headers
+
+    def _format_url(
+        self,
+        req: Request,
+        url: str,
+    ) -> str:
         for key, value in req.route_parameters.items():
-            url = url.replace(f"<{key}>", value)
+            url = url.replace(
+                f"<{key}>",
+                str(value),
+            )
+
         return url
 
     def _get_form_and_files(
-        self, data: BaseModel
-    ) -> Tuple[dict[str, Any], Optional[dict[str, tuple]]]:
+        self,
+        data: Any,
+    ) -> tuple[
+        Optional[dict[str, Any]],
+        Optional[dict[str, tuple[Any, ...]]],
+    ]:
+        """
+        Split a Pydantic model or mapping into form fields and uploaded files.
+        """
+        if isinstance(
+            data,
+            BaseModel,
+        ):
+            values: Mapping[str, Any] = {
+                field_name: getattr(
+                    data,
+                    field_name,
+                )
+                for field_name in type(data).model_fields
+            }
+
+        elif isinstance(
+            data,
+            Mapping,
+        ):
+            values = {str(key): value for key, value in data.items()}
+
+        else:
+            raise TypeError(
+                "Non-JSON request bodies must be a Pydantic model or a mapping."
+            )
+
         form_data: dict[str, Any] = {}
-        files: dict[str, tuple] = {}
-        for field in dir(data):
-            if field.startswith("_"):
-                continue
-            value = getattr(data, field, None)
-            if isinstance(value, UploadedFile):
-                files[field] = (value.filename, value.get_stream(), value.content_type)
-                continue
-            form_data[field] = value
-        if len(files.keys()) == 0:
-            files = cast(dict[str, tuple], None)
-        if len(form_data.keys()) == 0:
-            form_data = cast(dict[str, Any], None)
-        return form_data, files
+        files: dict[
+            str,
+            tuple[Any, ...],
+        ] = {}
 
-    def _create_auth_headers(self, auth: dict[str, Any]) -> str:
-        auth_type = auth.get("type")
-        username = auth.get("username")
-        password = auth.get("password")
+        for field_name, value in values.items():
+            if isinstance(
+                value,
+                UploadedFile,
+            ):
+                files[field_name] = (
+                    value.filename,
+                    value.get_stream(),
+                    value.content_type,
+                )
+
+            else:
+                form_data[field_name] = value
+
+        return (
+            form_data or None,
+            files or None,
+        )
+
+    def _resolve_auth_value(
+        self,
+        value: str | None,
+    ) -> str | None:
+        """
+        Resolve an authentication value from application configuration.
+
+        If the configuration key does not exist, the supplied value is used
+        literally.
+        """
+        if value is None:
+            return None
+
+        return cast(
+            str,
+            self._app.get_conf(
+                value,
+                value,
+            ),
+        )
+
+    def _create_auth_header(
+        self,
+        auth_config: dict[str, Any],
+    ) -> str:
+        auth_type = auth_config.get("type")
+
         if auth_type == AuthType.BASIC_AUTH:
-            credentials = f"{username}:{password}"
-            encoded = base64.b64encode(credentials.encode()).decode()
-            return f"Basic {encoded}"
-        if auth_type == AuthType.BEARER:
-            return f"Bearer {self._app.get_conf(password, password)}"  # type: ignore
-        if auth_type == AuthType.API_KEY:
-            return f"{self._app.get_conf(password, password)}"  # type: ignore
-        return ""
+            username = self._resolve_auth_value(auth_config.get("username"))
 
-    def _get_response_body(self, res: Response, media_type: MediaType) -> Any:
-        if media_type in [
+            password = self._resolve_auth_value(auth_config.get("password"))
+
+            if username is None or password is None:
+                raise ValueError(
+                    "Basic authentication requires both username and password."
+                )
+
+            credentials = f"{username}:{password}"
+
+            encoded = base64.b64encode(credentials.encode()).decode()
+
+            return f"Basic {encoded}"
+
+        if auth_type == AuthType.BEARER:
+            token = self._resolve_auth_value(auth_config.get("token"))
+
+            if token is None:
+                raise ValueError("Bearer authentication requires token.")
+
+            return f"Bearer {token}"
+
+        if auth_type == AuthType.API_KEY:
+            api_key = self._resolve_auth_value(auth_config.get("api_key"))
+
+            if api_key is None:
+                raise ValueError("API-key authentication requires api_key.")
+
+            return api_key
+
+        raise ValueError(f"Unsupported API authentication type: {auth_type!r}")
+
+    def _get_response_body(
+        self,
+        response: Response,
+        media_type: MediaType,
+    ) -> Any:
+        if media_type in {
             MediaType.APPLICATION_JSON,
             MediaType.APPLICATION_X_NDJSON,
             MediaType.APPLICATION_PROBLEM_JSON,
-        ]:
-            return res.json()
-        if media_type in [
+        }:
+            return response.json()
+
+        if media_type in {
             MediaType.TEXT_CSV,
             MediaType.TEXT_HTML,
             MediaType.TEXT_PLAIN,
             MediaType.TEXT_XML,
             MediaType.TEXT_YAML,
-        ]:
-            return res.text
-        return res.read()
+        }:
+            return response.text
 
-    def __init_subclass__(cls, **kwargs):
+        return response.read()
+
+    def __init_subclass__(
+        cls,
+        **kwargs: Any,
+    ) -> None:
         super().__init_subclass__(**kwargs)
 
         for name, value in list(cls.__dict__.items()):
             if name.startswith("_"):
                 continue
 
-            if callable(value) and hasattr(value, "__api_interface__"):
-                setattr(cls, name, ApiInterface._wrap_method(value))
+            if callable(value) and hasattr(
+                value,
+                "__api_interface__",
+            ):
+                setattr(
+                    cls,
+                    name,
+                    ApiInterface._wrap_method(value),
+                )
