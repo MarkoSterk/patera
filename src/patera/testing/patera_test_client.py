@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ..patera import Patera
 
 
-class PyJoltTestClient:
+class PateraTestClient:
     """
     Test client class for testing of Patera applications
     """

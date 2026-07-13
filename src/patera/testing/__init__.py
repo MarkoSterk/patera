@@ -2,6 +2,6 @@
 Testing subpackage for Patera
 """
 
-from .pyjolt_test_client import PyJoltTestClient
+from .patera_test_client import PateraTestClient
 
-__all__ = ["PyJoltTestClient"]
+__all__ = ["PateraTestClient"]
