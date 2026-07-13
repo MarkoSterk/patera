@@ -570,8 +570,8 @@ class Request:
 
         pm.parse_form(
             headers={
-                "Content-Type": content_type,
-                "content-type": content_type,
+                "Content-Type": content_type.encode(),
+                "content-type": content_type.encode(),
             },
             input_stream=stream,
             on_field=on_field,

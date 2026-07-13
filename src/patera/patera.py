@@ -912,7 +912,7 @@ class Patera(Injectable, Generic[ConfT]):
             receive,
             send,
             self,
-            path_kwargs,
+            cast(dict, path_kwargs),
             cast(Callable, route_handler),
         )
 
