@@ -1396,6 +1396,8 @@ class Patera(Injectable, Generic[ConfT]):
                     f"App extension {extension.__name__} must inherit from "
                     "BaseExtension."
                 )
+            if getattr(extension, "_ignore", False):
+                continue
             self.app.logger.info(f"Registering app extension: {extension.__name__}")
             self._resolve_dependency(extension)
 
