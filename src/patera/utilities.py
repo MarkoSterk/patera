@@ -281,8 +281,8 @@ def development(func_or_cls: Callable | Type[Any]) -> Callable | Type[Any]:
 
 def ignore(func_or_cls: Callable | Type[Any]) -> Callable | Type[Any]:
     """
-    Decorator to mark a controller/cli controller/middleware/logger or endpoint method as development only.
-    The decorated class or endpoint will be ignored and unreachable
+    Decorator to mark a controller/cli controller/middleware/logger as ignored.
+    The decorated class will be ignored during startup and runtime.
     """
     setattr(func_or_cls, "_ignore", True)
     return func_or_cls

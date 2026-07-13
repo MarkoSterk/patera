@@ -221,7 +221,7 @@ class Patera(Injectable, Generic[ConfT]):
                 "Missing valid configs object in @app_configs. "
                 "Configuration class must inherit from patera.BaseConfig"
             )
-
+        self._cli_mode = cli_mode
         self._this_path = os.path.dirname(__file__)
         self._app_base_url: str = getattr(self.__class__, "_base_url_path", "")
         self._is_built: bool = False
@@ -305,12 +305,12 @@ class Patera(Injectable, Generic[ConfT]):
 
         self.register_static_pages_controller(self.configs.STATIC_PAGES_URL)
         self.register_static_controller(self.configs.STATIC_URL)
-        self.register_openapi_controller()
 
         self._load_controllers_exc_handlers_middleware(cli_mode)
         self._register_app_extensions()
         self._resolve_injections()
 
+        self.register_openapi_controller()
         if not cli_mode:
             self._enable_cors()
 
@@ -1076,6 +1076,9 @@ class Patera(Injectable, Generic[ConfT]):
         if not getattr(middleware_class, "_middleware", False):
             return
 
+        if getattr(middleware_class, "_ignore", False):
+            return
+
         decorator_order = cast(int | None, getattr(middleware_class, "_order", None))
         default_order = cast(int | None, getattr(middleware_class, "_order_", None))
         here_set_order = order
@@ -1259,7 +1262,11 @@ class Patera(Injectable, Generic[ConfT]):
                         )
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
+        if not self._cli_mode:
+            return
         if not getattr(ctrl, "_cli_controller", False):
+            return
+        if getattr(ctrl, "_ignore", False):
             return
         self.logger.info(
             f"Registering CLI controller: {ctrl.ctrl_name} ({ctrl.__class__.__name__})"
@@ -1273,6 +1280,8 @@ class Patera(Injectable, Generic[ConfT]):
             if handler.__name__ in self._exception_handler_instances:
                 continue
             if not getattr(handler, "_exc_handler", False):
+                continue
+            if getattr(handler, "_ignore", False):
                 continue
             self.logger.info(f"Registering exception handler: {handler.__name__}")
             handler_instance = handler(self)
