@@ -576,10 +576,14 @@ class ApiInterface(
             }:
                 request_options["json"] = self._prepare_json_body(request_body)
 
+            elif consumes_media == MediaType.MULTIPART_FORM_DATA:
+                request_options["files"] = self._get_multipart_parts(request_body)
+
             else:
                 form_data, files = self._get_form_and_files(request_body)
 
-                request_options["data"] = form_data
+                if form_data is not None:
+                    request_options["data"] = form_data
 
                 if files is not None:
                     request_options["files"] = files
@@ -708,24 +712,39 @@ class ApiInterface(
     ) -> dict[str, str]:
         configs = configs or {}
 
-        request_headers: dict[str, str] = {
-            "Content-Type": str(
-                configs.get(
-                    "consumes",
-                    MediaType.APPLICATION_JSON,
-                )
+        consumes_media = cast(
+            MediaType,
+            configs.get(
+                "consumes",
+                MediaType.APPLICATION_JSON,
             ),
+        )
+
+        request_headers: dict[str, str] = {
             "Accept": str(
                 configs.get(
                     "produces",
                     MediaType.APPLICATION_JSON,
                 )
             ),
-            **configs.get(
-                "custom_headers",
-                {},
-            ),
+            **{
+                str(key): str(value)
+                for key, value in configs.get(
+                    "custom_headers",
+                    {},
+                ).items()
+            },
         }
+
+        if consumes_media == MediaType.MULTIPART_FORM_DATA:
+            for header_name in list(request_headers):
+                if header_name.lower() == "content-type":
+                    request_headers.pop(header_name)
+        else:
+            request_headers.setdefault(
+                "Content-Type",
+                str(consumes_media),
+            )
 
         auth_config: Optional[dict[str, Any]] = configs.get("auth")
 
@@ -759,28 +778,21 @@ class ApiInterface(
         self,
         data: Any,
     ) -> tuple[
-        Optional[dict[str, Any]],
-        Optional[dict[str, tuple[Any, ...]]],
+        dict[str, Any] | None,
+        list[tuple[str, tuple[Any, ...]]] | None,
     ]:
         """
         Split a Pydantic model or mapping into form fields and uploaded files.
+
+        Repeated file fields are preserved as repeated multipart parts.
         """
-        if isinstance(
-            data,
-            BaseModel,
-        ):
+        if isinstance(data, BaseModel):
             values: Mapping[str, Any] = {
-                field_name: getattr(
-                    data,
-                    field_name,
-                )
+                field_name: getattr(data, field_name)
                 for field_name in type(data).model_fields
             }
 
-        elif isinstance(
-            data,
-            Mapping,
-        ):
+        elif isinstance(data, Mapping):
             values = {str(key): value for key, value in data.items()}
 
         else:
@@ -789,24 +801,45 @@ class ApiInterface(
             )
 
         form_data: dict[str, Any] = {}
-        files: dict[
-            str,
-            tuple[Any, ...],
-        ] = {}
+        files: list[
+            tuple[
+                str,
+                tuple[Any, ...],
+            ]
+        ] = []
 
         for field_name, value in values.items():
-            if isinstance(
-                value,
-                UploadedFile,
-            ):
-                files[field_name] = (
-                    value.filename,
-                    value.get_stream(),
-                    value.content_type,
+            if isinstance(value, UploadedFile):
+                files.append(
+                    (
+                        field_name,
+                        (
+                            value.filename,
+                            value.get_stream(),
+                            value.content_type,
+                        ),
+                    )
                 )
+                continue
 
-            else:
-                form_data[field_name] = value
+            if isinstance(value, (list, tuple)) and all(
+                isinstance(item, UploadedFile) for item in value
+            ):
+                for uploaded_file in value:
+                    files.append(
+                        (
+                            field_name,
+                            (
+                                uploaded_file.filename,
+                                uploaded_file.get_stream(),
+                                uploaded_file.content_type,
+                            ),
+                        )
+                    )
+
+                continue
+
+            form_data[field_name] = value
 
         return (
             form_data or None,
@@ -896,6 +929,52 @@ class ApiInterface(
             return response.text
 
         return response.read()
+
+    def _get_multipart_parts(
+        self,
+        data: Any,
+    ) -> list[tuple[str, tuple[Any, ...]]]:
+        if isinstance(data, BaseModel):
+            values: Mapping[str, Any] = {
+                field_name: getattr(data, field_name)
+                for field_name in type(data).model_fields
+            }
+        elif isinstance(data, Mapping):
+            values = {str(key): value for key, value in data.items()}
+        else:
+            raise TypeError(
+                "Multipart request bodies must be a Pydantic model or a mapping."
+            )
+
+        parts: list[tuple[str, tuple[Any, ...]]] = []
+
+        for field_name, value in values.items():
+            items = value if isinstance(value, (list, tuple)) else [value]
+
+            for item in items:
+                if isinstance(item, UploadedFile):
+                    parts.append(
+                        (
+                            field_name,
+                            (
+                                item.filename,
+                                item.get_stream(),
+                                item.content_type,
+                            ),
+                        )
+                    )
+                else:
+                    parts.append(
+                        (
+                            field_name,
+                            (
+                                None,
+                                str(item),
+                            ),
+                        )
+                    )
+
+        return parts
 
     def __init_subclass__(
         cls,
