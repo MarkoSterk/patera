@@ -66,6 +66,38 @@ async def test_admin_pages(app, client_for):
         assert (await client.get("/admin/fr/")).status_code != 200
 
 
+async def test_dashboard_reads_recent_records_from_log_files(app, client_for):
+    async with client_for(app) as client:
+        try:
+            raise ValueError("disk check failed")
+        except ValueError:
+            app.logger.exception("disk almost full")
+        app.logger.info("unrelated message")
+
+        res = await client.get(
+            "/admin/en/dashboard",
+            params={"query": "disk"},
+            headers={"x-user": "admin"},
+        )
+        assert res.status_code == 200
+        assert "disk almost full" in res.text
+        assert "unrelated message" not in res.text
+        assert "ValueError: disk check failed" in res.text  # exception detail
+
+
+async def test_dashboard_explains_disabled_log_files(make_app, client_for):
+    app = make_app(
+        extensions=[Jobs, Admin],
+        middleware=[HeaderAuth],
+        ADMIN=ADMIN_CONFIG,
+        LOG_FILES={"ENABLED": False},
+    )
+    async with client_for(app) as client:
+        res = await client.get("/admin/en/dashboard", headers={"x-user": "admin"})
+        assert res.status_code == 200
+        assert "LOG_FILES.ENABLED" in res.text
+
+
 def test_admin_state_is_per_instance(make_app, app):
     other = make_app(extensions=[Admin], middleware=[HeaderAuth], ADMIN=ADMIN_CONFIG)
     assert app.get_extension(Admin).has_task_managers

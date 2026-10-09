@@ -4,11 +4,12 @@ Base configuration class
 
 from __future__ import annotations
 
-from typing import Optional, Any, Sequence
+from typing import Optional, Sequence
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .logging.logger_config_base import OutputSink
+from .logging.logger_config_base import DefaultLoggerConfig
+from .logging.log_files import LogFilesConfig
 from .request import Request
 from .response import Response
 
@@ -115,37 +116,16 @@ class BaseConfig(BaseSettings):
         None, description="Max age in seconds. None to disable."
     )
 
-    DEFAULT_LOGGER: dict[str, Any] = Field(
-        {
-            "SINK": OutputSink.STDERR,
-            "LEVEL": "TRACE",
-            "FORMAT": (
-                "<green>{time:HH:mm:ss}</green> | "
-                "<level>{level}</level> | "
-                "{extra[logger_name]} | "
-                "<level>{message}</level>"
-            ),
-            "ROTATION": None,
-            "RETENTION": None,
-            "COMPRESSION": None,
-            "ENQUEUE": True,
-            "BACKTRACE": True,
-            "DIAGNOSE": True,
-            "COLORIZE": True,
-            "SERIALIZE": False,
-            "ENCODING": "utf-8",
-            "MODE": "a",
-            "DELAY": True,
-        },
+    DEFAULT_LOGGER: DefaultLoggerConfig = Field(
+        default_factory=lambda: DefaultLoggerConfig.model_validate({}),
         description="Default patera logger configuration",
     )
 
-    IN_MEMORY_LOG_BUFFER_SIZE: int = Field(
-        1000,
+    LOG_FILES: LogFilesConfig = Field(
+        default_factory=lambda: LogFilesConfig.model_validate({}),
         description=(
-            "The size of the in-memory log message deque list. "
-            "Log messages are stored in-memory for later view in "
-            "the admin dashboard or elsewhere."
+            "JSON Lines log files. Every record is one JSON object per line; "
+            "the Admin dashboard reads recent records from these files."
         ),
     )
 

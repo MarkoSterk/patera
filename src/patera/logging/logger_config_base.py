@@ -146,6 +146,56 @@ class LoggerConfigBase(BaseModel):
             ) from exc
 
 
+class DefaultLoggerConfig(LoggerConfigBase):
+    """
+    Configuration of Patera's default console logger (``DEFAULT_LOGGER``).
+
+    Unknown keys are rejected, so a misspelt setting fails at startup.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    SINK: Optional[str | Path] = Field(
+        OutputSink.STDERR.value,
+        description="STDERR, STDOUT, NULL, or a file path relative to the application root",
+    )
+    LEVEL: Optional[LogLevel] = Field(LogLevel.TRACE, description="Minimum log level")
+    FORMAT: Optional[str] = Field(
+        (
+            "<green>{time:HH:mm:ss}</green> | "
+            "<level>{level}</level> | "
+            "{extra[logger_name]} | "
+            "<level>{message}</level>"
+        ),
+        description="Loguru format string",
+    )
+    ROTATION: Optional[RotationType] = Field(
+        None, description="Rotation of a file sink. None disables rotation."
+    )
+    RETENTION: Optional[RetentionType] = Field(
+        None, description="Retention of rotated files of a file sink."
+    )
+    COMPRESSION: CompressionType = Field(
+        None, description="Compression of rotated files of a file sink."
+    )
+    ENQUEUE: Optional[bool] = Field(
+        True, description="Write records from a background queue."
+    )
+    BACKTRACE: Optional[bool] = Field(True, description="Extend exception tracebacks")
+    DIAGNOSE: Optional[bool] = Field(
+        True, description="Show variable values in exception tracebacks"
+    )
+    COLORIZE: Optional[bool] = Field(True, description="Colorize output")
+    SERIALIZE: Optional[bool] = Field(
+        False, description="Write Loguru's JSON serialization instead of FORMAT"
+    )
+    ENCODING: Optional[str] = Field("utf-8", description="Encoding of a file sink")
+    MODE: Optional[str] = Field("a", description="Open mode of a file sink")
+    DELAY: Optional[bool] = Field(
+        True, description="Create a file sink on the first record"
+    )
+
+
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
@@ -189,7 +239,9 @@ class LoggerBase(ABC, Generic[AppT]):
         self.conf: Dict[str, Any] = self.validate_configs(conf)
 
     def validate_configs(self, configs: dict[str, Any]) -> dict[str, Any]:
-        return LoggerConfigBase.model_validate(configs).model_dump()
+        """Validates the logger's settings with configs_model (LoggerConfigBase by default)."""
+        model = self.configs_model or LoggerConfigBase
+        return model.model_validate(configs).model_dump()
 
     @property
     def app(self) -> AppT:

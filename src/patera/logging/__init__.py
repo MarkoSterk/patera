@@ -5,6 +5,7 @@ Logging module
 from .logger_config_base import (
     LoggerBase,
     LoggerConfigBase as LoggerConfig,
+    DefaultLoggerConfig,
     LogLevel,
     Writable,
     SinkInput,
@@ -16,10 +17,14 @@ from .logger_config_base import (
     OutputSink,
     logger,
 )
+from .log_files import JsonLogFiles, LogFilesConfig
 
 __all__ = [
     "LoggerBase",
     "LoggerConfig",
+    "DefaultLoggerConfig",
+    "JsonLogFiles",
+    "LogFilesConfig",
     "LogLevel",
     "Writable",
     "SinkInput",

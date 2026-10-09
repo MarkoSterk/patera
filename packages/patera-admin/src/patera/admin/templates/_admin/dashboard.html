@@ -23,6 +23,13 @@
       </div>
     </div>
 
+    {% if not log_files_enabled %}
+      <div class="alert alert-secondary" role="status">
+        <i class="bi bi-info-circle me-1"></i>
+        {{ translate('log_files_disabled') }}
+      </div>
+    {% endif %}
+
     <div class="card content-card shadow-sm">
       <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
@@ -224,7 +231,7 @@
                     <code>{{ log.function }}</code>
                   </td>
 
-                  <td class="log-message" data-message="{{ log.message|e }}">
+                  <td class="log-message" data-message="{{ log.message|e }}" data-exception="{{ log.exception|default('', true)|e }}">
                     {{ log.message|default('', true)|string|truncate(70) }}
                   </td>
                   <td>
@@ -467,7 +474,8 @@
       file: textFrom(tableRow, ".log-file"),
       line: textFrom(tableRow, ".log-line"),
       functionName: textFrom(tableRow, ".log-function"),
-      message: messageFrom(tableRow)
+      message: messageFrom(tableRow),
+      exception: tableRow.querySelector(".log-message")?.getAttribute("data-exception") || ""
     };
 
     const dialog = document.getElementById("log-dialog");
@@ -522,6 +530,10 @@
       </div>
 
       <pre id="log-full-message" class="log-full-message">${escapeHtml(log.message)}</pre>
+      ${log.exception ? `
+        <h3 class="h6 mt-3 mb-2">{{ translate('exception') }}</h3>
+        <pre class="log-full-message">${escapeHtml(log.exception)}</pre>
+      ` : ""}
     `;
 
     dialog.showModal();

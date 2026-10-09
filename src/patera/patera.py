@@ -26,7 +26,7 @@ from typing import (
 import aiofiles
 from loguru import logger
 from loguru._logger import Logger
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 from werkzeug.routing import WebsocketMismatch, RequestRedirect
 
@@ -72,7 +72,7 @@ from .configuration_base import BaseConfig
 from .middleware import MiddlewareBase, AppCallableType
 from .cli import CLIController
 from .logging.logger_config_base import LoggerBase
-from .logging.inmemory_buffer import InMemoryLogBuffer
+from .logging.log_files import JsonLogFiles, LogFilesConfig
 from .injectable import Injectable
 from .serializers import SerializerRegistry
 from .response_renderer import ResponseRenderer, ResponseRendererException
@@ -278,25 +278,24 @@ class Patera(Injectable, Generic[ConfT]):
             self,
         )
 
-        sink_id = DefaultLogger(self).configure()
-        self._logger_sink_ids.append(sink_id)
+        default_logger = DefaultLogger(self)
+        self._logger_sink_ids.append(default_logger.configure())
 
         self._router: Router = Router(self._configs.STRICT_SLASHES)
         self._socket_router: Router = Router(self._configs.STRICT_SLASHES)
         self._logger: Logger = cast(Logger, logger)
 
-        self.log_buffer: InMemoryLogBuffer = InMemoryLogBuffer(
-            maxlen=self._configs.IN_MEMORY_LOG_BUFFER_SIZE
+        log_files_conf: Any = self._configs.LOG_FILES
+        if isinstance(log_files_conf, BaseModel):
+            log_files_conf = log_files_conf.model_dump()
+        self.log_files: JsonLogFiles = JsonLogFiles(
+            LogFilesConfig.model_validate(log_files_conf or {}),
+            self._root_path,
+            default_logger_name=default_logger.logger_name,
         )
-
-        self._log_buffer_sink_id = logger.add(
-            self.log_buffer,
-            level="TRACE",
-            enqueue=True,
-            backtrace=True,
-            diagnose=False,
-        )
-        self._logger_sink_ids.append(self._log_buffer_sink_id)
+        log_files_sink_id = self.log_files.attach()
+        if log_files_sink_id is not None:
+            self._logger_sink_ids.append(log_files_sink_id)
 
         self._app: AppCallableType = self._base_app
 
@@ -931,6 +930,7 @@ class Patera(Injectable, Generic[ConfT]):
                 # Sink was already removed.
                 pass
         self._logger_sink_ids.clear()
+        self.log_files.detach()
 
     async def _handle_http_request(self, scope, receive, send):
         """

@@ -26,6 +26,9 @@ QUIET_LOGGER: dict[str, Any] = {
     "COLORIZE": False,
 }
 
+# Synchronous writes, so a test can read a record right after logging it.
+SYNC_LOG_FILES: dict[str, Any] = {"ENQUEUE": False}
+
 
 class AppFactory:
     """Creates Patera applications inside temporary packages."""
@@ -71,6 +74,7 @@ class AppFactory:
         name, root = self.package(files)
 
         config.setdefault("DEFAULT_LOGGER", QUIET_LOGGER)
+        config.setdefault("LOG_FILES", SYNC_LOG_FILES)
         config.setdefault("APP_NAME", "Test app")
         annotations = {key: Any for key in config}
         config_cls = type(

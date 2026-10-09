@@ -159,6 +159,18 @@ TRANSLATIONS_MAP: dict[str, dict[str, str]] = {
         "si": "Poglej dnevnik",
         "es": "Ver registro",
     },
+    "log_files_disabled": {
+        "en": "Log files are disabled (LOG_FILES.ENABLED), so no log messages are recorded for this dashboard.",
+        "de": "Logdateien sind deaktiviert (LOG_FILES.ENABLED), daher werden für dieses Dashboard keine Logmeldungen aufgezeichnet.",
+        "si": "Dnevniške datoteke so onemogočene (LOG_FILES.ENABLED), zato se za to nadzorno ploščo ne beležijo dnevniška sporočila.",
+        "es": "Los archivos de registro están desactivados (LOG_FILES.ENABLED), por lo que no se guardan mensajes de registro para este panel.",
+    },
+    "exception": {
+        "en": "Exception",
+        "de": "Ausnahme",
+        "si": "Izjema",
+        "es": "Excepción",
+    },
     "no_log_messages_available": {
         "en": "No log messages available.",
         "de": "Keine Logmeldungen verfügbar.",

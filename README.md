@@ -230,8 +230,8 @@ Built-in options:
 | `CORS_EXPOSE_HEADERS` | `[]` | Response headers exposed to the browser. |
 | `CORS_ALLOW_CREDENTIALS` | `True` | Allow credentials (the request origin is echoed instead of `*`). |
 | `CORS_MAX_AGE` | `None` | Preflight cache time in seconds. |
-| `DEFAULT_LOGGER` | see [Logging](#logging) | Configuration of the default log sink. |
-| `IN_MEMORY_LOG_BUFFER_SIZE` | `1000` | Number of log records kept in memory (admin dashboard). |
+| `DEFAULT_LOGGER` | `DefaultLoggerConfig()` | Default console sink, see [Logging](#logging). |
+| `LOG_FILES` | `LogFilesConfig()` | Rotating JSON Lines log files read by the admin dashboard, see [Logging](#logging). |
 | `CONTROLLER_FOLDERS`, `CLI_CONTROLLER_FOLDERS`, `EXCEPTION_HANDLER_FOLDERS`, `MIDDLEWARE_FOLDERS`, `LOGGER_FOLDERS` | `None` | Additional folders for [auto-discovery](#project-layout-and-auto-discovery). |
 
 ## The application class
@@ -664,19 +664,60 @@ from docstrings. Exclude a controller or endpoint with `open_api_spec=False`.
 ## Logging
 
 Patera logs with [Loguru](https://loguru.readthedocs.io). Use `self.app.logger` (or `app.logger`).
-The default sink is configured with `DEFAULT_LOGGER`:
+The default sink is configured with `DEFAULT_LOGGER`, a `DefaultLoggerConfig` model. Fields you
+leave out keep their defaults, and unknown fields are rejected:
 
 ```python
+from patera.logging import DefaultLoggerConfig
+
+
 class Config(BaseConfig):
     ...
-    DEFAULT_LOGGER: dict[str, Any] = {
-        "SINK": "STDERR",          # STDERR, STDOUT, NULL or a file path
-        "LEVEL": "INFO",
-        "FORMAT": "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}</level>",
-        "ENQUEUE": True,
-        "COLORIZE": True,
-    }
+    DEFAULT_LOGGER: DefaultLoggerConfig = DefaultLoggerConfig(
+        SINK="STDERR",             # STDERR, STDOUT, NULL or a file path
+        LEVEL="INFO",
+        ENQUEUE=True,
+        COLORIZE=True,
+    )
 ```
+
+Fields can also be set from the environment, for example `PATERA_DEFAULT_LOGGER__LEVEL=INFO`.
+
+### Log files
+
+Every record at `LOG_FILES.LEVEL` or above is also written to a JSON Lines file, one JSON object
+per line with `time`, `level`, `message`, `logger_name`, `name`, `file`, `line`, `function`,
+`process`, `thread`, and, when present, `exception` (the formatted traceback) and `extra` (values
+bound with `logger.bind(...)`). The admin dashboard reads its log view from these files.
+
+```python
+from patera.logging import LogFilesConfig
+
+
+class Config(BaseConfig):
+    ...
+    LOG_FILES: LogFilesConfig = LogFilesConfig(
+        PATH="logs/patera.jsonl",  # relative to the application package; must end with .jsonl
+        LEVEL="INFO",
+        ROTATION="10 MB",          # size, time of day ("00:00") or interval ("1 day"); None = never
+        FILE_COUNT=5,              # files kept, including the active one
+    )
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `ENABLED` | `True` | Write log files. |
+| `PATH` | `logs/patera.jsonl` | Active file. Rotated files are renamed with their rotation time, e.g. `patera.2026-10-09_13-25-00_123456.jsonl`. |
+| `LEVEL` | `DEBUG` | Minimum level written. |
+| `ROTATION` | `10 MB` | When the active file is rotated. |
+| `FILE_COUNT` | `5` | Number of files kept; older rotated files are deleted. |
+| `ENQUEUE` | `True` | Write from a background queue. |
+| `READ_LIMIT` | `10000` | Maximum number of newest records returned by `app.log_files.read()`. |
+
+`app.log_files.read(limit)` (or `await app.log_files.read_async(limit)`) returns the newest
+records, oldest first. Rotation is not coordinated between processes: with several server
+workers appending to one file, set `ROTATION=None` and rotate with an external tool, or run a
+single worker.
 
 Additional sinks are classes in a `logging`/`loggers` folder:
 
@@ -703,7 +744,6 @@ class Config(BaseConfig):
     }
 ```
 
-The most recent log records are also kept in memory (`app.log_buffer`) for the admin dashboard.
 
 ## Command line interface
 

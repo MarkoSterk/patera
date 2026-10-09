@@ -66,7 +66,7 @@ class _AdminController(Controller[Patera]):
         """
         query_schema = LogsQuerySchema(**req.query_parameters)  # type: ignore
 
-        logs: list[dict[str, Any]] = list(self.app.log_buffer.get_all())
+        logs: list[dict[str, Any]] = await self.app.log_files.read_async()
 
         if query_schema.query is not None and query_schema.query.strip():
             logs = [
@@ -112,6 +112,7 @@ class _AdminController(Controller[Patera]):
                 "logs_total_pages": total_pages,
                 "logs_order_by": query_schema.order_by,
                 "logs_query": query_schema.query or "",
+                "log_files_enabled": self.app.log_files.enabled,
             },
         )
 
@@ -159,6 +160,7 @@ class _AdminController(Controller[Patera]):
         level: str = str(log.get("level", "")).lower()
         line: str = str(log.get("line", "")).lower()
         time: str = str(log.get("time", "")).lower()
+        exception: str = str(log.get("exception", "")).lower()
 
         query = query.lower()
 
@@ -171,6 +173,7 @@ class _AdminController(Controller[Patera]):
             or query in level
             or query in line
             or query in time
+            or query in exception
         )
 
     def get_order_value(self, log: dict[str, Any], order_by: str) -> Any:

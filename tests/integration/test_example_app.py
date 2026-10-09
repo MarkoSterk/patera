@@ -17,7 +17,9 @@ EXAMPLE_DIR = Path(__file__).resolve().parents[2] / "examples" / "basic_app"
 
 
 @pytest.fixture
-def example_app(monkeypatch):
+def example_app(monkeypatch, tmp_path):
+    # Keep the example's JSON Lines log file out of the source tree.
+    monkeypatch.setenv("PATERA_LOG_FILES__PATH", str(tmp_path / "logs" / "app.jsonl"))
     monkeypatch.syspath_prepend(str(EXAMPLE_DIR))
     for name in [m for m in sys.modules if m == "app" or m.startswith("app.")]:
         monkeypatch.delitem(sys.modules, name)
