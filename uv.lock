@@ -434,37 +434,37 @@ wheels = [
 
 [package.optional-dependencies]
 cublas = [
-    { name = "nvidia-cublas" },
+    { name = "nvidia-cublas", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cudart = [
-    { name = "nvidia-cuda-runtime" },
+    { name = "nvidia-cuda-runtime", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufft = [
-    { name = "nvidia-cufft" },
+    { name = "nvidia-cufft", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufile = [
-    { name = "nvidia-cufile" },
+    { name = "nvidia-cufile", marker = "sys_platform == 'linux'" },
 ]
 cupti = [
-    { name = "nvidia-cuda-cupti" },
+    { name = "nvidia-cuda-cupti", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 curand = [
-    { name = "nvidia-curand" },
+    { name = "nvidia-curand", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusolver = [
-    { name = "nvidia-cusolver" },
+    { name = "nvidia-cusolver", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusparse = [
-    { name = "nvidia-cusparse" },
+    { name = "nvidia-cusparse", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvjitlink = [
-    { name = "nvidia-nvjitlink" },
+    { name = "nvidia-nvjitlink", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvrtc = [
-    { name = "nvidia-cuda-nvrtc" },
+    { name = "nvidia-cuda-nvrtc", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvtx = [
-    { name = "nvidia-nvtx" },
+    { name = "nvidia-nvtx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 
 [[package]]
@@ -1257,7 +1257,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.119.0"
+version = "0.120.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1425,7 +1425,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "patera" },
@@ -1440,7 +1440,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "docstring-parser" },
@@ -1467,7 +1467,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-apiinterface"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-apiinterface" }
 dependencies = [
     { name = "patera" },
@@ -1478,7 +1478,7 @@ requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-auth"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -1497,7 +1497,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -1529,7 +1529,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1546,7 +1546,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -1561,7 +1561,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -1576,7 +1576,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-migrate"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -1593,7 +1593,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
