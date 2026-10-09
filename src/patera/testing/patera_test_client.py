@@ -66,5 +66,12 @@ class PateraTestClient:
     async def delete(self, path: str, **kwargs):
         return await self.request("DELETE", path, **kwargs)
 
+    async def head(self, path: str, **kwargs):
+        return await self.request("HEAD", path, **kwargs)
+
+    async def options(self, path: str, **kwargs):
+        return await self.request("OPTIONS", path, **kwargs)
+
     async def close(self):
-        await self.client.aclose()
+        if self.client is not None:
+            await self.client.aclose()

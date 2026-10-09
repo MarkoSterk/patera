@@ -3,7 +3,7 @@ Middleware base class
 """
 
 from abc import abstractmethod, ABC
-from patera.injectable import Injectable
+from patera.injectable import Injectable, resolve_component_configs
 from typing import (
     Callable,
     TYPE_CHECKING,
@@ -11,6 +11,7 @@ from typing import (
     Any,
     Generic,
     TypeAlias,
+    cast,
     overload,
     Protocol,
     TypeVar,
@@ -18,7 +19,7 @@ from typing import (
 
 from pydantic import BaseModel
 
-from .utilities import run_sync_or_async, pascal_to_upper_snake
+from .utilities import run_sync_or_async
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -95,33 +96,6 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
         self._next = next_app
         self._resolve_injections()
 
-    def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        name: str = pascal_to_upper_snake(target_type.__name__)
-        value = self.app._extensions.get(name, None)
-        if value is None:
-            value = target_type(self.app)
-            self.app._extensions[name] = value
-            # self.app._extensions[target_type.__name__] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        value = self.app.get_conf(config_name)
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
-            raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
-
     @abstractmethod
     async def middleware(self, req: "Request") -> "Response":
         """
@@ -152,10 +126,14 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
 
     @property
     def configs(self) -> ConfT:
-        """Returns the middleware's configuration instance"""
-        configs: ConfT = self.app.get_conf(
-            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
-        )
-        if configs is None or not isinstance(configs, BaseModel):
-            raise TypeError(f"Invalid configuration for {self.__class__.__name__}")
-        return configs
+        """
+        Returns the middleware's configuration instance.
+
+        Dictionaries are validated with the declared config model and a
+        missing configuration falls back to the model's defaults.
+        """
+        cached = self.__dict__.get("_resolved_configs")
+        if cached is None:
+            cached = resolve_component_configs(self, MiddlewareBase)
+            self.__dict__["_resolved_configs"] = cached
+        return cast(ConfT, cached)

@@ -23,10 +23,14 @@ from patera import (
     HttpStatus,
     MediaType,
 )
-from patera.auth import login_required
+from patera.auth import role_required
 
-from .admin_interface import AdminInterface
-from .exceptions import AdminLoginRequiredException, AdminUnsupportedLanguage
+from .admin_interface import AdminInterface, Permissions
+from .exceptions import (
+    AdminAuthorizationRequiredException,
+    AdminLoginRequiredException,
+    AdminUnsupportedLanguage,
+)
 
 
 class _AdminTMController(Controller[Patera[BaseConfig]]):
@@ -47,7 +51,12 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
 
     @get("/")
     @produces(MediaType.TEXT_HTML)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def task_list(self, req: Request, manager: str) -> Response:
         task_manager = self.get_task_manager(manager)
 
@@ -70,7 +79,12 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
     @post("/<string:job_id>")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def run_job(self, req: Request, manager: str, job_id: str) -> Response:
         """
         Runs a scheduled job immediately as a one-off background execution.
@@ -121,7 +135,12 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
     @patch("/<string:job_id>")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def pause_job(self, req: Request, manager: str, job_id: str) -> Response:
         """
         Pauses the scheduled job.
@@ -165,7 +184,12 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
     @put("/<string:job_id>")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def resume_job(self, req: Request, manager: str, job_id: str) -> Response:
         """
         Resumes a paused scheduled job.
@@ -206,7 +230,12 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
     @delete("/<string:job_id>")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_DELETE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def remove_job(self, req: Request, manager: str, job_id: str) -> Response:
         """
         Removes a job from the scheduler and the TaskManager active jobs map.

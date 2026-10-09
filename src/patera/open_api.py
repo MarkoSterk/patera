@@ -4,7 +4,7 @@ OpenAPI controller
 
 import re
 from typing import Any, Dict, Optional, Set, Type, Tuple, List, cast, Callable
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from .http_statuses import HttpStatus
 from .media_types import MediaType
@@ -13,7 +13,11 @@ from .request import Request
 from .controller import Controller, get, produces
 from .utilities import _extract_response_type
 
-_WERKZEUG_PARAM_RE = re.compile(r"<(?:(int|string|path):)?([a-zA-Z_][a-zA-Z0-9_]*)>")
+# Matches werkzeug route parameters such as <id>, <int:id>, <int(signed=True):id>
+# or <any(a, b):kind>.
+_WERKZEUG_PARAM_RE = re.compile(
+    r"<(?:([a-zA-Z_][a-zA-Z0-9_]*)(?:\([^)]*\))?:)?([a-zA-Z_][a-zA-Z0-9_]*)>"
+)
 
 
 class OpenApiSpecs(BaseModel):
@@ -75,87 +79,50 @@ def _model_name(model: Type) -> str:
     return getattr(model, "__name__", "AnonymousModel")
 
 
-def _pydantic_schema_dict(model: Optional[Type]) -> Optional[Dict[str, Any]]:
-    if model is None:
-        return None
-    # Pydantic v2
-    if hasattr(model, "model_json_schema"):
-        try:
-            return model.model_json_schema(ref_template="#/components/schemas/{model}")
-        except TypeError:
-            # older/stricter signatures
-            return model.model_json_schema()
-    # Pydantic v1
-    if hasattr(model, "schema"):
-        try:
-            return model.schema(ref_template="#/components/schemas/{model}")
-        except TypeError:
-            return model.schema()
-    # Fallback – unknown object
-    return {"type": "object"}
+_REF_TEMPLATE = "#/components/schemas/{model}"
 
 
-def _rebuild_model(model: Optional[Type]) -> None:
-    if model is None:
-        return
-    # Pydantic v2
-    if hasattr(model, "model_rebuild"):
-        try:
-            model.model_rebuild()
-        except TypeError:
-            pass
-    # Pydantic v1
-    if hasattr(model, "update_forward_refs"):
-        try:
-            # model.update_forward_refs()
-            model.model_rebuild()
-        except TypeError:
-            pass
+def _is_model_class(tp: Any) -> bool:
+    return isinstance(tp, type) and issubclass(tp, BaseModel)
 
 
 def _pydantic_schema_and_defs(
     model: Optional[Type],
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     """
-    Returns (schema_for_model, defs) where defs are nested component schemas
+    Returns (schema_for_type, defs) where defs are nested component schemas
     that must be merged into components/schemas.
+
+    Pydantic models and any other type Pydantic understands (list[Model],
+    dict[str, int], unions, ...) are supported.
     """
     if model is None:
         return None, {}
 
-    _rebuild_model(model)
+    try:
+        if _is_model_class(model):
+            model.model_rebuild()
+            schema = model.model_json_schema(ref_template=_REF_TEMPLATE)
+        else:
+            schema = TypeAdapter(model).json_schema(ref_template=_REF_TEMPLATE)
+    except Exception:
+        # Types Pydantic cannot describe are documented as generic objects.
+        return {"type": "object"}, {}
 
-    # Pydantic v2
-    if hasattr(model, "model_json_schema"):
-        try:
-            schema = model.model_json_schema(
-                ref_template="#/components/schemas/{model}"
-            )
-        except TypeError:
-            schema = model.model_json_schema()
-        defs = schema.pop("$defs", {}) or {}
-        return schema, defs
-
-    # Pydantic v1
-    if hasattr(model, "schema"):
-        try:
-            schema = model.schema(ref_template="#/components/schemas/{model}")
-        except TypeError:
-            schema = model.schema()
-        defs = schema.pop("definitions", {}) or {}
-        return schema, defs
-
-    # Fallback
-    return {"type": "object"}, {}
+    defs = schema.pop("$defs", {}) or {}
+    return schema, defs
 
 
 def _ensure_schema(
     components: Dict[str, Any], model: Optional[Type]
 ) -> Optional[Dict[str, Any]]:
+    """
+    Registers the schema of ``model`` in components and returns a schema
+    object for it: a $ref for Pydantic models, an inline schema otherwise.
+    """
     if model is None:
         return None
 
-    name = _model_name(model)
     if "schemas" not in components:
         components["schemas"] = {}
 
@@ -166,6 +133,10 @@ def _ensure_schema(
     for def_name, def_schema in defs.items():
         components["schemas"].setdefault(def_name, def_schema)
 
+    if not _is_model_class(model):
+        return schema or {"type": "object"}
+
+    name = _model_name(model)
     # Register the model schema itself (if not already present)
     if name not in components["schemas"]:
         components["schemas"][name] = schema or {"type": "object"}
@@ -176,7 +147,10 @@ def _ensure_schema(
 
 _TYPE_MAP = {
     "int": {"type": "integer", "format": "int64"},
+    "float": {"type": "number", "format": "double"},
+    "uuid": {"type": "string", "format": "uuid"},
     "string": {"type": "string"},
+    "default": {"type": "string"},
     "path": {
         "type": "string"
     },  # openapi does not have a special type for path. Will be treated as string with x-greedy-path: true
@@ -222,6 +196,7 @@ def build_openapi(
     version: str,
     openapi_version: str,
     servers: Optional[list[str]] = None,
+    description: str = "",
 ) -> Dict[str, Any]:
     """
     controllers structure: {
@@ -250,7 +225,7 @@ def build_openapi(
     """
     spec: Dict[str, Any] = {
         "openapi": openapi_version,
-        "info": {"title": title, "version": version, "description": ""},
+        "info": {"title": title, "version": version, "description": description},
         "paths": {},
         "components": {"schemas": {}},
     }
@@ -262,9 +237,11 @@ def build_openapi(
 
     referenced_models: Set[Type] = set()
 
-    for base_path, controller in controllers.items():
+    for controller in controllers.values():
         if not controller.open_api_spec:
             continue
+
+        base_path = controller.path
 
         for http_method, endpoints_map in controller.endpoints_map.items():
             for endpoint_path, ep_cfg in endpoints_map.items():

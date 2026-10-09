@@ -11,7 +11,7 @@ from typing import Any, Optional, TypedDict, cast
 from urllib.parse import quote
 from pydantic import BaseModel, ValidationError, field_validator
 
-from .admin_interface import AdminInterface
+from .admin_interface import AdminInterface, Permissions
 
 from patera import (
     Patera,
@@ -33,9 +33,10 @@ from patera.controller import (
     before_request,
 )
 
-from patera.auth import login_required
+from patera.auth import role_required
 
 from .exceptions import (
+    AdminAuthorizationRequiredException,
     AdminUnsupportedLanguage,
     AdminLoginRequiredException,
 )
@@ -232,7 +233,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
             raise AdminUnsupportedLanguage(lang)
 
     @get("/explorer")
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def explorer(self, req: Request) -> Response:
         return await req.res.html(
             "_admin/files/file_explorer.html",
@@ -247,7 +253,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
 
     @get("/")
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def list_root(self, req: Request) -> Response:
         try:
             query = FilePathInput.model_validate(req.query_parameters)
@@ -266,7 +277,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
 
     @get("/<path:directory>")
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def list_directory(self, req: Request, directory: str) -> Response:
         try:
             query = FilePathInput(path=directory)
@@ -286,7 +302,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @post("/")
     @consumes(MediaType.MULTIPART_FORM_DATA)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_CREATE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def upload(self, req: Request) -> Response:
         try:
             form_data = await req.form_and_files()
@@ -311,7 +332,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @post("/folder")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_CREATE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def create_folder(self, req: Request) -> Response:
         try:
             json_data = await req.get_data("json") or {}
@@ -336,7 +362,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @delete("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_DELETE,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def delete(self, req: Request) -> Response:
         try:
             json_data = await req.get_data("json") or {}
@@ -361,7 +392,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @patch("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def rename(self, req: Request) -> Response:
         try:
             json_data = await req.get_data("json") or {}
@@ -386,7 +422,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @patch("/move")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_EDIT,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def move(self, req: Request) -> Response:
         try:
             json_data = await req.get_data("json") or {}
@@ -410,7 +451,12 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
 
     @post("/download")
     @consumes(MediaType.APPLICATION_JSON)
-    @login_required(raise_authentication_exception=AdminLoginRequiredException)
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        Permissions.ADMIN_CAN_VIEW,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
     async def download(self, req: Request) -> Response:
         try:
             json_data = await req.get_data("json") or {}

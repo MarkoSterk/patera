@@ -4,7 +4,7 @@ version = "0.9.0"
 requires-python = ">=3.13"
 dependencies = [
   "patera",
-  "sqlalchemy",
+  "sqlalchemy[asyncio]>=2.0",
   "aiosqlite",
 ]
 

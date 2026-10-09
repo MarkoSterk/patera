@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from ..media_types import MediaType
 from ..http_statuses import HttpStatus
 from ..injectable import Injectable
-from ..utilities import run_sync_or_async, pascal_to_upper_snake
+from ..utilities import run_sync_or_async
 
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
@@ -59,33 +59,6 @@ class Controller(Injectable, Generic[AppT]):
         self._resolve_injections()
         self._after_init_methods()
 
-    def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        name: str = pascal_to_upper_snake(target_type.__name__)
-        value = self.app._extensions.get(name, None)
-        if value is None:
-            value = target_type(self.app)
-            self.app._extensions[name] = value
-            # self.app._extensions[target_type.__name__] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        value = self.app.get_conf(config_name)
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
-            raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
-
     def _after_init_methods(self):
         for name in dir(self):
             method = getattr(self, name, None)
@@ -119,13 +92,19 @@ class Controller(Injectable, Generic[AppT]):
                 ignore: bool = getattr(method, "_ignore", False)
                 if ignore or (dev_only and not self.app.get_conf("DEBUG", False)):
                     continue
-                if endpoint_handler.get("tags") is not None:
-                    endpoint_handler["tags"].extend(self._open_api_tags)
-                http_method: str = endpoint_handler.get("http_method")  # type: ignore
-                endpoints[http_method.upper()][endpoint_handler["path"]] = {
+                # Copy: the handler dict is shared by every instance of the
+                # controller class (and every app that registers it).
+                handler_info: dict[str, Any] = dict(endpoint_handler)
+                if handler_info.get("tags") is not None:
+                    handler_info["tags"] = [
+                        *handler_info["tags"],
+                        *self._open_api_tags,
+                    ]
+                http_method: str = handler_info.get("http_method")  # type: ignore
+                endpoints[http_method.upper()][handler_info["path"]] = {
                     "method": method,
                     "base_path": self._path,
-                    **endpoint_handler,
+                    **handler_info,
                 }
         self._endpoints_map = endpoints
         return endpoints

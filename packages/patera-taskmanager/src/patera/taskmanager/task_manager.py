@@ -13,6 +13,7 @@ from typing import (
     cast,
     TYPE_CHECKING,
 )
+import inspect
 from functools import wraps
 
 from apscheduler.events import EVENT_JOB_SUBMITTED, EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
@@ -63,8 +64,10 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     """
 
     scheduler_cls: Type[BaseScheduler] = AsyncIOScheduler
-    job_stores: dict[str, BaseJobStore] = {"default": MemoryJobStore()}
-    executors: dict[str, BaseExecutor] = {"default": AsyncIOExecutor()}
+    # None -> a fresh MemoryJobStore / AsyncIOExecutor per TaskManager instance.
+    # (Shared instances at class level would leak jobs between instances/apps.)
+    job_stores: Optional[dict[str, BaseJobStore]] = None
+    executors: Optional[dict[str, BaseExecutor]] = None
     job_defaults: dict[str, bool | int] = {
         "coalesce": False,
         "max_instances": 3,
@@ -87,10 +90,21 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
                 "scheduler_cls must be a class and subclass of BaseScheduler"
             )
 
+        job_stores = (
+            self.job_stores
+            if self.job_stores is not None
+            else {"default": MemoryJobStore()}
+        )
+        executors = (
+            self.executors
+            if self.executors is not None
+            else {"default": AsyncIOExecutor()}
+        )
+
         self._scheduler = self.scheduler_cls(
-            jobstores=self.job_stores,
-            executors=self.executors,
-            job_defaults=self.job_defaults,
+            jobstores=job_stores,
+            executors=executors,
+            job_defaults=dict(self.job_defaults),
             daemon=self._daemon,
         )
 
@@ -139,13 +153,17 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         """
         Shutdown hook for stopping the scheduler.
         """
-        self.scheduler.shutdown()
+        if self.scheduler.running:
+            self.scheduler.shutdown()
 
     def _get_defined_jobs(self) -> None:
         """
         Finds methods decorated with @schedule_job.
         """
         for name in dir(self):
+            if isinstance(inspect.getattr_static(self, name, None), property):
+                continue
+
             method = getattr(self, name)
 
             if not callable(method):

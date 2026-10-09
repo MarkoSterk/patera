@@ -28,6 +28,8 @@ from pydantic import BaseModel, field_validator, Field, ConfigDict
 
 from loguru import logger as logoru_logger
 
+from ..utilities import pascal_to_upper_snake
+
 if TYPE_CHECKING:
     from ..patera import Patera
 
@@ -172,11 +174,19 @@ class LoggerBase(ABC, Generic[AppT]):
         # loads configs for the logger from application configurations
         # by the config class name as upper-case
         # example: CustomLoggerConfig -> CUSTOM_LOGGER_CONFIG
-        self.conf: Dict[str, Any] = (
-            app.get_conf(self.configs_name, app.get_conf(self.__class__.__name__, {}))
+        conf: Any = (
+            app.get_conf(
+                self.configs_name,
+                app.get_conf(
+                    self._legacy_configs_name,
+                    app.get_conf(self.__class__.__name__, {}),
+                ),
+            )
             or {}
-        )  # type: ignore
-        self.conf = self.validate_configs(self.conf)
+        )
+        if isinstance(conf, BaseModel):
+            conf = conf.model_dump()
+        self.conf: Dict[str, Any] = self.validate_configs(conf)
 
     def validate_configs(self, configs: dict[str, Any]) -> dict[str, Any]:
         return LoggerConfigBase.model_validate(configs).model_dump()
@@ -187,7 +197,12 @@ class LoggerBase(ABC, Generic[AppT]):
 
     @property
     def configs_name(self) -> str:
-        """Returns class name as upper snake case"""
+        """Returns class name as upper snake case (HTTPLogger -> HTTP_LOGGER)"""
+        return pascal_to_upper_snake(self.__class__.__name__)
+
+    @property
+    def _legacy_configs_name(self) -> str:
+        """Previous naming scheme (HTTPLogger -> H_T_T_P_LOGGER), still accepted."""
         name = self.__class__.__name__
         return re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
 

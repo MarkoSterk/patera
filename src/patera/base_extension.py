@@ -6,8 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast, TypeVar, Generic
 from pydantic import BaseModel
 
-from .injectable import Injectable
-from .utilities import pascal_to_upper_snake
+from .injectable import Injectable, resolve_component_configs
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -28,33 +27,6 @@ class BaseExtension(Injectable, Generic[AppT, ConfT]):
     def init(self) -> None:
         pass
 
-    def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        name: str = pascal_to_upper_snake(target_type.__name__)
-        value = self.app._extensions.get(name, None)
-        if value is None:
-            value = target_type(self.app)
-            self.app._extensions[name] = value
-            # self.app._extensions[target_type.__name__] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        value = self.app.get_conf(config_name)
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
-            raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
-
     @property
     def app(self) -> AppT:
         if self._app is None:
@@ -63,13 +35,18 @@ class BaseExtension(Injectable, Generic[AppT, ConfT]):
 
     @property
     def configs(self) -> ConfT:
-        """Returns the extension's configuration instance"""
-        configs: ConfT = self.app.get_conf(
-            self.configs_name, self.app.get_conf(self.__class__.__name__, None)
-        )
-        if configs is None or not isinstance(configs, BaseModel):
-            raise TypeError(f"Invalid configuration for {self.__class__.__name__}")
-        return configs
+        """
+        Returns the extension's configuration instance.
+
+        The configuration is looked up by the extension's UPPER_SNAKE_CASE
+        class name. Dictionaries are validated with the declared config model
+        and a missing configuration falls back to the model's defaults.
+        """
+        cached = self.__dict__.get("_resolved_configs")
+        if cached is None:
+            cached = resolve_component_configs(self, BaseExtension)
+            self.__dict__["_resolved_configs"] = cached
+        return cast(ConfT, cached)
 
     @property
     def nice_name(self) -> str | None:

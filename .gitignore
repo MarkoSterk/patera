@@ -15,3 +15,9 @@ wheels/
 .ruff_cache/
 .mypy_cache/
 patera_book/
+
+# Test artefacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/

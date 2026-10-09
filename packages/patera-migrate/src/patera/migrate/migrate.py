@@ -45,9 +45,14 @@ class PywayCLIController(CLIController[AppT]):
         configs = {}
         os.environ["PYWAY_DATABASE_MIGRATION_DIR"] = str(self._ext._migrations_path)
         os.environ["PYWAY_CONFIG_FILE"] = str(self._ext._configs_path)
-        with open(str(self._ext._configs_path)) as config_file:
+        with open(str(self._ext._configs_path), encoding="utf-8") as config_file:
             for line in config_file.readlines():
-                config, value = line.split(": ")
+                line = line.strip()
+                if not line or line.startswith("#") or ":" not in line:
+                    continue
+                # Split on the first colon only: values (e.g. passwords) may
+                # contain colons themselves.
+                config, value = line.split(":", 1)
                 configs[config.strip()] = value.strip()
         pyway_configs = PywayConfigFile(**configs)
         return pyway_configs
@@ -111,7 +116,7 @@ class Migrate(Generic[AppT]):
     def __init__(self, app: AppT, db: SqlDatabase):
         self._app = app
         self._db = db
-        self.__db_name__ = db.__db_name__
+        self.__db_name__ = db.db_name
         _configs = db.configs.model_dump()
         self._configs = _PateraPywayConfigs(**_configs)
 
@@ -123,7 +128,7 @@ class Migrate(Generic[AppT]):
         self._migrations_path: Path = (
             Path(self._app.root_path) / self._configs.MIGRATE_DATABASE_MIGRATION_DIR
         )
-        self._migrations_path.mkdir(exist_ok=True)
+        self._migrations_path.mkdir(parents=True, exist_ok=True)
         self._configs_path: Path = (
             self._migrations_path / self._configs.MIGRATE_CONFIG_FILE
         )
@@ -153,13 +158,16 @@ class Migrate(Generic[AppT]):
         db_type = parsed.scheme.split("+")[0]
 
         if db_type == "sqlite":
+            # sqlite:///relative.db -> "relative.db"
+            # sqlite:////abs/path.db -> "/abs/path.db"
+            path = parsed.path[1:] if parsed.path.startswith("/") else parsed.path
             return {
                 "type": "sqlite",
                 "username": None,
                 "password": None,
                 "host": None,
                 "port": None,
-                "database": parsed.path.lstrip("/"),
+                "database": path,
             }
 
         return {

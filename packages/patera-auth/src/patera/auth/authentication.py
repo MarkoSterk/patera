@@ -163,21 +163,16 @@ class AuthUtils:
         return token
 
     @staticmethod
-    def validate_jwt_token(token: str, secret_key: str) -> Dict | None:
+    def validate_jwt_token(token: str, secret_key: str) -> Dict:
         """
         Validates a JWT token.
 
         :param token: The JWT token to validate.
         :return: Decoded payload if the token is valid.
-        :raises: InvalidJWTError if the token is expired.
-                 InvalidJWTError for other validation issues.
+        :raises: jwt.ExpiredSignatureError if the token is expired.
+                 jwt.InvalidTokenError (base class) for any other validation issue.
         """
-        try:
-            # Decode the token using the app's SECRET_KEY
-            payload = jwt.decode(token, secret_key, algorithms=["HS256"])
-            return payload
-        except:
-            raise
+        return jwt.decode(token, secret_key, algorithms=["HS256"])
 
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
@@ -209,10 +204,8 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         Initilizer for authentication module
         """
         super().__init__(app, next_app)  # type: ignore
-        self._configs = app.get_conf(
-            self.configs_name,
-            app.get_conf(self.__class__.__name__, AuthenticationConfig()),
-        )
+        # Uses the AuthenticationConfig defaults if the app has no configuration
+        # for this middleware (see MiddlewareBase.configs).
         self.authentication_error = self.configs.AUTHENTICATION_ERROR_MSG
         self.authorization_error = self.configs.AUTHORIZATION_ERROR_MSG
 
@@ -325,7 +318,8 @@ def login_required(
     """
 
     def decorator(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
-        attributes: dict[str, Any] = getattr(handler, "_authentication", {})
+        # Copy: the dict may be inherited from a parent controller class.
+        attributes: dict[str, Any] = dict(getattr(handler, "_authentication", {}))
         attributes["required"] = True
         attributes["authentication_exception"] = raise_authentication_exception
         setattr(handler, "_authentication", attributes)
@@ -344,7 +338,8 @@ def role_required(
     """
 
     def decorator(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
-        attributes: dict[str, Any] = getattr(handler, "_authentication", {})
+        # Copy: the dict may be inherited from a parent controller class.
+        attributes: dict[str, Any] = dict(getattr(handler, "_authentication", {}))
         attributes["roles"] = list(roles)
         attributes["required"] = True
         attributes["authentication_exception"] = raise_authentication_exception

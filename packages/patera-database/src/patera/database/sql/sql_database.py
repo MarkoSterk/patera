@@ -58,9 +58,9 @@ class SqlDatabaseConfig(BaseModel):
     DATABASE_SESSION_NAME: str = Field(
         "session",
         description=(
-            "AsyncSession variable name for use "
-            "with @managed_session decorator and "
-            "@readonly_session decorator"
+            "Name under which this database's request-bound AsyncSession is "
+            "stored in the request context (current_request.session(name)). "
+            "Must be unique per database when using multiple databases."
         ),
     )
     SHOW_SQL: bool = Field(
@@ -281,7 +281,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
 
     @property
     def db_name(self) -> str:
-        return self.__db_name__ or self.__class__.__name__.lower()
+        return getattr(self, "__db_name__", None) or self.__class__.__name__.lower()
 
     @property
     def nice_name(self) -> str:
@@ -313,9 +313,10 @@ def cli_session(
         - a bind_session(...) context
 
     Example:
+        @cli_controller
         class MyCliController(CLIController):
 
-            @handler("seed")
+            @command("seed")
             @cli_session("main")
             async def seed(self) -> None:
                 ...

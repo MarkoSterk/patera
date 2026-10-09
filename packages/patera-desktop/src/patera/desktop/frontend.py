@@ -63,9 +63,8 @@ class Frontend(BaseExtension[AppT], Generic[AppT]):
             _FrontendInterfaceController
         )
         self.app.register_controller(ctrl)
-        ctrl_path = getattr(ctrl, "_controller_path")
-        ctrl_instance: _FrontendInterfaceController = self._app._controllers.get(
-            ctrl_path
+        ctrl_instance: _FrontendInterfaceController = self._app.get_controller(
+            _FrontendInterfaceController
         )  # type: ignore
         ctrl_instance.frontend = self
 

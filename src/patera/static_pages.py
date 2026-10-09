@@ -11,14 +11,24 @@ if TYPE_CHECKING:
     from .patera import Patera  # noqa: F401
 
 
+STATIC_PAGES_TEMPLATE_PREFIX = "__static_pages__"
+
+
 class StaticPages(Controller["Patera[Any]"]):
     @after_init
     def add_template_path(self) -> None:
         """
-        Add template path to Jinja2 templates search path.
-        """
+        Registers the static pages folder with Jinja2.
 
-        self.app.add_template_path(str(self.static_pages_path))
+        Requested pages are rendered through a private template prefix, so an
+        app template with the same name (e.g. templates/index.html) can never
+        be served instead of the page and vice versa. The folder is also added
+        to the regular search path, after the app templates, so pages can
+        extend/include each other by name.
+        """
+        pages_path = str(self.static_pages_path)
+        self.app.add_template_prefix(STATIC_PAGES_TEMPLATE_PREFIX, pages_path)
+        self.app.add_template_path(pages_path)
 
     @get("/<path:page>")
     @produces(MediaType.TEXT_HTML)
@@ -38,7 +48,8 @@ class StaticPages(Controller["Patera[Any]"]):
         if not path.is_file():
             raise StaticPageNotFound(page)
 
-        return await req.res.html(page)
+        template_name = path.relative_to(self.static_pages_path).as_posix()
+        return await req.res.html(f"{STATIC_PAGES_TEMPLATE_PREFIX}/{template_name}")
 
     @property
     def static_pages_path(self) -> Path:

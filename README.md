@@ -2,2093 +2,1177 @@
   <img src="https://raw.githubusercontent.com/MarkoSterk/Patera/refs/heads/main/src/patera/graphics/patera_logo.png" alt="Patera Logo" width="200">
 </p>
 
-# Patera - async first python web framework
+# Patera - async-first Python web framework
 
-This framework is in its alpha stage and will probably see some major changes/improvements until it reaches
-the beta stage for testing. Any eager tinkerers are invited to test the framework in its alpha stage and provide feedback.
+Patera is a modular, async-first ASGI web framework with a structure inspired by Java frameworks:
+class-based controllers, decorators for routing and HTTP semantics, dependency injection of
+application services, and typed configuration objects.
 
-## Getting started
+The core package handles routing, requests/responses, validation, templates, static files, CORS,
+middleware, OpenAPI documentation, logging, a CLI and a test client. Optional packages add SQL
+databases, migrations, authentication, caching, scheduled tasks, e-mail, declarative API clients,
+an AI interface, an admin dashboard and a desktop launcher.
 
-### From PyPi with uv or pip
+> Patera is in an early (alpha) stage. The API may still change between versions.
 
-In your project folder
-```
-uv init
-uv add patera
-```
-or with pip
-```
-pip install patera
-```
-We strongly recommend using uv for dependency management.
+## Contents
 
-The above command will install patera with basic dependencies. For some subpackages you will need additional dependencies. Options are:
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Running the application](#running-the-application)
+- [Configuration](#configuration)
+- [The application class](#the-application-class)
+- [Project layout and auto-discovery](#project-layout-and-auto-discovery)
+- [Controllers](#controllers)
+- [Requests and responses](#requests-and-responses)
+- [Routing behaviour](#routing-behaviour)
+- [Services and dependency injection](#services-and-dependency-injection)
+- [Exception handling](#exception-handling)
+- [Templates](#templates)
+- [Static files and static pages](#static-files-and-static-pages)
+- [CORS](#cors)
+- [Middleware](#middleware)
+- [OpenAPI](#openapi)
+- [Logging](#logging)
+- [Command line interface](#command-line-interface)
+- [Testing](#testing)
+- [Extensions](#extensions)
+- [Developing Patera](#developing-patera)
 
-**Caching**
-```
-uv add "patera[cache]"
-```
+## Installation
 
-**Scheduler**
-```
-uv add "patera[scheduler]"
-```
+Patera requires Python 3.13 or newer. We recommend [uv](https://docs.astral.sh/uv/):
 
-**AI interface** (experimental)
-```
-uv add "patera[ai_interface]"
-```
-
-**Full install**
-```
-uv add "patera[full]"
-```
-
-##Getting started with project template
-
-```
-uv run patera new-project
-```
-
-or with pip (don't forget to activate the virtual environment)
-```
-pipx patera new-project
+```sh
+uv init --python 3.13 my-app
+cd my-app
+uv add "patera[dev]"     # core + uvicorn/watchfiles for the development server
 ```
 
-This will create a template project structure which you can use to get started.
+or with pip:
 
-## Blank start
+```sh
+pip install "patera[dev]"
+```
 
-If you wish to start without the template you can do that ofcourse. However, we recommend you have a look at the template structure to see how to organize your project. There is also an example project in the "examples/dev" folder of this GitHub repo where you can see the app structure and recommended patterns.
+Optional features are installed with extras:
 
-A minimum app example would be:
+| Extra | Installs | Purpose |
+| --- | --- | --- |
+| `dev` | uvicorn, watchfiles | development server with auto-reload (`patera dev`) |
+| `testing` | pytest, pytest-asyncio, httpx, ... | testing tools (`patera test`) |
+| `database` | `patera-database` | async SQLAlchemy integration |
+| `migrate` | `patera-migrate` | SQL migrations (pyway) |
+| `auth` | `patera-auth` | authentication/authorization middleware |
+| `caching` | `patera-caching` | response caching (in-memory) |
+| `caching-redis` / `caching-sqlite` | + redis / aiosqlite | Redis or SQLite cache backends |
+| `taskmanager` | `patera-taskmanager` | scheduled and background tasks (APScheduler) |
+| `email` | `patera-email` | SMTP e-mail client |
+| `apiinterface` | `patera-apiinterface` | declarative clients for external HTTP APIs |
+| `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental, installs PyTorch) |
+| `admin` | `patera-admin` | admin dashboard |
+| `desktop` | `patera-desktop` | run the app as a desktop application (pywebview) |
+| `all` | all of the above except `desktop` | |
+
+```sh
+uv add "patera[database,auth,caching]"
+```
+
+## Quick start
+
+A Patera project is a Python package (by default called `app`):
 
 ```
-#app/__init__.py <-- in the app folder
+my-app/
+  app/
+    __init__.py          # the application class
+    configs.py           # configuration
+    api/
+      greeting_api.py    # controllers are discovered automatically
+    templates/
+    static/
+  .env
+  pyproject.toml
+```
 
-from app.configs import Config
-from patera import Patera, app, on_shutdown, on_startup
+`app/configs.py`:
 
-@app(__name__, configs = Config)
-class Application(Patera):
+```python
+import os
+
+from patera import BaseConfig
+
+
+class Config(BaseConfig):
+    BASE_PATH: str = os.path.dirname(__file__)  # required
+    APP_NAME: str = "My app"
+    VERSION: str = "1.0.0"
+```
+
+`app/__init__.py`:
+
+```python
+from patera import Patera, app
+
+from .configs import Config
+
+
+@app(__name__, configs=Config)
+class App(Patera[Config]):
     pass
 ```
 
-and the configuration object is:
+`app/api/greeting_api.py`:
 
-```
-#app/configs.py <-- in the app folder
-
-import os
-from patera import BaseConfig
-
-class Config(BaseConfig): #must inherit from BaseConfig
-    """Config class"""
-    APP_NAME: str = "Test app"
-    VERSION: str = "1.0"
-    SECRET_KEY: str = "some-super-secret-key" #change for a secure random string
-    BASE_PATH: str = os.path.dirname(__file__)
-    DEBUG: bool = True
-```
-
-Available configuration options of the application are:
-
-```
-APP_NAME: str = Field(description="Human-readable name of the app")
-VERSION: str = Field(description="Application version")
-BASE_PATH: str #base path of app. os.path.dirname(__file__) in the configs.py file is the usual value
-
-REQUEST_CLASS: Type[Request] = Field(Request, description="Request class used for handling application requests. Must be a subclass of patera.request.Request")
-RESPONSE_CLASS: Type[Response] = Field(Response, description="Response class used for returning application responses. Must be a subclass of patera.response.Response")
-
-# required for Authentication extension
-SECRET_KEY: Optional[str]
-
-# optionals with sensible defaults
-DEBUG: Optional[bool] = True
-HOST: Optional[str] = "localhost"
-TEMPLATES_DIR: Optional[str] = "/templates"
-STATIC_DIR: Optional[str] = "/static"
-STATIC_URL: Optional[str] = "/static"
-TEMPLATES_STRICT: Optional[bool] = True
-STRICT_SLASHES: Optional[bool] = False
-OPEN_API: Optional[bool] = True
-OPEN_API_URL: Optional[str] = "/openapi"
-OPEN_API_DESCRIPTION: Optional[str] = "Simple API"
-
-#global CORS policy - optional with defaults
-CORS_ENABLED: Optional[bool] = True #use cors
-CORS_ALLOW_ORIGINS: Optional[list[str]] = ["*"] #List of allowed origins
-CORS_ALLOW_METHODS: Optional[list[str]] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] #allowed methods
-CORS_ALLOW_HEADERS: Optional[list[str]] = ["Authorization", "Content-Type"] #List of allowed headers
-CORS_EXPOSE_HEADERS: Optional[list[str]] = [] # List of headers to expose
-CORS_ALLOW_CREDENTIALS: Optional[bool] = True #Allow credentials
-CORS_MAX_AGE: Optional[int] = None #Max age in seconds. None to disable
-
-# controllers, extensions, models
-CONTROLLERS: Optional[List[str]] #import strings
-CLI_CONTROLLERS: Optional[List[str]] #import strings
-EXTENSIONS: Optional[List[str]] #import strings
-MODELS: Optional[List[str]] #import strings
-EXCEPTION_HANDLERS: Optional[List[str]] #import strings
-MIDDLEWARE: Optional[List[str]] #import strings
-LOGGERS: Optional[List[str]] #import strings
-
-DEFAULT_LOGGER: dict[str, Any] = {
-    LEVEL: Optional[LogLevel] = LogLevel.TRACE
-    FORMAT: Optional[str] = "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}<level>"
-    BACKTRACE: Optional[bool] = True
-    DIAGNOSE: Optional[bool] = True
-    COLORIZE: Optional[bool] = True
-}
-```
-
-You can then run the app with a run script:
-
-```
-#run.py <-- in the root folder
-
-if __name__ == "__main__":
-    import uvicorn
-    from app.configs import Config
-    configs = Config() #to load default values of user does not provide them
-    uvicorn.run("app:Application", host=configs.HOST, port=configs.PORT, lifespan=configs.LIFESPAN, reload=configs.DEBUG, factory=True)
-```
-
-```sh
-uv run --env-file .env.dev run.py
-```
-
-or directly from the terminal with:
-
-```sh
-uv run --env-file .env.dev uvicorn app:Application --reload --port 8080 --factory --host localhost
-```
-
-This will start the application on localhost on port 8080 with reload enabled (debug mode). The **lifespan** argument is important when you wish to use a database connection or other on_startup/on_shutdown methods. If lifespan="on", uvicorn will give startup/shutdown signals which the app can use to run certain methods. Other lifespan options are: "auto" and "off".
-
-The ***--env-file .env.dev*** can be omitted if environmental variables are not used.
-
-### Startup and shutdown methods
-
-Sometimes we wish to add startup and shutdown methods to our application. One of the most common reasons is connecting to a database at startup and disconnecting at shutdown. In fact, this is what the SqlDatabase extension does automatically (see Extensions section below).
-To add such methods, we can add them to the application class implementation like this:
-
-```
-from app.configs import Config
-from patera import Patera, app, on_shutdown, on_startup
-
-
-@app(__name__, configs = Config)
-class Application(Patera):
-
-    @on_startup
-    async def first_startup_method(self):
-        print("Starting up...")
-
-    @on_shutdown
-    async def first_shutdown_method(self):
-        print("Shuting down...")
-```
-
-All methods decorated with the @on_startup or @on_shutdown decorators will be executed when the application starts. In theory, any number of methods can be defined and decorated, however, they will be executed in alphabetical order which can cause issues if not careful. Therefore we suggest you use a single method per-decorator and use it to delegate work to other methods in the correct order.
-
-
-### Application methods and properties
-
-```
-def get_conf(self, config_name: str, default: Any = None) -> Any:
-    """
-    Returns app configuration with provided config_name.
-    Raises error if configuration is not found.
-    """
-
-def url_for(self, endpoint: str, **values) -> str:
-    """
-    Returns url for endpoint method/handler
-    :param endpoint: the name of the endpoint handler method namespaced with the controller name
-    :param values: dynamic route parameters
-    :return: url (string) for endpoint
-    """
-
-def run_cli(self):
-    """
-    Runs the app and executes a CLI command (does not start the actual server).
-    """
-@property
-def configs(self) -> dict[str, Any]:
-    """
-    Returns the entire application configuration dictionary
-    """
-
-@property
-def root_path(self) -> str:
-    """
-    Returns root path of application
-    """
-
-@property
-def app(self):
-    """
-    Returns self
-    For compatibility with the Controller class
-    which contains the app object on the app property
-    """
-
-@property
-def static_files_path(self) -> str:
-    """Static files paths"""
-
-@property
-def version(self) -> str:
-    """Returns app version"""
-
-@property
-def app_name(self) -> str:
-    """Returns app name"""
-
-@property
-def logger(self):
-    """Returns the logger object (from Loguru)"""
-```
-
-## Logging
-
-Patera uses Loguru for logging. It is available through the application object (***app.logger: Logger***) in every controller endpoint through the ***self*** keyword in endpoint methods. A default logger is configured for the application. You can modify its behaviour through application configurations. Configurations with defaults are:
-
-```
-LEVEL: Optional[LogLevel] = LogLevel.TRACE
-FORMAT: Optional[str] = "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}<level>"
-BACKTRACE: Optional[bool] = True
-DIAGNOSE: Optional[bool] = True
-COLORIZE: Optional[bool] = True
-```
-
-To change the configurations you have to create a new dictionary with the name **DEFAULT_LOGGER** in the app configurations and provide the above configuration options. Example:
-
-```
-#from patera import LogLevel
-
-DEFAULT_LOGGER: dict[str, Any] = {
-    "LEVEL": LogLevel.DEBUG,
-    "FORMAT": "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}<level>"
-    "BACKTRACE": True
-    "DIAGNOSE": True
-    "COLORIZE": True
-    "SERIALIZE": False
-    "ENCODING": "utf-8"
-}
-```
-
-### Adding custom logger sinks
-
-Patera uses the same global Logger instance everywhere. However, you can configure different sinks and configure filters, output formats etc.
-To add a custom logger you have to create a class which inherits from the LoggerBase class
-
-```
-#app/loggers/file_logger.py
-from patera.logging import LoggerBase
-
-class FileLogger(LoggerBase):
-    """File logger example"""
-```
-
-and then simply add the logger to the application configs:
-
-```
-#configs.py
-
-LOGGERS: Optional[List[str]] = ['app.logging.file_logger:FileLogger']
-```
-
-To configure the file logger you have to add an app config field (dictonary) with the name of the logger as
-upper-snake-case (FileLogger -> FILE_LOGGER):
-
-```
-#configs.py
-import os
-from patera import LogLevel
-
-FILE_LOGGER: dict[str, Any] = {
-    SINK: Optional[str|Path] = os.path.join(BASE_PATH, "logging", "file.log"),
-    LEVEL: Optional[LogLevel] = LogLevel.TRACE,
-    FORMAT: Optional[str] = "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}</level>",
-    ENQUEUE: Optional[bool] = False,
-    BACKTRACE: Optional[bool] = True,
-    DIAGNOSE: Optional[bool] = True,
-    COLORIZE: Optional[bool] = True,
-    DELAY: Optional[bool] = True,
-    ROTATION: Optional[RotationType] = "5 MB", #accepts: str, int, timedelta
-    RETENTION: Optional[RetentionType] = "5 files", #accepts: str, int or timedelta
-    COMPRESSION: CompressionType = "zip",
-    SERIALIZE: Optional[bool] = False
-    ENCODING: Optional[str] = "utf-8",
-    MODE: Optional[str] = "a",
-}
-```
-This will add a file sink which will write a "file.log" file until it reaches the 5 MB threshold size. When this size is reached, the file is renamed "file.log.<TIME_STAMP>" and a new "file.log" is started. The setup will rotate 5 files.
-
-If you wish to implement log filtering or more complex formating you can simply override the default methods of the LoggerBase class:
-
-**WARNING**
-When using ENQUEUE=True, you MUST use server lifespan events to trigger appropriate removal of added sinks at application shutdown. Otherwise, a warning (resource tracker) for leaked semaphore objects will be triggered.
-
-```
-class FileLogger(LoggerBase):
-    """Example file logger"""
-
-    def get_format(self) -> str:
-        """Should return a valid format string for the logger output"""
-        return self.get_conf_value(
-            "FORMAT",
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level: <8}</level> | {extra[logger_name]} | "
-            "{name}:{function}:{line} - <cyan>{message}</cyan>",
-        )
-
-    def get_filter(self) -> FilterType:
-        """Should return a filter method which returns a boolean"""
-        return None
-```
-
-For example, the ***get_format*** method could return a valid JSON format string for the logger (to create a .jsonl file) and the filter method could filter log messages for specific phrases to destinguish between different log messages. Example filter method:
-
-```
-def get_filter(self):
-    def _filter(record: dict[str, any]) -> bool:
-        # Only log messages where the message includes the string "PERFORMANCE"
-        # Message from a performance logger for bottleneck detection.
-        return "PERFORMANCE" in record["message"]
-
-    return _filter
-```
-
-Every logger accepts all of the above configurations, however, some are only applied to file loggers (retention, rotation, queueu, etc) because they don't make sense for simple console loggers. **DEFAULT** sink is ***STDERR***, but ***STDOUT*** is also accepted.
-
-
-## Adding controllers for request handling
-
-Controllers are created as classes with **async** methods that handle specific requests. An example controller is:
-
-```
-#app/api/users/user_api.py
-
-from patera import Request, Response, HttpStatus, MediaType
-from patera.controller import Controller, path, get, produces, post, consumes
+```python
 from pydantic import BaseModel
 
-class UserData(BaseModel):
-    email: str
-    fullname: str
+from patera import HttpStatus, MediaType, Request, Response
+from patera.controller import Controller, consumes, get, path, post, produces
 
-@path("/api/v1/users")
-class UsersApi(Controller):
+from app import App
 
-    @get("/<int:user_id>")
+
+class Greeting(BaseModel):
+    name: str
+
+
+@path("/api/v1/greetings")
+class GreetingApi(Controller[App]):
+    @get("/")
     @produces(MediaType.APPLICATION_JSON)
-    async def get_user(self, req: Request, user_id: int) -> Response:
-        """Returns a user by user_id"""
-        #some logic to load the user
-
-        return req.response.json({
-            "id": user_id,
-            "fullname": "John Doe",
-            "email": "johndoe@email.com"
-        }).status(HttpStatus.OK)
+    async def hello(self, req: Request) -> Response:
+        return req.res.json({"message": "Hello, World!"})
 
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
-    @produces(MediaType.APPLICATION_JSON)
-    async def create_user(self, req: Request, user_data: UserData) -> Response[UserData]:
-        """Creates new user"""
-        #logic for creating and storing user
-        return req.response.json(user_data).status(HttpStatus.CREATED)
-
-```
-Each endpoint method has access to the application object and its configurations and methods via the self argument (self.app: Patera).
-The controller must be registered with the application in the configurations:
-
-```
-CONTROLLERS: List[str] = [
-    'app.api.users.user_api:UserApi' #path:Controller
-]
+    @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
+    async def greet(self, req: Request, greeting: Greeting) -> Response:
+        return req.res.json({"message": f"Hello, {greeting.name}!"})
 ```
 
-In the above example controller the **post** route accepts incomming json data (@consumes) and automatically
-injects it into the **user_data** variable with a Pydantic BaseModel type object. The incomming data is also automatically validated
-and raises a validation error (422 - Unprocessible entity) if data is incorrect/missing. For more details about data validation and options we suggest you take a look at the Pydantic library. The @produces decorator automatically sets the correct content-type on the
-response object and the return type hint (-> Response[UserData]:) indicates as what type of object the response body should be serialized.
+Start the development server and open <http://localhost:3000/api/v1/greetings/>:
 
-### Available decorators for controllers
-
-```
-@path(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
+```sh
+uv run patera dev
 ```
 
-This is the main decorator for a controller. It assignes the controller a url path and controlls if the controller should be included in the OpenApi specifications.
-It also assignes tag(s) for grouping of controller endpoints in the OpenApi specs.
+The generated API documentation is available at <http://localhost:3000/openapi/docs>.
+A complete small example lives in [`examples/basic_app`](examples/basic_app).
 
-```
-@get(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
-@post(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
-@put(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
-@patch(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
-@delete(url_path: str, open_api_spec: bool = True, tags: list[str]|None = None)
-@socket(url_path: str) #for webwocket connections
-```
+## Running the application
 
-Main decorator assigned to controller endpoint methods. Determines the type of http request an endpoint handles (GET, POST, PUT, PATCH or DELETE), the endpoint url path (conbines with the controller path), if it should be added to the OpenApi specifications and fine grain endpoint grouping in the OpenApi specs via the **tags** argument.
+The `patera` command finds your application class automatically (it looks for the class decorated
+with `@app` in `app/__init__.py`, `app/app.py`, `app/main.py`, ...). Use `--app module:Class` or the
+`PATERA_IMPORT` environment variable to point at it explicitly, and `PATERA_APP_PACKAGE` if your
+package is not called `app`.
 
-```
-@consumes(media_type: MediaType)
-```
+| Command | Description |
+| --- | --- |
+| `patera dev [--app app:App] [--env-file .env]` | development server (uvicorn) with auto-reload. Loads `.env`, `.env.dev` or `.env.local` if no file is given. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `localhost:3000`). |
+| `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian)), `DEBUG` is forced off. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
+| `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
+| `patera test [--env-file .env.test] [pytest args...]` | runs pytest after loading the test environment file. |
+| `patera desktop [--mode dev\|prod]` | runs the app as a desktop application (needs `patera-desktop`). |
 
-Indicates the kind of http request body this endpoint consumes (example: MediaType.APPLICATION_JSON, indicates it needs a json request body.). Available options are:
+The application class is an ASGI application factory, so any ASGI server works, e.g.
+`uvicorn app:App --factory --lifespan on`. Keep lifespan enabled: startup/shutdown hooks
+(database connections, schedulers, ...) depend on it.
 
-```
-APPLICATION_X_WWW_FORM_URLENCODED = "application/x-www-form-urlencoded"
-MULTIPART_FORM_DATA = "multipart/form-data"
-APPLICATION_JSON = "application/json"
-APPLICATION_PROBLEM_JSON = "application/problem+json"
-APPLICATION_XML = "application/xml"
-TEXT_XML = "text/xml"
-TEXT_PLAIN = "text/plain"
-TEXT_HTML = "text/html"
-APPLICATION_OCTET_STREAM = "application/octet-stream"
-IMAGE_PNG = "image/png"
-IMAGE_JPEG = "image/jpeg"
-IMAGE_GIF = "image/gif"
-APPLICATION_PDF = "application/pdf"
-APPLICATION_X_NDJSON = "application/x-ndjson"
-APPLICATION_CSV = "application/csv"
-TEXT_CSV = "text/csv"
-APPLICATION_YAML = "application/yaml"
-TEXT_YAML = "text/yaml"
-APPLICATION_GRAPHQL = "application/graphql"
-NO_CONTENT = "empty"
+## Configuration
+
+Configuration classes inherit from `patera.BaseConfig`, a
+[pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) model.
+Every option can be overridden with an environment variable prefixed with `PATERA_`.
+Nested values use `__` as separator:
+
+```sh
+PATERA_DEBUG=false
+PATERA_PORT=8080
+PATERA_CORS_ALLOW_ORIGINS='["https://app.example.com"]'
+PATERA_MAIN_DB__DATABASE_URI=postgresql+asyncpg://user:pass@db/app
 ```
 
-If this decorator is used it must be used in conjuction with a Pydantic data class provided as a parameter in the endpoint method:
+Extension and middleware settings are regular fields of your config class, named after the class in
+UPPER_SNAKE_CASE (`MainDb` → `MAIN_DB`, `PublicCache` → `PUBLIC_CACHE`). See
+[Services and dependency injection](#services-and-dependency-injection).
 
-```
-@post("/")
-@consumes(MediaType.APPLICATION_JSON)
-@produces(MediaType.APPLICATION_JSON)
-async def create_user(self, req: Request, data: TestModel) -> Response[ResponseModel]:
-    """Consumes and produces json"""
-```
+Read configuration values with `app.configs.NAME`, `app.get_conf("NAME", default)` (supports dotted
+paths into nested models and dictionaries: `app.get_conf("MAIN_DB.DATABASE_URI")`) or the
+`ConfigVar` descriptor in controllers and services.
 
-TestModel is a Pydantic class.
+Built-in options:
 
-```
-@produces(media_type: MediaType)
-```
+| Option | Default | Description |
+| --- | --- | --- |
+| `BASE_PATH` | *required* | Directory of the application package (`os.path.dirname(__file__)`). |
+| `APP_PACKAGE` | `"app"` | Name of the application package. |
+| `APP_NAME` | `"Patera app"` | Human readable name (logs, OpenAPI title). |
+| `VERSION` | `"1.0"` | Application version (OpenAPI). |
+| `DEBUG` | `True` | Debug mode. Unhandled exceptions propagate in debug mode and become a generic 500 response otherwise. `@development` routes only exist in debug mode. |
+| `HOST` / `PORT` / `PROTOCOL` | `"localhost"` / `3000` / `"http"` | Used for the OpenAPI server URL and startup message. |
+| `LIFESPAN` | `"on"` | For custom run scripts; `patera dev`/`prod` always enable lifespan. |
+| `REQUEST_CLASS` / `RESPONSE_CLASS` | `Request` / `Response` | Custom subclasses of the request/response classes. |
+| `TEMPLATES_DIR` | `"templates"` | Template folder, relative to `BASE_PATH`. |
+| `TEMPLATES_STRICT` | `True` | Undefined template variables raise errors. |
+| `AUTO_RELOAD` | `True` | Reload changed templates. |
+| `STATIC_DIR` / `STATIC_URL` | `"static"` / `"/static"` | Static files folder and URL prefix. |
+| `STATIC_CONTROLLER_NAME` | `"static"` | `url_for` alias for static files: `url_for("static", filename="app.css")`. |
+| `USE_STATIC_PAGES` | `False` | Serve HTML pages from `STATIC_PAGES_DIR`. |
+| `STATIC_PAGES_DIR` / `STATIC_PAGES_URL` | `"static_pages"` / `"/"` | Static pages folder and URL prefix. |
+| `STATIC_PAGES_CONTROLLER_NAME` | `"static_pages"` | `url_for` alias for pages: `url_for("static_pages", page="about")`. |
+| `STRICT_SLASHES` | `False` | If `False`, `/users` and `/users/` match the same route. |
+| `OPEN_API` / `OPEN_API_URL` / `OPEN_API_DESCRIPTION` | `True` / `"/openapi"` / `"Simple API"` | OpenAPI documentation. |
+| `CORS_ENABLED` | `True` | Global CORS handling. |
+| `CORS_ALLOW_ORIGINS` | `["*"]` | Allowed origins. |
+| `CORS_ALLOW_METHODS` | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed methods. |
+| `CORS_ALLOW_HEADERS` | `["Authorization", "Content-Type"]` | Allowed request headers. |
+| `CORS_EXPOSE_HEADERS` | `[]` | Response headers exposed to the browser. |
+| `CORS_ALLOW_CREDENTIALS` | `True` | Allow credentials (the request origin is echoed instead of `*`). |
+| `CORS_MAX_AGE` | `None` | Preflight cache time in seconds. |
+| `DEFAULT_LOGGER` | see [Logging](#logging) | Configuration of the default log sink. |
+| `IN_MEMORY_LOG_BUFFER_SIZE` | `1000` | Number of log records kept in memory (admin dashboard). |
+| `CONTROLLER_FOLDERS`, `CLI_CONTROLLER_FOLDERS`, `EXCEPTION_HANDLER_FOLDERS`, `MIDDLEWARE_FOLDERS`, `LOGGER_FOLDERS` | `None` | Additional folders for [auto-discovery](#project-layout-and-auto-discovery). |
 
-The produces decorator indicates and sets the media type of the response body. Although the media type is set automatically it still shows a warning if the actual media type which was set in the endpoint by the developer does not match the intended value.
+## The application class
 
-```
-@open_api_docs(*args: Descriptor)
-```
+```python
+from patera import Patera, app, app_path, on_shutdown, on_startup
+from patera.injectable import Inject
 
-This decorator sets the possible return types of the decorated endpoint if the request was not successful (example: 404, 400, 401, 403 response codes). It accepts any number of Descriptor objects:
+from .configs import Config
+from .services.greetings import GreetingService
+from .database import Databases
 
-```
-Descriptor(status: HttpStatus = HttpStatus.BAD_REQUEST, description: str|None = None, media_type: MediaType = MediaType.APPLICATION_JSON, body: Type[BaseModel]|None = None)
-```
 
-like this:
+@app_path("/demo")                 # optional prefix for every controller route
+@app(__name__, configs=Config)
+class App(Patera[Config]):
+    app_extensions = [Databases]   # extensions created at startup
+    greetings: Inject[GreetingService]
 
-```
-@get("/<int:user_id>")
-@produces(MediaType.APPLICATION_JSON)
-@open_api_docs(Descriptor(status=HttpStatus.NOT_FOUND, description="User not found", body=ErrorResponse),
-                Descriptor(status=HttpStatus.BAD_REQUEST, description="Bad request", body=ErrorResponse))
-async def get_user(self, req: Request, user_id: int) -> Response[ResponseModel]:
-    """Endpoint logic """
-```
+    @on_startup
+    async def start(self) -> None:
+        self.logger.info("Starting")
 
-The above example adds two possible endpoint responses (NOT_FOUND and BAD_REQUEST) with descriptions and what type of object is returned as json (default).
-
-```
-@development
-```
-
-This decorator can be applied to the controller class or individual endpoints. Controllers/endpoints with this decorator will be
-disabled (unreachable) when the application is not in ***DEBUG*** mode (when ***DEBUG=False***). The decorator is for easy disabling
-of features which are not yet ready for production.
-
-### Request and Response objects
-
-Each request gets its own Request object which is passed to the controller endpoint method. The Request object contains all
-request parameters:
-
-```
-req: Request
-req.route_parameters -> dict[str, int|str] #route parameters as a dictionary
-req.method -> str #http method (uppercase string: GET, POST, PUT, PATCH, DELETE)
-req.path -> str #request path (url: str)
-req.query_string -> str #(the entire query string - what comes after "?" in the url)
-req.headers -> dict[str, str] #all request headers
-req.query_params -> dict[str, str] #query parameters as a dictionary
-req.user -> Any #loaded user (if present). See the authentication implementation below.
-req.res -> Response #the Response object
-req.state -> Any #for setting any state which must be passed down in the request chain (i.e. middleware etc)
-```
-
-The response object provided on the Request object has methods:
-
-```
-req.res: Response
-req.res.status(self, status_code: int|HttpStatus) -> Self #sets http status code
-req.res.redirect(self, location: str, status_code: int|HttpStatus = HttpStatus.SEE_OTHER) -> instructs client to redirect to location
-req.res.json(self, data: Any) -> Self #sets a json object as the response body
-req.res.no_content(self) -> Self #no content response
-req.res.text(self, text: str) -> Self #sets text as the response body
-req.res.html_from_string(self, text: str, context: Optional[dict[str, Any]] = None) -> Self #creates a rendered template from the provided string
-req.res.html(self, template_path: str, context: Optional[dict[str, Any]] = None) -> Self #creates a rendered template from the template file
-req.res.send_file(self, body, headers) -> Self #sends a file as the response
-req.res.set_header(self, key: str, value: str) -> Self #sets response header
-req.res.set_cookie(self, cookie_name: str, value: str,
-                   max_age: int|None = None, path: str = "/",
-                   domain: str|None = None, secure: bool = False,
-                   http_only: bool = True) -> Self #sets a cookie in the response
-delete_cookie(self, cookie_name: str,
-                      path: str = "/", domain: Optional[str] = None) -> Self #deletes a cookie
+    @on_shutdown
+    async def stop(self) -> None:
+        self.logger.info("Stopping")
 ```
 
+Startup and shutdown hooks run in alphabetical order of their method names; use a single hook per
+event that calls other methods in the order you need. If a startup hook raises, the server is
+notified that startup failed. Extensions add their own hooks with
+`app.add_on_startup_method(...)`/`app.add_on_shutdown_method(...)`.
 
-### Before and after request handling in Controllers
+Useful members of the application object:
 
-Sometimes we need to process a request before it ever hits the endpoint. For this, middleware or additional decorators is often used. If only a specific endpoint needs
-this pre- or postprocessing, decorators are the way to go, however, if all controller endpoints need it we can add methods to the controller which will run for each request.
-We can to this by adding and decorating controller methods:
+| Member | Description |
+| --- | --- |
+| `configs`, `get_conf(name, default=None)` | configuration |
+| `url_for(endpoint, **params)` | URL of an endpoint (`"Controller.method"`, `"alias.method"`, `"static"`) |
+| `get_extension(cls)`, `extensions` | registered extensions/services |
+| `get_controller(cls_or_name)`, `controllers` | registered controller instances |
+| `register_controller(*classes)` | register controllers manually |
+| `register_exception_handler(*classes)` | register exception handlers manually |
+| `register_middleware(cls, order=None)` | register middleware manually (before the first request) |
+| `add_template_path(path)` | additional template folder |
+| `add_on_startup_method(fn)`, `add_on_shutdown_method(fn)` | lifespan hooks |
+| `json_spec` | the OpenAPI specification (dict) |
+| `logger` | the [Loguru](https://loguru.readthedocs.io) logger |
+| `root_path`, `static_files_path`, `app_name`, `version` | |
+| `default_exception_response(req, exc)` | override to customize the [default error responses](#exception-handling) |
 
-```
-#at the top of the controller file:
-from patera.controller import (Controller, path, get, produces, before_request, after_request)
-####
-@path("/api/v1/users", tags=["Users"])
-class UsersApi(Controller):
+## Project layout and auto-discovery
 
-    @before_request
-    async def before_request_method(self, req: Request):
-        """Some before request logic"""
+When the application is created, Patera imports modules from well-known folders inside the
+application package and registers the classes it finds. A module is imported if its folder and
+file name match:
 
-    @after_request
-    async def after_request_method(self, res: Response):
-        """Some after request logic"""
+| Kind | Folders | File name contains | Registered when |
+| --- | --- | --- | --- |
+| Controllers | `api`, `public`, `controllers`, `routers`, `routes` | `api`, `controller`, `public`, `router`, `routes` | decorated with `@path` |
+| Exception handlers | `exceptions`, `exc_controllers` | `handler`, `exception_controller`, `controller` | decorated with `@exception_handler` |
+| Middleware | `middleware`, `middlewares` | `middleware`, `mw` | decorated with `@middleware` |
+| CLI controllers | `cli`, `cli_controllers`, `clis` | `cli`, `cli_controller` | decorated with `@cli_controller` (CLI mode only) |
+| Loggers | `logging`, `loggers` | `logger`, `log_sink`, `logging` | decorated with `@logger` |
+
+Folders are searched recursively. Add folders with the `*_FOLDERS` options. Classes marked with
+`@ignore` are skipped; classes (and endpoint methods) marked with `@development` are only registered
+when `DEBUG` is on. Anything can also be registered explicitly with the `register_*` methods.
+
+## Controllers
+
+A controller is a class that groups endpoints under a base path:
+
+```python
+from pydantic import BaseModel
+
+from patera import HttpStatus, MediaType, Request, Response
+from patera.controller import (
+    Controller, after_request, before_request, consumes, delete, get, patch, path, post, produces, put,
+)
+
+from app import App
+
+
+class UserIn(BaseModel):
+    name: str
+    email: str
+
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+
+@path("/api/v1/users", tags=["Users"], alias="users")
+class UserApi(Controller[App]):
 
     @get("/")
-    @produces(MediaType.APPLICATION_JSON)
-    async def get_users(self, req: Request) -> Response[ResponseModel]:
-        """Endpoint for returning all app users"""
-        #await asyncio.sleep(10)
-        session = db.create_session()
-        users = await User.query(session).all()
-        response: ResponseModel = ResponseModel(message="All users fetched.",
-                                                status="success", data=None)
-        await session.close() #must close the session
-        return req.response.json(response).status(HttpStatus.OK)
+    async def list_users(self, req: Request) -> Response[list[UserOut]]:
+        return req.res.json([{"id": 1, "name": "Ana"}])
+
+    @get("/<int:user_id>")
+    async def get_user(self, req: Request, user_id: int) -> Response[UserOut]:
+        return req.res.json({"id": user_id, "name": "Ana", "password_hash": "..."})
+
+    @post("/")
+    @consumes(MediaType.APPLICATION_JSON)
+    @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
+    async def create_user(self, req: Request, user: UserIn) -> Response[UserOut]:
+        return req.res.json({"id": 2, "name": user.name})
+
+    @delete("/<int:user_id>")
+    async def delete_user(self, req: Request, user_id: int) -> Response:
+        return req.res.no_content()
+
+    @before_request
+    async def before(self, req: Request) -> None:
+        ...  # runs before every endpoint of this controller
+
+    @after_request
+    async def after(self, res: Response) -> None:
+        res.set_header("x-controller", "users")
 ```
 
-The before and after request methods don't have to return anything. The request/response objects can be manipulated in-place. In theory, any number of methods
-can be decorated with the before- and after_request decorators and all will run before the request is passed to the endpoint method, however, they are executed in
-alphabetical order which can be combersome. This is why we suggest you use a single method which calls/delegates work to other methods.
+- `@path(url, open_api_spec=True, tags=None, alias=None)` – base path of the controller. `alias` is
+  an alternative name for `url_for` (`url_for("users.get_user", user_id=1)`); the class name always
+  works too (`url_for("UserApi.get_user", user_id=1)`). Several controllers may share a base path.
+- `@get`, `@post`, `@put`, `@patch`, `@delete(url, open_api_spec=True, tags=None)` – endpoints.
+  The first argument after `self` is always the `Request`; route parameters are passed as keyword
+  arguments. Handlers may be `async` or plain functions (these run in a thread pool).
+- Route parameters use [Werkzeug converters](https://werkzeug.palletsprojects.com/en/stable/routing/#built-in-converters):
+  `<name>`, `<int:id>`, `<float:x>`, `<uuid:key>`, `<path:rest>` (matches slashes), ...
+- `@consumes(MediaType)` – the request must have this content type (otherwise `415`). Parameters
+  annotated with a Pydantic model are validated from the JSON body, url-encoded form or multipart
+  form (including `UploadedFile` fields). Invalid data returns `422` with the validation errors
+  unless you [handle](#exception-handling) `pydantic.ValidationError` yourself.
+- `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
+  explicitly set content type/status wins). Documented in OpenAPI.
+- `-> Response[Model]` – a dict body is validated and serialized through `Model`, which filters
+  out undeclared fields (e.g. `password_hash` above). The annotation (also generic ones like
+  `list[Model]`) documents the response in OpenAPI.
+- `@before_request` / `@after_request` – controller level hooks. `@after_init` methods run once after
+  the controller is created.
+- `@open_api_docs(Descriptor(status, description, media_type, body))` – document error responses.
+- `@cors(...)` / `@no_cors` – per-endpoint [CORS](#cors) settings.
+- `@development` – endpoint (or controller) only exists in debug mode; `@ignore` – never registered.
 
 ### Websockets
 
-You can add a websocket handler to any controller by using the ***@socket(url_path: str)*** decorator on the handler method.
+```python
+from patera.controller import Controller, path, socket
 
-```
-@path("/api/v1/users", tags=["Users"])
-class UsersApi(Controller):
 
-    @socket("/ws")
-    #@auth.login_required
-    #@role_required
-    async def socket_handler(self, req: Request) -> None:
-        """
-        Example socket handler
-        This method doesn't return anything. It is receiving/sending messages directly via the Request and Response objects.
-        """
-        #accept the connection
+@path("/ws")
+class ChatSocket(Controller[App]):
+    @socket("/chat/<room>")
+    async def chat(self, req: Request, room: str) -> None:
+        await req.receive()   # {"type": "websocket.connect"}
         await req.accept()
         while True:
-            data = await req.receive()
-            if data["type"] == "websocket.disconnect":
-                break #breaks the loop if the user disconnects
-            if data["type"] == "websocket.receive":
-                ##some logic to perform when user sends a message
-                await req.res.send({
-                    "type": "websocket.send",
-                    "text": "Hello from server. Echo: " + data.get("text", "")
-                })
+            message = await req.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+            await req.send({"type": "websocket.send", "text": f"[{room}] {message.get('text')}"})
 ```
 
-This is a minimal websocker handler implementation. It first accepts the connection and then listens to receiving/incomming messages and sends responses.
-The handler method can be protected with ***@login_required*** and ***@role_required*** decorators from the authentication extension. See implementation details in the
-extension section.
+Websocket handlers receive the raw ASGI messages through `req.receive()`/`req.send()`; HTTP
+middleware is not applied to them.
 
-## CORS
+## Requests and responses
 
-Patera has built-in CORS support. There are several configurations which you can set to in the Config class to configure CORS.
-Configuration options with default values are:
+`Request`:
 
-```
-CORS_ENABLED: Optional[bool] = True #use cors
-CORS_ALLOW_ORIGINS: Optional[list[str]] = ["*"] #List of allowed origins
-CORS_ALLOW_METHODS: Optional[list[str]] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] #allowed methods
-CORS_ALLOW_HEADERS: Optional[list[str]] = ["Authorization", "Content-Type"] #List of allowed headers
-CORS_EXPOSE_HEADERS: Optional[list[str]] = [] # List of headers to expose
-CORS_ALLOW_CREDENTIALS: Optional[bool] = True #Allow credentials
-CORS_MAX_AGE: Optional[int] = None #Max age in seconds. None to disable
-```
+| Member | Description |
+| --- | --- |
+| `method`, `path`, `query_string`, `headers` (lower-case keys) | request line and headers |
+| `query_parameters` | dict; repeated keys become lists |
+| `route_parameters` | parsed route parameters |
+| `await body()`, `await json()` | raw body / parsed JSON (`None` if empty or invalid) |
+| `await form()`, `await files()`, `await form_and_files()` | url-encoded and multipart data; files are `UploadedFile` objects (`filename`, `content_type`, `size`, `read()`, `save(path)`, `stream`) |
+| `await get_data(location)` | `"json"`, `"form"`, `"files"`, `"form_and_files"` or `"query"` |
+| `user`, `roles`, `set_user()`, `set_roles()` | authenticated user (see [Authentication](#authentication)) |
+| `context` | request-scoped storage (`req.context.set(key, value)`, `req.context.get(key)`) |
+| `app`, `res` / `response` | the application and the response being built |
 
-The above configurations will set CORS policy on the application scope. If you wish to fine-tune the policy on specific
-endpoints you can use two decoratos.
+The current request is also available anywhere during request handling through
+`patera.ctx.current_request`.
 
-To disable cors on an endpoint:
+`Response` (`req.res`) methods return the response, so calls can be chained:
 
-```
-#imports
-from patera.controller import no_cors
-
-#inside a controller
-
-@GET("/")
-@no_cors
-async def my_endpoint(self, req: Request) -> Response:
-    """some endpoint logic"""
+```python
+return req.res.json({"ok": True}).status(HttpStatus.CREATED).set_header("x-id", "7")
 ```
 
-this will disable CORS for this specific endpoint no matter the global settings.
+| Method | Description |
+| --- | --- |
+| `json(data)` | JSON body (dicts, lists, Pydantic models, ...) |
+| `text()`, `html_body()`, `xml()`, `csv()`, `yaml()`, `ndjson(rows)`, `bytes(data, media_type)` | other bodies |
+| `await html(template, context)`, `await html_from_string(source, context)` | rendered [templates](#templates) |
+| `problem(title, detail, status, type_="about:blank", instance=None, extra=None)` | RFC 9457 problem details |
+| `stream(iterable, media_type)`, `stream_text(iterable)` | streaming responses (sync or async iterables) |
+| `send_file(bytes, headers)` | file download |
+| `redirect(location, status=303)`, `no_content()` | redirects and `204` |
+| `status(code)` | status code (`int` or `HttpStatus`) |
+| `set_header()`, `set_headers()` | headers |
+| `set_cookie(name, value, max_age, path, domain, secure, http_only, same_site)`, `delete_cookie()`, `add_raw_cookie()` | cookies |
 
-If you wish you can set a different set of CORS rules for an endpoint using the ***@cors*** decorator:
+## Routing behaviour
 
+- With `STRICT_SLASHES=False` (default) `/users` and `/users/` reach the same endpoint.
+- Unknown paths return `404` (JSON). A known path with the wrong method returns `405` with an
+  `Allow` header.
+- `HEAD` requests are answered by the matching `GET` endpoint, without a body.
+- `OPTIONS` requests to routes without an explicit handler return `204` with an `Allow` header
+  (CORS preflight requests are answered by the CORS middleware).
+- `url_for("Controller.method", **params)` builds URLs, also in templates.
+
+## Services and dependency injection
+
+Application services are subclasses of `BaseExtension` (alias: `Service`). Each service is a
+singleton per application. Declare dependencies with `Inject[...]` on the application class,
+controllers, services, middleware, exception handlers or CLI controllers – they are created on first
+use and shared:
+
+```python
+from pydantic import BaseModel
+
+from patera import Service
+from patera.injectable import ConfigVar, Inject
+
+
+class GreetingSettings(BaseModel):
+    PREFIX: str = "Hello"
+
+
+class Formatter(Service):
+    def format(self, prefix: str, name: str) -> str:
+        return f"{prefix}, {name}!"
+
+
+class GreetingService(Service["App", GreetingSettings]):
+    formatter: Inject[Formatter]
+
+    def init(self) -> None:          # called after construction
+        self.greeted = 0
+
+    def greet(self, name: str) -> str:
+        self.greeted += 1
+        return self.formatter.format(self.configs.PREFIX, name)
+
+
+@path("/greetings")
+class GreetingApi(Controller["App"]):
+    greetings: Inject[GreetingService]
+    app_name: str = ConfigVar("APP_NAME")
+    label: str = ConfigVar("GREETING_LABEL", "Greetings")   # with default
+
+    @get("/<name>")
+    async def greet(self, req: Request, name: str) -> Response:
+        return req.res.text(self.greetings.greet(name))
 ```
-#imports
-from patera.controller import cors
 
-#inside a controller
+`self.configs` of a service returns the configuration field named after the class in
+UPPER_SNAKE_CASE (`GreetingService` → `GREETING_SERVICE`). The second type argument of
+`Service[...]`/`BaseExtension[...]` declares the configuration model, which means:
 
-@GET("/")
-@cors(*,
-    allow_origins: Optional[list[str]] = None,
-    allow_methods: Optional[list[str]] = None,
-    allow_headers: Optional[list[str]] = None,
-    expose_headers: Optional[list[str]] = None,
-    allow_credentials: Optional[bool] = None,
-    max_age: Optional[int] = None,)
-async def my_endpoint(self, req: Request) -> Response:
-    """some endpoint logic"""
+- a configuration model instance in the config class is used as is,
+- a plain dict (e.g. from `PATERA_GREETING_SERVICE__PREFIX=Hi`) is validated with the model,
+- a missing configuration falls back to the model's defaults (or raises a clear error if the model
+  has required fields).
+
+```python
+class Config(BaseConfig):
+    BASE_PATH: str = os.path.dirname(__file__)
+    GREETING_SERVICE: GreetingSettings = GreetingSettings(PREFIX="Welcome")
 ```
 
-This will override the global CORS settings with endpoint-specific settings.
-
-### CORS responses
-
-If the request does not comply with CORS policy error responses are automatically returned:
-
-**403 - Forbiden** - if the request origin is not allowed
-**405 - Method not allowed** - if the request method is not allowed
-
-## Routing
-
-Patera uses the same router as Flask under the hood (Werkzeug). This means that all the same patterns apply.
-
-Examples:
-```
-@get("/api/v1/users/<int:user_id>)
-@get("/api/v1/users/<string:user_name>)
-@get("/api/v1/users/<path:path>) #handles: "/api/v1/users/account/dashboard/main"
-```
-
-Route parameters marked with "<int:>" will be injected into the handler as integers, "<string:>" as a string and "<path:>" injects the entire path as a string.
-
-### Route not found
-
-If a route is not found (wrong url or http method) a NotFound (from patera.exception import NotFound) error is raised. You can handle the exception in the ExceptionHandler class. If not handled, a generic JSON response is returned.
+Services that should exist from startup (e.g. to register hooks) are listed in
+`App.app_extensions`; others are created when they are first injected. Retrieve any service with
+`app.get_extension(GreetingService)`. Injection also works with
+`from __future__ import annotations`, as long as the injected class is importable at runtime (not
+only under `TYPE_CHECKING`).
 
 ## Exception handling
 
-Exception handling can be achived by creating an exception handler class (or more then one) and registering it with the application.
+Exception handlers are classes with methods mapped to exception types:
 
-```
-# app/api/exceptions/exception_handler.py
+```python
+from pydantic import ValidationError
 
-from typing import Any
-from pydantic import BaseModel, ValidationError
-from patera.exceptions import ExceptionHandler, handles
-from patera import Request, Response, HttpStatus
+from patera import HttpStatus, Request, Response
+from patera.exceptions import BaseHttpException, ExceptionHandler, exception_handler, handles
 
-from .custom_exceptions import EntityNotFound
 
-class ErrorResponse(BaseModel):
-    message: str
-    details: Any|None = None
+class EntityNotFound(BaseHttpException):
+    def __init__(self, message: str):
+        super().__init__(message, HttpStatus.NOT_FOUND)
 
-class CustomExceptionHandler(ExceptionHandler):
+
+@exception_handler
+class ApiExceptionHandler(ExceptionHandler):
 
     @handles(ValidationError)
-    async def validation_error(self, req: "Request", exc: ValidationError) -> "Response[ErrorResponse]":
-        """Handles validation errors"""
-        details = {}
-        if hasattr(exc, "errors"):
-            for error in exc.errors():
-                details[error["loc"][0]] = error["msg"]
+    async def validation_error(self, req: Request, exc: ValidationError) -> Response:
+        details = exc.errors(include_url=False, include_context=False)
+        return req.res.json({"message": "Invalid data", "details": details}).status(422)
 
-        return req.response.json({
-            "message": "Validation failed.",
-            "details": details
-        }).status(HttpStatus.UNPROCESSABLE_ENTITY)
+    @handles(BaseHttpException)          # also handles subclasses, e.g. EntityNotFound
+    async def http_error(self, req: Request, exc: BaseHttpException) -> Response:
+        return req.res.json({"message": exc.message, "data": exc.data}).status(exc.status_code)
 ```
 
-The above CustomExceptionHandler class can also be registered with the application in configs.py file.
+Put the class in an `exceptions` folder (file name containing `handler`) or register it with
+`app.register_exception_handler(...)`. A handler registered for a base class also handles its
+subclasses; the most specific handler wins.
 
-```
-EXCEPTION_HANDLERS: List[str] = [
-    'app.api.exceptions.exception_handler:CustomExceptionHandler'
-]
-```
-
-You can define any number of methods and decorate them with the @handles decorator to indicate which exception
-should be handled by the method. The @handles decorator excepts any number of exceptions as arguments.
-
-Any exceptions that are raised throughout the app can be handled in one or more ExceptionHandler classes. If an unhandled exception occurs
-and the application is in DEBUG mode, the exception will raise an error, however, if the application is NOT in DEBUG mode, the exception is
-suppressed and a JSON response with content
-
-```
-{
-    "status": "error",
-    "message": "Internal server error",
-}
-```
-
-with status code 500 (Internal server error) is returned and the request is logged as critical.
-To avoid this generic response you can implement a handler in your ExceptionHandler class which handles raw exceptions (pythons Exception class).
-
-```
-@handles(ValidationError, SomeOtherException, AThirdException)
-async def handler_method(self, req: "Request", exc: ValidationError|SomeOtherException|AThirdException) -> "Response[ErrorResponse]":
-    ###handler logic and response return
-```
-
-Each handler method accepts exactly three arguments. The "self" keyword pointing at the exception handler instance (has acces to the application object -> self.app),
-the current request object and the raised exception.
-
-### Custom exceptions
-
-Custom exceptions can be made by defining a class which inherits from the patera.exceptions.BaseHttpException, from the patera.Exceptions.CustomException or simply by inheriting from pythons Exception class.
-
-```
-from patera.exception import BaseHttpException, CustomException
-
-class MyCustomException(Exception):
-    """implementation"""
-
-class MyCustomHttpException(BaseHttpException):
-    """implementation"""
-
-class CustomExceptionFromCustomException(CustomException):
-    """implementation"""
-```
-
-The exceptions can then be registered with your exception handler to provide required responses to users.
-
-### Quick aborts
-
-Sometimes, you just wish to quickly abort a request (when data is not found, something else goes wrong.). Since Patera advocates for the
-fail-fast pattern, it provides two convinience methods for quickly aborting requests. These methods are:
-
-```
-from patera import abort, html_abort
-abort(msg: str, status_code: HttpStatus = HttpStatus.BAD_REQUEST, status: str = "error", data: Any = None)
-html_abort(template: str, status_code: HttpStatus = HttpStatus.BAD_REQUEST, data: Any = None)
-```
-
-These methods raise a AborterException and HtmlAborterException, respectively. An example of the abort method use;
-
-```
-from patera import abort, html_abort
-
-@get("/api/v1/users/<int:user_id>)
-async def get_user(self, req: Request, user_id: int) -> Response:
-    """Handler logic"""
-    #Entity not found
-    abort(msg=f"User with id {user_id} not found",
-        status_code=HttpStatus.NOT_FOUND,
-        status="error", data=None)
-```
-
-To handle AborterExceptions you have to implement a handler in your ExceptionHandler class, however, HtmlAborterExceptions are automatically
-rendered and returned.
-
-### Redirecting
-Sometimes we wish to redirect the user to a different resource. In this case we can use a redirect response of the Response object.
-
-```
-@get("/api/v1/auth/login)
-async def get_user(self, req: Request, data: UserLoginData) -> Response:
-    """Handler logic"""
-    #Redirect after login
-    return req.response.redirect("url-for-location")
-```
-
-The above example instructs the client to redirect to "url-for-location" with default status code 303 (SEE OTHER).
-
-### Redirecting to other endpoint
-
-We can provide a hard-coded string to the ***redirect*** method, however, this can be cumbersome. The url might change and the redirect would break.
-To avoid this, we can use the url_for method provided by the application object:
-
-```
-#Redirect after login
-return req.response.redirect(self.app.url_for("<ControllerName>.<endpointMethodName>"), **kwargs)
-```
-
-This will construct the correct url with any route parameters (provided as key-value pairs <-> kwargs) and return it as a string.
-In this way, we do not have to hard-code and remember all urls in our app. We can also change the non-dynamic parts of the endpoint
-without breaking redirects.
-
-
-## Static assets/files
-
-The application serves files in the "/static" folder on the path "/static/<path:filename>".
-If you have an image named "my_image.png" in the static folder you can access it on the url: http://localhost:8080/static/my_image.png
-The path ("/static") and folder name ("/static") can be configured via the application configurations. The folder should be inside the "app" folder.
-
-To construct the above example url for ***my_image.png*** we can use the ***url_for*** method like this:
-
-```
-self.app.url_for("Static.get", filename="my_image.png")
-```
-
-This will return the correct url for the image. If the image was located in subfolders we would simply have to change the ***filename** argument
-in the method call.
-
-In this example, the url_for method returns the url for the ***get*** method of the ***Static*** controller (automatically registered by the application)
-with required ***filename*** argument.
-
-## Template (HTML) responses
-
-Controller endpoints can also return rendered HTML or plain text content.
-
-```
-#inside a controller class
-
-@get("/<int:user_id>")
-@produces(MediaType.TEXT_HTML)
-async def get_user(self, req: Request, user_id: int) -> Response:
-    """Returns a user by user_id"""
-    #some logic to load the user
-    context: dict[str, Any] = {#any key-value pairs you wish to include in the template}
-
-    return await (req.response.html("my_template.html", context)).status(HttpStatus.OK)
-```
-
-The template name/path must be relative to the templates folder of the application. Because the html response accesses/loads the template
-from the templates folder, the .html method of the response object is async and must thus be awaited.
-
-The name/location of the templates folder can be configured via application configurations.
-
-Patera uses Jinja2 as the templating engine, the synatx is thus the same as in any framework which uses the same engine.
-
-## OpenAPI specifications
-
-OpenAPI specifications are automatically generated and exposed on "/openapi/docs" (Swagger UI) and "/openapi/specs.json" endpoints (in Debug mode only).
-To make sure the endpoint descriptions, return types and request specification are accurate, we suggest you use all required endpoint decorators available for
-endpoints.
-
-## Extensions
-Patera has a few built-in extensions that can be used ad configured for database connection/management, task scheduling, authentication and
-interfacing with LLMs.
-
-### Database connectivity and management
-
-#### SQL
-
-To add SQL database connectivity to your Patera app you can use the database.sql module.
-
-```
-#extensions.py
-from patera.database.sql import SqlDatabase
-from patera.database.sql.migrate import Migrate
-
-db: SqlDatabase = SqlDatabase(db_name="db", configs_name="SQL_DATABASE") #"db" and "SQL_DATABASE" is the default so they can be omitted
-migrate: Migrate = Migrate(db, command_prefix: str = "")
-```
-
-you can then indicate the extensions in the app configurations:
-
-```
-EXTENSIONS: List[str] = [
-    'app.extensions:db',
-    'app.extensions:migrate'
-]
-```
-
-This will initilize and configure the extensions with the application at startup. To configure the extensions simply add
-neccessary configurations to the config class or dictionary. Available configurations are:
-
-```
-SQL_DATADATE = {
-    "DATABASE_URI": "sqlite+aiosqlite:///./test.db",#for a simple SQLite database
-    "SESSION_NAME": "session",
-    "SHOW_SQL": False
-}
-```
-
-To use a Postgresql db the **DATABASE_URI** string should be like this:
-```
-"DATABASE_URI": "postgresql+asyncpg://user:pass@localhost/dbname"
-```
-
-Session name variable (for use with @managed_session and @readonly_session):
-```
-"SESSION_NAME": "session"
-```
-This is the name of the AsyncSession variable that is injected when using the managed_session decorator of the extension. The default is "session". This is useful when you wish to use
-managed sessions for multiple databases in the same controller endpoint.
-
-```
-"SHOW_SQL": False
-```
-
-This configuration directs the extension to log every executed SQL statement to the console. This is a good way to
-debug and optimize code during development but should not be used in production.
-
-**Migrate**
-```
-ALEMBIC_MIGRATION_DIR: str = "migrations" #default folder name for migrations
-ALEMBIC_DATABASE_URI_SYNC: str = "sqlite:///./test.db" #a connection string with a sync driver
-```
-
-The SqlDatabase extension accepts a configs_name: str argument which is passed to its Migrate instance. This argument determines the configurations dictionary in the configs.py file which
-should be used for the extension. By default all extensions use upper-pascal-case format of the extension name (SqlDatabase -> "SQL_DATABASE"). The Migrate instance can be passed a
-command_prefix: str which can be used to differentiate different migration instances if uses multiple (for multiple databases).
-```
-#extensions.py
-.
-.
-.
-db: SqlDatabase = SqlDatabase(configs_name="MY_DATABASE") #default configs_name="SQL_DATABASE"
-migrate: Migrate = Migrate(db: SqlDatabase, command_prefix: str = "")
-```
-
-In this case the configuration variables should be:
-```
-MY_DATABASE = {
-    "DATABASE_URI": "<connection_str>",
-    "ALEMBIC_MIGRATION_DIR": "<migrations_directory>"
-    "ALEMBIC_DATABASE_URI_SYNC": "<connection_str_with_sync_driver>"
-}
-
-```
-This is useful in cases where you need more then one database.
-
-The migrate extension exposes some function which facilitate database management.
-They can be envoked via the cli.py script in the project root
-
-```
-#cli.py <- next to the run.py script
-"""CLI utility script"""
-
-if __name__ == "__main__":
-    from app import Application
-    app = Application()
-    app.run_cli()
-```
-
-You can run the script with command like this:
-```sh
-uv run cli.py db-init
-uv run cli.py db-migrate --message "Your migration message"
-uv run cli.py db-upgrade
-```
-The above commands initialize the migrations tracking of the DB, prepares the migration script and finally upgrades the DB.
-
-Other available cli commands for DB management are:
-
-```
-db-downgrade --revision "rev. number"
-db-history --verbose --indicate-current
-db-current --verbose
-db-heads --verbose
-db-show --revision "rev. number"
-db-stamp --revision "rev. number"
-```
-
-Arguments to the above commands are optional.
-
-**If using command_prefix**
-If using a command prefix for the Migrate instance the commands can be executed like this:
-
-```
-uv run cli.py <command_prefix>db-init
-uv run cli.py <command_prefix>db-migrate --message "Your migration message"
-uv run cli.py <command_prefix>db-upgrade
-```
-
-The same applies to other commands of the Migrate extension.
-
-**The use of the Migrate extension is completely optional when using a database.**
-
-##### Database Models
-To store/fetch data from the database you can use model classes. An example class is:
-
-```
-#app/api/models/user_model.py
-
-from sqlalchemy import Integer, String, ForeignKey
-from sqlalchemy.orm import mapped_column, Mapped, relationship
-
-from patera.database import create_declerative_base
-
-Base = create_declerative_base("db") #passed argument must be the same as the database name you wish to
-                                    #use the model with. Default is "db" so it can be omitted.
-
-class User(Base):
-    """
-    User model
-    """
-    __tablename__: str = "users"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    fullname: Mapped[str] = mapped_column(String(30))
-    email: Mapped[str] = mapped_column(String(50), unique=True)
-```
-
-The Base class created with create_declerative_base should be used with all db models for the same database.
-
-##### Querying
-To perform queries in the database you can use the associated models. A simple query for getting a user by its ID is:
-
-```
-user: User = await User.query(session).filter_by(id=user_id).first()
-```
-
-This returns the first user that matches the filter_by criteria. To get all users in the table you can do:
-
-```
-users:  list[User] = await User.query(session).all()
-```
-
-The ***session*** object is an active AsyncSession instance which can be injected via the ***@managed_session*** or ***@readonly_session*** decorators on controller endpoint handlers.
-
-**Manual session handling is highly discouraged and should be used only for very specific use cases and with utmost care. Unclosed sessions can cause memory leaks and other problem, especially in long running apps.**
-
-The ***Model.query(session)*** method returns an AsyncQuery object which exposes many methods for querying and filtering:
-
-```
-def where(self, *conditions) -> "AsyncQuery": #Adds WHERE conditions (same as `filter()`).
-def filter(self, *conditions) -> "AsyncQuery": #Adds WHERE conditions to the query (supports multiple conditions).
-def filter_by(self, **kwargs) -> "AsyncQuery": #Adds WHERE conditions using keyword arguments (simpler syntax).
-def join(self, other_model: Model) -> "AsyncQuery": #Performs a SQL JOIN with another model.
-def limit(self, num: int) -> "AsyncQuery": #"Limits the number of results returned.
-def offset(self, num: int) -> "AsyncQuery": #Skips a certain number of results (used for pagination).
-def order_by(self, *columns) -> "AsyncQuery": Sorts results based on one or more columns.
-def like(self, column, pattern, escape=None) -> "AsyncQuery": #Filters results using a SQL LIKE condition.
-def ilike(self, column, pattern, escape=None) -> "AsyncQuery": #Filters results using a SQL ILIKE condition.
-```
-
-The above methods always return the AsyncQuery object and thus serve as query builders. This means that the methods can be chained to construct the desired query.
-Actual results are returned once we execute the query with one of the following methods (must be awaited):
-
-```
-async def count(self) -> int: #returns number of results
-async def paginate(self, page: int = 1, per_page: int = 10) -> Dict[str, Any]: #returnes a dictionary with paginated results (see below)
-async def all(self) -> list: #returns all results
-async def first(self) -> Any: #returns first result
-async def one(self) -> Any: #returns only one result
-```
-
-##### Paginated results
-
-The paginate method returns a pagination object (dictionary) with the following structure:
-
-```
-result = dict: {
-    "items": list[Model], #List of results
-    "total": int, #Total records
-    "page": int, #Current page
-    "pages": int, #Total pages
-    "per_page": int, #Results per page
-    "has_next": bool, #Whether there's a next page
-    "has_prev": bool #Whether there's a previous page
-}
-```
-
-**For model detection (for correct Migration extension working) all models should be added in the app configurations**
-
-```
-MODELS: List[str] = [
-    'app.api.models.user_model:User'
-]
-```
-
-**SqlDatabase and Migrate extension uses Sqlalchemy and Alembic under the hood.**
-
-##### Automatic session handling
-
-Manual session handling is highly discouraged because it is easy to forget to close/commit an active session. Therefore two convenience decorators can be used:
-
-```
-@post("/")
-@consumes(MediaType.APPLICATION_JSON)
-@produces(MediaType.APPLICATION_JSON)
-@db.managed_session
-async def create_user(self, req: Request, user_data: UserData, session: AsyncSession) -> Response[UserData]:
-    """Creates new user"""
-    user: User = User(fullname=user_data.fullname, email=user_data.email)
-    session.add(user)
-    await session.flush() #to get the new users id.
-    return req.response.json(UserData(id=user_id, fullname=user.fullname)).status(HttpStatus.OK)
-
-@get("/<int:user_id>")
-@consumes(MediaType.APPLICATION_JSON)
-@produces(MediaType.APPLICATION_JSON)
-@db.readonly_session
-async def get_user(self, req: Request, user_id: int, session: AsyncSession) -> Response[UserData]:
-    """Creates new user"""
-    user: User = await User.query(session).filter_by(id=user_id).first()
-    return req.response.json(UserData(id=user_id, fullname=user.fullname)).status(HttpStatus.OK)
-```
-
-The ***@managed_session*** decorator automatically injects the active session into the endpoint handler and runs the endpoint inside a session context, which handles
-session closure/commit and possible rollbacks in case of errors. The ***@readonly_session*** decorator injects the active session which can be used for read-only operations.
-No rollbacks or commits neccessary. The readonly session decorator prevents accidental writes (nothing is commited), has slightly lower overhead, fewer lock surprises and
-communicates a clear intent (reading data).
-
-**session.flush()** will cause the session to perform the insert and fetch the objects id(s).
-
-#### NoSQL
-
-Besides SQL databases another popular solution are NoSQL databases like MongoDB. Patera supports them out of the box. To setup a NoSQL database you must provide the following configurations:
-
-```
-#configs.py
-
-NOSQL_DATABASE = {
-    "BACKEND": type #class of the selected NoSQL backend implementation. Example for MongoDB: from patera.database.nosql.backends import MongoBackend
-    "DATABASE_URI": str #connection string. Example: mongodb+srv://<db_username>:<db_password>@cluster0.273gshd.mongodb.net
-    "DATABASE": Optional[str]
-    "DB_INJECT_NAME": str = "db" #name of the injected variable for managed sessions
-    "SESSION_NAME": str = "session" #name of the injected session variable for managed sessions
-}
-```
-
-To use the NoSQL extension simply add it to the extension like this:
-
-```
-#extensions.py
-#other extensions
-from patera.database.nosql import NoSqlDatabase
-
-nosqldb: NoSqlDatabase = NoSqlDatabase()
-```
-
-and then add the extension to the app configs
-
-```
-#configs.py
-
-EXTENSIONS: list[str] = [
-    #other extensions
-    'app.extensions:nosqldb',
-]
-```
-
-This will initilize the extension and configure it. As usual, a config variable prefix can be supplied at instantiation: nosqldb: NoSqlDatabase = NoSqlDatabase(variable_prefix="MY_PREFIX_").
-
-##### Managed database transactions
-
-To use a managed database transaction (scoped session) you can use the ***@managed_database*** decorator on controller endpoint handler methods.
-
-```
-#inside a controller
-
-@post("/")
-@consumes(MediaType.APPLICATION_JSON)
-@produces(MediaType.APPLICATION_JSON)
-@nosqldb.managed_database
-async def create_user(self, req: Request, data: TestModel, db: Any, session: Any = None) -> Response[TestModelOut]:
-    """Consumes and produces json"""
-    #inserts a new document into collection
-    await db.insert_one("<collection_name>", {"email": data.email, "fullname": data.fullname, "age": data.age}, session=session)
-    return req.response.json({
-        "message": "User added successfully",
-        "status": "success"
-    }).status(200)
-```
-
-The above usage of the ***managed_database*** decorator injects a db client handle and the corresponding session into the endpoint handler. You can pass the session object
-to all queries/inserts to scope them to the same session. This ensures that the entire transaction is rolled back in case of exceptions in one of the queries/inserts.
-
-**session** objects are not available in all databases and therefore the injected session object is ***None*** in those cases. Please check if your database supports managed/scoped sessions. If managed/scoped sessions are not available everything still works, however, each query/insert is treated as an isolated call.
-
-##### Simple queries/inserts
-
-If you wish to perform only one query, insert or delete (i.e. get/delete user by id or insert one user) you can simply use the instantiated NoSqlDatabase extension object (***nosqldb***) to call the desired query/insert/delete method.
-
-##### Methods and properties
-The extension exposes the following methods/properties:
-
-```
-@property
-def variable_prefix(self) -> str:
-    return self._variable_prefix
-
-@property
-def db_name(self) -> str:
-    return self.__db_name__
-
-@property
-def backend(self) -> AsyncNoSqlBackendBase:
-    if not self._backend:
-        raise RuntimeError("Backend not connected. Was init_app/connect called?")
-    return self._backend
-
-def database_handle(self) -> Any:
-    return self.backend.database_handle()
-
-def get_collection(self, name: str) -> Any:
-    return self.backend.get_collection(name)
-
-async def find_one(self, collection: str, filter: Mapping[str, Any], **kwargs) -> Any:
-    return await self.backend.find_one(collection, filter, **kwargs)
-
-async def find_many(self, collection: str, filter: Mapping[str, Any] | None = None, **kwargs) -> list[Any]:
-    return await self.backend.find_many(collection, filter, **kwargs)
-
-async def insert_one(self, collection: str, doc: Mapping[str, Any], **kwargs) -> Any:
-    return await self.backend.insert_one(collection, doc, **kwargs)
+Without a matching handler:
 
-async def insert_many(self, collection: str, docs: Iterable[Mapping[str, Any]], **kwargs) -> Any:
-    return await self.backend.insert_many(collection, docs, **kwargs)
+| Exception | Response |
+| --- | --- |
+| `BaseHttpException` and subclasses (`abort()`, authentication errors, ...) | JSON `{"status", "message", "data"}` with the exception's status code |
+| `pydantic.ValidationError` | `422` with `{"status": "error", "message": "Validation failed", "errors": [...]}` |
+| anything else | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
 
-async def update_one(self, collection: str, filter: Mapping[str, Any], update: Mapping[str, Any], **kwargs) -> Any:
-    return await self.backend.update_one(collection, filter, update, **kwargs)
+Override `default_exception_response(req, exc)` on the application class to change this fallback.
 
-async def delete_one(self, collection: str, filter: Mapping[str, Any], **kwargs) -> Any:
-    return await self.backend.delete_one(collection, filter, **kwargs)
+Quick aborts:
 
-async def aggregate(self, collection: str, pipeline: Iterable[Mapping[str, Any]], **kwargs) -> list[Any]:
-    return await self.backend.aggregate(collection, pipeline, **kwargs)
+```python
+from patera import HttpStatus, abort, html_abort
 
-async def execute_raw(self, *args, **kwargs) -> Any:
-    """
-    Escape hatch for backend-specific commands. See MongoBackend.execute_raw docstring.
-    """
-    return await self.backend.execute_raw(*args, **kwargs)
+abort("User not found", HttpStatus.NOT_FOUND, data={"id": user_id})   # JSON error response
+html_abort("errors/404.html", HttpStatus.NOT_FOUND, {"id": user_id})  # renders the template
 ```
 
-Keep in mind that some aspects, like the ***execute_raw*** method are backend specific. They therefore depend on the selected backend (MongoDB etc).
+## Templates
 
-##### Custom backend implementations
+Templates are rendered with [Jinja2](https://jinja.palletsprojects.com) (async, auto-escaping for
+HTML/XML) from `TEMPLATES_DIR`:
 
-To create a custom backend implementation create a class which extends and implements the ***AsyncNoSqlBackendBase*** abstract class. The abstract class can be imported as ***from patera.database.nosql.backends import AsyncNoSqlBackendBase***. After that, simply implement all required methods. The required methods are:
-
-```
-class AsyncNoSqlBackendBase(ABC):
-    """
-    Minimal async adapter interface a backend must implement.
-    """
-
-    @classmethod
-    @abstractmethod
-    def configure_from_app(cls, app: "Patera", variable_prefix: str) -> "AsyncNoSqlBackendBase":
-        """
-        Classmethod to configure backend from app config.
-        Called during NoSqlDatabase.init().
-        """
-        ...
-
-    @abstractmethod
-    async def connect(self) -> None:
-        ...
-
-    @abstractmethod
-    async def disconnect(self) -> None:
-        ...
-
-    @abstractmethod
-    def database_handle(self) -> Any:
-        """
-        Returns an object representing the 'database' to use inside handlers.
-        For backends without a database concept, return a client/root handle.
-        """
-        ...
-
-    @abstractmethod
-    def supports_transactions(self) -> bool:
-        ...
-
-    @abstractmethod
-    async def start_session(self) -> Any:
-        """
-        Return a session/context object usable in transactions (or None if unsupported).
-        """
-        ...
-
-    @abstractmethod
-    async def with_transaction(self, fn: Callable[..., Any], *args, session: Any = None, **kwargs) -> Any:
-        """
-        Execute fn inside a transaction if supported; otherwise call fn directly.
-        """
-        ...
-
-    @abstractmethod
-    def get_collection(self, name: str) -> Any:
-        ...
-
-    @abstractmethod
-    async def find_one(self, collection: str, filter: Mapping[str, Any], *, session: Any = None, **kwargs) -> Any:
-        ...
-
-    @abstractmethod
-    async def find_many(self, collection: str, filter: Mapping[str, Any] | None = None, *, session: Any = None,
-                        limit: Optional[int] = None, skip: Optional[int] = None, sort: Optional[Iterable[tuple[str, int]]] = None,
-                        **kwargs) -> list[Any]:
-        ...
-
-    @abstractmethod
-    async def insert_one(self, collection: str, doc: Mapping[str, Any], *, session: Any = None, **kwargs) -> Any:
-        ...
-
-    @abstractmethod
-    async def insert_many(self, collection: str, docs: Iterable[Mapping[str, Any]], *, session: Any = None, **kwargs) -> Any:
-        ...
-
-    @abstractmethod
-    async def update_one(self, collection: str, filter: Mapping[str, Any], update: Mapping[str, Any], *,
-                         upsert: bool = False, session: Any = None, **kwargs) -> Any:
-        ...
-
-    @abstractmethod
-    async def delete_one(self, collection: str, filter: Mapping[str, Any], *, session: Any = None, **kwargs) -> Any:
-        ...
-
-    @abstractmethod
-    async def aggregate(self, collection: str, pipeline: Iterable[Mapping[str, Any]], *,
-                        session: Any = None, **kwargs) -> list[Any]:
-        ...
-
-    @abstractmethod
-    async def execute_raw(self, *args, **kwargs) -> Any:
-        """
-        Backend escape hatch for commands that don't fit the generic surface.
-        For MongoDB, this could be db.command(...), collection.bulk_write(...), etc.
-        """
-        ...
-```
-
-The specific implementation for each database backend type will differ. Have a look at the ***patera.database.nosql.backend.mongo_backend*** for MongoDB.
-
-##### MongoDB
-To use MongoDB as the backend you will have to install the following dependencies:
-
-```
-uv add motor
-uv add "mongodb[srv]"
-```
-
-## User Authentication
-
-To setup user authentication and protection of controller endpoints use the authentication extension.
-
-```
-#authentication.py <- next to extensions.py
-
-from enum import StrEnum
-from typing import Optional
-from patera import Request
-from patera.auth import Authentication
-
-from app.extensions import db
-from app.api.models import User
-
-class UserRoles(StrEnum):
-    ADMIN = "admin"
-    SUPERUSER = "superuser"
-    USER = "user"
-
-class Auth(Authentication):
-
-    async def user_loader(self, req: Request) -> Optional[User]:
-        """Loads user from the provided cookie"""
-        cookie_header = req.headers.get("cookie", "")
-        if cookie_header:
-            # Split the cookie string on semicolons and equals signs to extract individual cookies
-            cookies = dict(cookie.strip().split('=', 1) for cookie in cookie_header.split(';'))
-            auth_cookie = cookies.get("auth_cookie")
-            if auth_cookie:
-                user_id = self.decode_signed_cookie(auth_cookie)
-                if user_id:
-                    session = db.create_session()
-                    user = await User.query(session).filter_by(id=user_id).first()
-                    await session.close()
-                    return user
-        return None
-
-    async def role_check(self, user: User, roles: list[UserRoles]) -> bool:
-        """Checks intersection of user roles and required roles"""
-        user_roles = set([role.role for role in user.roles])
-        return len(user_roles.intersection(set(roles))) > 0
-
-auth: Auth = Auth()
-```
-
-The Auth class inherits from the Patera Authentication class. The user must implement the user_loader and role_check (optional) methods.
-These methods provide logic for loading a user when a protected endpoint is requested and checking if the user has permissions.
-Above is an example which loads the user from a cookie. If the user is not found an AuthenticationException is raised which can be handled
-in the CustomExceptionHandler. If the user doesn't have required roles (role_check -> False) an UnauthorizedException exception is raised
-which can be also handled in the CustomExceptionHandler.
-
-The instantiated Auth class must be added to the application configs.
-
-```
-EXTENSIONS: List[str] = [
-    'app.extensions:db',
-    'app.extensions:migrate',
-    'app.authentication:auth'
-]
-```
-
-Controller endpoints can be protected with two decorators like this:
-
-```
-@get("/<int:user_id>")
-@produces(MediaType.APPLICATION_JSON)
-@auth.login_required
-@auth.role_required(UserRoles.ADMIN, UserRoles.SUPERUSER)
-async def get_user(self, req: Request, user_id: int) -> Response[UserData]:
-    """Returns a user by user_id"""
-    session = db.create_session()
-    user: User = await User.query(session).filter_by(id=user_id).first()
-    await session.close()
-
-    return req.response.json(UserData(id=user_id, fullname=user.fullname, email=user.email)).status(HttpStatus.OK)
-```
-
-If using the @auth.role_required decorator you MUST also use the @auth.login_required decorator. The login_required
-decorator calls the user_loader method and attaches the loaded user object to the Request object: **req.user**.
-The above role_check implementation assumes that there is a one-to-many relationship on the User and Role (not shown) models.
-
-The Authentication extension can be configured with the following options:
-
-```
-AUTHENTICATION = {
-    "AUTHENTICATION_ERROR_MESSAGE": str = "Login required" #message of the raised exception
-    "UNAUTHORIZED_ERROR_MESSAGE": str = "Missing user role(s)" #message of the raised exception
-}
-```
-
-The auth instance exposes other useful methods for easy user authentication:
-
-```
-auth.create_signed_cookie_value(self, value: str|int) -> str #creates a signed cookie
-auth.decode_signed_cookie(self, cookie_value: str) -> str #decodes signed cookie
-auth.create_password_hash(self, password: str) -> str #creates a password hash
-auth.check_password_hash(self, password: str, hashed_password: str) -> bool #check password hash against provided password
-auth.create_jwt_token(self, payload: Dict, expires_in: int = 3600) -> str #creates a JWT string
-auth.validate_jwt_token(self, token: str) -> Dict|None #validates JWT string (from request)
-```
-
-The decode_signed_cookie method is used in the above user_loader example.
-
-### Update - @login_required and @role_required with Controller classes
-
-Both authentication related decorators can now be used on controller classes to protect all endpoints simultaneusly instead of each individual endpoint.
-This is useful for classes serving resources for which the user always has to be authenticated and for classes related to administrator tasks where the user always has to
-be authenticated and also have specific authorizations/roles (i.e. Admin). Usage:
-
-```
-
-@path("/api/v1/users", tags=["Users"])
-@login_required
-@role_required(*roles)
-class UsersApi(Controller):
-    """All endpoints are protected"""
-    ...
-```
-
-The decorators are added to the classes methods list which is executed upon each request even before the @before_request methods. The execution order of the methods is
-top-bottom so make sure the @login_required decorator is above the @role_required decorator to load the user before checking roles.
-
-## Task scheduling
-
-The task_manager extensions allows for easy management of tasks that should run periodically or running of one-time fire&forget methods.
-To use the extension you have to install the neccessary dependencies with:
-
-```
-uv add "patera[scheduler]"
-```
-
-The extension can be setup like this:
-
-```
-#scheduler.py <- next to __init__.py
-
-from patera.task_manager import TaskManager, schedule_job
-
-class Scheduler(TaskManager):
-
-    @schedule_job("interval", minutes=1, id="my_job")
-    async def some_task(self):
-        print("Performing task")
-
-scheduler: Scheduler = Scheduler()
-```
-
-It can then be added to application configs like the Authentication extension.
-
-```
-EXTENSIONS: List[str] = [
-    'app.extensions:db',
-    'app.extensions:migrate',
-    'app.authentication:auth',
-    'app.scheduler:scheduler'
-]
-```
-
-All methods defined in the Scheduler class and decorated with the @schedule_job decorator will be run with provided parameters. The extension uses the APScheduler
-module we therefore recommend you take a look at their documentation for more details about job scheduling. In the above example, the "some_task" method will run
-as an interval method every minute. To use the extension to run fire&forget methods (like sending emails) where we don't neccessary have to wait for the method to finish
-we can use the run_background_task method:
-
-```
-from app.scheduler import scheduler
-
-
-@post("/")
-@consumes(MediaType.APPLICATION_JSON)
-@produces(MediaType.APPLICATION_JSON)
-async def get_user(self, req: Request, user_data: UserData) -> Response[UserData]:
-    """Creates new user"""
-    user: User = User(fullname=user_data.fullname, email=user_data.email)
-    session = db.create_session()
-    session.add(user)
-    await session.commit()
-
-    scheduler.run_background_task(send_email, *args, **kwargs) #args and kwargs are any number or arguments and keyword arguments that the send_mail method might need
-    return req.response.json(UserData(id=user_id, fullname=user.fullname)).status(HttpStatus.OK)
-```
-
-This kicks off the send_email method without waiting for it to finish.
-
-The extension accepts the following configuration options via the application (indicated are defaults):
-
-```
-TASK_MANAGER = {
-    "JOB_STORES": {
-        "default": MemoryJobStore()
-    },
-    "EXECUTORS": {
-        "default": AsyncIOExecutor()
-    },
-    "JOB_DEFAULTS": {
-        "coalesce": False,
-        "max_instances": 3
-    },
-    "DAEMON": True,
-    "SCHEDULER": AsyncIOScheduler
-}
-```
-
-The scheduler object exposes a number of methods which can be used to manipulate ongoing scheduled tasks:
-
-```
-scheduler.add_job(self, func: Callable, *args, **kwargs) -> Job #adds a Job to the scheduler
-scheduler.remove_job(self, job: str|Job, job_store: Optional[str] = None) #removes job from scheduler by its id:str or the Job object
-scheduler.pause_job(self, job: str|Job) #pauses a running job by job id:str or the Job object
-scheduler.resume_job(self, job: str|Job) #resumes a job by job id:str or the Job object
-scheduler.get_job(self, job_id: str) -> Job|None #returns the job if it exists
-```
-
-## Caching
-
-Caching is a simple method to increase the throughput of applications. It stores responses of frequently requested resources whos data
-doesn't change often. An example would be fetching all users of an app, where new users are not added often. Why do database queries for each request if the query result is always going to be the same. To prevent unneccessary database queries the controller endpoint response can be cached with the caching extensions.
-
-After this, you can add the extension to your app with:
-
-```
-#extensions.py <-next to __init__.py
-
-from patera.caching import Cache
-
-#other extensions
-cache: Cache = Cache() #can also add a variable prefix to specify a configs namespace for using multiple caching instances.
-# cache: Cache = Cache(variable_prefix = "MY_CACHE_")
-```
-
-and then you can add the instantiated extension to application configs:
-
-```
-EXTENSIONS: List[str] = [
-    'app.extensions:db',
-    'app.extensions:migrate',
-    'app.authentication:auth',
-    'app.scheduler:scheduler',
-    'app.extensions:cache'
-]
-```
-
-The cache can use in-memory caching (default), SQLite database or Redis. To use the in-memory cache no configurations are strictly neccessary.
-Available configurations:
-
-```
-CACHE = {
-    BACKEND: Type[BaseCacheBackend] = MemoryCacheBackend
-    REDIS_URL: str
-    DURATION: int = 300 #cache duration in seconds - with default 300 s
-    REDIS_PASSWORD: str
-    KEY_PREFIX: Optional[str] #for using a namespace in a Redis/SQLite db (if multiple applications use the db)
-    SQLITE_PATH: Optional[str] = "./pyjolt_cache.db" - SQLite cache only
-    SQLITE_TABLE: Optional[str] = "cache_entries" #name of cache table in SQLite - SQLite cache only
-    SQLITE_WAL_CHECKPOINT_MODE: Optional[str] = "PASSIVE" #Mode for WAL checkpointing: PASSIVE|FULL|RESTART|TRUNCATE - SQLite cache only
-    SQLITE_WAL_CHECKPOINT_EVERY: Optional[int] = 100 #Insert WAL checkpoint every N write operations - SQLite cache only
-}
-```
-
-Only the default cache duration can be set if using in-memory/SQLite caching. The default value is 300 seconds.
-When using a variable prefix, the configs look like: "MY_PREFIX_CACHE_BACKEND", if "MY_PREFIX_" is passed as the prefix variable.
-
-Once configured the caching extension can be used like this in controller endpoints:
-
-```
-@get("/<int:user_id>")
-@produces(MediaType.APPLICATION_JSON)
-@cache.cache(duration=300)#default is 300 so this is not needed
-async def get_user(self, req: Request, user_id: int) -> Response[UserData]:
-    """Returns a user by user_id"""
-    user: User = await User.query().filter_by(id=user_id).first()
-
-    return req.response.json(UserData(id=user_id, fullname=user.fullname, email=user.email)).status(HttpStatus.OK)
-```
-
-**The @cache.cache decorator MUST be applied as the bottom-most decorator** to make sure it caches the result of the actual
-endpoint function and NOT results of other decorators. This is especially crucial if using authentication.
-
-The caching extension stores the result of the endpoint by creating a key-value pair, where the key is a combination
-of the endpoint function name and route parameters. This makes sure that the endpoint stores the response for user_id=1 and user_id=2
-seperately.
-
-The extension exposes several methods on the cache object which allows for manual manipulation of the cache:
-
-```
-cache.set(key: str, value: Response, duration: Optional[int]) -> None #sets a cached key-value pair
-cache.get(key: str) -> Dict #gets the cache value for the provided key
-cache.delete(key: str) -> None #removes cache entry for the provided key
-cache.clear() -> None #clears entire cache
-```
-
-### Custom caching backends
-
-To create a custom caching backend you have to create a class which inherits and satisfies the ***BaseCacheBackend*** abstract class.
-Simply inherit from this class and implement the following methods:
-
-```
-#patera.caching
-
-class BaseCacheBackend(ABC):
-    """
-    Abstract cache backend blueprint.
-
-    Subclasses should implement:
-    - configure_from_app(cls, app) -> BaseCacheBackend
-    - connect / disconnect
-    - get / set / delete / clear
-    """
-
-    @classmethod
-    @abstractmethod
-    def configure_from_app(cls, app: "Patera", variable_prefix: str) -> "BaseCacheBackend":
-        """Create a configured backend instance using app config."""
-
-    @abstractmethod
-    async def connect(self) -> None:
-        """Establish any required connections (no-op for memory)."""
-
-    @abstractmethod
-    async def disconnect(self) -> None:
-        """Tear down connections (no-op for memory)."""
-
-    @abstractmethod
-    async def get(self, key: str) -> Optional[dict]:
-        """Return cached payload dict or None."""
-
-    @abstractmethod
-    async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
-        """Store payload dict under key with optional TTL in seconds."""
-
-    @abstractmethod
-    async def delete(self, key: str) -> None:
-        """Delete a cached entry if present."""
-
-    @abstractmethod
-    async def clear(self) -> None:
-        """Clear the entire cache namespace."""
-```
-
-Once you implement the class according to specifications (from patera.caching import BaseCacheBackend), simply pass it as the config parameter ("CACHE_BACKEND") and use it.
-
-## AI Interface (Experimental!)
-
-The AI Interface extension helps the user integrate a chat interface to popular vendors with ChatGPT compatible api's seemlesly. You must first install the needed dependencies with:
-
-```
-uv add "patera[ai_interface]"
-```
-
-This will install OpenAi, Torch, Numpy, Sentence-transformers and pgvector libraries. These are neccessary for all required funcionality. With this, you will be able to connect to any ChatGPT compatible api like Groq, xAI, Perplexity (Sonar), Google Gemini and locally hosten Ollama, LM Studio or VLLM.
-
-The extension accepts several configurations which are listed below (with defaults):
-
-```
-AI_INTERFACE = {
-    API_KEY: str #required
-    API_BASE_URL: Optional[str] = "https://api.openai.com/v1" #points to the OpenAi compatible api of the service
-    ORGANIZATION_ID: Optional[str] = None
-    PROJECT_ID: Optional[str] = None
-    TIMEOUT: Optional[int] = 30
-    MODEL: Optional[str] = "gpt-3.5-turbo" #model that is used
-    TEMPERATURE: Optional[float] = 1.0 #temperature (randomness) of the used model. For higher "creativity"
-    RESPONSE_FORMAT: Optional[dict[str, str]] = {"type": "json_object"} #format of the return object
-    TOOL_CHOICE: Optional[bool] = False #if AI tools can be used
-    MAX_RETRIES: Optional[int] = 0 #number of retries in case of failure
-    CHAT_CONTEXT_NAME: Optional[str] = "chat_context" #name of the injected chat context varible
-}
-```
-
-To implement the interface:
-
+```python
+@get("/")
+async def index(self, req: Request) -> Response:
+    return await req.res.html("index.html", {"title": "Home"})
 ```
-#ai_interface.py #next to __init__.py
 
-from typing import Optional
-
-from app.api.models.chat_session import ChatSession
-from app.extensions import db
-
-from patera.database import AsyncSession
-from patera.ai_interface import AiInterface
-from patera.request import Request
-
-
-class Interface(AiInterface):
-
-    @db.managed_session
-    async def chat_context_loader(self, req: Request,
-                                  session: AsyncSession) -> Optional[ChatSession]:
-        chat_session_id: Optional[int] = req.route_parameters.get("chat_session_id",
-                                                                  None)
-        if chat_session_id is None:
-            return None
-        return await ChatSession.query(session).filter_by(id = chat_session_id).first()
-
-ai_interface: Interface = Interface()
-```
-
-Then simply include the ai_interface in the application configs like before to load and register it with the app:
-
-```
-#configs.py
-
-EXTENSIONS: list[str] = [
-    'app.extensions:db',
-    'app.extensions:migrate',
-    'app.authentication:auth',
-    'app.ai_interface:ai_interface'
-]
-```
-
-When implementing the interface you have to provide the ***chat_context_loader*** method which at minimum accepts the ***self*** argument pointing at the extension (has access to the application via ***self.app***) and the current request. The above example
-also adds the ***@db.managed_session*** decorator for automatic injection and handling of database sessions. The implemented method must return None (when the chat context was not found) or the chat context object (database model). If the method returns None, the extension raises a ChatContextNotFound exception (from patera.ai_interface import ChatContextNotFound). This error can simply be handled in the ExceptionHandler implementation (see above).
-
-If the method returns a valid object (not None), the object is injected into the endpoint handler method with the configured chat context name (default: "chat_context"). This helps with loading existing chat contexts and keeps the endpoint handlers lean.
-
-### AI Tools
-
-You can also expose certain functions to the AI interface which can be called directly by the AI. This is useful to run methods like getting the current weather in a location. The exposed methods must be declared inside the interface class (next to the chat_context_loader) and decorated with the ***@tool*** decorator. Example:
-
-```
-from patera.ai_interface import tool
-
-class Interface(AiInterface):
-
-    #chat_context_loader implementation
-
-    @tool(name = "method_name", description: "method_description")
-    async def some_tool(self, arg1: str, arg2: str) -> Any:
-        """some tool logic"
-```
-
-The above example exposes the method ***some_method*** to the AI interface. The decorator ***@tool*** accepts to optional arguments (name and description). If none are provided the actual method name is used and the doc string for the description. The description helps the AI interface (the called LLM) determine which method should be called. Therefore it is recommended to provide concise and accurate descriptions. The exposed method is not just exposed but also analyzed and a method metadata object is constructed which also provides details about the implemented method (arguments, arguments types etc.). With this added metadata the AI (called LLM) can determine which arguments it must pass to the method or if any arguments are missing.
-
-If execution of the tool method failes for whatever reason, a "FailedToRunAiToolMethod" exception is raised which can be handled in the ExceptionHandler implementation.
-
-The number of method tools is not limited, however, we recommend to seperate them into subclasses which the main interface class can inherit from (in addition to the AiInterface class). In this way, you can keep the tools logically grouped.
-
-## Email client
-
-The email client extension can be used for sending emails using the ***aiosmtplib*** package. You can simply initilize the extension:
-
-```
-#app/extensions.py
-from patera.email import EmailClient
-
-email_client: EmailClient = EmailClient(configs_name = "EMAIL_CLIENT") #configs_name="EMAIL_CLIENT" is the default and can be omitted
-```
-
-You then register the extension in the application configs:
-```
-#app/configs.py
-
-EXTENSIONS: list[str] = [
-    .
-    .
-    .
-    "app.extension:email_client"
-]
-```
-
-You have to provide certain configurations for the client:
-
-```
-#app/configs.py
-
-EMAIL_CLIENT: dict[str, str|int|bool] = {
-    "SENDER_NAME_OR_ADDRESS": str #the name or email that is used for the sender
-    "SMTP_SERVER": str #url of the smtp server
-    "SMTP_PORT" int #port of the smtp server
-    "USERNAME": str #username for the used email account
-    "PASSWORD": str #password of the used email account
-    "USE_TLS": bool = True #if tls encryption should be used. Default = True
-}
-
-```
-
-Once registered and configured the client can be used in any endpoint/method like this:
-
-```
-#inside endpoint method:
-
-await email_client.send_email(to_address: str|list[str], subject: str, body: str, attachments: Optional[dict[str, bytes]] = None) -> None
-await email_client.send_email_with_template(to_address: str|list[str], subject: str, template_path: str, attachments: Optional[dict[str, bytes]] = None, context: Optional[dict[str, Any]] = None) -> None
+```html
+<h1>{{ title }}</h1>
+<a href="{{ url_for('UserApi.list_users') }}">Users</a>
+<link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
 ```
-
-The first method sends the string body and the second method uses the template at the provided path (same as in template html responses)
-
-## Command line interface
 
-If you wish you can create command line interface utility methods to help with application maintanence. To do so you have to use the CLIController class:
+Besides your context, templates receive `app`, `request`, `url_for`, `attribute` (`getattr`) and
+`len`. With `TEMPLATES_STRICT=True` (default) undefined variables raise errors. The application's
+own template folder always takes precedence over template folders added by extensions or static
+pages.
 
-```
-#app/cli/cli_controller.py
-
-from patera.cli import CLIController, command, argument
+## Static files and static pages
 
-class UtilityCLIController(CLIController):
-    """A simple CLI utility controller."""
+Files in `STATIC_DIR` are served at `STATIC_URL` (`/static/<path:filename>`) with `Content-Type`
+detection, HTTP range requests (`206 Partial Content`, useful for media) and path traversal
+protection. In production, consider serving static files with a reverse proxy instead.
 
-    @command("greet", help="Greet a user with a message.")
-    @argument("name", arg_type=str, description="The name of the user to greet.")
-    async def greet(self, name: str):
-        """Greet by name."""
-        print(f"Hello, {name}! Welcome to the CLI utility.")
+With `USE_STATIC_PAGES=True`, HTML files in `STATIC_PAGES_DIR` are rendered as Jinja templates and
+served under `STATIC_PAGES_URL` without writing a controller (`pages/about.html` →
+`/about` or `/about.html`, `pages/docs/intro.html` → `/docs/intro`). Pages can extend/include each
+other by name. Build links with `url_for("static_pages", page="about")`.
 
-    @command("add", help="Add two numbers.")
-    @argument("a", arg_type=int, description="The first number.")
-    @argument("b", arg_type=int, description="The second number.")
-    async def add(self, a: int, b: int):
-        """Add two numbers and print the result."""
-        result = a + b
-        print(f"The sum of {a} and {b} is {result}.")
-```
+## CORS
 
-In this controller you can add as many cli method as you wish with the use of the @command and @argument decorators. The ***self*** keyword points at the controller instance which has access to the application instance (***self.app: Patera***).
-Each command method requires the @command decorator, but the @argument decorator(s) are optional depending on if the method needs input from the user or not.
+CORS is enabled by default and configured with the `CORS_*` options. The middleware answers
+preflight requests (`OPTIONS` with `Access-Control-Request-Method`) and adds CORS headers to all
+responses of allowed origins, including error responses. Requests from origins that are not allowed
+are processed normally but without CORS headers, so the browser blocks cross-origin reads while
+same-origin requests keep working; preflights from such origins get `403`.
 
-### @command
-The @command decorator requires a coommand_name: str argument under which the command will be accessible. You can also provide a ***help*** argument detailing the purpose of the method and options.
+Per endpoint:
 
-### @argument
-You can add as many @argument decorators as you wish to a method. This decorator tells the parser what arguments (name) to except and in what data type these arguments are going to be. Patera automatically casts arguments
-into the provided type. Allowed types are ***int***, ***float*** and ***str***.
+```python
+from patera.controller import cors, no_cors
 
-After you have created the CLI controller you have to register it with the application. To do so you have to add it in the application configurations
+@get("/partner-data")
+@cors(allow_origins=["https://partner.example.com"], allow_credentials=False, max_age=600)
+async def partner_data(self, req: Request) -> Response: ...
 
-```
-CLI_CONTROLLERS: List[str] = [
-    'app.cli.cli_controller:UtilityCLIController' #path:CLIController
-]
+@get("/internal")
+@no_cors
+async def internal(self, req: Request) -> Response: ...
 ```
 
 ## Middleware
 
-Middleware can be useful for anything from logging to measuring performance or modifying requests/responses. To use middleware in your Patera app you have to create a middleware class
+Middleware wraps the request handling chain:
 
-```
-#app/middleware/timing_mw.py
-
+```python
+# app/middleware/timing_mw.py
 import time
-from patera.middleware import MiddlewareBase
-from patera.request import Request
-from patera.response import Response
 
-class TimingMW(MiddlewareBase):
+from patera import Request, Response
+from patera.middleware import MiddlewareBase, middleware
+
+
+@middleware(order=10)
+class TimingMiddleware(MiddlewareBase):
     async def middleware(self, req: Request) -> Response:
-        t0 = time.perf_counter()
-        res = await self.next(req)           # pass down
-        res.headers["x-process-time-ms"] = str(int((time.perf_counter() - t0)*1000))
+        start = time.perf_counter()
+        res = await self.next(req)          # or return a response directly (short-circuit)
+        res.set_header("x-process-time-ms", str(int((time.perf_counter() - start) * 1000)))
         return res
 ```
 
-This class must inherit from MiddlewareBase and define an ***async def middleware(self, req: Request) -> Response*** method. The example measures how long it takes to process the request and adds an "x-process-time-ms" header to the response. Each middleware must return a Response (either by returning one directly - short-circuit, or by awaiting self.next(req) and returning that result).
+Middleware is discovered in `middleware` folders (file names containing `middleware` or `mw`) or
+registered with `app.register_middleware(TimingMiddleware, order=10)` before the first request.
+Lower order numbers run first (outermost). Built-in middleware uses negative orders: CORS `-101`,
+the SQL session manager `-100`, authentication `-99`. If an order is taken, the next free number is
+used and a warning is logged. Middleware can declare a configuration model just like services
+(`MiddlewareBase[App, MyConfig]`, available as `self.configs`).
 
-To add the middleware to the application you simply register it by adding it to the configurations of the app:
+Exceptions raised in middleware are handled by the exception handlers. Static files bypass
+middleware.
 
+## OpenAPI
+
+With `OPEN_API=True` the specification is served at `/openapi/specs.json` and a Swagger UI at
+`/openapi/docs`. It is generated from your controllers: paths and path parameters, request bodies
+from `@consumes` + Pydantic parameters, responses from `@produces` and `Response[Model]`
+annotations, error responses from `@open_api_docs`, tags from `@path(tags=...)` and descriptions
+from docstrings. Exclude a controller or endpoint with `open_api_spec=False`.
+
+## Logging
+
+Patera logs with [Loguru](https://loguru.readthedocs.io). Use `self.app.logger` (or `app.logger`).
+The default sink is configured with `DEFAULT_LOGGER`:
+
+```python
+class Config(BaseConfig):
+    ...
+    DEFAULT_LOGGER: dict[str, Any] = {
+        "SINK": "STDERR",          # STDERR, STDOUT, NULL or a file path
+        "LEVEL": "INFO",
+        "FORMAT": "<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {extra[logger_name]} | <level>{message}</level>",
+        "ENQUEUE": True,
+        "COLORIZE": True,
+    }
 ```
-#configs.py
 
-MIDDLEWARE: list[str] = [
-    'app.middleware.timing_mw:TimingMW'
-]
+Additional sinks are classes in a `logging`/`loggers` folder:
+
+```python
+# app/loggers/file_logger.py
+from patera.logging import LoggerBase, logger
+
+
+@logger("File logger")
+class FileLogger(LoggerBase):
+    def get_filter(self):
+        return lambda record: record["level"].no >= 30   # WARNING and above
 ```
 
-**Middleware order note**
-Middleware wraps the base application in reverse order of the provided list, so the **first element** is the **outermost** wrapper.
+```python
+class Config(BaseConfig):
+    ...
+    FILE_LOGGER: dict[str, Any] = {
+        "SINK": "logs/app.log",     # relative to the application package
+        "LEVEL": "WARNING",
+        "ROTATION": "5 MB",
+        "RETENTION": "10 days",
+        "COMPRESSION": "zip",
+    }
+```
 
-#### Exception handling in middleware
-Middleware runs in the same call chain as endpoint handlers. If your middleware raises, the framework catches it and dispatches to any registered exception handlers. If you handle the error inside the middleware and return a Response, exception handlers will not run. To attach data (e.g., timing) even on errors, store it on req.state: Any in a finally block and read it in your exception handler.
+The most recent log records are also kept in memory (`app.log_buffer`) for the admin dashboard.
 
-**Note**
-Middleware is useful when you wish to run some functionality for every request. For more fine-grained functionality we recommend using before/after request handlers in controllers or decorators on endpoint handlers.
+## Command line interface
+
+Maintenance commands are methods of CLI controllers:
+
+```python
+# app/cli/maintenance_cli.py
+from patera.cli import CLIController, cli_controller, command
+
+
+@cli_controller(name="maintenance")
+class MaintenanceCLI(CLIController):
+
+    @command("greet", help="Greets a user")
+    async def greet(self, name: str, times: int = 1) -> None:
+        for _ in range(times):
+            print(f"Hello, {name}!")
+```
+
+```sh
+uv run patera cli maintenance:greet Ana 3
+```
+
+Positional arguments are converted according to the parameter annotations (`str`, `int`,
+`float`, `bool` and other callables); parameters with defaults are optional. The application is
+created in CLI mode (no HTTP server, no middleware). A failing command prints the error and exits
+with status code `1`. CLI controllers support dependency injection like any other component.
 
 ## Testing
 
-Patera uses Pytest for running tests. For creating tests use the PyJoltTestClient object from ***patera.testing***.
-We recommend creating a ***tests*** folder inside your ***app*** directory (next to templates and static folders). You may organize tests differently as long as you follow Pytest’s discovery rules.
+`patera.testing.PateraTestClient` runs the application (including startup/shutdown hooks) and sends
+requests through [HTTPX](https://www.python-httpx.org):
 
-### Configuring test client
-
-Inside the ***tests*** folder create a **conftest.py** file with the following content:
-
-```
+```python
 # tests/conftest.py
-
 import pytest
-from patera.testing import PyJoltTestClient
-from app import Application
+
+from patera.testing import PateraTestClient
+from app import App
+
 
 @pytest.fixture
-async def application():
-    yield Application()
-
-@pytest.fixture
-async def client(application):
-    async with PyJoltTestClient(application) as c:
+async def client():
+    async with PateraTestClient(App()) as c:
         yield c
 ```
 
-this creates and yields the test client for use in all test methods. The test client manages lifespan events using asgi_lifespan, so any startup/shutdown hooks will work just like when running the app with Uvicorn.
-Inside the ***tests*** folder you can create as many test files as you wish. To can also organize them into subfolders as long as you follow **Pytest naming conventions**. An example test file is:
-
-```
-#tests/test_user_api.py
-
-async def test_get_users(client):
-    res = await client.get("/api/v1/users")
+```python
+# tests/test_users.py
+async def test_list_users(client):
+    res = await client.get("/api/v1/users/")
     assert res.status_code == 200
-
 ```
 
-In this file there is a single method (test_get_users) which gets the PyJoltTestClient automatically injected. It makes a GET request to the "/api/v1/users" endpoint and asserts that the response
-status code is 200 (OK). If the assertion fails the test fails.
+The client offers `get`, `post`, `put`, `patch`, `delete`, `head`, `options` and `request`
+(all accept the usual HTTPX keyword arguments such as `json=`, `headers=`, `files=`).
+Configure pytest in `pyproject.toml`:
 
-### Running tests
-
-If you use uv for dependency management you can run all specified tests with the following command:
-
-```
-uv run --env-file path/to/.env pytest
-```
-
-this will load environmental variables and run pytest. Pytest automatically detects the ***tests** folder and all specified tests (if proper naming conventions are followed). If you don't use .env files
-you can ommit "--env-file path/to/.env".
-
-#### Pytest configs
-
-If using ***uv*** for dependency management you can add configurations for Pytest to the pyproject.toml file. Otherwise, look up configuration handling. uv example:
-
-```
+```toml
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 ```
 
-## Benchmarks
+and run `uv run patera test` (loads `.env.test`) or `uv run pytest`.
 
-A simple test using Apache Bench, hitting the endpoint (example app) ***/api/v1/users*** shows the following results:
+## Extensions
 
-```
-(Patera) marko@Markos-MacBook-Air Patera % ab -k -c 200 -n 2000 http://localhost:8080/api/v1/users
-This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
-Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
-Licensed to The Apache Software Foundation, http://www.apache.org/
+Extensions are services (see [Services and dependency injection](#services-and-dependency-injection)):
+you subclass them, configure them through a config field named after your subclass and register
+them in `App.app_extensions` (or inject them).
 
-Benchmarking localhost (be patient)
-Completed 200 requests
-Completed 400 requests
-Completed 600 requests
-Completed 800 requests
-Completed 1000 requests
-Completed 1200 requests
-Completed 1400 requests
-Completed 1600 requests
-Completed 1800 requests
-Completed 2000 requests
-Finished 2000 requests
+### SQL databases
+
+`patera-database` integrates async SQLAlchemy. Install a driver for your database too
+(`aiosqlite` is included; e.g. `asyncpg` for PostgreSQL).
+
+```python
+# app/database.py
+from sqlalchemy import Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from patera.database.sql import DeclarativeBaseModel, SqlDatabase, SqlDatabaseManager
 
 
-Server Software:        uvicorn
-Server Hostname:        localhost
-Server Port:            8080
+class MainDb(SqlDatabase):
+    __db_name__ = "main"
 
-Document Path:          /api/v1/users
-Document Length:        139 bytes
 
-Concurrency Level:      200
-Time taken for tests:   1.845 seconds
-Complete requests:      2000
-Failed requests:        0
-Keep-Alive requests:    0
-Total transferred:      573561 bytes
-HTML transferred:       278000 bytes
-Requests per second:    1083.84 [#/sec] (mean)
-Time per request:       184.529 [ms] (mean)
-Time per request:       0.923 [ms] (mean, across all concurrent requests)
-Transfer rate:          303.54 [Kbytes/sec] received
+class Databases(SqlDatabaseManager):
+    databases = [MainDb]
 
-Connection Times (ms)
-              min  mean[+/-sd] median   max
-Connect:        0    0   0.7      0       3
-Processing:     6  178 114.2    177    1065
-Waiting:        2  178 114.2    177    1064
-Total:          6  179 114.3    177    1067
 
-Percentage of the requests served within a certain time (ms)
-  50%    177
-  66%    194
-  75%    202
-  80%    214
-  90%    341
-  95%    377
-  98%    512
-  99%    534
- 100%   1067 (longest request)
+class Base(DeclarativeBaseModel):
+    __abstract__ = True
+    __db_name__ = "main"          # models are bound to a database by name
+
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
 ```
 
-The test was performed on ***localhost*** with 200 concurrent requests and 2000 total requests. The endpoint performs a simple query (SQLite database) to fetch all users.
+```python
+# app/configs.py
+from patera.database.sql import SqlDatabaseConfig
+
+class Config(BaseConfig):
+    ...
+    MAIN_DB: SqlDatabaseConfig = SqlDatabaseConfig(DATABASE_URI="sqlite+aiosqlite:///./app.db")
+```
+
+```python
+# app/__init__.py
+@app(__name__, configs=Config)
+class App(Patera[Config]):
+    app_extensions = [Databases]
+```
+
+`SqlDatabaseConfig` options: `DATABASE_URI`, `DATABASE_SESSION_NAME` (default `"session"`),
+`SHOW_SQL`, `NICE_NAME`, `EXPIRE_ON_COMMIT`, `AUTOFLUSH`. The engine connects on startup and is
+disposed on shutdown. Register only the manager, not the individual databases. With several
+databases, give each one a unique `__db_name__` **and** a unique `DATABASE_SESSION_NAME`.
+
+**Sessions and transactions.** During a request, model queries and repositories share one session
+per database. At the end of the request the manager middleware commits it if the controller or
+endpoint is marked `@transactional` and no exception occurred; otherwise all changes are rolled
+back.
+
+```python
+from patera.database.sql import Repository, query, transactional
+from patera.injectable import Inject
+
+
+class NoteRepository(Repository[Note]):
+    model = Note
+
+    @query("SELECT * FROM notes WHERE title LIKE :pattern ORDER BY id")
+    async def search(self, pattern: str) -> list[Note]: ...   # SQL with bound parameters
+
+
+@path("/notes")
+class NoteApi(Controller[App]):
+    notes: Inject[NoteRepository]
+
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        page = await Note.query().order_by(Note.id).paginate(page=1, per_page=20)
+        return req.res.json({"total": page.total, "titles": [n.title for n in page.items]})
+
+    @post("/")
+    @transactional
+    async def create(self, req: Request) -> Response:
+        note = await self.notes.create_and_flush(title=(await req.json())["title"])
+        return req.res.json({"id": note.id}).status(201)
+```
+
+- `Model.query()` returns a chainable `AsyncQuery` (`where`/`filter`, `filter_by`, `join`,
+  `order_by`, `order_by_strings("title DESC")`, `limit`, `offset`, and the terminal methods `all`,
+  `first`, `one`, `one_or_none`, `count`, `exists`, `paginate`).
+- `Repository[Model]` offers `get`, `get_one_by`, `first_by`, `list_all`, `list_by`, `count`,
+  `exists`, `create`, `create_and_flush`, `add`, `add_all`, `save`, `delete`, `flush`, `refresh`,
+  `paginate`, `execute`. `@query` methods map rows to models, Pydantic/dataclass types, dicts or
+  scalars based on the return annotation (`Optional[...]` allows no result).
+- Outside requests pass a session explicitly:
+  `async with db.create_session() as session: await Note.query(session).all()`, or decorate a CLI
+  command with `@cli_session("main")` (opens a session and a transaction for the command).
+- `SqlDatabaseManager` gives access to the databases: `manager.get_database("main")`,
+  `manager["main"]`, `manager.get_default_database()`.
+
+### Migrations
+
+`patera-migrate` adds SQL migrations based on [pyway](https://github.com/jasondcamp/pyway). Add the
+`Migrate` mixin to the database class:
+
+```python
+from patera.migrate import Migrate
+
+class MainDb(SqlDatabase, Migrate):
+    __db_name__ = "main"
+```
+
+Migration settings are part of the database configuration: `MIGRATE_CLI_NAME` (`"migrate"`),
+`MIGRATE_DATABASE_MIGRATION_DIR` (`"migrations"`, relative to the application package),
+`MIGRATE_TABLE` (`"pyway_migrations"`), `MIGRATE_SQL_MIGRATION_PREFIX` (`"V"`),
+`MIGRATE_SQL_MIGRATION_SEPARATOR` (`"__"`), `MIGRATE_SQL_MIGRATION_SUFFIXES` (`".sql"`).
+
+```sh
+uv run patera cli migrate:init       # writes migrations/.pyway.conf from DATABASE_URI
+# add migrations/V01_01__create_notes.sql
+uv run patera cli migrate:info
+uv run patera cli migrate:migrate
+uv run patera cli migrate:validate
+```
+
+### Authentication
+
+`patera-auth` provides an authentication middleware. Implement how users and roles are loaded:
+
+```python
+# app/middleware/auth_mw.py
+import jwt
+
+from patera import Request
+from patera.auth import Authentication, AuthUtils
+from patera.middleware import middleware
+
+
+@middleware
+class TokenAuth(Authentication):
+    async def user_loader(self, req: Request):
+        token = req.headers.get("authorization", "").removeprefix("Bearer ")
+        try:
+            claims = AuthUtils.validate_jwt_token(token, self.app.configs.SECRET_KEY)
+        except jwt.InvalidTokenError:
+            return None                    # -> not authenticated
+        return await load_user(claims["sub"])
+
+    async def roles_loader(self, user) -> list:
+        return user.roles
+```
+
+```python
+from patera.auth import login_required, role_required
+
+
+@path("/account")
+@login_required()                       # every endpoint requires a user
+class AccountApi(Controller[App]):
+
+    @get("/")
+    async def me(self, req: Request) -> Response:
+        return req.res.json({"user": req.user.name})
+
+    @get("/admin")
+    @role_required("admin", "owner")    # any of the listed roles
+    async def admin(self, req: Request) -> Response: ...
+```
+
+Routes without the decorators do not load the user. A missing user raises
+`AuthenticationException` (`401`), missing roles raise `AuthorizationException` (`403`, the
+required roles in `data`); both produce JSON error responses unless you handle them. Role
+requirements on the controller and on the endpoint must both be satisfied. Configure messages with
+`TOKEN_AUTH: AuthConfig = AuthConfig(AUTHENTICATION_ERROR_MSG=..., AUTHORIZATION_ERROR_MSG=...,
+ALWAYS_LOAD_ROLES=False)`. Override `refresh_credentials(res)` to renew cookies/tokens.
+
+`AuthUtils` contains helpers: `create_password_hash`/`check_password_hash` (bcrypt),
+`create_signed_cookie_value`/`decode_signed_cookie` (HMAC) and
+`create_jwt_token`/`validate_jwt_token` (HS256; validation raises `jwt.InvalidTokenError`).
+
+### Caching
+
+`patera-caching` caches responses of endpoints:
+
+```python
+from patera.caching import Caching, CachingConfig, cache
+
+
+class PublicCache(Caching):
+    pass                                 # in-memory backend by default
+
+
+class Config(BaseConfig):
+    ...
+    PUBLIC_CACHE: CachingConfig = CachingConfig(DURATION=60, MAX_SIZE=1000)
+
+
+@path("/stats")
+class StatsApi(Controller[App]):
+    @get("/")
+    @cache("PUBLIC_CACHE", duration=15)  # registered name of the extension
+    async def stats(self, req: Request) -> Response:
+        return req.res.json(await compute_stats())
+```
+
+Register `PublicCache` in `app_extensions`. Put `@cache` directly above the handler (below
+`@get`). The key combines the handler name, method, path and query string (or pass `key=...`).
+Only successful (`< 400`), non-streaming responses without cookies are cached; the status, headers
+and media type are restored on a hit. Cache only public data or include the user in the key.
+
+Manual use: `await cache.get(key, req)`, `await cache.set(key, response, duration)`,
+`await cache.delete(key)`, `await cache.delete("users:*", wildcard=True)`,
+`await cache.delete(r"^users:\d+$", regex=True)`, `await cache.clear()`.
+
+Other backends are assigned in `init()`:
+
+```python
+from patera.caching.backends.redis_cache_backend import RedisCacheBackend
+from patera.caching.backends.sqlite_cache_backend import SQLiteCacheBackend
+
+
+class SharedCache(Caching):
+    def init(self) -> None:
+        self.backend = RedisCacheBackend(url="redis://localhost:6379/0", default_ttl=60, key_prefix="myapp")
+        # or: RedisCacheBackend.configure_from_app(self.app, self.configs)  (REDIS_URL, KEY_PREFIX, ...)
+        # or: SQLiteCacheBackend(db_path="cache.db", default_ttl=60)
+        super().init()
+```
+
+The Redis and SQLite backends store pickled data – only use storage that you control. Custom
+backends implement `patera.caching.BaseCacheBackend`.
+
+### Task manager
+
+`patera-taskmanager` schedules jobs with [APScheduler](https://apscheduler.readthedocs.io/en/3.x/):
+
+```python
+from patera.taskmanager import TaskManager, schedule_job
+
+
+class Jobs(TaskManager):
+
+    @schedule_job("interval", minutes=5, id="cleanup")
+    async def cleanup(self) -> None:
+        self.app.logger.info("Cleaning up")
+
+    @schedule_job("cron", hour=3, id="nightly")
+    async def nightly(self) -> None: ...
+```
+
+Register `Jobs` in `app_extensions`; the scheduler starts and stops with the application. Optional
+configuration: `JOBS: TaskManagerConfig = TaskManagerConfig(NICE_NAME="Jobs", DAEMON=True)`.
+At runtime: `add_job(func, trigger, **kwargs)`, `remove_job(job)`, `pause_job(job)`,
+`resume_job(job)`, `run_job_now(job)`, `get_job(id)`, `jobs`, `is_job_running(job)` and
+`run_background_task(func, *args)` for fire-and-forget work. Customize the scheduler with the class
+attributes `scheduler_cls`, `job_stores`, `executors` and `job_defaults`.
+
+### E-mail
+
+```python
+from patera.email import EmailClient, EmailConfig
+
+
+class Mailer(EmailClient):
+    pass
+
+
+class Config(BaseConfig):
+    ...
+    MAILER: EmailConfig = EmailConfig(
+        SENDER_NAME_OR_ADDRESS="My app <noreply@example.com>",
+        SMTP_SERVER="smtp.example.com", SMTP_PORT=587,
+        USERNAME="user", PASSWORD="secret", USE_TLS=True,
+    )
+```
+
+```python
+mailer: Inject[Mailer]
+...
+await self.mailer.send_email("ana@example.com", "Report", "See attachment", attachments={"report.csv": data})
+await self.mailer.send_email_with_template(["a@example.com"], "Welcome", "mail/welcome.txt", context={"name": "Ana"})
+```
+
+### External APIs
+
+`patera-apiinterface` turns annotated methods into HTTP calls (with [HTTPX](https://www.python-httpx.org)):
+
+```python
+from patera import HttpMethod
+from patera.apiinterface import ApiInterface, AuthType, auth, headers, method, resource, service, timeout
+
+
+@service("GITHUB_URL")                         # config key or literal URL
+@auth(AuthType.BEARER, token="GITHUB_TOKEN")   # config key or literal value
+@headers({"X-Client": "my-app"})
+@timeout(10)
+class GithubApi(ApiInterface):
+
+    @method(HttpMethod.GET)
+    @resource("/repos/<repo_id>")              # filled from the current request's route parameters
+    async def get_repo(self) -> Repo: ...      # Pydantic return types are validated
+
+    @method(HttpMethod.POST)
+    @resource("/repos")
+    async def create_repo(self, name: str, private: bool) -> dict: ...   # arguments become the JSON body
+```
+
+Also available: `@consumes`/`@produces` (body and response formats, incl. form data and file
+uploads), `AuthType.BASIC_AUTH` and `AuthType.API_KEY`, and `@no_auth` to disable inherited
+authentication for one method. During a request the current query string is forwarded and `<name>`
+placeholders are filled from route parameters; the methods can also be called outside requests.
+
+### AI interface (experimental)
+
+`patera-aiinterface` connects to chat completion APIs (OpenAI-compatible and Ollama). It depends on
+PyTorch/sentence-transformers for optional prompt augmentation.
+
+```python
+from typing import AsyncIterator
+
+from patera.aiinterface import AiService, AiServiceConfig, ChatResponse, system_prompt, user_prompt
+from patera.aiinterface.service_provider.openai import OpenAIServiceProvider
+
+
+class Assistant(AiService):
+    service_provider = OpenAIServiceProvider()      # or OllamaServiceProvider()
+
+    @system_prompt("You are a helpful translator.")
+    @user_prompt("Translate '<:text>' to <:language>.")
+    async def translate(self, text: str, language: str = "German") -> ChatResponse: ...
+
+    @system_prompt("You are a storyteller.")
+    @user_prompt("Tell a short story about <:topic>.")
+    async def story(self, topic: str) -> AsyncIterator[ChatResponse]: ...   # streaming
+
+
+class Config(BaseConfig):
+    ...
+    ASSISTANT: AiServiceConfig = AiServiceConfig(
+        BASE_URL="https://api.openai.com/v1", API_KEY="...", MODEL="gpt-4o-mini",
+    )
+```
+
+```python
+answer = await self.assistant.translate("Good morning", "French")
+async for chunk in await self.assistant.story("cats"):
+    ...
+```
+
+`<:name>` placeholders are filled from the method's arguments (including defaults). Conversation
+history (`@history`, with a `history_provider` based on `BaseHistoryProvider`) and retrieval
+augmentation (`@augmentation`, with an `augmentation_provider`) are optional. The `@tool` decorator
+marks methods as tools, but the bundled providers do not send tool definitions yet.
+
+### Admin dashboard
+
+`patera-admin` provides a web dashboard for logs, database models, files in the static folder, task
+managers and e-mail clients. It requires an [authentication](#authentication) middleware: users need
+the roles from `patera.admin.Permissions` (`ADMIN_CAN_ENTER` plus
+`ADMIN_CAN_VIEW`/`CREATE`/`EDIT`/`DELETE`).
+
+```python
+from patera.admin import AdminConfig, AdminInterface
+
+
+class Admin(AdminInterface):
+    MANAGED_MODELS = [Note]
+
+
+class Config(BaseConfig):
+    ...
+    ADMIN: AdminConfig = AdminConfig(
+        URL_FOR_FOR_LOGIN="AuthApi.login", URL_FOR_FOR_LOGOUT="AuthApi.logout",
+    )
+```
+
+List `Admin` in `app_extensions` **after** the extensions it should manage (databases, task
+managers, e-mail clients). The dashboard is served at `/admin/<lang>/` (`en`, `de`, `si`, `es`).
+
+### Desktop applications
+
+`patera-desktop` runs the application in a native window ([pywebview](https://pywebview.flowrl.com)):
+`uv run patera desktop --mode dev`. Window options are read from `PATERA_DESKTOP_*` environment
+variables (`TITLE`, `WIDTH`, `HEIGHT`, `RESIZABLE`, `FULLSCREEN`, `ICON`, ...).
+
+## Developing Patera
+
+The repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/): the
+core package lives in `src/patera`, the extensions in `packages/`. All of them share the `patera`
+namespace.
+
+```sh
+uv sync --all-packages --all-extras    # note: the AI interface pulls in PyTorch
+uv run pytest                          # tests/ (unit, integration and extension tests)
+uv run pytest --cov
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src/patera
+```
+
+Scripts in [`scripts/`](scripts/README.md) bump versions, build and publish all packages.

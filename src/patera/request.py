@@ -313,6 +313,9 @@ class Request:
         self._route_handler = route_handler
         self._response: Response[Any] = app.response_class(app, self)
         self._context: dict[str, Any] = {}
+        # Set for OPTIONS requests to routes without an explicit OPTIONS
+        # handler; holds the methods allowed on the route.
+        self.automatic_options: Optional[list[str]] = None
 
     @property
     def route_handler(self) -> Callable:
@@ -397,6 +400,9 @@ class Request:
 
                 if not msg.get("more_body", False):
                     break
+            elif msg["type"] == "http.disconnect":
+                # Client went away before the body was complete.
+                break
 
         self._body = b"".join(parts)
 
@@ -554,11 +560,17 @@ class Request:
             fileobj.seek(0)
             content = fileobj.read()
 
-            headers = getattr(f, "headers", {}) or {}
-            part_content_type = (
-                self._get_header_case_insensitive(headers, "Content-Type")
-                or "application/octet-stream"
-            )
+            # python-multipart exposes the part's Content-Type as
+            # File.content_type (bytes or str depending on the version).
+            part_content_type = getattr(f, "content_type", None)
+            if isinstance(part_content_type, bytes):
+                part_content_type = part_content_type.decode("latin1")
+            if not part_content_type:
+                headers = getattr(f, "headers", {}) or {}
+                part_content_type = self._get_header_case_insensitive(
+                    headers, "Content-Type"
+                )
+            part_content_type = part_content_type or "application/octet-stream"
 
             uploaded_file = UploadedFile(
                 filename=filename,

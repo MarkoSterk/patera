@@ -32,7 +32,7 @@ from patera import (
     Request,
     UploadedFile,
 )
-from patera.ctx import current_request
+from patera.ctx import current_request, has_request_context
 
 
 class AuthType(StrEnum):
@@ -507,12 +507,17 @@ class ApiInterface(
                 f"API interface method {func.__name__} is missing @resource."
             )
 
-        req = cast(
-            Request,
-            current_request.req,
+        # The active request (if any) supplies route parameters for <name>
+        # placeholders in the resource URL and the forwarded query string.
+        # Without a request context (background tasks, CLI) neither is used.
+        req: Optional[Request] = (
+            cast(Request, current_request.req) if has_request_context() else None
         )
 
-        return_type = get_type_hints(func).get("return")
+        try:
+            return_type = get_type_hints(func).get("return")
+        except Exception:
+            return_type = None
 
         url = cast(
             str,
@@ -559,9 +564,10 @@ class ApiInterface(
         request_options: dict[str, Any] = {
             "headers": request_headers,
             "timeout": request_timeout,
-            "params": req.query_parameters,
             "follow_redirects": follow_redirects,
         }
+        if req is not None:
+            request_options["params"] = req.query_parameters
 
         if http_method != HttpMethod.GET and request_body is not _MISSING_BODY:
             consumes_media = configs.get(
@@ -763,9 +769,11 @@ class ApiInterface(
 
     def _format_url(
         self,
-        req: Request,
+        req: Optional[Request],
         url: str,
     ) -> str:
+        if req is None:
+            return url
         for key, value in req.route_parameters.items():
             url = url.replace(
                 f"<{key}>",
@@ -917,6 +925,9 @@ class ApiInterface(
             MediaType.APPLICATION_X_NDJSON,
             MediaType.APPLICATION_PROBLEM_JSON,
         }:
+            if not response.content:
+                # e.g. 204 No Content
+                return None
             return response.json()
 
         if media_type in {

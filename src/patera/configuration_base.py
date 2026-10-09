@@ -4,7 +4,6 @@ Base configuration class
 
 from __future__ import annotations
 
-import re
 from typing import Optional, Any, Sequence
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,8 +11,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .logging.logger_config_base import OutputSink
 from .request import Request
 from .response import Response
-
-IMPORT_STR_RE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*$")
 
 
 class BaseConfig(BaseSettings):
@@ -49,7 +46,10 @@ class BaseConfig(BaseSettings):
     PROTOCOL: str = Field("http", description="Protocol to use in URLs, http or https")
     LIFESPAN: str = Field(
         "on",
-        description="Whether to use server lifespan events/signals. Options: on, auto, off",
+        description=(
+            "Whether to use server lifespan events/signals (on, auto, off). For use "
+            "in custom run scripts; 'patera dev' and 'patera prod' always enable lifespan."
+        ),
     )
     TEMPLATES_DIR: str = Field(
         "templates", description="Relative templates dir from root"
@@ -68,7 +68,8 @@ class BaseConfig(BaseSettings):
     STATIC_DIR: str = Field("static", description="Relative static dir from root")
     STATIC_URL: str = Field("/static", description="URL prefix for static files")
     STATIC_CONTROLLER_NAME: str = Field(
-        "static", description="Mount name for static files controller"
+        "static",
+        description="url_for alias of the static files controller (url_for('static', filename='a.css'))",
     )
 
     USE_STATIC_PAGES: bool = Field(
@@ -76,8 +77,8 @@ class BaseConfig(BaseSettings):
         description=(
             "Whether to use the built-in static pages controller. If True, it will serve "
             "HTML files from the directory specified in STATIC_PAGES_DIR at the URL prefix "
-            "specified in STATIC_PAGES_URL. The controller will be mounted with the name specified "
-            "in STATIC_CONTROLLER_NAME."
+            "specified in STATIC_PAGES_URL. Use url_for(STATIC_PAGES_CONTROLLER_NAME, page=...) "
+            "to build page URLs."
         ),
     )
     STATIC_PAGES_DIR: str = Field(
@@ -86,7 +87,8 @@ class BaseConfig(BaseSettings):
     )
     STATIC_PAGES_URL: str = Field("/", description="URL prefix for static pages")
     STATIC_PAGES_CONTROLLER_NAME: str = Field(
-        "static_pages", description="Mount name for static pages controller"
+        "static_pages",
+        description="url_for alias of the static pages controller (url_for('static_pages', page='about'))",
     )
 
     TEMPLATES_STRICT: bool = Field(True, description="Strict template rendering")

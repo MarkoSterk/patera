@@ -22,7 +22,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.2",
-    "python-multipart>=0.0.22",
+    "python-multipart>=0.0.25",
     "websockets>=16.0",
     "werkzeug>=3.1.6",
 ]
@@ -35,6 +35,7 @@ caching = ["patera-caching"]
 caching-redis = ["patera-caching[redis]"]
 caching-sqlite = ["patera-caching[sqlite]"]
 database = ["patera-database"]
+migrate = ["patera-migrate"]
 email = ["patera-email"]
 taskmanager = ["patera-taskmanager"]
 testing = ["anyio", "pytest", "pytest-cov", "pytest-asyncio", "asgi-lifespan", "httpx"]
@@ -101,14 +102,22 @@ disable = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["app/tests"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning:apscheduler.*",
+]
+markers = [
+    "integration: tests that run a complete application through the ASGI interface",
+]
+
+[tool.coverage.run]
+source = ["src/patera", "packages"]
+omit = ["*/static/*", "*/templates/*"]
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
-exclude = [
-    "src/patera/cli/templates",
-    "src/patera/database/sql/migrate/env_template.py"
-    ]
 
 [dependency-groups]
 dev = [
@@ -117,4 +126,11 @@ dev = [
     "ruff>=0.15.5",
     "uvicorn>=0.42.0",
     "watchfiles>=1.1.1",
+    "anyio",
+    "asgi-lifespan>=2.1.0",
+    "httpx>=0.28.1",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov",
+    "fakeredis>=2.20",
 ]

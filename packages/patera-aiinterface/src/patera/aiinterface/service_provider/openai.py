@@ -126,9 +126,12 @@ class OpenAIServiceProvider(BaseServiceProvider):
 
         msg: str = self.format_message(user_prompt, **kwargs)
 
+        session_id: Any = None
         messages: list[dict[str, str]] = []
         if use_history:
-            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
+            # get_history_messages returns (session_id, messages)
+            session_id, history = await ext.history_provider.get_history_messages(req)  # type: ignore
+            messages = list(history)
 
         if use_augmentation:
             augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
@@ -143,7 +146,7 @@ class OpenAIServiceProvider(BaseServiceProvider):
             sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
             if use_history:
-                ext.history_provider.save_message(sys_message, 0)  # type: ignore
+                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -165,14 +168,15 @@ class OpenAIServiceProvider(BaseServiceProvider):
 
         if use_history:
             ext.history_provider.save_message(  # type: ignore
-                messages[len(messages) - 1], len(messages) - 1
+                session_id, messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
         openai_response = from_openai(json_response)
+        openai_response.session_id = session_id
 
         if use_history:
             ext.history_provider.save_message(  # type: ignore
-                openai_response.message.to_dict(), len(messages)
+                session_id, openai_response.message.to_dict(), len(messages)
             )  # type: ignore
 
         return openai_response
@@ -209,9 +213,12 @@ class OpenAIServiceProvider(BaseServiceProvider):
                 f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
             )
 
+        session_id: Any = None
         messages: list[dict[str, str]] = []
         if use_history:
-            messages = await ext.history_provider.get_history_messages(req)  # type: ignore
+            # get_history_messages returns (session_id, messages)
+            session_id, history = await ext.history_provider.get_history_messages(req)  # type: ignore
+            messages = list(history)
 
         base_url = ext.configs.BASE_URL or "https://api.openai.com/v1"
         url = base_url.rstrip("/") + "/chat/completions"
@@ -236,7 +243,7 @@ class OpenAIServiceProvider(BaseServiceProvider):
             messages.append(sys_message)
 
             if use_history:
-                ext.history_provider.save_message(sys_message, 0)  # type: ignore
+                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -280,6 +287,7 @@ class OpenAIServiceProvider(BaseServiceProvider):
                     if chunk_response is None:
                         continue
 
+                    chunk_response.session_id = session_id
                     if chunk_response.message.content:
                         accumulated_content.append(chunk_response.message.content)
 
@@ -287,10 +295,11 @@ class OpenAIServiceProvider(BaseServiceProvider):
 
         if use_history:
             ext.history_provider.save_message(  # type: ignore
-                messages[len(messages) - 1], len(messages) - 1
+                session_id, messages[len(messages) - 1], len(messages) - 1
             )  # type: ignore
 
             ext.history_provider.save_message(  # type: ignore
+                session_id,
                 {
                     "role": "assistant",
                     "content": "".join(accumulated_content),
@@ -301,5 +310,5 @@ class OpenAIServiceProvider(BaseServiceProvider):
     def format_message(self, user_prompt: str, **kwargs) -> str:
         if kwargs:
             for key, value in kwargs.items():
-                user_prompt = user_prompt.replace(f"<:{key}>", value)
+                user_prompt = user_prompt.replace(f"<:{key}>", str(value))
         return user_prompt

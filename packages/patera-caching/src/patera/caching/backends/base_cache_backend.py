@@ -6,7 +6,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, Optional, Any, TypeVar
 from patera import Patera
-from ..cache import CachingConfig
+from ..config import CachingConfig
 
 AppT = TypeVar("AppT", bound=Patera[Any], default=Patera[Any])
 
@@ -22,8 +22,8 @@ class BaseCacheBackend(ABC, Generic[AppT]):
     """
 
     @abstractmethod
-    def configure_from_app(self, app: AppT, configs: CachingConfig) -> None:
-        """Create a configured backend instance using app config."""
+    def configure_from_app(self, app: AppT, configs: CachingConfig) -> Any:
+        """Configure the backend from the app/extension configuration."""
 
     @abstractmethod
     async def connect(self) -> None:
@@ -45,7 +45,13 @@ class BaseCacheBackend(ABC, Generic[AppT]):
     async def delete(
         self, key: str, *, regex: bool = False, wildcard: bool = False
     ) -> int:
-        """Delete cache entries."""
+        """
+        Delete cache entries and return the number of deleted entries.
+
+        - exact key by default
+        - wildcard=True: shell-style pattern (fnmatch), e.g. "users:*"
+        - regex=True: regular expression searched in the key
+        """
 
     @abstractmethod
     async def clear(self) -> None:

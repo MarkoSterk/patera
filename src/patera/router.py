@@ -3,6 +3,7 @@ Router class for application routing. Uses Wrkzeug under the hood.
 """
 
 from typing import Callable, Any, Mapping
+from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, Rule
 
 
@@ -36,6 +37,27 @@ class Router:
         Matches the path and method against the routing map.
         Returns (endpoint_function, path_variables_dict) if found, otherwise (None, {}).
         """
+        try:
+            return self._match(path, method)
+        except NotFound:
+            if self.url_map.strict_slashes or path == "/":
+                raise
+            # Werkzeug matches "/x" against a "/x/" rule (and vice versa) when
+            # strict slashes are off, but only for allowed methods; other
+            # methods yield NotFound instead of MethodNotAllowed. Check the
+            # alternative form so the correct 405 (and automatic OPTIONS) work.
+            alternative = path[:-1] if path.endswith("/") else path + "/"
+            try:
+                self._match(alternative, method)
+            except MethodNotAllowed:
+                raise
+            except Exception:
+                pass
+            raise
+
+    def _match(
+        self, path: str, method: str
+    ) -> tuple[Callable | None, Mapping[str, Any]]:
         adapter = self.url_map.bind("", path_info=path)
         endpoint_name, kwargs = adapter.match(method=method)
         endpoint = self.endpoints.get(endpoint_name)

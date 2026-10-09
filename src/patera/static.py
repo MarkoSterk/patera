@@ -44,7 +44,7 @@ class Static(Controller):
         # Checks if file exists
         file_path = None
         candidate = safe_join(req.app.static_files_path, filename)
-        if candidate and os.path.exists(candidate):
+        if candidate and os.path.isfile(candidate):
             file_path = candidate
         if not file_path:
             return req.res.no_content().status(HttpStatus.NOT_FOUND)

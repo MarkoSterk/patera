@@ -1,11 +1,10 @@
 from patera.controller import Controller, path, get, produces
-from patera import Request, Response, HttpStatus, MediaType, ignore
+from patera import Request, Response, HttpStatus, MediaType
 
 from app import App
 
 
 @path("/")
-@ignore
 class PublicController(Controller[App]):
     @get("/")
     @produces(MediaType.TEXT_HTML)
@@ -15,7 +14,7 @@ class PublicController(Controller[App]):
                 "index.html",
                 context={
                     "app_name": self.app.configs.APP_NAME,
-                    "app_version": self.app.configs.APP_VERSION,
+                    "app_version": self.app.configs.VERSION,
                 },
             )
         ).status(HttpStatus.OK)

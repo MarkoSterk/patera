@@ -2,7 +2,7 @@
 SQLite cache backend
 
 Indicated values are defaults
-CACHE_SQLITE_PATH: str = "./pyjolt_cache.sqlite3" # file path (required for persistence)
+CACHE_SQLITE_PATH: str = "./patera_cache.db" # file path (required for persistence)
 CACHE_SQLITE_TABLE: str = "cache_entries" # table name
 CACHE_KEY_PREFIX: str = "patera:cache:" # optional key namespace
 CACHE_DURATION: int = 300 # default TTL seconds
@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import os
 import pickle
+import re
 import time
+from fnmatch import fnmatchcase
 from typing import Generic, Optional, TYPE_CHECKING, Tuple, TypeVar, cast, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field  # noqa: F401
 
 import aiosqlite
 
@@ -30,7 +32,7 @@ AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 class SQLiteCacheConfig(BaseModel):
     CACHE_SQLITE_PATH: str = Field(
-        "./pyjolt_cache.db",
+        "./patera_cache.db",
         description="SQLite DB file path (use ':memory:' for in-memory)",
     )
     CACHE_SQLITE_TABLE: str = Field(
@@ -67,6 +69,10 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._table = table
         self.default_ttl = int(default_ttl)
         self._conn: Optional[aiosqlite.Connection] = None
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table):
+            # The table name is interpolated into SQL statements.
+            raise ValueError(f"Invalid SQLite cache table name: {table!r}")
+        key_prefix = key_prefix or ""
         if key_prefix and not key_prefix.endswith(":"):
             key_prefix = key_prefix + ":"
         self._prefix = key_prefix
@@ -80,12 +86,18 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._write_ops = 0
 
     @classmethod
-    def configure_from_app(
-        cls, app: AppT, configs: dict[str, Any]
+    def configure_from_app(  # type: ignore[override]
+        cls, app: AppT, configs: dict[str, Any] | BaseModel
     ) -> "SQLiteCacheBackend":
-        db_path = cast(str, configs.get("SQLITE_PATH", "./pyjolt_cache.db"))
-        table = cast(str, configs.get("SQLITE_TABLE", "cache_entries"))
-        default_ttl = int(configs.get("DURATION", 300))
+        """
+        Creates a backend from a config mapping or a CachingConfig
+        (SQLITE_PATH, SQLITE_TABLE, DURATION, KEY_PREFIX, ...).
+        """
+        if isinstance(configs, BaseModel):
+            configs = configs.model_dump()
+        db_path = cast(str, configs.get("SQLITE_PATH") or "./patera_cache.db")
+        table = cast(str, configs.get("SQLITE_TABLE") or "cache_entries")
+        default_ttl = int(configs.get("DURATION") or 300)
         key_prefix = cast(str, configs.get("KEY_PREFIX", ""))
         checkpoint_mode = cast(
             str, configs.get("SQLITE_WAL_CHECKPOINT_MODE", "PASSIVE")
@@ -213,15 +225,45 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         await self._cleanup_expired()
         await self._maybe_checkpoint()
 
-    async def delete(self, key: str) -> None:
+    async def delete(
+        self, key: str, *, regex: bool = False, wildcard: bool = False
+    ) -> int:
+        """
+        Deletes entries (exact key, wildcard pattern or regex) in this
+        backend's namespace and returns the number of deleted entries.
+        """
+        if regex and wildcard:
+            raise ValueError("Use either regex=True or wildcard=True, not both.")
         if self._conn is None:
             await self.connect()
         assert self._conn is not None
-        await self._conn.execute(
-            f"DELETE FROM {self._table} WHERE k = ?", (self._k(key),)
-        )
+
+        if not regex and not wildcard:
+            keys = [self._k(key)]
+        else:
+            async with self._conn.execute(f"SELECT k FROM {self._table}") as cur:
+                rows = await cur.fetchall()
+            pattern = re.compile(key) if regex else None
+            keys = []
+            for (full_key,) in rows:
+                if self._prefix and not full_key.startswith(self._prefix):
+                    continue
+                short_key = full_key[len(self._prefix) :]
+                if pattern is not None:
+                    if pattern.search(short_key):
+                        keys.append(full_key)
+                elif fnmatchcase(short_key, key):
+                    keys.append(full_key)
+
+        deleted = 0
+        for full_key in keys:
+            cursor = await self._conn.execute(
+                f"DELETE FROM {self._table} WHERE k = ?", (full_key,)
+            )
+            deleted += max(cursor.rowcount, 0)
         await self._conn.commit()
         await self._maybe_checkpoint()
+        return deleted
 
     async def clear(self) -> None:
         if self._conn is None:
@@ -234,6 +276,8 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
             )
         else:
             await self._conn.execute(f"DELETE FROM {self._table}")
+        # Commit first: a checkpoint cannot run inside the open transaction.
+        await self._conn.commit()
         # Checkpoint after full clear to truncate WAL
         await self._conn.execute(f"PRAGMA wal_checkpoint({self._checkpoint_mode});")
         await self._conn.commit()

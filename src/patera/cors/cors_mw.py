@@ -29,9 +29,14 @@ class CORSMiddleware(MiddlewareBase):
 
         if cors_opts["enabled"] and origin:
             if not self._origin_allowed(origin, cors_opts["allow_origins"]):
-                return req.res.json(
-                    {"status": "error", "message": "CORS origin not allowed"}
-                ).status(403)
+                if is_preflight:
+                    return req.res.json(
+                        {"status": "error", "message": "CORS origin not allowed"}
+                    ).status(403)
+                # Simple/actual requests are passed through without CORS
+                # headers; the browser then blocks cross-origin reads. Same-origin
+                # requests (browsers also send Origin on them) keep working.
+                return await self.next(req)
 
             if is_preflight:
                 return self._handle_preflight(scope, req, origin, cors_opts)
@@ -87,6 +92,7 @@ class CORSMiddleware(MiddlewareBase):
         # Check if handler explicitly disables CORS
         if getattr(handler, "_disable_cors", False):
             opts["enabled"] = False
+            opts["allow_origins"] = self._normalize_list(opts["allow_origins"])
             return opts
 
         # Merge @cors decorator overrides
@@ -186,7 +192,7 @@ class CORSMiddleware(MiddlewareBase):
             request_headers=acr_headers,
             opts=cors_opts,
         )
-        return req.res.set_headers(headers)
+        return req.res.no_content().set_headers(headers)
 
     def _wrap_cors_send(self, send, origin: str, cors_opts: dict):
         cors_headers = self._build_cors_headers_for_response(

@@ -79,8 +79,14 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
 
     @property
     def session(self) -> AsyncSession:
+        """
+        Returns the request-bound session of the model's database, creating
+        it (and binding it to the request context) on first use.
+        """
         database = self.get_database()
-        session: AsyncSession = current_request.session(database.session_name)  # type: ignore
+        session = current_request.session(database.session_name)
+        if session is None:
+            session = self.model.get_session()
         return session
 
     @property

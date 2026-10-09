@@ -64,6 +64,15 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
                     "Database names must be unique."
                 )
 
+            for other in self._db_instances.values():
+                if other.session_name == db_instance.session_name:
+                    raise RuntimeError(
+                        f"Databases {other.db_name!r} and {db_instance.db_name!r} "
+                        f"share the session name {db_instance.session_name!r}. "
+                        "Request-bound sessions are stored by session name, so "
+                        "set a unique DATABASE_SESSION_NAME for each database."
+                    )
+
             self._db_instances[db_instance.db_name] = db_instance
 
             # Backwards-compatible direct lookup by database name.

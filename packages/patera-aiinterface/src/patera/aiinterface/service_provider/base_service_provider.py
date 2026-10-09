@@ -21,7 +21,7 @@ class BaseServiceProvider(ABC):
         **kwargs,
     ) -> ChatResponse: ...
 
-    async def stream(
+    def stream(
         self,
         req: Request,
         system_prompt: str,
@@ -31,6 +31,10 @@ class BaseServiceProvider(ABC):
         ext: "AiService",
         **kwargs,
     ) -> AsyncIterator[ChatResponse]:
+        """
+        Streams the chat response. Implementations are async generators
+        (``async def stream(...): ... yield chunk``).
+        """
         raise NotImplementedError(
             "If you wish to use streaming mode please implement the stream() method."
         )

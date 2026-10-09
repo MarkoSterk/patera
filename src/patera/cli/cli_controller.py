@@ -4,6 +4,7 @@ CLI controller module for Patera.
 
 import inspect
 import asyncio
+import sys
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -13,12 +14,13 @@ from typing import (
     TypeVar,
     Generic,
     Any,
+    get_type_hints,
     overload,
 )
 from functools import wraps
 
 from ..injectable import Injectable
-from ..utilities import run_sync_or_async, pascal_to_upper_snake
+from ..utilities import run_sync_or_async
 
 if TYPE_CHECKING:
     from ..patera import Patera
@@ -66,35 +68,10 @@ class CLIController(Injectable, Generic[AppT]):
         self._register_commands()
         self._resolve_injections()
 
-    def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        name: str = pascal_to_upper_snake(target_type.__name__)
-        value = self.app._extensions.get(name, None)
-        if value is None:
-            value = target_type(self.app)
-            self.app._extensions[name] = value
-            # self.app._extensions[target_type.__name__] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        value = self.app.get_conf(config_name)
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
-            raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
-
     def _register_commands(self):
         for attr_name in dir(self):
+            if isinstance(inspect.getattr_static(self, attr_name, None), property):
+                continue
             method = getattr(self, attr_name)
             if callable(method):
                 command = getattr(method, "cli_command", {})
@@ -110,18 +87,24 @@ class CLIController(Injectable, Generic[AppT]):
         return self._cli_commands.get(method, None)
 
     def run_command(self, method: Callable, *args, **kwargs):
+        """
+        Runs a CLI command. On failure the error is printed to stderr and the
+        process exits with status code 1, so scripts/CI can detect failures.
+        """
         try:
             converted_values = self.prepare_cli_args(
-                method, kwargs.get("command_args", [])
+                method, kwargs.get("command_args", []) or []
             )
             return asyncio.run(run_sync_or_async(method, *converted_values))
         except Exception as exc:
-            print(f"Failed to run method: {method.__name__}")
+            print(f"Failed to run method: {method.__name__}", file=sys.stderr)
             print(
                 "Help: ",
                 self._cli_commands_help.get(method.__name__, "No help string provided"),
+                file=sys.stderr,
             )
-            print(exc)
+            print(exc, file=sys.stderr)
+            raise SystemExit(1) from exc
 
     def convert_value(self, value: str, annotation: type) -> Any:
         """
@@ -152,6 +135,11 @@ class CLIController(Injectable, Generic[AppT]):
         """
         sig = inspect.signature(method)
         params = list(sig.parameters.values())
+        try:
+            # Resolves string annotations (from __future__ import annotations)
+            type_hints = get_type_hints(method)
+        except Exception:
+            type_hints = {}
         converted = []
         raw_index = 0
 
@@ -166,7 +154,8 @@ class CLIController(Injectable, Generic[AppT]):
                 raise ValueError(f"Missing required argument: {param.name}")
 
             raw_value = raw_args[raw_index]
-            converted.append(self.convert_value(raw_value, param.annotation))
+            annotation = type_hints.get(param.name, param.annotation)
+            converted.append(self.convert_value(raw_value, annotation))
             raw_index += 1
 
         if raw_index < len(raw_args):

@@ -167,7 +167,7 @@ def bind_session(session_name: str, session: "AsyncSession"):
     finally:
         if previous is None:
             ctx.sessions.remove_session(session_name)
-            if ctx.sessions.sessions is None:
+            if ctx.sessions.is_empty():
                 ctx.sessions = None
         else:
             ctx.sessions.set_session(session_name, previous)

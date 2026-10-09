@@ -2,11 +2,12 @@
 Exception controller implementation
 """
 
+import inspect
 from functools import wraps
 from typing import Any, Callable, TYPE_CHECKING, Generic, Type, TypeVar
 
 from ..controller.decorators import AsyncMethod, P, R
-from ..utilities import run_sync_or_async, _extract_response_type, pascal_to_upper_snake
+from ..utilities import run_sync_or_async, _extract_response_type
 from ..injectable import Injectable
 
 if TYPE_CHECKING:
@@ -28,33 +29,6 @@ class ExceptionHandler(Injectable, Generic[AppT]):
         self._app = app
         self._resolve_injections()
 
-    def _resolve_dependency(self, target_type: type[Any]) -> Any:
-        name: str = pascal_to_upper_snake(target_type.__name__)
-        value = self.app._extensions.get(name, None)
-        if value is None:
-            value = target_type(self.app)
-            self.app._extensions[name] = value
-            # self.app._extensions[target_type.__name__] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        value = self.app.get_conf(config_name)
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
-            raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
-
     def get_exception_mapping(self) -> dict[str, Callable]:
         """Produces exception mapping"""
         owner_cls: "type[ExceptionHandler]|None" = self.__class__ or None
@@ -63,6 +37,8 @@ class ExceptionHandler(Injectable, Generic[AppT]):
             return handlers
 
         for name in dir(owner_cls):
+            if isinstance(inspect.getattr_static(self, name, None), property):
+                continue
             method = getattr(self, name, None)
             if method is None or not callable(method):
                 continue
@@ -97,8 +73,8 @@ def handles(*exceptions: Type[Exception]):
             res: "Response" = await run_sync_or_async(func, self, *args, **kwargs)
             return res
 
-        handled_exceptions = getattr(func, "_handled_exceptions", []) or []
-        handled_exceptions.extend(list(exceptions))
+        handled_exceptions = list(getattr(func, "_handled_exceptions", []) or [])
+        handled_exceptions.extend(exceptions)
         # pylint: disable-next=W0212
         wrapper._handled_exceptions = handled_exceptions  # type: ignore[attr-defined]
         return wrapper

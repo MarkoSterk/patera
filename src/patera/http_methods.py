@@ -11,4 +11,6 @@ class HttpMethod(StrEnum):
     PUT = "PUT"
     PATCH = "PATCH"
     DELETE = "DELETE"
+    HEAD = "HEAD"
+    OPTIONS = "OPTIONS"
     SOCKET = "SOCKET"

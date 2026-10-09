@@ -4,6 +4,7 @@ Response class. Holds all information regarding responses to individual requests
 
 from __future__ import annotations
 
+import builtins
 from collections.abc import AsyncIterable, Iterable
 from typing import (
     Any,
@@ -136,7 +137,6 @@ class Response(Generic[U]):
         self.body = cast(U, text)
         self.media_type = MediaType.TEXT_PLAIN.value
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def html_body(self, html: str) -> Self:
@@ -146,7 +146,6 @@ class Response(Generic[U]):
         self.body = cast(U, html)
         self.media_type = MediaType.TEXT_HTML.value
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def xml(self, xml: str, media_type: str = MediaType.APPLICATION_XML.value) -> Self:
@@ -156,7 +155,6 @@ class Response(Generic[U]):
         self.body = cast(U, xml)
         self.media_type = media_type
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def csv(self, csv_text: str, media_type: str = MediaType.TEXT_CSV.value) -> Self:
@@ -166,7 +164,6 @@ class Response(Generic[U]):
         self.body = cast(U, csv_text)
         self.media_type = media_type
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def yaml(
@@ -180,7 +177,6 @@ class Response(Generic[U]):
         self.body = cast(U, yaml_text)
         self.media_type = media_type
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def ndjson(self, rows: Any) -> Self:
@@ -191,7 +187,6 @@ class Response(Generic[U]):
         self.body = cast(U, rows)
         self.media_type = MediaType.APPLICATION_X_NDJSON.value
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     def bytes(
@@ -205,7 +200,6 @@ class Response(Generic[U]):
         self.body = cast(U, bytes(data))
         self.media_type = media_type
         self.charset = None
-        self.status(HttpStatus.OK)
         return self
 
     async def html_from_string(
@@ -216,8 +210,8 @@ class Response(Generic[U]):
         """
         Renders an HTML string as a Jinja template and stores the rendered HTML as response body.
         """
-        if context is None:
-            context = {}
+        # Copy so the caller's dictionary is not modified.
+        context = dict(context or {})
 
         context["app"] = self.app
         context["url_for"] = self.app.url_for
@@ -230,7 +224,6 @@ class Response(Generic[U]):
         self.body = cast(U, rendered)
         self.media_type = MediaType.TEXT_HTML.value
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
     async def html(
@@ -244,8 +237,8 @@ class Response(Generic[U]):
         template_path: relative path of template inside the templates folder
         context: dictionary with data used in the template
         """
-        if context is None:
-            context = {}
+        # Copy so the caller's dictionary is not modified.
+        context = dict(context or {})
 
         context["app"] = self.app
         context["url_for"] = self.app.url_for
@@ -259,10 +252,11 @@ class Response(Generic[U]):
         self.body = cast(U, rendered)
         self.media_type = MediaType.TEXT_HTML.value
         self.charset = "utf-8"
-        self.status(HttpStatus.OK)
         return self
 
-    def send_file(self, body: bytes | bytearray, headers: dict[str, str]) -> Self:
+    def send_file(
+        self, body: builtins.bytes | bytearray, headers: dict[str, str]
+    ) -> Self:
         """
         Creates a file response. The caller can pass precomputed headers such as Content-Disposition.
 
@@ -463,7 +457,7 @@ class Response(Generic[U]):
 
     def stream(
         self,
-        iterable: AsyncIterable[bytes] | Iterable[bytes],
+        iterable: AsyncIterable[builtins.bytes] | Iterable[builtins.bytes],
         media_type: str = MediaType.APPLICATION_OCTET_STREAM.value,
     ) -> Self:
         """
@@ -485,7 +479,7 @@ class Response(Generic[U]):
         Creates a streaming text response.
         """
 
-        async def _aiter() -> AsyncIterator[bytes]:
+        async def _aiter() -> AsyncIterator[builtins.bytes]:
             if hasattr(iterable, "__aiter__"):
                 async for chunk in iterable:  # type: ignore[attr-defined]
                     yield str(chunk).encode(charset)
@@ -500,7 +494,9 @@ class Response(Generic[U]):
         return self
 
     @property
-    def stream_iterable(self) -> Optional[AsyncIterable[bytes] | Iterable[bytes]]:
+    def stream_iterable(
+        self,
+    ) -> Optional[AsyncIterable[builtins.bytes] | Iterable[builtins.bytes]]:
         return self._stream
 
     @property

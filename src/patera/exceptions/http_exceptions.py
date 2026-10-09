@@ -21,6 +21,7 @@ class BaseHttpException(Exception):
         """
         Init method
         """
+        super().__init__(message)
         self.message = message
         if isinstance(status_code, HttpStatus):
             status_code = status_code.value
@@ -29,7 +30,7 @@ class BaseHttpException(Exception):
         self.data = data
 
 
-class StaticPageNotFound(BaseException):
+class StaticPageNotFound(BaseHttpException):
     """
     Static page not found error
     """

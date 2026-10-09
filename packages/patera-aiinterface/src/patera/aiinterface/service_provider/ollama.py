@@ -172,9 +172,12 @@ class OllamaServiceProvider(BaseServiceProvider):
                 f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
             )
 
+        session_id: Any = None
         messages: list[Any] = []
         if use_history:
-            messages = await ext.history_provider._get_history()  # type: ignore
+            # get_history_messages returns (session_id, messages)
+            session_id, history = await ext.history_provider.get_history_messages(req)  # type: ignore
+            messages = list(history)
 
         url = ext.configs.BASE_URL
         url = url.rstrip("/") + "/api/chat"
@@ -195,7 +198,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             sys_message = {"role": "system", "content": system_prompt}
             messages.append(sys_message)
             if use_history:
-                ext.history_provider.save_message(sys_message, 0)  # type: ignore
+                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
 
         messages.append({"role": "user", "content": msg})
 
@@ -213,6 +216,7 @@ class OllamaServiceProvider(BaseServiceProvider):
             payload.pop("options")
 
         timeout = ext.configs.TIMEOUT
+        accumulated_content: list[str] = []
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
@@ -221,10 +225,23 @@ class OllamaServiceProvider(BaseServiceProvider):
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line:
-                        yield from_ollama(json.loads(line))
+                        chunk = from_ollama(json.loads(line), session_id)
+                        if chunk.message.content:
+                            accumulated_content.append(chunk.message.content)
+                        yield chunk
+
+        if use_history:
+            ext.history_provider.save_message(  # type: ignore
+                session_id, messages[len(messages) - 1], len(messages) - 1
+            )
+            ext.history_provider.save_message(  # type: ignore
+                session_id,
+                {"role": "assistant", "content": "".join(accumulated_content)},
+                len(messages),
+            )
 
     def format_message(self, user_prompt: str, **kwargs) -> str:
         if kwargs:
             for key, value in kwargs.items():
-                user_prompt = user_prompt.replace(f"<:{key}>", value)
+                user_prompt = user_prompt.replace(f"<:{key}>", str(value))
         return user_prompt

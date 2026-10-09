@@ -10,8 +10,10 @@ CACHE_KEY_PREFIX      = "patera:cache:"              # optional prefix/namespace
 from __future__ import annotations
 
 import pickle
+import re
 from typing import Generic, Optional, TypeVar, cast, List, TYPE_CHECKING, Any
 
+from pydantic import BaseModel
 from redis.asyncio import Redis, from_url
 
 from .base_cache_backend import BaseCacheBackend
@@ -39,19 +41,31 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._client: Optional[Redis] = None
         self.default_ttl = int(default_ttl)
         # Normalize prefix to empty or end with ':' for nicer namespaces
-        if key_prefix and not key_prefix.endswith(":") and key_prefix != "":
+        key_prefix = key_prefix or ""
+        if key_prefix and not key_prefix.endswith(":"):
             key_prefix = key_prefix + ":"
         self._prefix = key_prefix
 
     @classmethod
-    def configure_from_app(
-        cls, app: AppT, configs: dict[str, Any]
+    def configure_from_app(  # type: ignore[override]
+        cls, app: AppT, configs: dict[str, Any] | BaseModel
     ) -> "RedisCacheBackend":
+        """
+        Creates a backend from a config mapping or a CachingConfig
+        (REDIS_URL, REDIS_PASSWORD, DURATION, KEY_PREFIX).
+        """
+        if isinstance(configs, BaseModel):
+            configs = configs.model_dump()
         url = configs.get("REDIS_URL", "")
         password = configs.get("REDIS_PASSWORD", None)
-        ttl = cast(int, configs.get("DURATION"))
-        key_prefix = configs.get("KEY_PREFIX", "")
-        return cls(url=url, password=password, default_ttl=ttl, key_prefix=key_prefix)
+        ttl = configs.get("DURATION")
+        key_prefix = configs.get("KEY_PREFIX", "") or ""
+        return cls(
+            url=url,
+            password=password,
+            default_ttl=int(ttl) if ttl is not None else 300,
+            key_prefix=key_prefix,
+        )
 
     async def connect(self) -> None:
         if not self._client:
@@ -65,7 +79,7 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
 
     async def disconnect(self) -> None:
         if self._client:
-            await self._client.close()
+            await self._client.aclose()
             self._client = None
 
     # ---- helpers ----
@@ -84,16 +98,46 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         raw = await client.get(self._k(key))
         if not raw:
             return None
-        return cast(dict, pickle.loads(raw))
+        return cast(dict, pickle.loads(cast(bytes, raw)))
 
     async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
         client = await self._ensure()
         ttl = int(duration) if duration is not None else self.default_ttl
-        await client.setex(self._k(key), ttl, pickle.dumps(value))
+        if ttl <= 0:
+            # Redis rejects non-positive expiry times; nothing to cache.
+            await client.delete(self._k(key))
+            return
+        await client.set(self._k(key), pickle.dumps(value), ex=ttl)
 
-    async def delete(self, key: str) -> None:
+    async def delete(
+        self, key: str, *, regex: bool = False, wildcard: bool = False
+    ) -> int:
+        """
+        Deletes entries (exact key, wildcard pattern or regex) in this
+        backend's namespace and returns the number of deleted entries.
+        """
+        if regex and wildcard:
+            raise ValueError("Use either regex=True or wildcard=True, not both.")
+
         client = await self._ensure()
-        await client.delete(self._k(key))
+
+        if not regex and not wildcard:
+            return int(await client.delete(self._k(key)))
+
+        if wildcard:
+            matches = [k async for k in client.scan_iter(match=self._k(key))]
+        else:
+            pattern = re.compile(key)
+            matches = []
+            async for raw_key in client.scan_iter(match=f"{self._prefix}*"):
+                text = raw_key.decode() if isinstance(raw_key, bytes) else raw_key
+                if pattern.search(text[len(self._prefix) :]):
+                    matches.append(raw_key)
+
+        deleted = 0
+        for i in range(0, len(matches), 1000):
+            deleted += int(await client.delete(*matches[i : i + 1000]))
+        return deleted
 
     async def clear(self) -> None:
         client = await self._ensure()

@@ -68,13 +68,39 @@ def pascal_to_upper_snake(name: str) -> str:
     return s2.upper()
 
 
+_RESPONSE_TYPE_CACHE: dict[Any, Optional[Type[Any]]] = {}
+
+
 def _extract_response_type(func) -> Optional[Type[Any]]:
     """
     If the function is annotated as -> Response[T], return T; else None.
+
+    Results are cached per function. Annotations that cannot be resolved at
+    runtime (e.g. names imported only under TYPE_CHECKING) yield None instead
+    of failing the request.
     """
+    target = getattr(func, "__func__", func)
+    try:
+        return _RESPONSE_TYPE_CACHE[target]
+    except (KeyError, TypeError):
+        pass
+
+    result = _compute_response_type(target)
+
+    try:
+        _RESPONSE_TYPE_CACHE[target] = result
+    except TypeError:  # pragma: no cover - unhashable callable
+        pass
+    return result
+
+
+def _compute_response_type(func) -> Optional[Type[Any]]:
     from .response import Response  # avoid circular import
 
-    hints = get_type_hints(func, include_extras=True)
+    try:
+        hints = get_type_hints(func, include_extras=True)
+    except Exception:
+        return None
     ret = hints.get("return")
     if ret is None:
         return None
@@ -157,15 +183,25 @@ def run_in_background(func: Callable[..., Any], *args, **kwargs) -> Task:
         return await asyncio.to_thread(func, *args, **kwargs)
 
     task = asyncio.create_task(runner())
+    # Keep a strong reference: the event loop only keeps weak references to
+    # tasks, so an unreferenced task may be garbage collected mid-execution.
+    _BACKGROUND_TASKS.add(task)
 
     def _handle_task_result(t: asyncio.Task) -> None:
-        try:
-            t.result()
-        except Exception as exc:
-            print(f"Background task failed: {exc}")
+        _BACKGROUND_TASKS.discard(t)
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            from loguru import logger
+
+            logger.opt(exception=exc).error(f"Background task failed: {exc}")
 
     task.add_done_callback(_handle_task_result)
     return task
+
+
+_BACKGROUND_TASKS: set[Task] = set()
 
 
 async def get_file(
@@ -201,16 +237,24 @@ async def get_file(
 async def get_range_file(res, file_path: str, range_header: str, content_type: str):
     """Returns a ranged response. Useful for large static files, video streaming etc."""
     total = os.path.getsize(file_path)
-    m = re.match(r"bytes=(\d+)-(\d*)", range_header)
-    if not m:
+    m = re.fullmatch(r"\s*bytes=(\d*)-(\d*)\s*", range_header)
+    if not m or (not m.group(1) and not m.group(2)):
+        # Missing/unsupported (e.g. multi-range) header: send the whole file.
         start, end, status = 0, total - 1, 200
+    elif not m.group(1):
+        # Suffix range: "bytes=-500" -> the last 500 bytes.
+        suffix = int(m.group(2))
+        start, end, status = max(total - suffix, 0), total - 1, 206
     else:
         start = int(m.group(1))
         end = int(m.group(2)) if m.group(2) else total - 1
         end = min(end, total - 1)
-        if start > end:
-            raise StaticAssetNotFound()
         status = 206
+
+    if status == 206 and (start >= total or start > end):
+        res.status(416)
+        res.set_headers({"content-range": f"bytes */{total}", "accept-ranges": "bytes"})
+        return res
 
     length = end - start + 1
     headers = {
@@ -225,8 +269,8 @@ async def get_range_file(res, file_path: str, range_header: str, content_type: s
 
     # **Don’t** read the bytes here.  Just stash info on `res`.
     res.status(status)
-    # merge headers onto res.headers
-    res.headers.update(headers)
+    # set_headers normalizes header names (and syncs the media type)
+    res.set_headers(headers)
     # mark zero-copy parameters
     res.set_zero_copy({"file_path": file_path, "start": start, "length": length})
     return res

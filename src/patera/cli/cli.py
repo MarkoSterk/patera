@@ -85,6 +85,20 @@ def main():
 
     start_cli_parser = subparsers.add_parser("cli")
     start_cli_parser.add_argument(
+        "--app",
+        type=str,
+        default=None,
+        required=False,
+        help="Import string of App class implementation",
+    )
+    start_cli_parser.add_argument(
+        "--env-file",
+        type=str,
+        default=None,
+        required=False,
+        help="Path to environment variable file",
+    )
+    start_cli_parser.add_argument(
         "command_name",
         type=str,
         help="CLI command name to run",
@@ -101,7 +115,7 @@ def main():
         type=str,
         default=None,
         required=False,
-        help="Environment file to use with testing",
+        help="Import string of App class implementation",
     )
     start_testing_parser.add_argument(
         "--env-file",

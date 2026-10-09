@@ -2,15 +2,15 @@
 In-memory cache implementation
 """
 
-from typing import Generic, Optional, TypeVar, cast, Any, TypedDict
-import asyncio
+from typing import Generic, Optional, TypeVar, Any, TypedDict
 import re
+import time
 
 from cachetools import TTLCache
 from fnmatch import fnmatchcase
 
 from .base_cache_backend import BaseCacheBackend
-from ..cache import CachingConfig
+from ..config import CachingConfig
 from patera import Patera
 
 AppT = TypeVar("AppT", bound=Patera[Any], default=Patera[Any])
@@ -34,9 +34,17 @@ class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self.default_ttl = default_ttl
         self.maxsize = maxsize
         # Stores: key -> {payload: dict, expire: float}
-        self._cache: TTLCache[str, CacheItem] = cast(
-            TTLCache[str, CacheItem], None
-        )  # Initialized in configure_from_app
+        # Usable right away; configure_from_app() may re-create it with the
+        # configured size/TTL.
+        self._cache: TTLCache[str, CacheItem] = TTLCache(
+            maxsize=self.maxsize, ttl=self.default_ttl
+        )
+        self._configured = False
+
+    @property
+    def is_configured(self) -> bool:
+        """True once configure_from_app() has been called."""
+        return self._configured
 
     def configure_from_app(self, app: AppT, configs: CachingConfig) -> None:
         self.default_ttl = (
@@ -46,6 +54,13 @@ class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
             configs.MAX_SIZE if configs.MAX_SIZE is not None else self.maxsize
         )
         self._cache = TTLCache(maxsize=self.maxsize, ttl=self.default_ttl)
+        self._configured = True
+
+    @staticmethod
+    def _now() -> float:
+        # Same clock as cachetools' TTLCache (time.monotonic); works outside
+        # of a running event loop.
+        return time.monotonic()
 
     async def connect(self) -> None:
         return None
@@ -58,7 +73,7 @@ class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         if not item:
             return None
         expire = item.get("expire", 0)
-        if expire < asyncio.get_event_loop().time():
+        if expire < self._now():
             try:
                 del self._cache[key]
             except KeyError:
@@ -68,7 +83,7 @@ class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
 
     async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
         ttl = int(duration) if duration is not None else self.default_ttl
-        expire = asyncio.get_event_loop().time() + ttl
+        expire = self._now() + ttl
         self._cache[key] = {"payload": value, "expire": expire}
 
     async def delete(

@@ -116,7 +116,7 @@ class AiService(
             **kwargs,
         )
 
-    def _stream_wrapper(self, func, *args, **kwargs) -> AsyncIterator[ChatResponse]:
+    def _stream_wrapper(self, func, **kwargs) -> AsyncIterator[ChatResponse]:
         """
         Wrapper method for handling streaming chat requests, calling the service provider and yielding the response
         """
@@ -133,7 +133,28 @@ class AiService(
             use_history,
             use_augmentation,
             self,  # type: ignore
+            **kwargs,
         )
+
+    @staticmethod
+    def _bind_arguments(func, self, args, kwargs) -> dict[str, Any]:
+        """
+        Maps positional and keyword arguments of an AI method call to the
+        method's parameter names (used for <:name> placeholders in prompts).
+        """
+        signature = inspect.signature(func)
+        bound = signature.bind_partial(self, *args, **kwargs)
+        bound.apply_defaults()
+        arguments: dict[str, Any] = {}
+        for index, (name, value) in enumerate(bound.arguments.items()):
+            if index == 0:  # self
+                continue
+            kind = signature.parameters[name].kind
+            if kind is inspect.Parameter.VAR_KEYWORD:
+                arguments.update(value)
+            elif kind is not inspect.Parameter.VAR_POSITIONAL:
+                arguments[name] = value
+        return arguments
 
     @classmethod
     def _wrap_method(cls, func):
@@ -141,9 +162,10 @@ class AiService(
         async def inner(self, *args, **kwargs):
             result = inspect.get_annotations(func)
             return_type = result.get("return", "")
+            arguments = cls._bind_arguments(func, self, args, kwargs)
             if "AsyncIterator" in str(return_type):
-                return self._stream_wrapper(func, *args, **kwargs)
-            return await self._wrapper(func, **kwargs)
+                return self._stream_wrapper(func, **arguments)
+            return await self._wrapper(func, **arguments)
 
         return inner
 

@@ -277,7 +277,7 @@ def find_patera_app_import(
                 if (
                     issubclass(obj, patera_class)
                     and obj is not patera_class
-                    and getattr(obj, "_is_patera_app")
+                    and getattr(obj, "_is_patera_app", False)
                 ):
                     return f"{module_name}:{name}"
             except TypeError:
@@ -341,6 +341,7 @@ def _start_prod(
     from granian.log import LogLevels
     from ..patera import Patera
 
+    load_env_file(cwd, env_file)
     os.environ["PATERA_DEBUG"] = "0"
 
     root = _resolve_root(cwd)
@@ -490,7 +491,7 @@ def start_testing(
     pytest_args = kwargs.pop("pytest_args", []) or []
 
     if not pytest_args:
-        pytest_args = [cwd]
+        pytest_args = [str(cwd)]
 
     return pytest.main(pytest_args)  # type: ignore
 

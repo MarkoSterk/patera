@@ -205,7 +205,7 @@ def consumes(media_type: MediaType) -> _EndpointDecorator:
                 if name in kwargs:
                     continue
 
-                ann = hints.get(name, param.annotation)
+                ann = _unwrap_annotated(hints.get(name, param.annotation))
                 if _is_pydantic_model(ann):
                     kwargs[name] = _build_model(ann, payload)
 

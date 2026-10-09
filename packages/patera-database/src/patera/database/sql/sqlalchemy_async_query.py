@@ -85,6 +85,14 @@ class AsyncQuery(Generic[T]):
 
             col_name = parts[0]
             direction = parts[1].upper() if len(parts) > 1 else "ASC"
+            if direction not in ("ASC", "DESC"):
+                raise ValueError(f"Invalid order direction {parts[1]!r}")
+
+            # Only mapped columns are allowed (the strings may come from users).
+            if col_name not in self.model.__mapper__.columns:
+                raise ValueError(
+                    f"{self.model.__name__} has no column named {col_name!r}"
+                )
             column = getattr(self.model, col_name)
 
             if direction == "DESC":

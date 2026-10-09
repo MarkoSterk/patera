@@ -76,19 +76,22 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     MANAGED_MODELS: list[Type] = []
     TRANSLATIONS_MAP = TRANSLATIONS_MAP
 
-    _admin_menu: list[dict[str, str]] = []
-    _databases_menu: list[dict[str, str | Any]] = []
-    _task_managers: dict[str, Any] = {}
-    _email_services: dict[str, Any] = {}
-    _models_map: dict[str, Type] = {}
     _supported_languages: list[str] = ["en", "de", "si", "es"]
     _supported_extensions: list[str] = ["sqldatabase"]
-    _translation_maps: dict[str, dict[str, str]] = {}
 
     def init(self):
         """
         Initilizer method for extension
         """
+        # Per-instance state (class-level containers would be shared between
+        # every AdminInterface instance and every app in the process).
+        self._admin_menu: list[dict[str, str]] = []
+        self._databases_menu: list[dict[str, str | Any]] = []
+        self._task_managers: dict[str, Any] = {}
+        self._email_services: dict[str, Any] = {}
+        self._models_map: dict[str, Type] = {}
+        self._translation_maps: dict[str, dict[str, str]] = {}
+
         self._admin_root_path: str = os.path.dirname(__file__)
         templates_path = os.path.join(self._admin_root_path, "templates")
         self._app.add_template_path(templates_path)
@@ -123,8 +126,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         # decorated admin controller
         admin_controller = admin_controller_dec(_AdminController)
         self._app.register_controller(admin_controller)
-        ctrl_path = getattr(admin_controller, "_controller_path")
-        ctrl_instance: _AdminController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance: _AdminController = self._app.get_controller(_AdminController)  # type: ignore
         ctrl_instance.admin_interface = self
 
     def _register_admin_file_explorer(self) -> None:
@@ -140,8 +142,9 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         # decorated admin controller
         admin_controller = admin_controller_dec(_AdminFileController)
         self._app.register_controller(admin_controller)
-        ctrl_path = getattr(admin_controller, "_controller_path")
-        ctrl_instance: _AdminFileController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance: _AdminFileController = self._app.get_controller(
+            _AdminFileController
+        )  # type: ignore
         ctrl_instance.admin_interface = self
 
     def _register_db_controller(self) -> None:
@@ -151,8 +154,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         admin_db_controller_dec = path(base_url, open_api_spec=False)
         admin_db_controller = admin_db_controller_dec(_AdminDbController)
         self._app.register_controller(admin_db_controller)
-        ctrl_path = getattr(admin_db_controller, "_controller_path")
-        ctrl_instance: _AdminDbController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance: _AdminDbController = self._app.get_controller(_AdminDbController)  # type: ignore
         ctrl_instance.admin_interface = self
 
     def _register_email_controller(self) -> None:
@@ -162,9 +164,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         admin_email_controller_dec = path(base_url, open_api_spec=False)
         admin_email_controller = admin_email_controller_dec(_AdminEmailClientController)
         self._app.register_controller(admin_email_controller)
-        ctrl_path = getattr(admin_email_controller, "_controller_path")
-        ctrl_instance: _AdminEmailClientController = self._app._controllers.get(
-            ctrl_path
+        ctrl_instance: _AdminEmailClientController = self._app.get_controller(
+            _AdminEmailClientController
         )  # type: ignore
         ctrl_instance.admin_interface = self
 
@@ -175,8 +176,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         admin_email_controller_dec = path(base_url, open_api_spec=False)
         admin_email_controller = admin_email_controller_dec(_AdminTMController)
         self._app.register_controller(admin_email_controller)
-        ctrl_path = getattr(admin_email_controller, "_controller_path")
-        ctrl_instance: _AdminTMController = self._app._controllers.get(ctrl_path)  # type: ignore
+        ctrl_instance: _AdminTMController = self._app.get_controller(_AdminTMController)  # type: ignore
         ctrl_instance.admin_interface = self
 
     def _register_models_controller(self) -> None:
@@ -199,7 +199,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
                 databases.append(
                     {
                         "extension": extInst,
-                        "db_name": extInst.__db_name__,  # type: ignore
+                        "db_name": extInst.db_name,  # type: ignore
                         "name": extInst.nice_name,  # type: ignore, # type: ignore
                         "url_for": "_AdminDbController.database_overview",
                     }
@@ -249,11 +249,16 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         """
         if lang is None:
             lang = self.current_language
-        translated_value = (
-            self.__class__.TRANSLATIONS_MAP[key][lang]
-            if key in self.__class__.TRANSLATIONS_MAP
-            else key
-        )
+        translations = self.__class__.TRANSLATIONS_MAP.get(key)
+        if translations is None:
+            translated_value = key
+        else:
+            translated_value = (
+                translations.get(lang)
+                or translations.get(self.configs.DEFAULT_LANGUAGE.lower())
+                or translations.get("en")
+                or key
+            )
         if values is not None and isinstance(values, list):
             for i, val in enumerate(values):
                 translated_value = translated_value.replace(f"%{i}", str(val))
@@ -302,9 +307,19 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     @property
     def current_language(self) -> str:
-        return self._app.current_request.req.route_parameters.get(
-            "lang", self.configs.DEFAULT_LANGUAGE
+        """
+        Language from the URL, falling back to DEFAULT_LANGUAGE for languages
+        the admin interface does not support.
+        """
+        lang = (
+            self._app.current_request.req.route_parameters.get(
+                "lang", self.configs.DEFAULT_LANGUAGE
+            )
+            or self.configs.DEFAULT_LANGUAGE
         ).lower()
+        if lang not in self.supported_languages:
+            return self.configs.DEFAULT_LANGUAGE.lower()
+        return lang
 
     @property
     def logo_url(self) -> str:
@@ -339,7 +354,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         if language_map is not None:
             return language_map
         language_map = {}
-        for key, value in TRANSLATIONS_MAP.items():
-            language_map[key] = TRANSLATIONS_MAP[key][self.current_language]
+        for key in self.__class__.TRANSLATIONS_MAP:
+            language_map[key] = self.translate(key, self.current_language)
         self._translation_maps[self.current_language] = language_map
         return language_map
