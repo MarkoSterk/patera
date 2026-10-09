@@ -21,3 +21,6 @@ patera_book/
 .coverage
 .coverage.*
 htmlcov/
+
+# Patera JSON Lines log files
+logs/
