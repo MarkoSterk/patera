@@ -170,7 +170,7 @@ package is not called `app`.
 | Command | Description |
 | --- | --- |
 | `patera dev [--app app:App] [--env-file .env]` | development server (uvicorn) with auto-reload. Loads `.env`, `.env.dev` or `.env.local` if no file is given. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `localhost:3000`). |
-| `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian)), `DEBUG` is forced off. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
+| `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the core package), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
 | `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
 | `patera test [--env-file .env.test] [pytest args...]` | runs pytest after loading the test environment file. |
 | `patera desktop [--mode dev\|prod]` | runs the app as a desktop application (needs `patera-desktop`). |

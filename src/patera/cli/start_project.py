@@ -341,7 +341,10 @@ def _start_prod(
     from granian.log import LogLevels
     from ..patera import Patera
 
-    load_env_file(cwd, env_file)
+    # Production only loads an explicitly named environment file; the
+    # development fallbacks (.env, .env.dev, .env.local) are not searched.
+    if env_file:
+        load_env_file(cwd, env_file)
     os.environ["PATERA_DEBUG"] = "0"
 
     root = _resolve_root(cwd)

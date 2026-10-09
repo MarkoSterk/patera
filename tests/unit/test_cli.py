@@ -152,3 +152,42 @@ def test_main_parses_cli_arguments(monkeypatch):
     assert captured["env_file"] == ".env.x"
     assert captured["command_name"] == "db:migrate"
     assert captured["command_args"] == ["a", "b"]
+
+
+def test_prod_loads_only_an_explicit_env_file(tmp_path, monkeypatch):
+    import os
+
+    import granian
+
+    from patera.cli.start_project import _start_prod
+
+    served = []
+
+    class FakeGranian:
+        def __init__(self, target, **kwargs):
+            served.append((target, kwargs))
+
+        def serve(self):
+            pass
+
+    monkeypatch.setattr(granian, "Granian", FakeGranian)
+    # setenv + delenv registers the variables so monkeypatch removes them again
+    # after the test (values loaded from the env file must not leak).
+    for name in ("PATERA_TEST_PROD_VALUE", "PATERA_PORT"):
+        monkeypatch.setenv(name, "placeholder")
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("PATERA_DEBUG", "1")
+    (tmp_path / ".env.dev").write_text("PATERA_TEST_PROD_VALUE=dev\n")
+    (tmp_path / ".env.prod").write_text(
+        "PATERA_TEST_PROD_VALUE=prod\nPATERA_PORT=8123\n"
+    )
+    monkeypatch.delenv("PATERA_PORT", raising=False)
+
+    _start_prod(str(tmp_path), False, app="app:App")
+    assert "PATERA_TEST_PROD_VALUE" not in os.environ  # .env.dev is not searched
+    assert os.environ["PATERA_DEBUG"] == "0"
+
+    _start_prod(str(tmp_path), False, app="app:App", env_file=".env.prod")
+    assert os.environ["PATERA_TEST_PROD_VALUE"] == "prod"
+    assert served[-1][0] == "app:App"
+    assert served[-1][1]["port"] == 8123
