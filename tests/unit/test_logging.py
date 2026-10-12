@@ -156,7 +156,7 @@ async def test_startup_is_logged_and_the_banner_can_be_disabled(
     assert len(started) == 1
     assert started[0]["message"].endswith(
         f"mode at {app.configs.PROTOCOL}://{app.configs.HOST}:{app.configs.PORT}"
-        f"{app._app_base_url}"
+        f"{app.url_prefix}"
     )
 
     app = make_app(STARTUP_BANNER=True)

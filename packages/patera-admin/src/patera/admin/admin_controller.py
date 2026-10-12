@@ -168,8 +168,7 @@ class _AdminController(Controller[Patera]):
                 NOTIFICATIONS_SEEN_COOKIE,
                 str(items[0]["time"]),
                 max_age=365 * 24 * 3600,
-                path=self.app._app_base_url
-                + self.admin_interface.configs.ADMIN_BASE_URL,
+                path=self.app.url_prefix + self.admin_interface.configs.ADMIN_BASE_URL,
             )
         return res
 

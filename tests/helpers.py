@@ -68,7 +68,6 @@ class AppFactory:
         files: Optional[dict[str, str]] = None,
         cli_mode: bool = False,
         app_base: Optional[type] = None,
-        base_url: Optional[str] = None,
         **config: Any,
     ) -> Patera[Any]:
         name, root = self.package(files)
@@ -93,8 +92,6 @@ class AppFactory:
             "__module__": name,
             "app_extensions": list(extensions),
         }
-        if base_url is not None:
-            namespace["_base_url_path"] = base_url
         base = app_base or Patera
         app_cls = app_decorator(name, configs=config_cls)(
             type("TestApp", (base,), namespace)

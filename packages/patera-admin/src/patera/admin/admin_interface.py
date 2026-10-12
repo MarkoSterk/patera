@@ -411,7 +411,7 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     def logo_url(self) -> str:
         if self.configs.LOGO_URL:
             return self.configs.LOGO_URL
-        return f"{self._app._app_base_url}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/patera_logo.png"
+        return f"{self._app.url_prefix}{self.configs.ADMIN_BASE_URL}/{self.configs.DEFAULT_LANGUAGE.lower()}/_static/patera_logo.png"
 
     @property
     def context_variables(self) -> dict[str, Any]:

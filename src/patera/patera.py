@@ -114,9 +114,9 @@ def print_startup_message(
     *,
     app_name: str = "Application",
     scheme: str = "http",
-    app_path: str = "",
+    url_prefix: str = "",
 ) -> None:
-    url = f"{scheme}://{host}:{port}{app_path}"
+    url = f"{scheme}://{host}:{port}{url_prefix}"
 
     mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
 
@@ -135,14 +135,6 @@ def print_startup_message(
 T = TypeVar("T", bound="Patera[Any]")
 ConfT = TypeVar("ConfT", bound=BaseConfig)
 ExtT = TypeVar("ExtT", bound=Injectable)
-
-
-def app_path(url_path: Optional[str] = None) -> Callable[[Type[T]], Type[T]]:
-    def decorator(cls: Type[T]) -> Type[T]:
-        setattr(cls, "_base_url_path", url_path)
-        return cls
-
-    return decorator
 
 
 def app(import_name: str, configs: Type[ConfT]) -> Callable[[Type[T]], Type[T]]:
@@ -224,7 +216,6 @@ class Patera(Injectable, Generic[ConfT]):
                 "Configuration class must inherit from patera.BaseConfig"
             )
         self._cli_mode = cli_mode
-        self._app_base_url: str = getattr(self.__class__, "_base_url_path", "") or ""
         self._is_built: bool = False
         self._root_path: str = get_app_root_path(import_name)
         self._configs: ConfT = validate_config(cast(type[ConfT], config_type))
@@ -1224,7 +1215,7 @@ class Patera(Injectable, Generic[ConfT]):
     def register_static_controller(self, base_path: str):
         static_controller_dec = path(f"{base_path}", open_api_spec=False)
         static_controller = static_controller_dec(Static)
-        self.register_controller(static_controller, with_base_path=False)  # type: ignore
+        self.register_controller(static_controller, with_url_prefix=False)  # type: ignore
 
     def register_static_pages_controller(self, base_path: str):
         if not self.configs.USE_STATIC_PAGES:
@@ -1341,7 +1332,7 @@ class Patera(Injectable, Generic[ConfT]):
         self.logger.info(
             f"{self.app_name} started in {mode} mode at "
             f"{self.configs.PROTOCOL}://{self.configs.HOST}:{self.configs.PORT}"
-            f"{self._app_base_url}"
+            f"{self.url_prefix}"
         )
         if self.configs.STARTUP_BANNER:
             print_startup_message(
@@ -1350,7 +1341,7 @@ class Patera(Injectable, Generic[ConfT]):
                 debug_mode=self.configs.DEBUG,
                 app_name=self.app_name,
                 scheme=self.configs.PROTOCOL,
-                app_path=self._app_base_url,
+                url_prefix=self.url_prefix,
             )
 
     def add_extension(self, extension: Injectable):
@@ -1405,10 +1396,13 @@ class Patera(Injectable, Generic[ConfT]):
     def register_controller(
         self,
         *ctrls: "type[Controller]",
-        with_base_path: bool = True,
+        with_url_prefix: bool = True,
     ):
-        """Registers controller class with application."""
-        base_path: str = self._app_base_url if with_base_path else ""
+        """
+        Registers controller classes with the application. Their routes get
+        the URL_PREFIX setting in front unless with_url_prefix is False.
+        """
+        base_path: str = self.url_prefix if with_url_prefix else ""
 
         for ctrl in ctrls:
             dev_only: bool = getattr(ctrl, "_development", False)
@@ -1564,7 +1558,7 @@ class Patera(Injectable, Generic[ConfT]):
             openapi_version=OPEN_API_VERSION,
             servers=[
                 f"{self._configs.PROTOCOL}://{self._configs.HOST}:{self._configs.PORT}"
-                f"{self._app_base_url or ''}"
+                f"{self.url_prefix}"
             ],
             description=self._configs.OPEN_API_DESCRIPTION,
         )
@@ -1700,6 +1694,11 @@ class Patera(Injectable, Generic[ConfT]):
         Returns root path of application.
         """
         return self._root_path
+
+    @property
+    def url_prefix(self) -> str:
+        """The URL_PREFIX setting: the prefix of every controller route ('' for none)."""
+        return self._configs.URL_PREFIX
 
     @property
     def app(self):

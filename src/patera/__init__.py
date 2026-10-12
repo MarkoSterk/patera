@@ -10,7 +10,7 @@ from pkgutil import extend_path
 
 __path__ = extend_path(__path__, __name__)
 
-from .patera import Patera, app, app_path, on_shutdown, on_startup  # noqa: E402
+from .patera import Patera, app, on_shutdown, on_startup  # noqa: E402
 from .base_extension import BaseExtension  # noqa: E402
 from .middleware import MiddlewareBase  # noqa: E402
 from .exceptions import abort, html_abort  # noqa: E402
@@ -41,7 +41,6 @@ __all__ = [
     "HttpStatus",
     "html_abort",
     "app",
-    "app_path",
     "on_shutdown",
     "on_startup",
     "BaseExtension",

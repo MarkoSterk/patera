@@ -132,8 +132,8 @@ def test_tags_do_not_accumulate_across_apps(make_app):
         assert app.json_spec["paths"]["/pets/"]["get"]["tags"] == ["Pets"]
 
 
-def test_base_url_is_part_of_server_url(make_app):
-    app = make_app(controllers=[PetController], base_url="/v2")
+def test_url_prefix_is_part_of_server_url(make_app):
+    app = make_app(controllers=[PetController], URL_PREFIX="/v2")
     assert app.json_spec["servers"][0]["url"].endswith("/v2")
 
 

@@ -226,6 +226,7 @@ Built-in options:
 | `USE_STATIC_PAGES` | `False` | Serve HTML pages from `STATIC_PAGES_DIR`. |
 | `STATIC_PAGES_DIR` / `STATIC_PAGES_URL` | `"static_pages"` / `"/"` | Static pages folder and URL prefix. |
 | `STATIC_PAGES_CONTROLLER_NAME` | `"static_pages"` | `url_for` alias for pages: `url_for("static_pages", page="about")`. |
+| `URL_PREFIX` | `""` | Prefix of every controller route, for example `"/api/v1"` (`PATERA_URL_PREFIX`). It must start with `/`; a trailing `/` is removed. Static files keep `STATIC_URL`. |
 | `STRICT_SLASHES` | `False` | If `False`, `/users` and `/users/` match the same route. |
 | `OPEN_API` / `OPEN_API_URL` / `OPEN_API_DESCRIPTION` | `True` / `"/openapi"` / `"Simple API"` | OpenAPI documentation. |
 | `CORS_ENABLED` | `True` | Global CORS handling. |
@@ -242,7 +243,7 @@ Built-in options:
 ## The application class
 
 ```python
-from patera import Patera, app, app_path, on_shutdown, on_startup
+from patera import Patera, app, on_shutdown, on_startup
 from patera.injectable import Inject
 
 from .configs import Config
@@ -250,7 +251,6 @@ from .services.greetings import GreetingService
 from .database import Databases
 
 
-@app_path("/demo")                 # optional prefix for every controller route
 @app(__name__, configs=Config)
 class App(Patera[Config]):
     app_extensions = [Databases]   # extensions created at startup
@@ -286,6 +286,7 @@ Useful members of the application object:
 | `json_spec` | the OpenAPI specification (dict) |
 | `logger` | the [Loguru](https://loguru.readthedocs.io) logger |
 | `root_path`, `static_files_path`, `app_name`, `version` | |
+| `url_prefix` | the `URL_PREFIX` setting (`""` without a prefix) |
 | `default_exception_response(req, exc)` | override to customize the [default error responses](#exception-handling) |
 
 ## Project layout and auto-discovery

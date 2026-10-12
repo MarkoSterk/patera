@@ -338,11 +338,52 @@ async def test_url_for(app):
         app.url_for("Nope.nothing")
 
 
-async def test_app_base_path(make_app, client_for):
-    app = make_app(controllers=[ExtraUserController], base_url="/v1")
+async def test_url_prefix(make_app, client_for):
+    app = make_app(
+        controllers=[ExtraUserController],
+        files={"static/a.css": "body {}"},
+        URL_PREFIX="/v1",
+    )
+    assert app.url_prefix == "/v1"
+    assert app.url_for("ExtraUserController.stats") == "/v1/api/users/stats"
+    # Static files keep STATIC_URL.
+    assert app.url_for("static", filename="a.css") == "/static/a.css"
     async with client_for(app) as client:
         assert (await client.get("/v1/api/users/stats")).status_code == 200
         assert (await client.get("/api/users/stats")).status_code == 404
+        assert (await client.get("/static/a.css")).status_code == 200
+
+
+async def test_url_prefix_from_the_environment(make_app, client_for, monkeypatch):
+    monkeypatch.setenv("PATERA_URL_PREFIX", "/api/v2/")
+    app = make_app(controllers=[ExtraUserController])
+    assert app.url_prefix == "/api/v2"  # a trailing slash is removed
+    async with client_for(app) as client:
+        assert (await client.get("/api/v2/api/users/stats")).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("", ""), ("/", ""), (" /v1/ ", "/v1")]
+)
+def test_url_prefix_is_normalized(value, expected):
+    from patera import BaseConfig
+
+    assert BaseConfig(BASE_PATH=".", URL_PREFIX=value).URL_PREFIX == expected
+
+
+def test_url_prefix_must_start_with_a_slash():
+    from pydantic import ValidationError
+
+    from patera import BaseConfig
+
+    with pytest.raises(ValidationError, match="must start with '/'"):
+        BaseConfig(BASE_PATH=".", URL_PREFIX="v1")
+
+
+def test_the_app_path_decorator_is_gone():
+    import patera
+
+    assert not hasattr(patera, "app_path")
 
 
 async def test_same_controller_in_two_apps(make_app, client_for):

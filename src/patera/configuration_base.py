@@ -123,6 +123,13 @@ class BaseConfig(BaseSettings):
     )
 
     TEMPLATES_STRICT: bool = Field(True, description="Strict template rendering")
+    URL_PREFIX: str = Field(
+        "",
+        description=(
+            "Prefix of every controller route, for example '/api/v1' (empty: no "
+            "prefix). Static files keep STATIC_URL."
+        ),
+    )
     STRICT_SLASHES: bool = Field(False, description="Route '/x' vs '/x/' strictness")
     OPEN_API: bool = Field(True, description="Enable OpenAPI endpoint")
     OPEN_API_URL: str = Field("/openapi", description="OpenAPI base path")
@@ -202,6 +209,15 @@ class BaseConfig(BaseSettings):
         if any(not isinstance(x, str) for x in v):
             raise TypeError("Must be a sequence[str] or None.")
         return list(v)
+
+    @field_validator("URL_PREFIX")
+    @classmethod
+    def _normalize_url_prefix(cls, value: str) -> str:
+        """'/api/v1/' becomes '/api/v1' and '/' becomes ''."""
+        value = value.strip()
+        if value and not value.startswith("/"):
+            raise ValueError(f"URL_PREFIX must start with '/', got {value!r}.")
+        return value.rstrip("/")
 
     @staticmethod
     def value_to_bool(value: str | int | bool) -> bool:

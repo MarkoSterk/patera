@@ -507,3 +507,21 @@ async def test_dashboard_sorts_by_level(app, client_for):
             text.index(f"sortcheck {name}") for name in ("critical", "error", "warning")
         ]
         assert positions == sorted(positions)
+
+
+async def test_admin_under_a_url_prefix(make_app, client_for):
+    app = make_app(
+        extensions=[Admin],
+        middleware=[HeaderAuth],
+        ADMIN=ADMIN_CONFIG,
+        URL_PREFIX="/v1",
+    )
+    async with client_for(app) as client:
+        res = await client.get("/v1/admin/en/dashboard", follow_redirects=False)
+        assert res.headers["location"] == "/v1/admin/en/"
+        res = await client.get("/v1/admin/en/dashboard", headers={"x-user": "admin"})
+        assert res.status_code == 200
+        # Admin's own assets and logo live under the prefix too.
+        assert "/v1/admin/en/_static/patera_logo.png" in res.text
+        logo = await client.get("/v1/admin/en/_static/patera_logo.png")
+        assert logo.status_code == 200

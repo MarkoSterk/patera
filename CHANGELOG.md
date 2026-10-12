@@ -34,6 +34,11 @@ together.
   (`Cookie` with `; `); use `Request.header_list()` for the separate values.
 - **Core:** loggers read their settings only under the UPPER_SNAKE_CASE name of their class.
 - **Core:** removed `patera.utilities.get_range_file()`; use `file_response()`.
+- **Core:** the `@app_path` decorator is replaced by the `URL_PREFIX` setting (`PATERA_URL_PREFIX`),
+  so the prefix can differ per environment: `@app_path("/demo")` becomes `URL_PREFIX: str = "/demo"`
+  in the configuration class. The value must start with `/`; a trailing `/` is removed.
+  `Patera.url_prefix` returns it, and `register_controller(with_base_path=...)` is now
+  `with_url_prefix=...`.
 - **Core:** dropped the unused dependencies h11, httpcore, idna, mako and markupsafe; websockets
   moved to the `dev` extra (used by the uvicorn development server). httpx and asgi-lifespan, used
   only by the test client, moved to the `testing` extra: install `patera[testing]` to use
