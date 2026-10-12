@@ -15,6 +15,7 @@ for dir in packages/*; do
 done
 
 echo "Checking package metadata..."
-uvx twine check --strict dist/*
+# Only the distributions: uv build also writes a .gitignore into dist/.
+uvx twine check --strict dist/*.whl dist/*.tar.gz
 
 echo "All packages built and checked."

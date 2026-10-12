@@ -1,6 +1,6 @@
 [project]
 name = "patera-taskmanager"
-version = "0.11.0"
+version = "0.11.1"
 description = "Scheduled and background jobs for Patera, based on APScheduler"
 readme = "README.md"
 license = "MIT"

@@ -17,7 +17,11 @@ Get-ChildItem "packages" -Directory | ForEach-Object {
     Invoke-Checked "Building package: $pkg" { uv build --package $pkg --out-dir dist }
 }
 
-$files = Get-ChildItem "dist" -File | ForEach-Object { $_.FullName }
+# Only the distributions: uv build also writes a .gitignore into dist/.
+$files = Get-ChildItem "dist" -File |
+    Where-Object { $_.Name -like "*.whl" -or $_.Name -like "*.tar.gz" } |
+    ForEach-Object { $_.FullName }
+if (-not $files) { throw "No distributions found in dist/" }
 Invoke-Checked "Checking package metadata..." { uvx twine check --strict @files }
 
 Write-Host "All packages built and checked."
