@@ -135,16 +135,19 @@ class _AdminEmailClientController(Controller[Patera]):
             attachments = self.prepare_email_attachments(data.attachment)
 
             run_in_background(
-                client.send_email,
+                self.deliver_email,
+                client,
                 to_address=data.recipients,
                 subject=data.subject,
                 body=data.message,
                 attachments=attachments,
             )
 
+            # Delivery happens in the background; a failure is reported as an
+            # Admin notification.
             return req.res.json(
                 {
-                    "message": "Email sent successfully",
+                    "message": "Email queued for sending",
                     "status": "success",
                 }
             ).status(HttpStatus.OK)
@@ -167,8 +170,36 @@ class _AdminEmailClientController(Controller[Patera]):
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
 
+    async def deliver_email(
+        self,
+        client: "EmailClient",
+        *,
+        to_address: str | list[str],
+        subject: str,
+        body: str,
+        attachments: Optional[dict[str, bytes]] = None,
+    ) -> None:
+        """
+        Sends an email from the panel. If sending fails, the error is logged
+        and an "email_failed" notification is recorded for the Admin header.
+        """
+        try:
+            await client.send_email(to_address, subject, body, attachments=attachments)
+        except Exception as exc:
+            self.app.logger.exception(exc)
+            recipients = [to_address] if isinstance(to_address, str) else to_address
+            self.admin_interface.notify(
+                "email_failed",
+                f'Email "{subject}" to {", ".join(recipients)} could not be sent: '
+                f"{exc}",
+                sender=client.configs.SENDER_NAME_OR_ADDRESS,
+                recipients=recipients,
+                subject=subject,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+
     def get_email_client(self, email: str) -> "EmailClient":
-        for client in self.admin_interface._email_services.values():
+        for client in self.admin_interface.email_services.values():
             if client.configs.SENDER_NAME_OR_ADDRESS == email:
                 return client
         raise AdminUnknownEmailClientException(email)
@@ -229,7 +260,7 @@ class _AdminEmailClientController(Controller[Patera]):
 
     @property
     def all_clients(self) -> list["EmailClient"]:
-        return [client for client in self.admin_interface._email_services.values()]
+        return [client for client in self.admin_interface.email_services.values()]
 
     @property
     def admin_interface(self) -> AdminInterface:

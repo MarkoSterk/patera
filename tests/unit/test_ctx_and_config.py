@@ -93,3 +93,26 @@ def test_version_is_installed_package_version():
     from patera.patera import PATERA_VERSION
 
     assert PATERA_VERSION == importlib.metadata.version("patera")
+
+
+class _Service(BaseModel):
+    URL: str
+    MODEL: str
+    API_KEY: str | None = None
+    TIMEOUT: int = 60
+
+
+def test_env_variable_changes_one_field_of_a_nested_default(monkeypatch):
+    from patera import BaseConfig
+
+    class Config(BaseConfig):
+        BASE_PATH: str = "."
+        SERVICE: _Service = _Service(URL="https://api.example.com", MODEL="small")
+
+    monkeypatch.setenv("PATERA_SERVICE__API_KEY", "secret")
+    monkeypatch.setenv("PATERA_SERVICE__TIMEOUT", "5")
+    configs = Config()
+    # The other fields keep the class default instead of failing as "missing".
+    assert configs.SERVICE == _Service(
+        URL="https://api.example.com", MODEL="small", API_KEY="secret", TIMEOUT=5
+    )

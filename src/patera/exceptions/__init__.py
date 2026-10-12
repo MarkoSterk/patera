@@ -7,6 +7,8 @@ from .http_exceptions import (
     StaticAssetNotFound,
     AborterException,
     StaticPageNotFound,
+    InvalidRequestBody,
+    RequestBodyTooLarge,
     abort,
     html_abort,
 )
@@ -15,6 +17,8 @@ from .runtime_exceptions import (
     CustomException,
     MethodNotControllerMethod,
     UnexpectedDecorator,
+    DuplicateRouteError,
+    CircularDependencyError,
 )
 
 from .exception_handler import ExceptionHandler, handles, exception_handler
@@ -26,10 +30,14 @@ __all__ = [
     "StaticAssetNotFound",
     "StaticPageNotFound",
     "AborterException",
+    "InvalidRequestBody",
+    "RequestBodyTooLarge",
     "abort",
     "html_abort",
     "MethodNotControllerMethod",
     "UnexpectedDecorator",
+    "DuplicateRouteError",
+    "CircularDependencyError",
     "ExceptionHandler",
     "handles",
     "NotFound",

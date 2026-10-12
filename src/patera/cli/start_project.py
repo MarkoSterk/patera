@@ -7,7 +7,7 @@ import sys
 import inspect
 from pathlib import Path
 import importlib
-from typing import Iterator, Optional, Type
+from typing import Any, Iterator, NoReturn, Optional, Type
 
 from dotenv import load_dotenv
 
@@ -161,13 +161,6 @@ def _iter_files_pruned(root: Path, filename: Optional[str] = None) -> Iterator[P
             yield current_path / file_name
 
 
-def has_python_files(path: Path) -> bool:
-    """
-    Return True if path directly contains at least one Python file.
-    """
-    return path.exists() and path.is_dir() and any(path.glob("*.py"))
-
-
 def has_project_python_files(root: Path) -> bool:
     """
     Return True if the project contains at least one Python file outside ignored dirs.
@@ -177,18 +170,16 @@ def has_project_python_files(root: Path) -> bool:
 
 def iter_candidate_files(root: Path) -> Iterator[Path]:
     """
-    Yield candidate Python files in priority order.
+    Yield the Python files that may define the application class.
 
-    Priority:
-    1. Common entrypoint names in root/APP_PACKAGE
-    # 2. Common entrypoint names in root
-    # 3. Common entrypoint names anywhere below root
-    # 4. All remaining Python files
+    Only common entrypoint names (``__init__.py``, ``app.py``, ``main.py``,
+    ``server.py``, ``run.py``, ``application.py``) inside the application
+    package are considered. The package is ``PATERA_APP_PACKAGE`` (default
+    ``app``) below root. Applications elsewhere are named with ``--app`` or
+    ``PATERA_IMPORT``.
 
-    Important:
-    This must not scan .venv, site-packages, node_modules, etc.
-    Otherwise the discovery mechanism tries to import installed dependencies
-    as if they were app modules.
+    Ignored directories (.venv, site-packages, node_modules, ...) are never
+    scanned, so installed dependencies are not imported as app modules.
     """
     root = root.resolve()
 
@@ -265,7 +256,7 @@ def find_patera_app_import(
         except Exception:
             import traceback
 
-            print(f"Failed to import module '{module_name}'")
+            print(f"Failed to import module '{module_name}'", file=sys.stderr)
             traceback.print_exc()
             continue
 
@@ -320,11 +311,68 @@ def _resolve_app_path(
     return app_path
 
 
-def _print_app_not_found() -> None:
-    print(
+def cli_fail(message: str) -> NoReturn:
+    """
+    Prints an error to standard error and exits with status 1, so process
+    supervisors, scripts and CI jobs can detect the failure.
+    """
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def _fail_app_not_found() -> NoReturn:
+    cli_fail(
         "Failed to locate Patera implementation. Please specify a correct import string "
         "(example: 'app:App')"
     )
+
+
+def resolve_server_address(app_path: str, *, production: bool) -> tuple[str, int]:
+    """
+    Decides where the server listens, so the CLI and the application agree.
+
+    For host and port, in order:
+
+    1. the PATERA_HOST / PATERA_PORT environment variables (also from the
+       loaded .env file);
+    2. a HOST / PORT default set on the application's configuration class;
+    3. the command's default: localhost:3000 for development,
+       0.0.0.0:80 for production.
+
+    In production "localhost" becomes "0.0.0.0", so the server is reachable
+    from outside a container. The result is written back to PATERA_HOST and
+    PATERA_PORT, so the application's configuration (startup message,
+    OpenAPI server URL) reports the address the server really uses.
+    """
+    from ..configuration_base import BaseConfig
+
+    config_cls: Any = None
+    try:
+        application = import_module(app_path)
+        config_cls = (getattr(application, "_app_configs", None) or {}).get("configs")
+    except Exception:
+        config_cls = None
+
+    def class_default(field: str) -> Any:
+        if config_cls is None or not hasattr(config_cls, "model_fields"):
+            return None
+        default = config_cls.model_fields[field].default
+        if default == BaseConfig.model_fields[field].default:
+            return None
+        return default
+
+    host = os.environ.get("PATERA_HOST") or class_default("HOST")
+    port = os.environ.get("PATERA_PORT") or class_default("PORT")
+    if host is None:
+        host = "0.0.0.0" if production else "localhost"
+    if port is None:
+        port = 80 if production else 3000
+    if production and host == "localhost":
+        host = "0.0.0.0"
+
+    os.environ["PATERA_HOST"] = str(host)
+    os.environ["PATERA_PORT"] = str(port)
+    return str(host), int(port)
 
 
 def _start_prod(
@@ -351,14 +399,9 @@ def _start_prod(
     app_path = _resolve_app_path(app, root, Patera)
 
     if app_path is None:
-        _print_app_not_found()
-        return
+        _fail_app_not_found()
 
-    address: str = os.environ.get("PATERA_HOST", "0.0.0.0")
-    if address == "localhost":
-        address = "0.0.0.0"
-
-    port: int = int(os.environ.get("PATERA_PORT", 80))
+    address, port = resolve_server_address(app_path, production=True)
     loop = Loops(os.environ.get("PATERA_LOOP", "auto"))
 
     Granian(
@@ -389,11 +432,9 @@ def _start_dev(
     app_path = _resolve_app_path(app, root, Patera)
 
     if app_path is None:
-        _print_app_not_found()
-        return
+        _fail_app_not_found()
 
-    address: str = os.environ.get("PATERA_HOST", "localhost")
-    port: int = int(os.environ.get("PATERA_PORT", 3000))
+    address, port = resolve_server_address(app_path, production=False)
     loop = str(os.environ.get("PATERA_LOOP", "auto"))
     access_log: bool = os.environ.get("PATERA_ACCESS_LOG", "false").lower() == "true"
 
@@ -429,9 +470,13 @@ def start_dev(
 ):
     try:
         _start_dev(cwd, True, app, env_file)
+    except ImportError as e:
+        cli_fail(
+            f"ERROR: {e}\n"
+            "Failed to start Uvicorn dev server. Install patera[dev] if not already."
+        )
     except Exception as e:
-        print("ERROR: ", str(e))
-        print("Failed to start Uvicorn dev server. Install patera[dev] if not already.")
+        cli_fail(f"ERROR: {e}\nFailed to start the development server.")
 
 
 def start_prod(
@@ -443,7 +488,7 @@ def start_prod(
     try:
         _start_prod(cwd, False, app, env_file)
     except Exception as e:
-        print("Failed to start Patera app in production mode: ", str(e))
+        cli_fail(f"Failed to start Patera app in production mode: {e}")
 
 
 def start_cli(
@@ -462,13 +507,16 @@ def start_cli(
     app_path = _resolve_app_path(app, root, Patera)
 
     if app_path is None:
-        _print_app_not_found()
-        return
+        _fail_app_not_found()
 
     application: Type[Patera] = import_module(app_path)
     app_instance: Patera = application(cli_mode=True)
 
     command_name = kwargs.pop("command_name", None)
+    list_commands = kwargs.pop("list", False)
+    if list_commands or command_name is None:
+        app_instance.print_cli_commands()
+        return
     app_instance.run_cli(command_name, *args, **kwargs)
 
 
@@ -483,11 +531,10 @@ def start_testing(
     try:
         import pytest  # type: ignore
     except ImportError:
-        print(
+        cli_fail(
             "Failed to import Pytest. Please add dependency for running tests. "
             "Run: 'pip install patera[testing]'"
         )
-        return
 
     load_env_file(cwd, env_file)
 
@@ -516,14 +563,13 @@ def start_desktop(
     try:
         from patera.desktop import DesktopLauncher  # type: ignore
     except ImportError:
-        print(
+        cli_fail(
             "patera-desktop extension is not installed. "
             "Please install the extension with: uv add patera-desktop"
         )
-        return
 
     if mode not in {"dev", "prod"}:
-        raise ValueError("Desktop mode must be either 'dev' or 'prod'")
+        cli_fail("Desktop mode must be either 'dev' or 'prod'")
 
     from ..patera import Patera
 
@@ -535,8 +581,7 @@ def start_desktop(
     app_path = _resolve_app_path(app, root, Patera)
 
     if app_path is None:
-        _print_app_not_found()
-        return
+        _fail_app_not_found()
 
     launcher = DesktopLauncher(
         app_path=app_path,

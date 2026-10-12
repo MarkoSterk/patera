@@ -79,3 +79,60 @@ async def test_config_and_background_tasks(make_app, client_for):
     async with client_for(app):
         jobs.run_background_task(done.set)
         await asyncio.wait_for(done.wait(), 1)
+
+
+async def test_jobs_added_directly_to_the_scheduler_are_managed(app, client_for):
+    jobs = app.get_extension(Jobs)
+    jobs.runs = []
+    hits: list[str] = []
+    async with client_for(app):
+        # Bypasses TaskManager.add_job entirely.
+        jobs.scheduler.add_job(
+            lambda: hits.append("direct"), "interval", hours=2, id="direct"
+        )
+        assert set(jobs.jobs) == {"hourly", "direct"}
+        assert jobs.get_job("direct") is not None
+
+        jobs.pause_job("direct")
+        assert jobs.get_job("direct").next_run_time is None
+        jobs.resume_job(jobs.get_job("direct"))
+        assert jobs.get_job("direct").next_run_time is not None
+
+        jobs.run_job_now("direct")
+        await asyncio.sleep(0.05)
+        assert hits == ["direct"]
+
+        jobs.remove_job("direct")
+        assert "direct" not in jobs.jobs
+
+
+async def test_finished_one_off_jobs_disappear(app, client_for):
+    jobs = app.get_extension(Jobs)
+    jobs.runs = []
+    done = asyncio.Event()
+    async with client_for(app):
+        jobs.add_job(done.set, "date", id="once")
+        await asyncio.wait_for(done.wait(), 2)
+        await asyncio.sleep(0.05)
+        assert "once" not in jobs.jobs
+        assert jobs.get_job("once") is None
+
+
+async def test_jobs_in_a_second_job_store_are_listed(make_app, client_for):
+    from apscheduler.jobstores.memory import MemoryJobStore
+
+    class TwoStores(TaskManager):
+        pass
+
+    app = make_app(extensions=[TwoStores])
+    jobs = app.get_extension(TwoStores)
+    jobs.scheduler.add_jobstore(MemoryJobStore(), "archive")
+    async with client_for(app):
+        job = jobs.add_job(
+            lambda: None, "interval", hours=1, id="old", jobstore="archive"
+        )
+        assert "old" in jobs.jobs
+        jobs.pause_job(job)
+        assert jobs.get_job("old").next_run_time is None
+        jobs.resume_job("old")
+        assert jobs.get_job("old").next_run_time is not None

@@ -3,7 +3,15 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, runtime_checkable, Type
+from typing import (
+    Any,
+    Optional,
+    Protocol,
+    Type,
+    get_args,
+    get_origin,
+    runtime_checkable,
+)
 
 from pydantic import BaseModel
 
@@ -129,33 +137,76 @@ class NdjsonSerializer:
         response_type: Optional[Type[Any]] = None,
     ) -> bytes | None:
         charset = response.charset or self.DEFAULT_CHARSET
+        return "".join(
+            ndjson_line(item, response_type)
+            for item in response.body  # type: ignore[union-attr]
+        ).encode(charset)
 
-        lines: list[str] = []
-        for item in response.body:  # type: ignore
-            if isinstance(item, BaseModel):
-                lines.append(item.model_dump_json())
-            elif (
-                response_type
-                and isinstance(response_type, type)
-                and issubclass(response_type, BaseModel)
-                and isinstance(item, dict)
-            ):
-                model_instance = response_type(**item)
-                lines.append(model_instance.model_dump_json())
-            else:
-                lines.append(
-                    json.dumps(item, ensure_ascii=False, separators=(",", ":"))
-                )
 
-        return "\n".join(lines).encode(charset)
+def ndjson_line(item: Any, response_type: Optional[Type[Any]] = None) -> str:
+    """
+    Serializes one NDJSON record, terminated by a newline as the format
+    requires. Dictionaries are validated through ``response_type`` when it
+    is a Pydantic model, the same way JSON bodies are.
+    """
+    if isinstance(item, BaseModel):
+        return item.model_dump_json() + "\n"
+    # Response[list[Model]] or Response[AsyncIterator[Model]] describes rows.
+    if get_origin(response_type) is not None:
+        args = get_args(response_type)
+        response_type = args[0] if len(args) == 1 else None
+    if (
+        response_type
+        and isinstance(response_type, type)
+        and issubclass(response_type, BaseModel)
+        and isinstance(item, dict)
+    ):
+        return response_type(**item).model_dump_json() + "\n"
+    return json.dumps(item, ensure_ascii=False, separators=(",", ":")) + "\n"
 
 
 class SerializerRegistry:
+    """
+    Ordered list of response serializers. For each response, the first
+    serializer whose ``can_serialize`` returns True renders the body.
+    """
+
     def __init__(self) -> None:
         self._serializers: list[ResponseSerializer] = []
 
-    def register(self, serializer: ResponseSerializer) -> None:
-        self._serializers.append(serializer)
+    @property
+    def serializers(self) -> tuple[ResponseSerializer, ...]:
+        """The registered serializers, in the order they are tried."""
+        return tuple(self._serializers)
+
+    def register(self, serializer: ResponseSerializer, *, first: bool = False) -> None:
+        """
+        Adds a serializer. By default it is tried after the ones already
+        registered, so it only sees bodies no earlier serializer claims.
+        With ``first=True`` it is tried before all of them, which is how a
+        default is overridden, for example with a faster JSON encoder.
+        """
+        if first:
+            self._serializers.insert(0, serializer)
+        else:
+            self._serializers.append(serializer)
+
+    def replace(self, serializer_type: type, serializer: ResponseSerializer) -> None:
+        """
+        Puts ``serializer`` in the position of the registered serializer of
+        type ``serializer_type``. Raises LookupError if there is none.
+        """
+        for index, registered in enumerate(self._serializers):
+            if type(registered) is serializer_type:
+                self._serializers[index] = serializer
+                return
+        raise LookupError(f"No serializer of type {serializer_type.__name__}.")
+
+    def unregister(self, serializer_type: type) -> None:
+        """Removes every registered serializer of type ``serializer_type``."""
+        self._serializers = [
+            s for s in self._serializers if type(s) is not serializer_type
+        ]
 
     def register_defaults(self) -> None:
         self.register(NoContentSerializer())

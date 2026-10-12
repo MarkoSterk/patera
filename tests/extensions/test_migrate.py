@@ -56,17 +56,8 @@ def test_parse_database_uri(migrate, uri, expected):
         assert parsed[key] == value
 
 
-def test_create_and_read_pyway_config(migrate, monkeypatch):
-    app, mig = migrate
-    assert mig._migrations_path.is_dir()
-    mig.create_pyway_config()
-    text = mig._configs_path.read_text()
-    assert "database_type: postgresql" in text
-    assert "database_port: 5433" in text
-
-    # A blank line, a comment and a value containing ": " are tolerated.
-    mig._configs_path.write_text(text + "\n# comment\ndatabase_password: a: b\n")
-    captured = {}
+def _captured_settings(app, monkeypatch) -> dict:
+    captured: dict = {}
 
     class FakeConfigFile:
         def __init__(self, **kwargs):
@@ -78,5 +69,105 @@ def test_create_and_read_pyway_config(migrate, monkeypatch):
     ctrl = app._cli_controllers["migrate"]
     ctrl._get_configs_from_file()
     ctrl._clear_env_vars()
-    assert captured["database_password"] == "a: b"
+    return captured
+
+
+def test_pyway_config_file_holds_no_credentials(migrate):
+    _, mig = migrate
+    assert mig._migrations_path.is_dir()
+    mig.create_pyway_config()
+    text = mig._configs_path.read_text()
+    assert "database_migration_dir: db/migrations" in text
+    assert "database_table: pyway_migrations" in text
+    for secret in (
+        "p@ss",
+        "p%40ss",
+        "database_username",
+        "db.example",
+        "database_password",
+    ):
+        assert secret not in text
+
+
+def test_connection_comes_from_the_database_uri(migrate, monkeypatch):
+    app, mig = migrate
+    mig.create_pyway_config()
+    captured = _captured_settings(app, monkeypatch)
     assert captured["database_type"] == "postgresql"
+    assert captured["database_username"] == "user"
+    assert captured["database_password"] == "p@ss"  # decoded
+    assert captured["database_host"] == "db.example"
+    assert captured["database_port"] == "5433"
+    assert captured["database_name"] == "app"
+
+
+def test_config_file_values_override_and_are_optional(migrate, monkeypatch):
+    app, mig = migrate
+    # Without a config file the commands still have everything they need.
+    assert _captured_settings(app, monkeypatch)["database_name"] == "app"
+
+    mig.create_pyway_config()
+    text = mig._configs_path.read_text()
+    # A blank line, a comment and a value containing ": " are tolerated.
+    mig._configs_path.write_text(
+        text + "\n# comment\ndatabase_host: replica: 1\ndatabase_table: history\n"
+    )
+    captured = _captured_settings(app, monkeypatch)
+    assert captured["database_host"] == "replica: 1"
+    assert captured["database_table"] == "history"
+    assert captured["database_password"] == "p@ss"
+
+
+def test_percent_encoded_credentials_are_decoded(migrate):
+    _, mig = migrate
+    parsed = mig.parse_database_uri(
+        "postgresql+asyncpg://us%3Aer:p%40ss%2Fw%25rd@host:5432/my%20db"
+    )
+    assert parsed["username"] == "us:er"
+    assert parsed["password"] == "p@ss/w%rd"
+    assert parsed["database"] == "my db"
+
+
+class ReportsDb(SqlDatabase, Migrate):
+    __db_name__ = "reports"
+
+
+def test_two_migrating_databases_keep_their_own_names(make_app):
+    app = make_app(
+        cli_mode=True,
+        MIGRATED_DB=SqlDatabaseConfig(
+            DATABASE_URI="sqlite+aiosqlite:///./main.db",
+            MIGRATE_CLI_NAME="migrate-main",
+        ),
+        REPORTS_DB=SqlDatabaseConfig(
+            DATABASE_URI="sqlite+aiosqlite:///./reports.db",
+            MIGRATE_CLI_NAME="migrate-reports",
+            MIGRATE_DATABASE_MIGRATION_DIR="reports_migrations",
+        ),
+    )
+    main = MigratedDb(app)._migrate
+    reports = ReportsDb(app)._migrate
+    controllers = app._cli_controllers
+    assert controllers["migrate-main"] is main._cli_controller
+    assert controllers["migrate-reports"] is reports._cli_controller
+    # The names stay attached to their own controllers.
+    assert main._cli_controller.ctrl_name == "migrate-main"
+    assert reports._cli_controller.ctrl_name == "migrate-reports"
+    assert main._cli_controller._ext is main
+    assert reports._cli_controller._ext is reports
+    names = [c.name for c in app.cli_commands()]
+    assert "migrate-main:migrate" in names and "migrate-reports:migrate" in names
+
+
+def test_two_databases_with_the_same_migration_name_conflict(make_app):
+    app = make_app(
+        cli_mode=True,
+        MIGRATED_DB=SqlDatabaseConfig(DATABASE_URI="sqlite+aiosqlite:///./main.db"),
+        REPORTS_DB=SqlDatabaseConfig(
+            DATABASE_URI="sqlite+aiosqlite:///./reports.db",
+            MIGRATE_DATABASE_MIGRATION_DIR="reports_migrations",
+        ),
+    )
+    MigratedDb(app)
+    with pytest.raises(ValueError, match="Set a different MIGRATE_CLI_NAME"):
+        ReportsDb(app)

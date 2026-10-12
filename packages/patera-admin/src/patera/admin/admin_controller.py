@@ -5,12 +5,12 @@ Admin extension controller
 from typing import Any, cast
 
 import os
-import mimetypes
 from werkzeug.security import safe_join
 
-from patera.utilities import get_file, get_range_file
-from patera.controller import Controller, get, before_request
-from patera import Patera, Request, Response, HttpStatus
+from patera.exceptions import StaticAssetNotFound
+from patera.utilities import file_response
+from patera.controller import Controller, get, post, before_request
+from patera import Patera, Request, Response
 from patera.auth import role_required, login_required
 from patera.static import static_resource
 
@@ -20,7 +20,13 @@ from .exceptions import (
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
 )
-from .schemas.dashboard_schemas import LogsQuerySchema
+from .schemas.dashboard_schemas import (
+    LOG_LEVELS,
+    LogsQuerySchema,
+    level_at_least,
+    log_sort_key,
+)
+from .admin_interface import NOTIFICATIONS_SEEN_COOKIE
 
 
 class _AdminController(Controller[Patera]):
@@ -68,6 +74,8 @@ class _AdminController(Controller[Patera]):
 
         logs: list[dict[str, Any]] = await self.app.log_files.read_async()
 
+        logs = [log for log in logs if level_at_least(log, query_schema.severity)]
+
         if query_schema.query is not None and query_schema.query.strip():
             logs = [
                 log for log in logs if self.filter_log_messages(log, query_schema.query)
@@ -82,7 +90,7 @@ class _AdminController(Controller[Patera]):
 
         logs = sorted(
             logs,
-            key=lambda log: self.get_order_value(log, order_by),
+            key=lambda log: log_sort_key(log, order_by),
             reverse=reverse,
         )
 
@@ -112,9 +120,58 @@ class _AdminController(Controller[Patera]):
                 "logs_total_pages": total_pages,
                 "logs_order_by": query_schema.order_by,
                 "logs_query": query_schema.query or "",
+                "logs_severity": query_schema.severity,
+                "log_levels": list(LOG_LEVELS),
                 "log_files_enabled": self.app.log_files.enabled,
             },
         )
+
+    @get("/notifications")
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def notifications(self, req: Request) -> Response:
+        """
+        Notifications for the Admin header, newest first, with the number
+        this browser has not marked as read.
+        """
+        items = await self.admin_interface.notifications()
+        seen_at = self.admin_interface.notifications_seen_at(req)
+        return req.res.json(
+            {
+                "status": "success",
+                "message": "Notifications",
+                "data": {
+                    "enabled": self.app.log_files.enabled,
+                    "unread": self.admin_interface.count_unread(items, seen_at),
+                    "items": items,
+                },
+            }
+        )
+
+    @post("/notifications/seen")
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def notifications_seen(self, req: Request) -> Response:
+        """Marks every current notification as read for this browser."""
+        items = await self.admin_interface.notifications(limit=1)
+        res = req.res.json(
+            {"status": "success", "message": "Notifications marked as read"}
+        )
+        if items and items[0]["time"]:
+            res.set_cookie(
+                NOTIFICATIONS_SEEN_COOKIE,
+                str(items[0]["time"]),
+                max_age=365 * 24 * 3600,
+                path=self.app._app_base_url
+                + self.admin_interface.configs.ADMIN_BASE_URL,
+            )
+        return res
 
     @get("/unauthorized")
     @login_required(raise_authentication_exception=AdminLoginRequiredException)
@@ -127,29 +184,13 @@ class _AdminController(Controller[Patera]):
     @static_resource
     async def static(self, req: Request, filename: str) -> Response:
         """
-        Endpoint for static files with HTTP Range support,
-        falling back to get_file for full-content requests.
+        Serves Admin's own assets, streamed from disk, with conditional
+        requests and HTTP Range support. A missing file is a JSON 404.
         """
-        # Checks if file exists
-        file_path = None
         candidate = safe_join(self.admin_interface.admin_root_path, "static", filename)
-        if candidate and os.path.exists(candidate):
-            file_path = candidate
-        if not file_path:
-            return req.res.no_content().status(HttpStatus.NOT_FOUND)
-
-        # checks/guesses mimetype
-        guessed, _ = mimetypes.guess_type(file_path)
-        content_type = guessed or "application/octet-stream"
-
-        # Checks range header and returns range if header is present
-        range_header = req.headers.get("range")
-        if not range_header:
-            status, headers, body = await get_file(file_path, content_type=content_type)
-            headers["Accept-Ranges"] = "bytes"
-            return req.res.send_file(body, headers).status(status)
-
-        return await get_range_file(req.res, file_path, range_header, content_type)
+        if not candidate or not os.path.isfile(candidate):
+            raise StaticAssetNotFound()
+        return file_response(req.res, candidate, req.headers)
 
     def filter_log_messages(self, log: dict[str, Any], query: str) -> bool:
         msg: str = str(log.get("message", "")).lower()
@@ -175,14 +216,6 @@ class _AdminController(Controller[Patera]):
             or query in time
             or query in exception
         )
-
-    def get_order_value(self, log: dict[str, Any], order_by: str) -> Any:
-        value = log.get(order_by)
-
-        if value is None:
-            return ""
-
-        return value
 
     def paginate_logs(
         self,

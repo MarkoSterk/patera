@@ -20,6 +20,9 @@ class BaseConfig(BaseSettings):
         env_file_encoding="utf-8",
         env_prefix="PATERA_",
         env_nested_delimiter="__",
+        # PATERA_MAIN_DB__DATABASE_URI=... changes one field of a nested
+        # default (MAIN_DB = SqlDatabaseConfig(...)) and keeps the others.
+        nested_model_default_partial_update=True,
     )
     APP_PACKAGE: str = Field(
         "app", description="Python package where app code is located. Default is 'app'."
@@ -42,8 +45,35 @@ class BaseConfig(BaseSettings):
 
     # optionals with sensible defaults
     DEBUG: bool = Field(True, description="If the app should run in debug mode or not.")
-    HOST: str = Field("localhost", description="Host ip where the app should run.")
-    PORT: int = Field(3000, description="Port on which the app should run.")
+    HOST: str = Field(
+        "localhost",
+        description=(
+            "Host the server listens on. `patera dev`/`patera prod` read it from "
+            "PATERA_HOST or this class; production turns localhost into 0.0.0.0."
+        ),
+    )
+    PORT: int = Field(
+        3000,
+        description=(
+            "Port the server listens on. `patera dev` defaults to 3000 and "
+            "`patera prod` to 80 unless PATERA_PORT or this class sets it."
+        ),
+    )
+    STARTUP_BANNER: bool = Field(
+        True,
+        description=(
+            "Print the Patera banner and address box to the console when the app "
+            "starts. The startup line is always logged."
+        ),
+    )
+    BACKGROUND_TASKS_SHUTDOWN_TIMEOUT: Optional[float] = Field(
+        10.0,
+        ge=0,
+        description=(
+            "Seconds to wait on shutdown for tasks started with "
+            "run_in_background() before cancelling them (None: no limit)."
+        ),
+    )
     PROTOCOL: str = Field("http", description="Protocol to use in URLs, http or https")
     LIFESPAN: str = Field(
         "on",
@@ -97,6 +127,16 @@ class BaseConfig(BaseSettings):
     OPEN_API: bool = Field(True, description="Enable OpenAPI endpoint")
     OPEN_API_URL: str = Field("/openapi", description="OpenAPI base path")
     OPEN_API_DESCRIPTION: str = Field("Simple API", description="OpenAPI description")
+    MAX_CONTENT_LENGTH: Optional[int] = Field(
+        10 * 1024 * 1024,
+        ge=0,
+        description=(
+            "Largest accepted request body in bytes (default 10 MB), for JSON, "
+            "form and multipart bodies alike. Larger requests are answered with "
+            "413. None disables the limit. A request may lower or raise it "
+            "through Request.max_content_length."
+        ),
+    )
 
     # CORS settings
     CORS_ENABLED: bool = Field(True, description="Enable CORS")

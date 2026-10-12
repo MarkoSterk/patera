@@ -114,6 +114,43 @@
 
           <div class="d-flex align-items-center gap-2">
 
+            <div
+              class="dropdown"
+              id="admin-notifications"
+              data-url="{{ admin_interface.url_for('_AdminController.notifications') }}"
+              data-seen-url="{{ admin_interface.url_for('_AdminController.notifications_seen') }}"
+            >
+              <a
+                class="btn position-relative"
+                href="#"
+                role="button"
+                data-bs-toggle="dropdown"
+                data-bs-auto-close="outside"
+                aria-expanded="false"
+                aria-label="{{ translate('notifications') }}"
+                title="{{ translate('notifications') }}"
+              >
+                <i class="bi bi-bell"></i>
+                <span
+                  id="admin-notifications-badge"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  hidden
+                ></span>
+              </a>
+
+              <div class="dropdown-menu dropdown-menu-end p-0 shadow" style="width: min(24rem, 90vw);">
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                  <strong class="small">{{ translate('notifications') }}</strong>
+                  <button type="button" class="btn btn-link btn-sm p-0" id="admin-notifications-seen">
+                    {{ translate('mark_all_as_read') }}
+                  </button>
+                </div>
+                <ul class="list-unstyled mb-0" id="admin-notifications-list" style="max-height: 22rem; overflow-y: auto;">
+                  <li class="px-3 py-3 text-muted small">{{ translate('no_notifications') }}</li>
+                </ul>
+              </div>
+            </div>
+
             <div class="dropdown">
               <a
                 class="btn dropdown-toggle"
@@ -142,7 +179,7 @@
             </div>
 
             <a
-              data-logout-url="{{ url_for(url_for_for_logut) }}"
+              data-logout-url="{{ url_for(url_for_for_logout) }}"
               data-login-url="{{ admin_interface.url_for('_AdminController.login') }}"
               class="btn ms-1"
               id="logout-btn"
@@ -157,3 +194,74 @@
       </div>
     </nav>
   </header>
+
+<script>
+  (function () {
+    const root = document.getElementById("admin-notifications");
+    if (!root) return;
+    const badge = document.getElementById("admin-notifications-badge");
+    const list = document.getElementById("admin-notifications-list");
+    const seenButton = document.getElementById("admin-notifications-seen");
+
+    function setBadge(unread) {
+      badge.hidden = !unread;
+      badge.textContent = unread > 99 ? "99+" : String(unread || "");
+    }
+
+    function renderItem(item) {
+      const li = document.createElement("li");
+      li.className = "px-3 py-2 border-bottom small";
+      const head = document.createElement("div");
+      head.className = "d-flex justify-content-between gap-2";
+      const title = document.createElement("strong");
+      title.className = item.level === "ERROR" || item.level === "CRITICAL" ? "text-danger" : "";
+      title.textContent = window.translate(item.kind);
+      const time = document.createElement("span");
+      time.className = "text-muted";
+      time.textContent = item.time ? new Date(item.time).toLocaleString() : "";
+      head.append(title, time);
+      const message = document.createElement("div");
+      message.className = "text-break";
+      message.textContent = item.message || "";
+      li.append(head, message);
+      return li;
+    }
+
+    async function load() {
+      try {
+        const response = await fetch(root.dataset.url, { headers: { "Accept": "application/json" } });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const data = payload.data || {};
+        list.replaceChildren();
+        if (!data.enabled || !(data.items || []).length) {
+          const empty = document.createElement("li");
+          empty.className = "px-3 py-3 text-muted small";
+          empty.textContent = data.enabled
+            ? window.translate("no_notifications")
+            : window.translate("notifications_need_log_files");
+          list.append(empty);
+        } else {
+          data.items.forEach((item) => list.append(renderItem(item)));
+        }
+        setBadge(data.unread || 0);
+      } catch (error) {
+        // The header still works without notifications.
+      }
+    }
+
+    seenButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch(root.dataset.seenUrl, {
+          method: "POST",
+          headers: { "Accept": "application/json" },
+        });
+        if (response.ok) setBadge(0);
+      } catch (error) {
+        // Leave the badge as it is.
+      }
+    });
+
+    load();
+  })();
+</script>

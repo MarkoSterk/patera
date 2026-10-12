@@ -59,6 +59,6 @@ def test_handles_does_not_share_state_between_methods(make_app):
 
     app = make_app(exception_handlers=[Handlers])
     mapping = app._exception_handlers
-    assert mapping["ValueError"].__name__ == "value"
-    assert mapping["KeyError"].__name__ == "other"
-    assert mapping["TypeError"].__name__ == "other"
+    assert mapping[ValueError].__name__ == "value"
+    assert mapping[KeyError].__name__ == "other"
+    assert mapping[TypeError].__name__ == "other"

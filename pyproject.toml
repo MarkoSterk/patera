@@ -1,57 +1,73 @@
 [project]
 name = "patera"
-version = "0.120.0"
-description = "A modular async-first python webframework"
+version = "0.121.0"
+description = "Modular async-first Python web framework with controllers, dependency injection and typed configuration"
 readme = "README.md"
-authors = [
-    { name = "MarkoSterk", email = "marko_sterk@hotmail.com" }
-]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Marko Šterk", email = "marko_sterk@hotmail.com" }]
 requires-python = ">=3.13"
+keywords = [
+    "asgi",
+    "async",
+    "web",
+    "framework",
+    "dependency injection",
+    "rest",
+    "api",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = [
     "aiofiles>=25.1.0",
-    "asgi-lifespan>=2.1.0",
     "granian>=2.7.2",
-    "h11>=0.16.0",
-    "httpcore>=1.0.9",
-    "httpx>=0.28.1",
-    "idna>=3.11",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "mako>=1.3.10",
-    "markupsafe>=3.0.3",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.25",
-    "websockets>=16.0",
     "werkzeug>=3.1.6",
 ]
 
 [project.optional-dependencies]
-aiinterface = ["patera-aiinterface"]
-apiinterface = ["patera-apiinterface"]
-auth = ["patera-auth"]
-caching = ["patera-caching"]
-caching-redis = ["patera-caching[redis]"]
-caching-sqlite = ["patera-caching[sqlite]"]
-database = ["patera-database"]
-migrate = ["patera-migrate"]
-email = ["patera-email"]
-taskmanager = ["patera-taskmanager"]
-testing = ["anyio", "pytest", "pytest-cov", "pytest-asyncio", "asgi-lifespan", "httpx"]
-dev = ["uvicorn", "watchfiles"]
-admin = ["patera-admin"]
-desktop = ["patera-desktop"]
+dev = ["uvicorn>=0.42.0", "watchfiles>=1.1.1", "websockets>=16.0"]
+testing = ["anyio", "pytest>=8", "pytest-cov", "pytest-asyncio>=0.24", "asgi-lifespan>=2.1.0", "httpx>=0.28.1"]
+database = ["patera-database>=0.11"]
+migrate = ["patera-migrate>=0.11"]
+auth = ["patera-auth>=0.11"]
+caching = ["patera-caching>=0.11"]
+caching-redis = ["patera-caching[redis]>=0.11"]
+caching-sqlite = ["patera-caching[sqlite]>=0.11"]
+taskmanager = ["patera-taskmanager>=0.11"]
+email = ["patera-email>=0.11"]
+apiinterface = ["patera-apiinterface>=0.11"]
+admin = ["patera-admin>=0.11"]
+aiinterface = ["patera-aiinterface>=0.11"]
+desktop = ["patera-desktop>=0.11"]
 all = [
-    "patera-database",
-    "patera-migrate",
-    "patera-email",
-    "patera-aiinterface",
-    "patera-apiinterface",
-    "patera-auth",
-    "patera-caching",
-    "patera-taskmanager",
-    "patera-admin"
+    "patera-database>=0.11",
+    "patera-migrate>=0.11",
+    "patera-email>=0.11",
+    "patera-apiinterface>=0.11",
+    "patera-auth>=0.11",
+    "patera-caching>=0.11",
+    "patera-taskmanager>=0.11",
+    "patera-admin>=0.11",
 ]
 
 [tool.uv.workspace]
@@ -81,7 +97,7 @@ patera-migrate = { workspace = true }
 patera-desktop = { workspace = true }
 
 [build-system]
-requires = ["uv_build>=0.10.9,<0.11.0"]
+requires = ["uv_build>=0.10.9,<0.13.0"]
 build-backend = "uv_build"
 
 [project.scripts]
@@ -89,7 +105,10 @@ patera = "patera.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/MarkoSterk/Patera"
+Documentation = "https://github.com/MarkoSterk/Patera#readme"
+Repository = "https://github.com/MarkoSterk/Patera"
 Issues = "https://github.com/MarkoSterk/Patera/issues"
+Changelog = "https://github.com/MarkoSterk/Patera/blob/main/CHANGELOG.md"
 
 [tool.pylint]
 # Global Pylint configuration
@@ -119,9 +138,14 @@ omit = ["*/static/*", "*/templates/*"]
 [tool.mypy]
 disable_error_code = ["import-untyped"]
 
+# Optional dependencies of the experimental packages (AI interface extras, Desktop).
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*", "pgvector.*", "sentence_transformers.*", "torch.*", "webview.*"]
+ignore_missing_imports = true
+
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
+    "mypy>=2.4.0",
     "pre-commit>=4.5.1",
     "ruff>=0.15.5",
     "uvicorn>=0.42.0",
@@ -133,4 +157,8 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov",
     "fakeredis>=2.20",
+    # AI interface document tests (SQLite always; PostgreSQL with PATERA_TEST_PG_URI)
+    "numpy>=2.4.4",
+    "pgvector>=0.4.2",
+    "asyncpg>=0.30",
 ]

@@ -75,6 +75,41 @@ class AborterException(BaseHttpException):
         super().__init__(message, status_code, status, data)
 
 
+class InvalidRequestBody(BaseHttpException):
+    """
+    Raised when a request body cannot be parsed, such as malformed JSON.
+    Answered with 400 Bad Request.
+    """
+
+    def __init__(
+        self,
+        message: str = "Malformed request body",
+        status_code: int = 400,
+        status: str = "error",
+        data: Any = None,
+    ):
+        super().__init__(message, status_code, status, data)
+
+
+class RequestBodyTooLarge(BaseHttpException):
+    """
+    Raised when a request body is larger than the allowed maximum.
+    Answered with 413 Content Too Large.
+    """
+
+    def __init__(
+        self,
+        max_content_length: int,
+        message: str = "Request body too large",
+        status_code: int = 413,
+        status: str = "error",
+    ):
+        super().__init__(
+            message, status_code, status, {"max_content_length": max_content_length}
+        )
+        self.max_content_length = max_content_length
+
+
 class HtmlAborterException(BaseHttpException):
     """
     Html aborter exception

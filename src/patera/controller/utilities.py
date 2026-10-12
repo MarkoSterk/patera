@@ -17,15 +17,6 @@ from ..request import Request
 from ..media_types import MediaType
 
 
-def _get_handler_dict(obj: Any) -> dict[str, Any]:
-    """Return or create the _handler dict on an object."""
-    d = getattr(obj, "_handler", None)
-    if not isinstance(d, dict):
-        d = {}
-        setattr(obj, "_handler", d)
-    return d
-
-
 def _unwrap_annotated(tp: Any) -> Any:
     """If Annotated[T, ...], return T; else the original."""
     if get_origin(tp) is Annotated:
@@ -78,7 +69,9 @@ async def _read_payload_for_consumes(
 ) -> Mapping[str, Any]:
     """
     Map declared MediaType → Request loader.
-    Returns mapping suitable for building Pydantic models.
+    Returns mapping suitable for building Pydantic models. An empty JSON
+    body becomes an empty mapping; malformed JSON raises InvalidRequestBody
+    (400), and a body over the size limit raises RequestBodyTooLarge (413).
     """
     if mt in (MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON):
         return (await req.json()) or {}

@@ -18,7 +18,7 @@ import re
 import time
 from fnmatch import fnmatchcase
 from typing import Generic, Optional, TYPE_CHECKING, Tuple, TypeVar, cast, Any
-from pydantic import BaseModel, Field  # noqa: F401
+from pydantic import BaseModel
 
 import aiosqlite
 
@@ -28,25 +28,6 @@ if TYPE_CHECKING:
     from patera import Patera
 
 AppT = TypeVar("AppT", bound="Patera", default="Patera")
-
-
-class SQLiteCacheConfig(BaseModel):
-    CACHE_SQLITE_PATH: str = Field(
-        "./patera_cache.db",
-        description="SQLite DB file path (use ':memory:' for in-memory)",
-    )
-    CACHE_SQLITE_TABLE: str = Field(
-        "cache_entries", description="Table name for cache entries"
-    )
-    CACHE_DURATION: int = Field(300, description="Cache default TTL in seconds")
-    CACHE_KEY_PREFIX: str = Field("", description="Cache key prefix/namespace")
-    CACHE_SQLITE_WAL_CHECKPOINT_MODE: str = Field(
-        "PASSIVE",
-        description="Mode for WAL checkpointing: PASSIVE|FULL|RESTART|TRUNCATE",
-    )
-    CACHE_SQLITE_WAL_CHECKPOINT_EVERY: int = Field(
-        100, description="Insert WAL checkpoint every N write operations"
-    )
 
 
 class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
@@ -86,19 +67,28 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._write_ops = 0
 
     @classmethod
-    def configure_from_app(  # type: ignore[override]
-        cls, app: AppT, configs: dict[str, Any] | BaseModel
-    ) -> "SQLiteCacheBackend":
+    def from_configs(
+        cls,
+        app: AppT,
+        configs: dict[str, Any] | BaseModel,
+        namespace: str = "cache",
+    ) -> "SQLiteCacheBackend[AppT]":
         """
         Creates a backend from a config mapping or a CachingConfig
-        (SQLITE_PATH, SQLITE_TABLE, DURATION, KEY_PREFIX, ...).
+        (SQLITE_PATH, SQLITE_TABLE, DURATION, KEY_PREFIX, ...). KEY_PREFIX
+        defaults to "patera:<application>:<namespace>:", so caches sharing
+        one file and table stay apart; set it to "" explicitly for none.
         """
-        if isinstance(configs, BaseModel):
-            configs = configs.model_dump()
+        configs = cls._config_values(configs)
         db_path = cast(str, configs.get("SQLITE_PATH") or "./patera_cache.db")
         table = cast(str, configs.get("SQLITE_TABLE") or "cache_entries")
         default_ttl = int(configs.get("DURATION") or 300)
-        key_prefix = cast(str, configs.get("KEY_PREFIX", ""))
+        configured_prefix = configs.get("KEY_PREFIX")
+        key_prefix = (
+            cls.default_key_prefix(app, namespace)
+            if configured_prefix is None
+            else str(configured_prefix)
+        )
         checkpoint_mode = cast(
             str, configs.get("SQLITE_WAL_CHECKPOINT_MODE", "PASSIVE")
         )
@@ -270,9 +260,15 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
             await self.connect()
         assert self._conn is not None
         if self._prefix:
-            like = f"{self._prefix}%"
+            # Escape LIKE wildcards: "_" in a prefix must match only "_".
+            escaped = (
+                self._prefix.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
             await self._conn.execute(
-                f"DELETE FROM {self._table} WHERE k LIKE ?", (like,)
+                f"DELETE FROM {self._table} WHERE k LIKE ? ESCAPE '\\'",
+                (f"{escaped}%",),
             )
         else:
             await self._conn.execute(f"DELETE FROM {self._table}")

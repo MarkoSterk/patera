@@ -47,6 +47,21 @@ class CORSMiddleware(MiddlewareBase):
 
         return await self.next(req)
 
+    def wrap_send_without_route(self, scope: dict, send: Callable) -> Callable:
+        """
+        Wraps ``send`` with the global CORS headers for a response that has no
+        route handler, such as a routing error. Returns ``send`` unchanged when
+        CORS is disabled, the request has no Origin, or the origin is not
+        allowed.
+        """
+        opts = self._resolve_cors_options(None)
+        origin = self._get_header(scope, "origin")
+        if not opts["enabled"] or not origin:
+            return send
+        if not self._origin_allowed(origin, opts["allow_origins"]):
+            return send
+        return self._wrap_cors_send(send, origin, opts)
+
     def _get_header(self, scope, name: str) -> Optional[str]:
         target = name.lower().encode("latin1")
         for k, v in scope.get("headers", []):
@@ -86,20 +101,18 @@ class CORSMiddleware(MiddlewareBase):
         """
         opts = self._global_cors_options()
 
-        if handler is None:
-            return opts
+        if handler is not None:
+            # Check if handler explicitly disables CORS
+            if getattr(handler, "_disable_cors", False):
+                opts["enabled"] = False
+                opts["allow_origins"] = self._normalize_list(opts["allow_origins"])
+                return opts
 
-        # Check if handler explicitly disables CORS
-        if getattr(handler, "_disable_cors", False):
-            opts["enabled"] = False
-            opts["allow_origins"] = self._normalize_list(opts["allow_origins"])
-            return opts
-
-        # Merge @cors decorator overrides
-        overrides = getattr(handler, "_cors_options", None) or {}
-        for k, v in overrides.items():
-            if v is not None:
-                opts[k] = v
+            # Merge @cors decorator overrides
+            overrides = getattr(handler, "_cors_options", None) or {}
+            for k, v in overrides.items():
+                if v is not None:
+                    opts[k] = v
 
         opts["allow_origins"] = self._normalize_list(opts["allow_origins"])
         opts["allow_methods"] = self._normalize_list(opts["allow_methods"], upper=True)
@@ -118,7 +131,6 @@ class CORSMiddleware(MiddlewareBase):
         self,
         *,
         origin: str,
-        request_method: Optional[str],
         request_headers: Optional[str],
         opts: dict[str, Any],
     ) -> dict[str, str]:
@@ -184,11 +196,12 @@ class CORSMiddleware(MiddlewareBase):
             and cors_opts["allow_methods"]
             and acr_method.upper() not in cors_opts["allow_methods"]
         ):
-            return req.res.text("Preflight method not allowed").status(405)
+            return req.res.json(
+                {"status": "error", "message": "Preflight method not allowed"}
+            ).status(405)
 
         headers = self._build_cors_headers_for_preflight(
             origin=origin,
-            request_method=acr_method,
             request_headers=acr_headers,
             opts=cors_opts,
         )

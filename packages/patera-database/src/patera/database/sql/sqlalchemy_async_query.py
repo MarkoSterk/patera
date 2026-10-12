@@ -33,18 +33,18 @@ class AsyncQuery(Generic[T]):
 
     session: AsyncSession
     model: type[T]
-    statement: Select[tuple[T]] | None = None
+    statement: Select[Any] | None = None
 
     def __post_init__(self) -> None:
         if self.statement is None:
             self.statement = select(self.model)
 
-    def _stmt(self) -> Select[tuple[T]]:
+    def _stmt(self) -> Select[Any]:
         if self.statement is None:
             raise RuntimeError("AsyncQuery.statement was not initialized")
         return self.statement
 
-    def _clone(self, statement: Select[tuple[T]]) -> AsyncQuery[T]:
+    def _clone(self, statement: Select[Any]) -> AsyncQuery[T]:
         return AsyncQuery(
             session=self.session,
             model=self.model,

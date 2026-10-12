@@ -142,3 +142,46 @@ class TestExtractResponseType:
                 ...
 
         assert _extract_response_type(Ctrl().handler) is Item
+
+
+class _AsyncCallable:
+    async def __call__(self, value):
+        await asyncio.sleep(0)
+        return value * 10
+
+
+async def test_run_sync_or_async_detects_async_callables():
+    import functools
+    import threading
+
+    main_thread = threading.get_ident()
+
+    async def coro(a, b):
+        return (a + b, threading.get_ident())
+
+    assert await run_sync_or_async(_AsyncCallable(), 2) == 20
+    result, thread = await run_sync_or_async(functools.partial(coro, 1), 2)
+    assert result == 3 and thread == main_thread
+    # A sync callable returning a coroutine has it awaited
+    assert await run_sync_or_async(lambda: coro(2, 2)) == (4, main_thread)
+
+
+async def test_background_tasks_finish_or_are_cancelled():
+    from patera.utilities import wait_for_background_tasks
+
+    finished = []
+
+    async def quick():
+        await asyncio.sleep(0.01)
+        finished.append("quick")
+
+    async def slow():
+        await asyncio.sleep(30)
+        finished.append("slow")
+
+    run_in_background(quick)
+    slow_task = run_in_background(slow)
+    assert await wait_for_background_tasks(timeout=0.2) == (1, 1)
+    assert finished == ["quick"]
+    assert slow_task.cancelled()
+    assert await wait_for_background_tasks(timeout=0.2) == (0, 0)

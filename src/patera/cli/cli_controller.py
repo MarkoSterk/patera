@@ -15,6 +15,7 @@ from typing import (
     Generic,
     Any,
     get_type_hints,
+    NamedTuple,
     overload,
 )
 from functools import wraps
@@ -27,6 +28,14 @@ if TYPE_CHECKING:
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="CLIController[Any]")
+
+
+class CLICommand(NamedTuple):
+    """One application command, as listed by ``patera cli``."""
+
+    name: str
+    usage: str
+    help: str
 
 
 @overload
@@ -57,14 +66,18 @@ def cli_controller(
 class CLIController(Injectable, Generic[AppT]):
     """
     Base class for CLI controllers.
-    This class automatically registers methods decorated with @command and @argument
-    as CLI commands in the provided Patera app instance.
+
+    Methods decorated with @command become commands, run as
+    ``patera cli <controller>:<command> [args...]``. Arguments are read from
+    the method signature and converted to its annotated types.
     """
 
     def __init__(self, app: AppT):
         self._app: AppT = app
         self._cli_commands: dict[str, Callable] = {}
         self._cli_commands_help: dict[str, str] = {}
+        # Public command names only (``_cli_commands`` also maps method names).
+        self._command_names: dict[str, Callable] = {}
         self._register_commands()
         self._resolve_injections()
 
@@ -79,9 +92,51 @@ class CLIController(Injectable, Generic[AppT]):
                     self._register_command(method, command)
 
     def _register_command(self, method: Callable, command: dict):
+        command_name = cast(str, command.get("command_name"))
         self._cli_commands[method.__name__] = method
-        self._cli_commands[cast(str, command.get("command_name"))] = method
+        self._cli_commands[command_name] = method
         self._cli_commands_help[method.__name__] = command.get("help", "")
+        self._command_names[command_name] = method
+
+    def commands(self) -> list[CLICommand]:
+        """
+        Lists this controller's commands as ``controller:command`` names
+        with their arguments and help text, sorted by name.
+        """
+        return [
+            CLICommand(
+                name=f"{self.ctrl_name}:{command_name}",
+                usage=self.usage(method),
+                help=self._cli_commands_help.get(method.__name__, ""),
+            )
+            for command_name, method in sorted(self._command_names.items())
+        ]
+
+    def usage(self, method: Callable) -> str:
+        """
+        Describes a command's arguments: ``<name:type>`` for required ones
+        and ``[name:type=default]`` for optional ones.
+        """
+        try:
+            type_hints = get_type_hints(method)
+        except Exception:
+            type_hints = {}
+        parts: list[str] = []
+        for param in inspect.signature(method).parameters.values():
+            if param.name == "self":
+                continue
+            annotation = type_hints.get(param.name, param.annotation)
+            label = param.name
+            if (
+                isinstance(annotation, type)
+                and annotation is not inspect.Parameter.empty
+            ):
+                label += f":{annotation.__name__}"
+            if param.default is inspect.Parameter.empty:
+                parts.append(f"<{label}>")
+            else:
+                parts.append(f"[{label}={param.default!r}]")
+        return " ".join(parts)
 
     def find_method(self, method: str) -> Callable | None:
         return self._cli_commands.get(method, None)
@@ -132,6 +187,8 @@ class CLIController(Injectable, Generic[AppT]):
     def prepare_cli_args(self, method, raw_args: list[str]) -> list[Any]:
         """
         Convert raw CLI args to properly typed args based on method annotations.
+        Missing optional arguments take their defaults. A missing required
+        argument, or more arguments than the method accepts, raises ValueError.
         """
         sig = inspect.signature(method)
         params = list(sig.parameters.values())

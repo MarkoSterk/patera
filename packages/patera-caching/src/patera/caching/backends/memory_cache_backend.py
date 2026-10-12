@@ -6,7 +6,9 @@ from typing import Generic, Optional, TypeVar, Any, TypedDict
 import re
 import time
 
-from cachetools import TTLCache
+from pydantic import BaseModel
+
+from cachetools import TLRUCache
 from fnmatch import fnmatchcase
 
 from .base_cache_backend import BaseCacheBackend
@@ -21,44 +23,44 @@ class CacheItem(TypedDict):
     expire: float
 
 
+def _expires_at(_key: str, item: CacheItem, _now: float) -> float:
+    return item["expire"]
+
+
 class MemoryCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
     """
-    In-memory cache using cachetools.TTLCache for bounded size and base TTL.
+    In-memory cache with a bounded size and per-entry durations.
 
-
-    Per-item TTL by storing an explicit expire timestamp alongside
-    the payload; TTLCache provides a global upper bound and eviction.
+    Each entry expires after its own duration (``default_ttl`` when none is
+    given), like the Redis and SQLite backends; the least recently used
+    entries are evicted when ``maxsize`` is reached.
     """
 
     def __init__(self, default_ttl: int = 300, maxsize: int = 10_000):
         self.default_ttl = default_ttl
         self.maxsize = maxsize
         # Stores: key -> {payload: dict, expire: float}
-        # Usable right away; configure_from_app() may re-create it with the
-        # configured size/TTL.
-        self._cache: TTLCache[str, CacheItem] = TTLCache(
-            maxsize=self.maxsize, ttl=self.default_ttl
+        self._cache: TLRUCache[str, CacheItem] = TLRUCache(
+            maxsize=self.maxsize, ttu=_expires_at, timer=lambda: self._now()
         )
-        self._configured = False
 
-    @property
-    def is_configured(self) -> bool:
-        """True once configure_from_app() has been called."""
-        return self._configured
-
-    def configure_from_app(self, app: AppT, configs: CachingConfig) -> None:
-        self.default_ttl = (
-            configs.DURATION if configs.DURATION is not None else self.default_ttl
+    @classmethod
+    def from_configs(
+        cls,
+        app: AppT,
+        configs: CachingConfig | BaseModel | dict[str, Any],
+        namespace: str = "cache",
+    ) -> "MemoryCacheBackend[AppT]":
+        """Creates a backend from DURATION and MAX_SIZE (defaults 300 / 10,000)."""
+        values = cls._config_values(configs)
+        return cls(
+            default_ttl=int(values.get("DURATION") or 300),
+            maxsize=int(values.get("MAX_SIZE") or 10_000),
         )
-        self.maxsize = (
-            configs.MAX_SIZE if configs.MAX_SIZE is not None else self.maxsize
-        )
-        self._cache = TTLCache(maxsize=self.maxsize, ttl=self.default_ttl)
-        self._configured = True
 
     @staticmethod
     def _now() -> float:
-        # Same clock as cachetools' TTLCache (time.monotonic); works outside
+        # Same clock as the cache's timer (time.monotonic); works outside
         # of a running event loop.
         return time.monotonic()
 

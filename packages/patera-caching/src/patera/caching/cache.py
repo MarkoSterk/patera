@@ -4,6 +4,7 @@ Caching extension and the @cache route handler decorator.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import wraps
 from typing import (
     Any,
@@ -15,7 +16,7 @@ from typing import (
 )
 from urllib.parse import urlencode
 
-from patera.utilities import run_sync_or_async
+from patera.utilities import pascal_to_upper_snake, run_sync_or_async
 from patera.base_extension import BaseExtension
 
 from .config import CachingConfig
@@ -34,15 +35,21 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     """
     Caching system for route handlers with **pluggable backend class**.
 
-    Provide a backend instance as the `backend` attribute (class attribute, or
-    set in `init()` before calling `super().init()`). It must implement
-    BaseCacheBackend. If not provided, an in-memory backend
-    (MemoryCacheBackend) configured from the extension's configs is used.
+    The backend is chosen in one of two ways:
 
-    Default cache duration is set with `DURATION` config (seconds)
+    - ``backend_class`` (default MemoryCacheBackend): the extension creates it
+      with ``backend_class.from_configs(app, configs)`` from its settings,
+      for example ``backend_class = RedisCacheBackend`` with REDIS_URL and
+      KEY_PREFIX in the configuration.
+    - ``backend``: an instance you construct yourself (as a class attribute,
+      or in ``init()`` before calling ``super().init()``). It is used as it
+      is, without reading the configuration.
+
+    Default cache duration is set with `DURATION` config (seconds).
     """
 
     backend: BackendT
+    backend_class: type[BaseCacheBackend] = MemoryCacheBackend
 
     def init(self) -> None:
         self._duration = self.configs.DURATION
@@ -50,16 +57,23 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
         backend = getattr(self, "backend", None)
 
         if backend is None:
-            backend = MemoryCacheBackend()
-            backend.configure_from_app(self.app, self.configs)
-        elif isinstance(backend, MemoryCacheBackend) and not backend.is_configured:
-            backend.configure_from_app(self.app, self.configs)
+            backend = self.backend_class.from_configs(
+                self.app, self.configs, namespace=self.cache_name
+            )
 
         self.backend = cast(BackendT, backend)
         self._backend = backend
 
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
+
+    @property
+    def cache_name(self) -> str:
+        """
+        The configuration name in lower case (PublicCache -> "public_cache").
+        Shared backends (Redis, SQLite) use it in their default key prefix.
+        """
+        return pascal_to_upper_snake(type(self).__name__).lower()
 
     async def connect(self) -> None:
         await self._backend.connect()
@@ -99,14 +113,32 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     async def clear(self) -> None:
         await self._backend.clear()
 
+    def user_cache_key(self, req: Request) -> Optional[str]:
+        """
+        Returns the part of the cache key that identifies the signed-in user,
+        or None for an anonymous request. The default uses the user's ``id``
+        (or ``pk``) attribute or key, and falls back to ``str(user)``.
+        Override it when users are identified differently.
+        """
+        user = req.user
+        if user is None:
+            return None
+        for name in ("id", "pk"):
+            value = (
+                user.get(name)
+                if isinstance(user, Mapping)
+                else getattr(user, name, None)
+            )
+            if value is not None:
+                return str(value)
+        return str(user)
+
     async def _make_cached_response(self, cached_data: dict, req: Request) -> Response:
         req.res.body = cached_data["body"]
         req.res.status_code = cached_data["status_code"]
         req.res.headers = dict(cached_data["headers"])
-        # Entries written by older versions do not carry these keys.
-        if cached_data.get("media_type") is not None:
-            req.res.media_type = cached_data["media_type"]
-            req.res.charset = cached_data.get("charset")
+        req.res.media_type = cached_data["media_type"]
+        req.res.charset = cached_data["charset"]
         return req.res
 
 
@@ -132,7 +164,10 @@ def _default_cache_key(handler: Callable, req: Request) -> str:
 
 
 def cache(
-    cache_name: str, duration: Optional[int] = None, key: Optional[str] = None
+    cache_name: str,
+    duration: Optional[int] = None,
+    key: Optional[str] = None,
+    per_user: bool = True,
 ) -> Callable:
     """
     Decorator for caching route handler results using the Caching extension.
@@ -141,6 +176,10 @@ def cache(
         class name, e.g. "PUBLIC_CACHE" for class PublicCache).
     duration: cache duration in seconds (defaults to the extension's DURATION)
     key: fixed cache key. Defaults to handler name + method + path + query.
+    per_user: when True (the default), a signed-in user gets an entry of their
+        own, so a response that depends on who asks is never served to
+        someone else. Anonymous requests share one entry. Set it to False
+        for responses that are the same for everyone.
 
     Only successful (< 400), non-streaming responses without cookies are cached.
     """
@@ -155,6 +194,10 @@ def cache(
                 )
             req: Request = args[0]
             cache_key = key if key is not None else _default_cache_key(handler, req)
+            if per_user:
+                user_key = cache_extension.user_cache_key(req)
+                if user_key is not None:
+                    cache_key = f"{cache_key}:user:{user_key}"
 
             cached_value: Optional[Response] = await cache_extension.get(cache_key, req)
             if cached_value is not None:

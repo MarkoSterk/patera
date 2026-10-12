@@ -13,7 +13,9 @@ middleware, OpenAPI documentation, logging, a CLI and a test client. Optional pa
 databases, migrations, authentication, caching, scheduled tasks, e-mail, declarative API clients,
 an AI interface, an admin dashboard and a desktop launcher.
 
-> Patera is in an early (alpha) stage. The API may still change between versions.
+> Patera is in beta. Until version 1.0, a minor release may contain breaking changes; each one is
+> listed in the [changelog](https://github.com/MarkoSterk/Patera/blob/main/CHANGELOG.md). The AI
+> interface and desktop packages are experimental.
 
 ## Contents
 
@@ -59,7 +61,7 @@ Optional features are installed with extras:
 
 | Extra | Installs | Purpose |
 | --- | --- | --- |
-| `dev` | uvicorn, watchfiles | development server with auto-reload (`patera dev`) |
+| `dev` | uvicorn, watchfiles, websockets | development server with auto-reload (`patera dev`) |
 | `testing` | pytest, pytest-asyncio, httpx, ... | testing tools (`patera test`) |
 | `database` | `patera-database` | async SQLAlchemy integration |
 | `migrate` | `patera-migrate` | SQL migrations (pyway) |
@@ -69,10 +71,10 @@ Optional features are installed with extras:
 | `taskmanager` | `patera-taskmanager` | scheduled and background tasks (APScheduler) |
 | `email` | `patera-email` | SMTP e-mail client |
 | `apiinterface` | `patera-apiinterface` | declarative clients for external HTTP APIs |
-| `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental, installs PyTorch) |
+| `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental; `patera-aiinterface[augmentation]` adds the embedding libraries) |
 | `admin` | `patera-admin` | admin dashboard |
 | `desktop` | `patera-desktop` | run the app as a desktop application (pywebview) |
-| `all` | all of the above except `desktop` | |
+| `all` | all of the above except `aiinterface` and `desktop` | |
 
 ```sh
 uv add "patera[database,auth,caching]"
@@ -210,7 +212,10 @@ Built-in options:
 | `APP_NAME` | `"Patera app"` | Human readable name (logs, OpenAPI title). |
 | `VERSION` | `"1.0"` | Application version (OpenAPI). |
 | `DEBUG` | `True` | Debug mode. Unhandled exceptions propagate in debug mode and become a generic 500 response otherwise. `@development` routes only exist in debug mode. |
-| `HOST` / `PORT` / `PROTOCOL` | `"localhost"` / `3000` / `"http"` | Used for the OpenAPI server URL and startup message. |
+| `HOST` / `PORT` / `PROTOCOL` | `"localhost"` / `3000` / `"http"` | Where the server listens and what the startup line and OpenAPI server URL report. `patera dev`/`prod` take `PATERA_HOST`/`PATERA_PORT`, then defaults set on your config class, then `localhost:3000` (dev) or `0.0.0.0:80` (prod). |
+| `STARTUP_BANNER` | `True` | Print the banner and address box on startup; the startup line is always logged. |
+| `MAX_CONTENT_LENGTH` | `10485760` (10 MB) | Largest accepted request body; `None` for no limit. Override per route with `@max_content_length`. |
+| `BACKGROUND_TASKS_SHUTDOWN_TIMEOUT` | `10.0` | Seconds to wait on shutdown for `run_in_background()` tasks before cancelling them (`None`: no limit). |
 | `LIFESPAN` | `"on"` | For custom run scripts; `patera dev`/`prod` always enable lifespan. |
 | `REQUEST_CLASS` / `RESPONSE_CLASS` | `Request` / `Response` | Custom subclasses of the request/response classes. |
 | `TEMPLATES_DIR` | `"templates"` | Template folder, relative to `BASE_PATH`. |
@@ -775,7 +780,8 @@ with status code `1`. CLI controllers support dependency injection like any othe
 ## Testing
 
 `patera.testing.PateraTestClient` runs the application (including startup/shutdown hooks) and sends
-requests through [HTTPX](https://www.python-httpx.org):
+requests through [HTTPX](https://www.python-httpx.org). It needs the `testing` extra, which also
+installs pytest and pytest-asyncio: `uv add --dev "patera[testing]"`.
 
 ```python
 # tests/conftest.py
@@ -932,9 +938,13 @@ Migration settings are part of the database configuration: `MIGRATE_CLI_NAME` (`
 `MIGRATE_DATABASE_MIGRATION_DIR` (`"migrations"`, relative to the application package),
 `MIGRATE_TABLE` (`"pyway_migrations"`), `MIGRATE_SQL_MIGRATION_PREFIX` (`"V"`),
 `MIGRATE_SQL_MIGRATION_SEPARATOR` (`"__"`), `MIGRATE_SQL_MIGRATION_SUFFIXES` (`".sql"`).
+`migrate:init` writes `.pyway.conf` into the migration directory (`app/migrations/.pyway.conf` by
+default). Each developer generates their own copy, so add it to `.gitignore`. The file holds only
+migration settings: the connection (including the password) is read from `DATABASE_URI` each time a
+command runs. A `database_*` value set in the file overrides the URI for that developer.
 
 ```sh
-uv run patera cli migrate:init       # writes migrations/.pyway.conf from DATABASE_URI
+uv run patera cli migrate:init       # writes app/migrations/.pyway.conf (keep it in .gitignore)
 # add migrations/V01_01__create_notes.sql
 uv run patera cli migrate:info
 uv run patera cli migrate:migrate
@@ -992,8 +1002,12 @@ requirements on the controller and on the endpoint must both be satisfied. Confi
 `TOKEN_AUTH: AuthConfig = AuthConfig(AUTHENTICATION_ERROR_MSG=..., AUTHORIZATION_ERROR_MSG=...,
 ALWAYS_LOAD_ROLES=False)`. Override `refresh_credentials(res)` to renew cookies/tokens.
 
-`AuthUtils` contains helpers: `create_password_hash`/`check_password_hash` (bcrypt),
-`create_signed_cookie_value`/`decode_signed_cookie` (HMAC) and
+`AuthUtils` contains helpers: `create_password_hash`/`check_password_hash` (bcrypt over a SHA-256
+digest, so passwords of any length count in full; a malformed stored hash simply does not match;
+plain bcrypt hashes from earlier versions still verify, and `password_hash_needs_update(hash)` says
+when to re-hash after a successful login),
+`create_signed_cookie_value`/`decode_signed_cookie(value, key, max_age=None)` (HMAC with a signing
+timestamp; `max_age` rejects older values) and
 `create_jwt_token`/`validate_jwt_token` (HS256; validation raises `jwt.InvalidTokenError`).
 
 ### Caching
@@ -1030,20 +1044,21 @@ Manual use: `await cache.get(key, req)`, `await cache.set(key, response, duratio
 `await cache.delete(key)`, `await cache.delete("users:*", wildcard=True)`,
 `await cache.delete(r"^users:\d+$", regex=True)`, `await cache.clear()`.
 
-Other backends are assigned in `init()`:
+Other backends are chosen with `backend_class`; the extension creates them from its settings
+with `backend_class.from_configs(app, configs, namespace)`:
 
 ```python
 from patera.caching.backends.redis_cache_backend import RedisCacheBackend
-from patera.caching.backends.sqlite_cache_backend import SQLiteCacheBackend
 
 
 class SharedCache(Caching):
-    def init(self) -> None:
-        self.backend = RedisCacheBackend(url="redis://localhost:6379/0", default_ttl=60, key_prefix="myapp")
-        # or: RedisCacheBackend.configure_from_app(self.app, self.configs)  (REDIS_URL, KEY_PREFIX, ...)
-        # or: SQLiteCacheBackend(db_path="cache.db", default_ttl=60)
-        super().init()
+    backend_class = RedisCacheBackend   # SHARED_CACHE = {"REDIS_URL": ..., "DURATION": 60}
 ```
+
+Keys in Redis and SQLite live under `KEY_PREFIX`, by default `patera:<app name>:<cache name>:`
+(for example `patera:blog:shared_cache:`), so several caches or applications can share one store and
+`clear()` only removes its own keys. To build a backend yourself, assign `self.backend` in `init()`
+before calling `super().init()`.
 
 The Redis and SQLite backends store pickled data – only use storage that you control. Custom
 backends implement `patera.caching.BaseCacheBackend`.
@@ -1115,8 +1130,8 @@ from patera.apiinterface import ApiInterface, AuthType, auth, headers, method, r
 class GithubApi(ApiInterface):
 
     @method(HttpMethod.GET)
-    @resource("/repos/<repo_id>")              # filled from the current request's route parameters
-    async def get_repo(self) -> Repo: ...      # Pydantic return types are validated
+    @resource("/repos/<repo_id>")              # filled from the argument of the same name
+    async def get_repo(self, repo_id: int) -> Repo: ...   # Pydantic return types are validated
 
     @method(HttpMethod.POST)
     @resource("/repos")
@@ -1125,50 +1140,124 @@ class GithubApi(ApiInterface):
 
 Also available: `@consumes`/`@produces` (body and response formats, incl. form data and file
 uploads), `AuthType.BASIC_AUTH` and `AuthType.API_KEY`, and `@no_auth` to disable inherited
-authentication for one method. During a request the current query string is forwarded and `<name>`
-placeholders are filled from route parameters; the methods can also be called outside requests.
+authentication for one method. Arguments fill `<name>` placeholders; the rest become query
+parameters (GET, HEAD) or the body. `@forward_request` (on a method or the class) additionally
+forwards the current request's query string and fills placeholders from its route parameters.
+
+A 4xx or 5xx answer raises `ApiInterfaceResponseError` with `status_code`, the decoded `body` and the
+`response`. Annotate a method with `-> httpx.Response` to receive every response unchecked.
 
 ### AI interface (experimental)
 
-`patera-aiinterface` connects to chat completion APIs (OpenAI-compatible and Ollama). It depends on
-PyTorch/sentence-transformers for optional prompt augmentation.
+`patera-aiinterface` connects to chat completion APIs (OpenAI-compatible and Ollama). Retrieval
+augmentation needs the embedding libraries (sentence-transformers, which brings PyTorch, and
+pgvector): `pip install "patera-aiinterface[augmentation]"`. Without them everything else works.
 
 ```python
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
-from patera.aiinterface import AiService, AiServiceConfig, ChatResponse, system_prompt, user_prompt
+from patera.aiinterface import (
+    AiService, AiServiceConfig, ChatResponse, SqlHistoryProvider, history, system_prompt, user_prompt,
+)
 from patera.aiinterface.service_provider.openai import OpenAIServiceProvider
 
 
+class ChatHistory(SqlHistoryProvider[ChatMessageRow]):   # a model with session_id, role,
+    model = ChatMessageRow                               # content and order_number columns
+
+
 class Assistant(AiService):
-    service_provider = OpenAIServiceProvider()      # or OllamaServiceProvider()
+    service_provider = OpenAIServiceProvider()           # or OllamaServiceProvider()
+    history_provider = ChatHistory()
 
     @system_prompt("You are a helpful translator.")
     @user_prompt("Translate '<:text>' to <:language>.")
     async def translate(self, text: str, language: str = "German") -> ChatResponse: ...
 
-    @system_prompt("You are a storyteller.")
-    @user_prompt("Tell a short story about <:topic>.")
-    async def story(self, topic: str) -> AsyncIterator[ChatResponse]: ...   # streaming
+    @history
+    @system_prompt("You are a friendly assistant.")
+    @user_prompt("<:message>")
+    async def chat(self, session_id: Optional[str], message: str) -> AsyncIterator[ChatResponse]: ...
 
 
 class Config(BaseConfig):
     ...
     ASSISTANT: AiServiceConfig = AiServiceConfig(
-        BASE_URL="https://api.openai.com/v1", API_KEY="...", MODEL="gpt-4o-mini",
+        BASE_URL="https://api.openai.com/v1", API_KEY="...", MODEL="gpt-4o-mini", HISTORY_LIMIT=10,
     )
 ```
 
 ```python
 answer = await self.assistant.translate("Good morning", "French")
-async for chunk in await self.assistant.story("cats"):
-    ...
+async for chunk in self.assistant.chat(None, "Hi!"):      # None starts a new session
+    session_id = chunk.session_id                         # send it back to continue the chat
 ```
 
-`<:name>` placeholders are filled from the method's arguments (including defaults). Conversation
-history (`@history`, with a `history_provider` based on `BaseHistoryProvider`) and retrieval
-augmentation (`@augmentation`, with an `augmentation_provider`) are optional. The `@tool` decorator
-marks methods as tools, but the bundled providers do not send tool definitions yet.
+Every call builds the messages the same way: the current system prompt first, then (with `@history`)
+the session's last `HISTORY_LIMIT` messages, then the user prompt with its `<:name>` placeholders
+filled from the method's arguments. A method annotated `-> AsyncIterator[ChatResponse]` streams and
+is iterated directly, without `await`; the others return one `ChatResponse`.
+
+- `@history` needs a `history_provider` and a `session_id` parameter on the method. `None` starts a
+  new session (a random UUID by default; override `new_session_id()`), and every response carries
+  the session id. The question and the answer are saved after the call (a streamed answer once the
+  stream ends); nothing is saved when the call fails. The system prompt is never stored, so a changed
+  prompt applies to existing sessions too. In a `@transactional` handler, `SqlHistoryProvider` uses
+  the request's session, so the messages commit or roll back with the request; anywhere else it uses
+  a short transaction of its own, so it works in plain requests, CLI commands and scheduled jobs
+  without a commit by the caller (a streamed answer, saved after the request's transaction has
+  ended, also gets its own). Writes to one chat session take turns, and on PostgreSQL an advisory
+  lock covers several worker processes too. Implement `load()` and `append()` of
+  `BaseHistoryProvider` for other storage.
+- `HISTORY_SUMMARY = HistorySummaryConfig(EVERY=10, MAX_WORDS=250)` keeps a rolling summary of
+  long conversations. Each call sends the summary, then the messages it does not cover; once
+  `EVERY` messages beyond the latest `HISTORY_LIMIT` are uncovered, they are merged into the summary
+  by one extra model call in the background, after the answer is returned. The summary is a row of
+  the messages table (`role="summary"`), every message stays stored in full, and concurrent updates
+  never overwrite each other. `await service.update_summary(session_id)` runs an update by hand.
+  Custom history providers support it by implementing `load_since`, `load_summary` and
+  `save_summary`.
+- `@augmentation` adds the most similar documents as a context message just before the user message
+  (`CONTEXT_TEMPLATE`, with `<:documents>`); the history never stores them. With history and
+  `REWRITE_QUERY=True`, a follow-up such as "who wrote it?" is first rewritten by the model into a
+  standalone question for the search (one extra call per message; off by default).
+- The documents are rows with a text and a `VectorColumn` (pgvector's type):
+
+  ```python
+  from patera.aiinterface.augmentation_provider import BaseAugmentationProvider
+  from patera.aiinterface.augmentation_provider.embeddings import VectorColumn
+
+
+  class Document(Base):
+      __tablename__ = "documents"
+      id: Mapped[int] = mapped_column(primary_key=True)
+      text: Mapped[str] = mapped_column(Text)
+      vector = mapped_column(VectorColumn(384))     # the embedding model's dimension
+
+
+  class Documents(BaseAugmentationProvider[Document]):
+      model = Document
+
+      def base_query(self, req):                    # optional: limit the candidates
+          return select(Document).where(Document.owner_id == req.user.id)
+
+
+  class Assistant(AiService):
+      ...
+      augmentation_provider = Documents()
+  ```
+
+  The embedding model is loaded the first time a text is embedded (in a worker thread), not when the
+  application starts, so CLI commands never load it; override `load_embedding_model()` to use
+  another model. `await assistant.augmentation_provider.add_documents(texts, **columns)` embeds and stores
+  documents with the same model that embeds the questions. On PostgreSQL with the pgvector extension
+  the search is one query that orders by cosine distance; on other databases the candidates are
+  compared in Python (`RETRIEVAL` forces either). Settings:
+  `AiServiceConfig.AUGMENTATION = AugmentationConfig(MATCH_LIMIT=5, MINIMAL_SIMILARITY=0.9, ...)`.
+- A missing provider for `@history` or `@augmentation` fails when the service starts.
+- Other settings: `RESPONSE_FORMAT` (for example `{"type": "json_object"}`), `TEMPERATURE` (`None`
+  for the provider's default), `MAX_RETRIES` (failed connections), `ORGANIZATION_ID` and
+  `PROJECT_ID` (OpenAI headers).
 
 ### Admin dashboard
 
@@ -1192,8 +1281,9 @@ class Config(BaseConfig):
     )
 ```
 
-List `Admin` in `app_extensions` **after** the extensions it should manage (databases, task
-managers, e-mail clients). The dashboard is served at `/admin/<lang>/` (`en`, `de`, `si`, `es`).
+Admin looks up the extensions it manages (databases, task managers, e-mail clients) on every page
+load, so their order in `app_extensions` does not matter. The dashboard is served at
+`/admin/<lang>/` (`en`, `de`, `sl`, `es`).
 
 ### Desktop applications
 
@@ -1210,9 +1300,14 @@ namespace.
 ```sh
 uv sync --all-packages --all-extras    # note: the AI interface pulls in PyTorch
 uv run pytest                          # tests/ (unit, integration and extension tests)
+PATERA_TEST_PG_URI=postgresql+asyncpg://... uv run pytest   # also run the pgvector tests
 uv run pytest --cov
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src/patera
 ```
 
 Scripts in [`scripts/`](scripts/README.md) bump versions, build and publish all packages.
+
+## License
+
+Patera and its extension packages are released under the [MIT License](https://github.com/MarkoSterk/Patera/blob/main/LICENSE).

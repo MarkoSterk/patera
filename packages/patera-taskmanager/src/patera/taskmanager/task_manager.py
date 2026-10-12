@@ -61,6 +61,11 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     - job_defaults
 
     Runtime configuration is loaded from application configs.
+
+    The scheduler is the single source of truth for jobs: jobs declared with
+    @schedule_job, added through add_job(), or added directly to
+    ``self.scheduler`` are all listed, looked up, paused, resumed, removed
+    and run in the same way.
     """
 
     scheduler_cls: Type[BaseScheduler] = AsyncIOScheduler
@@ -80,7 +85,6 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         self._daemon: bool = True
         self._scheduler: BaseScheduler
         self._initial_jobs_methods_list: list[Tuple] = []
-        self._active_jobs: dict[str, Job] = {}
         self._running_jobs: dict[str, int] = {}
 
         self._daemon = self.configs.DAEMON
@@ -184,8 +188,7 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
             return
 
         for func, args, kwargs in self._initial_jobs_methods_list:
-            job: Job = self.scheduler.add_job(func, *args, **kwargs)
-            self._active_jobs[job.id] = job
+            self.scheduler.add_job(func, *args, **kwargs)
 
         self._initial_jobs_methods_list = []
 
@@ -200,11 +203,9 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
 
     def add_job(self, func: Callable, *args, **kwargs) -> Job:
         """
-        Adds a job manually.
+        Adds a job manually. Arguments are passed to the scheduler's add_job().
         """
-        job: Job = self.scheduler.add_job(func, *args, **kwargs)
-        self._active_jobs[job.id] = job
-        return job
+        return self.scheduler.add_job(func, *args, **kwargs)
 
     def remove_job(self, job: str | Job, job_store: Optional[str] = None) -> None:
         """
@@ -218,44 +219,33 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         self._remove_job(cast(str, job), job_store)
 
     def pause_job(self, job: str | Job) -> None:
+        """
+        Pauses future runs of a job. Raises JobLookupError if it does not exist.
+        """
         job_id: str = job.id if isinstance(job, Job) else job
-
-        active_job = self._active_jobs.get(job_id)
-
-        if active_job is None:
-            raise JobLookupError(job_id)
-
-        active_job.pause()
+        self.scheduler.pause_job(job_id, self._job_store_of(job))
 
     def resume_job(self, job: str | Job) -> None:
         """
-        Resumes a paused job.
+        Resumes a paused job. Raises JobLookupError if it does not exist.
         """
-        if isinstance(job, Job):
-            job.resume()
-            return
-
-        paused_job: Optional[Job] = self._active_jobs.get(job, None)
-
-        if paused_job is None:
-            raise JobLookupError(job)
-
-        paused_job.resume()
+        job_id: str = job.id if isinstance(job, Job) else job
+        self.scheduler.resume_job(job_id, self._job_store_of(job))
 
     def get_job(self, job_id: str) -> Job | None:
         """
-        Returns a job by ID.
+        Returns a job by ID, from any job store, or None.
         """
-        return self._active_jobs.get(job_id, None)
+        return self.scheduler.get_job(job_id)
+
+    def _job_store_of(self, job: str | Job) -> Optional[str]:
+        return getattr(job, "_jobstore_alias", None) if isinstance(job, Job) else None
 
     def _remove_job(self, job_id: str, job_store: Optional[str] = None) -> None:
         """
-        Removes a job from the scheduler and active job list.
+        Removes a job from the scheduler.
         """
         self.scheduler.remove_job(job_id, job_store)
-
-        if job_id in self._active_jobs:
-            del self._active_jobs[job_id]
 
     def is_job_running(self, job: str | Job) -> bool:
         job_id: str = job.id if isinstance(job, Job) else job
@@ -301,9 +291,11 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     @property
     def jobs(self) -> dict[str, Job]:
         """
-        Returns a dictionary of active jobs.
+        Returns the scheduler's jobs by ID, from every job store, including
+        jobs added directly to the scheduler. Jobs that have finished for
+        good (a one-off date trigger, for example) are no longer listed.
         """
-        return self._active_jobs
+        return {job.id: job for job in self.scheduler.get_jobs()}
 
     @property
     def scheduler(self) -> BaseScheduler:

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from asgi_lifespan import LifespanManager
 
 from patera import Patera, Request, Response, on_shutdown, on_startup
 from patera.controller import Controller, get, path, socket
 from patera.middleware import MiddlewareBase, middleware
+
+from tests.helpers import make_request
 
 pytestmark = pytest.mark.integration
 
@@ -50,6 +54,84 @@ async def test_static_files_full_and_ranges(make_app, client_for):
         assert (await client.get("/static/dir")).status_code == 404
         assert (await client.get("/static/missing.txt")).status_code == 404
         assert (await client.get("/static/../__init__.py")).status_code == 404
+
+
+async def test_static_files_are_cacheable(make_app, client_for):
+    app = make_app(files={"static/data.bin": PNG})
+    async with client_for(app) as client:
+        full = await client.get("/static/data.bin")
+        etag = full.headers["etag"]
+        assert full.status_code == 200
+        assert full.content == PNG
+        assert full.headers["last-modified"].endswith("GMT")
+        assert full.headers["cache-control"] == "public, max-age=300"
+
+        # Ranges and errors carry the same validator as the full file
+        part = await client.get("/static/data.bin", headers={"range": "bytes=0-9"})
+        assert part.headers["etag"] == etag
+        bad = await client.get("/static/data.bin", headers={"range": "bytes=9000-"})
+        assert bad.status_code == 416
+        assert bad.headers["etag"] == etag
+
+        res = await client.get("/static/data.bin", headers={"if-none-match": etag})
+        assert res.status_code == 304
+        assert res.content == b""
+        assert res.headers["etag"] == etag
+        assert "content-type" not in res.headers
+        res = await client.get(
+            "/static/data.bin", headers={"if-none-match": f'W/"other", {etag}'}
+        )
+        assert res.status_code == 304
+        res = await client.get("/static/data.bin", headers={"if-none-match": "*"})
+        assert res.status_code == 304
+        res = await client.get("/static/data.bin", headers={"if-none-match": '"x"'})
+        assert res.status_code == 200
+
+        since = full.headers["last-modified"]
+        res = await client.get("/static/data.bin", headers={"if-modified-since": since})
+        assert res.status_code == 304
+        res = await client.get(
+            "/static/data.bin",
+            headers={"if-modified-since": "Thu, 01 Jan 1970 00:00:00 GMT"},
+        )
+        assert res.status_code == 200
+        # If-None-Match takes precedence over If-Modified-Since
+        res = await client.get(
+            "/static/data.bin",
+            headers={"if-none-match": '"x"', "if-modified-since": since},
+        )
+        assert res.status_code == 200
+
+        # If-Range: a matching validator gives the range, a stale one the full file
+        res = await client.get(
+            "/static/data.bin", headers={"range": "bytes=0-9", "if-range": etag}
+        )
+        assert res.status_code == 206
+        res = await client.get(
+            "/static/data.bin", headers={"range": "bytes=0-9", "if-range": '"old"'}
+        )
+        assert res.status_code == 200
+        assert res.content == PNG
+
+
+async def test_missing_static_file_is_a_json_404(make_app, client_for):
+    app = make_app(files={"static/a.txt": "a"})
+    async with client_for(app) as client:
+        res = await client.get("/static/missing.txt")
+        assert res.status_code == 404
+        assert res.headers["content-type"].startswith("application/json")
+        assert res.json()["status"] == "error"
+
+
+def test_full_files_are_sent_zero_copy(make_app, tmp_path):
+    from patera.utilities import file_response
+
+    target = tmp_path / "big.bin"
+    target.write_bytes(PNG)
+    app = make_app()
+    req = make_request(app)
+    res = file_response(req.res, str(target), req.headers)
+    assert res.zero_copy == {"file_path": str(target), "start": 0, "length": len(PNG)}
 
 
 async def test_static_pages(make_app, client_for):
@@ -248,7 +330,7 @@ DISCOVERY_FILES = {
 async def test_auto_discovery_of_project_modules(make_app, client_for):
     app = make_app(files=DISCOVERY_FILES)
     assert app.get_controller("DiscoveredApi") is not None
-    assert "KeyError" in app._exception_handlers
+    assert KeyError in app._exception_handlers
     async with client_for(app) as client:
         res = await client.get("/discovered/")
         assert res.text == "found me"
@@ -301,3 +383,60 @@ async def test_websocket_routing(make_app):
     await app(scope, receive, send)
     assert sent[0]["type"] == "websocket.close"
     assert sent[0]["code"] == 1008
+
+
+async def test_zero_copy_ends_the_body_when_the_file_shrinks(make_app, tmp_path):
+    from patera.utilities import file_response
+
+    target = tmp_path / "shrinking.bin"
+    target.write_bytes(PNG)
+    app = make_app()
+    req = make_request(app)
+    res = file_response(req.res, str(target), req.headers)
+    target.write_bytes(PNG[:100])  # the file shrinks before it is sent
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    await app.send_response(res, send)
+    bodies = [m for m in sent if m["type"] == "http.response.body"]
+    assert b"".join(m["body"] for m in bodies) == PNG[:100]
+    assert bodies[-1]["more_body"] is False
+
+
+async def test_shutdown_waits_for_background_tasks(make_app, client_for):
+    from patera import run_in_background
+
+    events: list[str] = []
+
+    async def send_report():
+        await asyncio.sleep(0.05)
+        events.append("report sent")
+
+    app = make_app()
+    app.add_on_shutdown_method(lambda: events.append("shutdown method"))
+    async with client_for(app):
+        run_in_background(send_report)
+    # The task finished before the shutdown methods ran
+    assert events == ["report sent", "shutdown method"]
+
+
+async def test_shutdown_cancels_background_tasks_after_the_timeout(
+    make_app, client_for
+):
+    from patera import run_in_background
+
+    async def endless():
+        await asyncio.sleep(60)
+
+    app = make_app(
+        BACKGROUND_TASKS_SHUTDOWN_TIMEOUT=0.05,
+        LOG_FILES={"ENQUEUE": False, "LEVEL": "INFO"},
+    )
+    async with client_for(app):
+        task = run_in_background(endless)
+    assert task.cancelled()
+    messages = [r["message"] for r in app.log_files.read()]
+    assert any("Cancelled 1 background task" in m for m in messages)

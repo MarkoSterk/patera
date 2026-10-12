@@ -143,3 +143,23 @@ async def test_read_async_and_shutdown_detaches_the_sink(make_app, client_for):
         records = await app.log_files.read_async()
         assert any(r["message"] == "during lifespan" for r in records)
     assert app.log_files.sink_id is None
+
+
+async def test_startup_is_logged_and_the_banner_can_be_disabled(
+    make_app, client_for, capsys
+):
+    app = make_app(LOG_FILES={"ENQUEUE": False, "LEVEL": "INFO"})  # banner off
+    async with client_for(app) as client:
+        await client.get("/missing")
+    assert "Patera" not in capsys.readouterr().out
+    started = [r for r in app.log_files.read() if " started in " in r["message"]]
+    assert len(started) == 1
+    assert started[0]["message"].endswith(
+        f"mode at {app.configs.PROTOCOL}://{app.configs.HOST}:{app.configs.PORT}"
+        f"{app._app_base_url}"
+    )
+
+    app = make_app(STARTUP_BANNER=True)
+    async with client_for(app) as client:
+        await client.get("/missing")
+    assert f"{app.configs.HOST}:{app.configs.PORT}" in capsys.readouterr().out

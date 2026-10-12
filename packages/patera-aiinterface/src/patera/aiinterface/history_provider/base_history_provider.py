@@ -1,116 +1,305 @@
 """
-Chat history provider
+Chat history providers.
+
+A history provider stores the user and assistant messages of each chat
+session. The system prompt is not stored: the AI service always sends the
+current one first.
+
+Providers can also keep a rolling summary of each session (used when
+AiServiceConfig.HISTORY_SUMMARY is set): a short digest of the older
+messages, so that only the summary and the latest messages are sent. The
+messages themselves are always kept in full.
 """
 
-from uuid import UUID
-from typing import Any, Type, Generic, TypeVar, TypedDict
-from patera import Request
-from patera.database.sql import SqlDatabase, DeclarativeBaseModel
-from patera.ctx import current_request
+from __future__ import annotations
+
+import asyncio
+import uuid
+import weakref
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, cast
+
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from patera.database.sql import DeclarativeBaseModel, SqlDatabase
+
+from ..service_provider.chat_response import ChatMessage
+
+if TYPE_CHECKING:
+    from ..ai_service import AiService
 
 ModelT = TypeVar("ModelT", bound=DeclarativeBaseModel)
 
 
-class ChatHistoryMessage(TypedDict):
-    role: str
-    content: str
+@dataclass(frozen=True, slots=True)
+class HistorySummary:
+    """A session's digest and the position of the last message it includes."""
+
+    text: str
+    covers_up_to: int
 
 
-class BaseHistoryProvider(Generic[ModelT]):
+@dataclass(frozen=True, slots=True)
+class StoredMessage:
+    """A message with its position in the session (0, 1, 2, ...)."""
+
+    position: int
+    message: ChatMessage
+
+
+class BaseHistoryProvider(ABC):
+    """
+    Storage for chat sessions. Implement load() and append(); override
+    new_session_id() for ids other than random UUID strings.
+
+    For HISTORY_SUMMARY, also implement load_since(), load_summary() and
+    save_summary() (SqlHistoryProvider does).
+    """
+
+    def bind(self, service: "AiService[Any, Any]") -> None:
+        """Called once by the AI service that uses this provider."""
+
+    @abstractmethod
+    async def load(self, session_id: Any, limit: Optional[int]) -> list[ChatMessage]:
+        """
+        The session's messages, oldest first. With a limit, only the last
+        ``limit`` messages.
+        """
+
+    @abstractmethod
+    async def append(self, session_id: Any, messages: list[ChatMessage]) -> None:
+        """Adds messages to the end of the session."""
+
+    async def new_session_id(self) -> Any:
+        """Id for a new chat session (a random UUID string by default)."""
+        return str(uuid.uuid4())
+
+    # ---- summaries (optional) ---------------------------------------------------
+
+    @property
+    def supports_summaries(self) -> bool:
+        cls = type(self)
+        return all(
+            getattr(cls, name) is not getattr(BaseHistoryProvider, name)
+            for name in ("load_since", "load_summary", "save_summary")
+        )
+
+    async def load_since(
+        self, session_id: Any, after: Optional[int], limit: Optional[int]
+    ) -> list[StoredMessage]:
+        """
+        Messages after position ``after`` (all when None), oldest first; with
+        a limit, only the last ``limit`` of them.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not store summaries.")
+
+    async def load_summary(self, session_id: Any) -> Optional[HistorySummary]:
+        """The session's latest summary, or None."""
+        raise NotImplementedError(f"{type(self).__name__} does not store summaries.")
+
+    async def save_summary(
+        self,
+        session_id: Any,
+        summary: HistorySummary,
+        replaces: Optional[HistorySummary],
+    ) -> bool:
+        """
+        Stores ``summary`` if the session's current summary is still
+        ``replaces`` (None: the session has none yet). Returns False when
+        another summary was saved in the meantime, so concurrent updates never
+        overwrite each other.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not store summaries.")
+
+
+class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
+    """
+    History stored in a SQL table, one row per message:
+
+        class ChatMessageRow(Base):
+            __tablename__ = "chat_messages"
+            id: Mapped[int] = mapped_column(primary_key=True)
+            session_id: Mapped[str] = mapped_column(String(36), index=True)
+            role: Mapped[str] = mapped_column(String(20))
+            content: Mapped[str] = mapped_column(Text)
+            order_number: Mapped[int] = mapped_column(Integer)
+
+        class ChatHistory(SqlHistoryProvider[ChatMessageRow]):
+            model = ChatMessageRow
+
+    During a @transactional request, reads and writes use the request's
+    session, so the messages commit (or roll back) with the request; anywhere
+    else they use a short transaction of their own, so history works in plain
+    requests, CLI commands and scheduled jobs without any commit by the
+    caller (see SqlDatabase.work_session()).
+
+    A session's summary is one more row in the same table, with the role
+    "summary" and the order number of the last message it covers, so
+    (session_id, order_number) must not be a unique key.
+
+    Writes to one chat session never overlap: within a process they take
+    turns, and on PostgreSQL a transaction-level advisory lock on the session
+    also covers other worker processes (held until the transaction commits,
+    so it also covers @transactional requests).
+    """
+
     model: Type[ModelT]
+    SUMMARY_ROLE: str = "summary"
 
     def __init__(
         self,
         *,
         session_id_column: str = "session_id",
-        message_column: str = "content",
+        content_column: str = "content",
         role_column: str = "role",
         order_column: str = "order_number",
     ) -> None:
-        self._session_id_column = session_id_column
-        self._message_column = message_column
-        self._role_column = role_column
-        self._order_column = order_column
-
-    @property
-    def session_id_column(self) -> str:
-        return self._session_id_column
-
-    @property
-    def message_column(self) -> str:
-        return self._message_column
-
-    @property
-    def role_column(self) -> str:
-        return self._role_column
-
-    @property
-    def order_column(self) -> str:
-        return self._order_column
-
-    def order_by(self, history: list[ModelT]) -> list[ModelT]:
-        return history
-
-    async def _get_history(self, session_id: str | int | UUID) -> list[ModelT]:
-        if session_id is None:
-            raise ValueError("Missing session id for chat history loader.")
-        database: SqlDatabase = current_request.app.extensions.get(
-            self.model.db_name(), None
+        self.session_id_column = session_id_column
+        self.content_column = content_column
+        self.role_column = role_column
+        self.order_column = order_column
+        self._service: Optional["AiService[Any, Any]"] = None
+        self._locks: weakref.WeakValueDictionary[Any, asyncio.Lock] = (
+            weakref.WeakValueDictionary()
         )
-        if database is None:
-            raise ValueError(f"No database found for model {self.model.__name__}")
-        session = current_request.session(database.session_name)
-        if session is None:
-            raise ValueError(
-                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+
+    def bind(self, service: "AiService[Any, Any]") -> None:
+        self._service = service
+
+    def _database(self) -> SqlDatabase:
+        if self._service is None:
+            raise RuntimeError(
+                f"{type(self).__name__} is not attached to an AI service."
             )
-        history_query = self.model.query(session).filter(
-            getattr(self.model, self.session_id_column) == session_id
+        database = self._service.app.extensions.get(self.model.db_name())
+        if database is None:
+            raise RuntimeError(
+                f"No database {self.model.db_name()!r} found for {self.model.__name__}."
+            )
+        return cast(SqlDatabase, database)
+
+    def _lock_for(self, session_id: Any) -> asyncio.Lock:
+        """The in-process lock of a chat session (kept while anyone holds it)."""
+        lock = self._locks.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[session_id] = lock
+        return lock
+
+    async def _lock_in_database(self, session: AsyncSession, session_id: Any) -> None:
+        """On PostgreSQL, locks the chat session until the transaction ends."""
+        if session.bind.dialect.name == "postgresql":
+            key = f"{self.model.__tablename__}:{session_id}"
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                {"key": key},
+            )
+
+    def _column(self, name: str) -> Any:
+        return getattr(self.model, name)
+
+    def _in_session(self, session_id: Any) -> Any:
+        return self._column(self.session_id_column) == session_id
+
+    def _is_message(self) -> Any:
+        return self._column(self.role_column) != self.SUMMARY_ROLE
+
+    def _message(self, row: Any) -> ChatMessage:
+        return ChatMessage(
+            role=getattr(row, self.role_column),
+            content=getattr(row, self.content_column),
         )
-        if hasattr(self.model, self.order_column):
-            history_query = history_query.order_by_strings(self.order_column)
 
-        history: list[ModelT] = await history_query.all()
-        return self.order_by(history)
-
-    async def get_history_messages(
-        self, req: Request
-    ) -> tuple[Any, list[ChatHistoryMessage]]:
-        session_id = req.route_parameters.get(self.session_id_column, None)
-        if session_id is None:
-            # history provider must implement generate_session_id() method to generate
-            # a session id for the chat session/history
-            session_id = await self.generate_session_id()
-            return session_id, []
-        history = await self._get_history(session_id)
-        return session_id, [
-            {
-                "role": getattr(m, self.role_column),
-                "content": getattr(m, self.message_column),
-            }
-            for m in history
+    async def load(self, session_id: Any, limit: Optional[int]) -> list[ChatMessage]:
+        return [
+            stored.message for stored in await self.load_since(session_id, None, limit)
         ]
 
-    async def generate_session_id(self) -> Any:
-        raise NotImplementedError("""If you wish to use the chat history provider
-                                  please provide a method to generate session ids.""")
-
-    def save_message(
-        self, session_id: Any, message: dict[str, Any], order_number: int
-    ) -> None:
-        database: SqlDatabase = current_request.app.extensions.get(
-            self.model.db_name(), None
+    async def load_since(
+        self, session_id: Any, after: Optional[int], limit: Optional[int]
+    ) -> list[StoredMessage]:
+        order = self._column(self.order_column)
+        query = (
+            select(self.model)
+            .where(self._in_session(session_id), self._is_message())
+            .order_by(order.desc())
         )
-        if database is None:
-            raise ValueError(f"No database found for model {self.model.__name__}")
-        session = current_request.session(database.session_name)
-        if session is None:
-            raise ValueError(
-                f"Missing active session. Model: {self.model.__name__}. Database: {self.model.db_name()}"
+        if after is not None:
+            query = query.where(order > after)
+        if limit is not None:
+            query = query.limit(limit)
+        async with self._database().work_session() as session:
+            rows = list((await session.execute(query)).scalars().all())
+            return [
+                StoredMessage(getattr(row, self.order_column), self._message(row))
+                for row in reversed(rows)
+            ]
+
+    async def append(self, session_id: Any, messages: list[ChatMessage]) -> None:
+        order = self._column(self.order_column)
+        last = select(func.max(order)).where(
+            self._in_session(session_id), self._is_message()
+        )
+        async with (
+            self._lock_for(session_id),
+            self._database().work_session() as session,
+        ):
+            await self._lock_in_database(session, session_id)
+            current = await session.scalar(last)
+            number = -1 if current is None else int(current)
+            for message in messages:
+                number += 1
+                row = self.model()
+                setattr(row, self.session_id_column, session_id)
+                setattr(row, self.role_column, message.role)
+                setattr(row, self.content_column, message.content)
+                setattr(row, self.order_column, number)
+                session.add(row)
+
+    def _summary_query(self, session_id: Any) -> Any:
+        return (
+            select(self.model)
+            .where(
+                self._in_session(session_id),
+                self._column(self.role_column) == self.SUMMARY_ROLE,
             )
-        message_obj = self.model()
-        setattr(message_obj, self.session_id_column, session_id)
-        setattr(message_obj, self.message_column, message["content"])
-        setattr(message_obj, self.role_column, message["role"])
-        setattr(message_obj, self.order_column, order_number)
-        session.add(message_obj)
+            .order_by(self._column(self.order_column).desc())
+            .limit(1)
+        )
+
+    async def load_summary(self, session_id: Any) -> Optional[HistorySummary]:
+        async with self._database().work_session() as session:
+            row = (await session.execute(self._summary_query(session_id))).scalar()
+            if row is None:
+                return None
+            return HistorySummary(
+                text=getattr(row, self.content_column),
+                covers_up_to=getattr(row, self.order_column),
+            )
+
+    async def save_summary(
+        self,
+        session_id: Any,
+        summary: HistorySummary,
+        replaces: Optional[HistorySummary],
+    ) -> bool:
+        async with (
+            self._lock_for(session_id),
+            self._database().work_session() as session,
+        ):
+            await self._lock_in_database(session, session_id)
+            row = (await session.execute(self._summary_query(session_id))).scalar()
+            current = None if row is None else getattr(row, self.order_column)
+            expected = None if replaces is None else replaces.covers_up_to
+            if current != expected:
+                return False
+            if row is None:
+                row = self.model()
+                setattr(row, self.session_id_column, session_id)
+                setattr(row, self.role_column, self.SUMMARY_ROLE)
+                session.add(row)
+            setattr(row, self.content_column, summary.text)
+            setattr(row, self.order_column, summary.covers_up_to)
+            return True

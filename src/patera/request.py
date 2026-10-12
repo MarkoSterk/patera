@@ -7,6 +7,7 @@ import re
 import json
 import base64
 from io import BytesIO
+from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs
 from typing import Callable, Any, TYPE_CHECKING, Mapping, Optional, cast
 
@@ -15,6 +16,7 @@ from pydantic_core import core_schema
 
 from .response import Response
 from .ctx import current_request, CurrentContextProxy
+from .exceptions.http_exceptions import InvalidRequestBody, RequestBodyTooLarge
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -284,6 +286,9 @@ def _normalize_multipart_part_headers(raw: bytes) -> bytes:
     return bytes(out)
 
 
+_NO_LIMIT_SET: Any = object()
+
+
 class Request:
     """
     ASGI-style request adapter that lazy-parses JSON, form, and multipart.
@@ -304,15 +309,20 @@ class Request:
         self._send: Callable = send
 
         self._body: bytes | None = None
-        self._json: dict[str, Any] | None = None
+        self._json: Any = None
         self._form: dict[str, Any] | None = None
         self._files: dict[str, Any] | None = None
 
-        self._user: Any = None
         self._route_parameters = route_parameters
         self._route_handler = route_handler
+        # An endpoint's @max_content_length overrides the app-wide setting.
+        endpoint_limit = getattr(route_handler, "_max_content_length", _NO_LIMIT_SET)
+        self._max_content_length: Optional[int] = (
+            app.get_conf("MAX_CONTENT_LENGTH", None)
+            if endpoint_limit is _NO_LIMIT_SET
+            else endpoint_limit
+        )
         self._response: Response[Any] = app.response_class(app, self)
-        self._context: dict[str, Any] = {}
         # Set for OPTIONS requests to routes without an explicit OPTIONS
         # handler; holds the methods allowed on the route.
         self.automatic_options: Optional[list[str]] = None
@@ -351,19 +361,71 @@ class Request:
 
     @property
     def headers(self) -> dict[str, str]:
-        raw = self.scope.get("headers", [])
+        """
+        Request headers by lower-case name. A header sent several times is
+        combined into one comma-separated value, as RFC 9110 allows; repeated
+        Cookie headers are joined with "; ". Use header_list() for the
+        separate values.
+        """
+        combined: dict[str, str] = {}
+        for raw_key, raw_value in self.scope.get("headers", []):
+            key = raw_key.decode("latin1").lower()
+            value = raw_value.decode("latin1")
+            if key in combined:
+                separator = "; " if key == "cookie" else ", "
+                combined[key] = f"{combined[key]}{separator}{value}"
+            else:
+                combined[key] = value
+        return combined
 
-        return {key.decode("latin1").lower(): val.decode("latin1") for key, val in raw}
+    def header_list(self, name: str) -> list[str]:
+        """Every value of a header, in the order received."""
+        target = name.lower().encode("latin1")
+        return [
+            value.decode("latin1")
+            for key, value in self.scope.get("headers", [])
+            if key.lower() == target
+        ]
+
+    @property
+    def cookies(self) -> dict[str, str]:
+        """
+        Cookies sent with the request, by name. Malformed cookie pairs are
+        skipped rather than failing the request.
+        """
+        result: dict[str, str] = {}
+        for header in self.header_list("cookie"):
+            for pair in header.split(";"):
+                if not pair.strip():
+                    continue
+                jar = SimpleCookie()
+                try:
+                    jar.load(pair.strip())
+                except CookieError:
+                    continue
+                for name, morsel in jar.items():
+                    result[name] = morsel.value
+        return result
+
+    def _parsed_query(self) -> dict[str, list[str]]:
+        qs = self.scope.get("query_string", b"")
+        return parse_qs(qs.decode("utf-8", "replace"), keep_blank_values=True)
 
     @property
     def query_parameters(self) -> dict[str, Any]:
-        qs = self.scope.get("query_string", b"")
-        parsed = parse_qs(qs.decode("utf-8"))
-
+        """
+        Query parameters by name. A parameter given once is a string, one
+        given several times a list; blank values are kept as "". Use
+        query_list() to always get a list.
+        """
         return {
             key: values if len(values) > 1 else values[0]
-            for key, values in parsed.items()
+            for key, values in self._parsed_query().items()
         }
+
+    def query_list(self, name: str) -> list[str]:
+        """Every value of a query parameter (an empty list if absent)."""
+        return list(self._parsed_query().get(name, []))
 
     @property
     def user(self) -> Any:
@@ -386,17 +448,54 @@ class Request:
     def remove_user(self) -> None:
         current_request.user = None
 
+    @property
+    def max_content_length(self) -> Optional[int]:
+        """
+        Largest body, in bytes, this request may send; None means no limit.
+
+        Defaults to the MAX_CONTENT_LENGTH setting. A middleware or a
+        before-request hook can raise or lower it for one request, for
+        example on an upload endpoint, before the body is read.
+        """
+        return self._max_content_length
+
+    @max_content_length.setter
+    def max_content_length(self, value: Optional[int]) -> None:
+        if value is not None and value < 0:
+            raise ValueError("max_content_length must be None or >= 0")
+        self._max_content_length = value
+
     async def body(self) -> bytes:
+        """
+        Reads and returns the whole request body.
+
+        Raises RequestBodyTooLarge (413) when the declared Content-Length or
+        the bytes actually received exceed ``max_content_length``. The
+        declared length is checked first, so an oversized upload is refused
+        before it is read.
+        """
         if self._body is not None:
             return self._body
 
+        limit = self._max_content_length
+        if limit is not None:
+            declared = self.headers.get("content-length")
+            if declared is not None and declared.strip().isdigit():
+                if int(declared) > limit:
+                    raise RequestBodyTooLarge(limit)
+
         parts: list[bytes] = []
+        received = 0
 
         while True:
             msg = await self._receive()
 
             if msg["type"] == "http.request":
-                parts.append(msg.get("body", b""))
+                chunk = msg.get("body", b"")
+                received += len(chunk)
+                if limit is not None and received > limit:
+                    raise RequestBodyTooLarge(limit)
+                parts.append(chunk)
 
                 if not msg.get("more_body", False):
                     break
@@ -408,7 +507,14 @@ class Request:
 
         return self._body
 
-    async def json(self) -> dict[str, Any] | None:
+    async def json(self) -> Any:
+        """
+        Parses the body as JSON and caches the result.
+
+        Returns None for an empty body. Malformed JSON raises
+        InvalidRequestBody (400); a body over ``max_content_length`` raises
+        RequestBodyTooLarge (413).
+        """
         if self._json is not None:
             return self._json
 
@@ -419,8 +525,11 @@ class Request:
 
         try:
             self._json = json.loads(raw)
-        except json.JSONDecodeError:
-            self._json = None
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise InvalidRequestBody(
+                "Malformed JSON body",
+                data={"detail": str(exc)},
+            ) from exc
 
         return self._json
 
@@ -434,7 +543,14 @@ class Request:
             self._form, self._files = await self._parse_multipart(ct)
         elif "application/x-www-form-urlencoded" in ct:
             raw = await self.body()
-            parsed = parse_qs(raw.decode("utf-8"))
+            try:
+                decoded = raw.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise InvalidRequestBody(
+                    "Malformed form body", data={"detail": str(exc)}
+                ) from exc
+            # Blank fields are kept as "", as they are for multipart forms.
+            parsed = parse_qs(decoded, keep_blank_values=True)
 
             self._form = {
                 key: values if len(values) > 1 else values[0]
@@ -446,6 +562,13 @@ class Request:
             self._files = {}
 
         return self._form
+
+    async def form_list(self, name: str) -> list[Any]:
+        """Every value of a form field (an empty list if absent)."""
+        value = (await self.form()).get(name)
+        if value is None:
+            return []
+        return list(value) if isinstance(value, list) else [value]
 
     async def files(self) -> dict[str, UploadedFile | list[UploadedFile]]:
         if self._files is None:
@@ -475,13 +598,6 @@ class Request:
 
     async def accept(self) -> None:
         await self._send({"type": "websocket.accept"})
-
-    @staticmethod
-    def _multipart_headers(content_type: str) -> dict[str, str]:
-        return {
-            "Content-Type": content_type,
-            "content-type": content_type,
-        }
 
     @staticmethod
     def _get_header_case_insensitive(hdrs: Any, key: str) -> str | None:

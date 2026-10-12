@@ -5,7 +5,8 @@ Response class. Holds all information regarding responses to individual requests
 from __future__ import annotations
 
 import builtins
-from collections.abc import AsyncIterable, Iterable
+import re
+from collections.abc import AsyncIterable, Iterable, Iterator, Sized
 from typing import (
     Any,
     Optional,
@@ -181,13 +182,40 @@ class Response(Generic[U]):
 
     def ndjson(self, rows: Any) -> Self:
         """
-        Creates an NDJSON response. The body is expected to be an iterable of JSON-serializable items.
-        Serialization is done later by a serializer.
+        Creates an NDJSON response: one JSON record per line.
+
+        A list, tuple or other sized collection is serialized in one piece by
+        the NDJSON serializer. A generator, iterator or async iterator is
+        streamed: each record is serialized and sent as soon as it is
+        produced, so large exports never sit in memory. In both cases
+        dictionaries are validated through the handler's ``Response[Model]``
+        annotation when it names a Pydantic model.
         """
-        self.body = cast(U, rows)
         self.media_type = MediaType.APPLICATION_X_NDJSON.value
         self.charset = "utf-8"
+
+        if hasattr(rows, "__aiter__") or (
+            isinstance(rows, Iterator) and not isinstance(rows, Sized)
+        ):
+            self._stream = self._ndjson_lines(rows)
+            self.body = None
+            return self
+
+        self._stream = None
+        self.body = cast(U, rows)
         return self
+
+    async def _ndjson_lines(self, rows: Any) -> AsyncIterator[builtins.bytes]:
+        from .serializers import ndjson_line
+
+        # Read at iteration time: the handler's response model is known by then.
+        row_type = self.expected_body_type()
+        if hasattr(rows, "__aiter__"):
+            async for row in rows:
+                yield ndjson_line(row, row_type).encode("utf-8")
+        else:
+            for row in rows:
+                yield ndjson_line(row, row_type).encode("utf-8")
 
     def bytes(
         self,
@@ -334,8 +362,24 @@ class Response(Generic[U]):
         domain: Domain where the cookie is available
         secure: Cookie is sent only over HTTPS
         http_only: Cookie is inaccessible to JavaScript
-        same_site: SameSite policy, e.g. 'Lax', 'Strict', 'None'
+        same_site: SameSite policy: 'Lax', 'Strict' or 'None' (any case)
+
+        Raises ValueError for a name or value that a browser would not
+        accept unchanged (spaces, ";", ",", quotes, backslashes or control
+        characters; encode such values first, for example with base64), and
+        for SameSite=None without Secure, which browsers reject.
         """
+        _check_cookie_name(cookie_name)
+        if not _COOKIE_VALUE_RE.fullmatch(value):
+            raise ValueError(
+                f"Cookie {cookie_name!r} has a value with characters that are "
+                "not allowed in cookies (spaces, ';', ',', quotes, backslashes "
+                "or control characters). Encode it first, for example with "
+                "base64.urlsafe_b64encode()."
+            )
+        same_site = _normalize_same_site(same_site, secure)
+        _check_cookie_attribute("path", path)
+        _check_cookie_attribute("domain", domain)
         cookie_parts = [f"{cookie_name}={value}"]
 
         if max_age is not None:
@@ -360,10 +404,18 @@ class Response(Generic[U]):
         path: str = "/",
         domain: str | None = None,
         same_site: str | None = "Lax",
+        secure: bool = False,
     ) -> Self:
         """
         Deletes a cookie by sending a Set-Cookie header with Max-Age=0 and a past Expires value.
+
+        Use the same path, domain and SameSite/Secure settings the cookie was
+        set with; a cookie set with SameSite=None needs secure=True here too.
         """
+        _check_cookie_name(cookie_name)
+        same_site = _normalize_same_site(same_site, secure)
+        _check_cookie_attribute("path", path)
+        _check_cookie_attribute("domain", domain)
         cookie_parts = [
             f"{cookie_name}=",
             "Max-Age=0",
@@ -374,6 +426,8 @@ class Response(Generic[U]):
             cookie_parts.append(f"Path={path}")
         if domain:
             cookie_parts.append(f"Domain={domain}")
+        if secure:
+            cookie_parts.append("Secure")
         if same_site:
             cookie_parts.append(f"SameSite={same_site}")
 
@@ -538,3 +592,34 @@ class Response(Generic[U]):
                 charset = param.split("=", 1)[1].strip()
 
         return media_type, charset
+
+
+# RFC 6265: cookie names are tokens; values are cookie-octets.
+_COOKIE_NAME_RE = re.compile(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]+")
+_COOKIE_VALUE_RE = re.compile(r"[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]*")
+_SAME_SITE_VALUES = {"lax": "Lax", "strict": "Strict", "none": "None"}
+
+
+def _check_cookie_name(name: str) -> None:
+    if not _COOKIE_NAME_RE.fullmatch(name or ""):
+        raise ValueError(f"Invalid cookie name: {name!r}")
+
+
+def _check_cookie_attribute(label: str, value: Optional[str]) -> None:
+    if value and (";" in value or any(ord(ch) < 0x20 for ch in value)):
+        raise ValueError(f"Invalid cookie {label}: {value!r}")
+
+
+def _normalize_same_site(same_site: Optional[str], secure: bool) -> Optional[str]:
+    if same_site is None:
+        return None
+    normalized = _SAME_SITE_VALUES.get(str(same_site).lower())
+    if normalized is None:
+        raise ValueError(
+            f"SameSite must be 'Lax', 'Strict' or 'None', got {same_site!r}"
+        )
+    if normalized == "None" and not secure:
+        raise ValueError(
+            "SameSite=None requires secure=True; browsers reject the cookie otherwise."
+        )
+    return normalized

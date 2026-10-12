@@ -16,6 +16,7 @@ from .decorators import (
     cors,
     no_cors,
     socket,
+    max_content_length,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "cors",
     "no_cors",
     "socket",
+    "max_content_length",
 ]

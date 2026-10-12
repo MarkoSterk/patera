@@ -20,7 +20,7 @@ from typing import (
 )
 
 from sqlalchemy import select, text
-from sqlalchemy.engine import Row, RowMapping
+from sqlalchemy.engine import CursorResult, Row, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -39,6 +39,22 @@ AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 
 def query(sql_query: str) -> Callable[[F], F]:
+    """
+    Runs the SQL statement when the decorated repository method is called.
+    The method's arguments are bound to the statement's :named parameters
+    and its return annotation decides the result:
+
+    - a model, ``list[Model]`` or ``Model | None``: ORM objects;
+    - ``dict``, a scalar (``int``, ``str``, ...), a class taking the columns
+      as keyword arguments, or a ``list[...]`` of these: converted rows;
+    - ``None``: the statement runs and nothing is returned (INSERT, UPDATE,
+      DELETE or DDL);
+    - ``int`` for a statement without result rows: the number of affected
+      rows;
+    - no annotation: the rows, or the number of affected rows for a
+      statement without result rows.
+    """
+
     def decorator(func: F) -> F:
         setattr(func, "__custom_query__", sql_query)
         return func
@@ -105,13 +121,17 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> Any:
         sql_string = cast(str, getattr(func, "__custom_query__"))
-        return_type: Any = get_type_hints(func).get("return")
-
+        hints = get_type_hints(func)
         params = self._build_query_params(func, *args, **kwargs)
 
-        if return_type is None:
-            result = await self.session.execute(text(sql_string), params)
-            return result.all()
+        if "return" not in hints:
+            result = await self._execute_text(sql_string, params)
+            return result.all() if result.returns_rows else result.rowcount
+
+        return_type: Any = hints["return"]
+        if return_type is NoneType:
+            await self._execute_text(sql_string, params)
+            return None
 
         normalized_type, is_optional = self._unwrap_optional(return_type)
         origin = get_origin(normalized_type)
@@ -125,7 +145,8 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
                     item_type, sql_string, params
                 )
 
-            result = await self.session.execute(text(sql_string), params)
+            result = await self._execute_text(sql_string, params)
+            self._require_rows(result, func, return_type)
             rows = result.mappings().all()
             return self._convert_many(rows, item_type)
 
@@ -150,7 +171,11 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
 
             return items[0]
 
-        result = await self.session.execute(text(sql_string), params)
+        result = await self._execute_text(sql_string, params)
+        if not result.returns_rows and normalized_type is int:
+            # INSERT / UPDATE / DELETE annotated with -> int: affected rows
+            return result.rowcount
+        self._require_rows(result, func, return_type)
         rows = result.mappings().all()
 
         if not rows:
@@ -168,6 +193,22 @@ class Repository(BaseExtension[AppT], Generic[T, AppT]):
             )
 
         return self._convert_one(rows[0], normalized_type)
+
+    async def _execute_text(
+        self, sql_string: str, params: dict[str, Any]
+    ) -> CursorResult[Any]:
+        # Text statements always produce a CursorResult (rowcount, returns_rows).
+        result = await self.session.execute(text(sql_string), params)
+        return cast(CursorResult[Any], result)
+
+    @staticmethod
+    def _require_rows(result: Any, func: Callable[..., Any], return_type: Any) -> None:
+        if not result.returns_rows:
+            raise TypeError(
+                f"The query of {func.__name__} returns no rows (INSERT, UPDATE, "
+                f"DELETE or DDL), so it cannot produce {return_type!r}. Annotate "
+                "it with -> None, or -> int for the number of affected rows."
+            )
 
     def _build_query_params(
         self,

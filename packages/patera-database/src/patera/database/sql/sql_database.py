@@ -16,6 +16,8 @@ from typing import (
     TypeVar,
     Generic,
 )
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import wraps
 from sqlalchemy import MetaData, Table, select, func
 from sqlalchemy.inspection import inspect
@@ -38,12 +40,19 @@ from .dialect_overview_extras import (
 
 # pylint: disable-next=E0402
 from patera.utilities import run_sync_or_async
-from patera.ctx import bind_session, request_context
+from patera.ctx import (
+    ActiveSessions,
+    bind_session,
+    get_request_context,
+    has_request_context,
+    request_context,
+)
 from patera.cli import CLIController
 
 # pylint: disable-next=E0402
 from patera.base_extension import BaseExtension
 from .declarative_base import DeclarativeBaseModel
+from .request_keys import TRANSACTION_OPEN
 
 if TYPE_CHECKING:
     from patera import Patera
@@ -110,8 +119,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._db_uri: str = ""
         self._session_name: str
-        self._models: dict[str, type[DeclarativeBaseModel]] = {}
-        self._number_of_tables: int = 0
         self._db_uri = self.configs.DATABASE_URI
         self._session_name = self.configs.DATABASE_SESSION_NAME
         self._app.add_on_startup_method(self.connect)
@@ -155,6 +162,9 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
             )
             await self._engine.dispose()
             self._engine = None
+        # Sessions made from the old factory would open connections on the
+        # disposed engine that nothing closes; the next use reconnects.
+        self._session_factory = None
 
     def create_session(self) -> AsyncSession:
         """
@@ -293,8 +303,106 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
 
     @property
     def models_list(self) -> list[Type[DeclarativeBaseModel]]:
-        """List fo all models"""
-        return [model for model in self._models.values()]
+        """
+        Returns the concrete models of this database: every non-abstract
+        DeclarativeBaseModel subclass whose ``__db_name__`` is this
+        database's name, sorted by class name. Models are found when the
+        property is read, so models imported after the database is created
+        are included.
+        """
+        models: dict[int, Type[DeclarativeBaseModel]] = {}
+        pending: list[type] = list(DeclarativeBaseModel.__subclasses__())
+        while pending:
+            model = pending.pop()
+            pending.extend(model.__subclasses__())
+            if model.__dict__.get("__abstract__", False):
+                continue
+            if getattr(model, "__db_name__", None) == self.db_name:
+                models[id(model)] = cast(Type[DeclarativeBaseModel], model)
+        return sorted(models.values(), key=lambda m: (m.__name__, m.__module__))
+
+    def request_session(self) -> AsyncSession:
+        """
+        This database's session of the current request, created and bound
+        to the request on first use (the middleware commits or rolls it back
+        and closes it when the request ends).
+        """
+        if not has_request_context():
+            raise RuntimeError("request_session() needs an active request context.")
+        ctx = get_request_context()
+        if ctx.sessions is None:
+            ctx.sessions = ActiveSessions()
+        session = ctx.sessions.get_session(self.session_name)
+        if session is None:
+            session = self.create_session()
+            ctx.sessions.set_session(self.session_name, session)
+        return session
+
+    @asynccontextmanager
+    async def work_session(self) -> AsyncIterator[AsyncSession]:
+        """
+        The session for a service's own reads and writes (chat history,
+        documents, ...):
+
+        - during a request whose handler is @transactional, the request's
+          session: the work is flushed at the end of the block and commits
+          or rolls back together with the request (so SQLite never sees two
+          writers in one request);
+        - everywhere else, a session_scope() of its own, committed when the
+          block exits, so no handler has to commit it.
+        """
+        if in_transactional_request():
+            session = self.request_session()
+            yield session
+            await session.flush()
+        else:
+            async with self.session_scope() as session:
+                yield session
+
+    @asynccontextmanager
+    async def session_scope(
+        self, *, transactional: bool = True
+    ) -> AsyncIterator[AsyncSession]:
+        """
+        Opens a managed session outside a request: in a scheduled job, a
+        background task or a service called from one.
+
+        The block runs in its own lightweight request context with the
+        session bound under this database's session name, so models and
+        repositories find it exactly as they do during a request. With
+        ``transactional=True`` (the default) the block runs in a transaction
+        that commits when it exits normally and rolls back on an exception.
+        The session is always closed. The engine is connected if it is not
+        connected yet, and is left connected.
+
+        Example:
+            async with db.session_scope() as session:
+                await PostRepository().publish_scheduled()
+        """
+        if self._session_factory is None:
+            await self.connect()
+
+        with request_context(app=self.app):
+            async with self.create_session() as session:
+                if transactional:
+                    async with session.begin():
+                        with bind_session(self.session_name, session):
+                            yield session
+                else:
+                    with bind_session(self.session_name, session):
+                        yield session
+
+
+def in_transactional_request() -> bool:
+    """
+    True while a request whose handler (or its controller) is marked
+    @transactional still has its commit ahead: its request sessions are
+    committed when it succeeds. False once the database middleware has
+    finished, for example while a streamed response body is being sent.
+    """
+    if not has_request_context():
+        return False
+    return bool(get_request_context().extras.get(TRANSACTION_OPEN, False))
 
 
 def cli_session(
@@ -369,6 +477,62 @@ def cli_session(
 
             finally:
                 await db_extension.disconnect()
+
+        return wrapper
+
+    return decorator
+
+
+def background_session(
+    db_impl_or_name: str,
+    *,
+    transactional: bool = True,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Opens a managed SQL database session for a method that runs outside a
+    request, such as a scheduled task-manager job or a background task.
+
+    It is the counterpart of @cli_session for a running application: the
+    method runs inside ``SqlDatabase.session_scope()``, so models and
+    repositories find their session as they do during a request. The engine
+    stays connected afterwards, because the application owns it.
+
+    The decorated method must belong to an object with an ``app`` attribute,
+    such as an extension, a service, a task manager or a controller.
+
+    Example:
+        class Jobs(TaskManager):
+            @schedule_job("interval", minutes=1)
+            @background_session("main")
+            async def publish_scheduled(self) -> None:
+                await PostRepository().publish_due()
+    """
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if py_inspect.isclass(func):
+            raise TypeError("@background_session can only be applied to methods.")
+
+        @wraps(func)
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            app = getattr(self, "app", None)
+            if app is None:
+                raise TypeError(
+                    "@background_session can only be used on methods of objects "
+                    "with an 'app' attribute (extensions, services, task managers)."
+                )
+
+            db_extension = cast(
+                Optional["SqlDatabase[Any]"],
+                app.extensions.get(db_impl_or_name),
+            )
+            if db_extension is None:
+                raise ValueError(
+                    f"Database extension with name {db_impl_or_name!r} "
+                    "is not registered."
+                )
+
+            async with db_extension.session_scope(transactional=transactional):
+                return await run_sync_or_async(func, self, *args, **kwargs)
 
         return wrapper
 

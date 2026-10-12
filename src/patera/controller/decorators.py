@@ -193,9 +193,12 @@ def consumes(media_type: MediaType) -> _EndpointDecorator:
             if not _content_type_matches(incoming_ct, media_type):
                 return req.response.json(
                     {
-                        "detail": "Unsupported Media Type",
-                        "expected": media_type.value,
-                        "received": incoming_ct or None,
+                        "status": "error",
+                        "message": "Unsupported media type",
+                        "data": {
+                            "expected": media_type.value,
+                            "received": incoming_ct or None,
+                        },
                     }
                 ).status(415)
 
@@ -350,3 +353,27 @@ def no_cors(func: Callable) -> Callable:
     """
     setattr(func, "_disable_cors", True)
     return func
+
+
+def max_content_length(limit: Optional[int]) -> Callable[[Callable], Callable]:
+    """
+    Sets the largest request body, in bytes, one endpoint accepts. It
+    overrides the MAX_CONTENT_LENGTH setting for that endpoint; None removes
+    the limit. Larger bodies are answered with 413.
+
+    Usage:
+    ```
+        @post("/uploads")
+        @max_content_length(200 * 1024 * 1024)
+        async def upload(self, req: Request) -> Response:
+            ...
+    ```
+    """
+    if limit is not None and limit < 0:
+        raise ValueError("max_content_length must be None or >= 0")
+
+    def decorator(func: Callable) -> Callable:
+        setattr(func, "_max_content_length", limit)
+        return func
+
+    return decorator

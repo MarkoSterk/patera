@@ -3,7 +3,6 @@ Base logger configuration class
 """
 
 import sys
-import re
 from abc import ABC
 from datetime import timedelta
 from pathlib import Path
@@ -212,7 +211,10 @@ def logger(name: Optional[str] = None):
 class LoggerBase(ABC, Generic[AppT]):
     """
     Base template for configuring a Loguru sink.
-    Subclasses implement get_sink() and optionally override getters below.
+
+    Settings are read from the configuration field named after the class in
+    upper snake case (AuditLogger -> AUDIT_LOGGER). Subclasses override
+    get_sink() or the other getters to change how the sink is set up.
     """
 
     configs_model: ClassVar[Optional[Type[LoggerConfigBase]]] = cast(
@@ -224,16 +226,7 @@ class LoggerBase(ABC, Generic[AppT]):
         # loads configs for the logger from application configurations
         # by the config class name as upper-case
         # example: CustomLoggerConfig -> CUSTOM_LOGGER_CONFIG
-        conf: Any = (
-            app.get_conf(
-                self.configs_name,
-                app.get_conf(
-                    self._legacy_configs_name,
-                    app.get_conf(self.__class__.__name__, {}),
-                ),
-            )
-            or {}
-        )
+        conf: Any = app.get_conf(self.configs_name, {}) or {}
         if isinstance(conf, BaseModel):
             conf = conf.model_dump()
         self.conf: Dict[str, Any] = self.validate_configs(conf)
@@ -251,12 +244,6 @@ class LoggerBase(ABC, Generic[AppT]):
     def configs_name(self) -> str:
         """Returns class name as upper snake case (HTTPLogger -> HTTP_LOGGER)"""
         return pascal_to_upper_snake(self.__class__.__name__)
-
-    @property
-    def _legacy_configs_name(self) -> str:
-        """Previous naming scheme (HTTPLogger -> H_T_T_P_LOGGER), still accepted."""
-        name = self.__class__.__name__
-        return re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
 
     def get_sink(self) -> SinkInput:
         sink = self.conf.get("SINK", "STDERR")
@@ -290,18 +277,6 @@ class LoggerBase(ABC, Generic[AppT]):
             "<level>{level: <8}</level> | {extra[logger_name]} | "
             "{name}:{function}:{line} - <cyan>{message}</cyan>",
         )
-
-    def dict_to_format_string(self, fmt_dict: dict[str, str]) -> str:
-        """
-        Converts a dictionary of Loguru placeholders into a JSON-like
-        format string suitable for loguru.add(format=...).
-
-        CURRENTLY DOESN'T WORK AS INTENDED
-        """
-        items = []
-        for key, value in fmt_dict.items():
-            items.append(f'"{key}": "{value}"')
-        return "{{{}}}".format(", ".join(items))
 
     def get_rotation(self) -> Optional[RotationType]:
         return self.get_conf_value("ROTATION", None)
@@ -360,9 +335,6 @@ class LoggerBase(ABC, Generic[AppT]):
     def get_delay(self) -> bool:
         return self.get_conf_value("DELAY", True)
 
-    def remove_existing_handlers(self) -> bool:
-        return self.get_conf_value("remove_existing_handlers", False)
-
     def _build_handler_kwargs(self) -> Dict[str, Any]:
         return {
             "level": self.get_level(),
@@ -386,9 +358,6 @@ class LoggerBase(ABC, Generic[AppT]):
 
     def _is_stream_sink(self, sink: SinkAccepted) -> bool:
         return (not isinstance(sink, str)) and hasattr(sink, "write")
-
-    def _is_callable_sink(self, sink: SinkAccepted) -> bool:
-        return callable(sink) and not hasattr(sink, "write")
 
     def _normalize_sink(self, sink: SinkInput) -> SinkAccepted:
         if isinstance(sink, Path):

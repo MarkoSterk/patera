@@ -173,19 +173,7 @@ class DeclarativeBaseModel(DeclarativeBase):
                 "when no explicit AsyncSession is provided."
             )
 
-        database = cls.get_database()
-        ctx = get_request_context()
-
-        if ctx.sessions is None:
-            ctx.sessions = ActiveSessions()
-
-        session = ctx.sessions.get_session(database.session_name)
-
-        if session is None:
-            session = database.create_session()
-            ctx.sessions.set_session(database.session_name, session)
-
-        return session
+        return cls.get_database().request_session()
 
     @classmethod
     def get_standalone_session(cls) -> AsyncSession:

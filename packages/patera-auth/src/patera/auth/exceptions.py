@@ -21,12 +21,3 @@ class AuthorizationException(BaseHttpException):
 
     def __init__(self, message: str, roles: list[Any]):
         super().__init__(message, HttpStatus.FORBIDDEN, "error", roles)
-
-
-class InvalidJWTError(BaseHttpException):
-    """
-    Invalid or expired JWT token error
-    """
-
-    def __init__(self, message: str):
-        super().__init__(message, 401, "error", None)

@@ -99,9 +99,16 @@ def main():
         help="Path to environment variable file",
     )
     start_cli_parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List the application's commands (also the default without a name)",
+    )
+    start_cli_parser.add_argument(
         "command_name",
         type=str,
-        help="CLI command name to run",
+        nargs="?",
+        default=None,
+        help="CLI command to run, as controller:command. Omit to list commands.",
     )
     start_cli_parser.add_argument(
         "command_args",

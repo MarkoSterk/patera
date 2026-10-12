@@ -1,17 +1,50 @@
 [project]
 name = "patera-aiinterface"
-version = "0.10.0"
+version = "0.11.0"
+description = "Experimental LLM interface for Patera: prompts, chat history and retrieval augmentation"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Marko Šterk", email = "marko_sterk@hotmail.com" }]
 requires-python = ">=3.13"
-dependencies = [
-    "docstring-parser>=0.18.0",
-    "numpy>=2.4.4",
-    "openai>=2.32.0",
+keywords = [
     "patera",
-    "patera-database",
+    "llm",
+    "ai",
+    "openai",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "httpx>=0.28.1",
+    "patera>=0.121",
+    "patera-database>=0.11",
+]
+
+[project.optional-dependencies]
+# Retrieval augmentation (@augmentation): embedding model and vector columns.
+augmentation = [
+    "numpy>=2.4.4",
     "pgvector>=0.4.2",
     "sentence-transformers>=5.4.1",
-    "torch>=2.11.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/MarkoSterk/Patera"
+Documentation = "https://github.com/MarkoSterk/Patera#readme"
+Repository = "https://github.com/MarkoSterk/Patera"
+Issues = "https://github.com/MarkoSterk/Patera/issues"
+Changelog = "https://github.com/MarkoSterk/Patera/blob/main/CHANGELOG.md"
 
 [tool.uv.sources]
 patera = { workspace = true }
@@ -21,5 +54,5 @@ patera-database = { workspace = true }
 module-name = "patera.aiinterface"
 
 [build-system]
-requires = ["uv_build>=0.10.9,<0.11.0"]
+requires = ["uv_build>=0.10.9,<0.13.0"]
 build-backend = "uv_build"

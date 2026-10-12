@@ -4,7 +4,12 @@ Redis cache implementation
 CACHE_REDIS_URL       = "redis://localhost:6379/0"   # required
 CACHE_REDIS_PASSWORD  = None                          # optional
 CACHE_DURATION        = 300                           # optional (default TTL)
-CACHE_KEY_PREFIX      = "patera:cache:"              # optional prefix/namespace
+CACHE_KEY_PREFIX      = "patera:<app>:<cache>:"      # optional prefix/namespace
+
+Every key lives under the prefix, and clear() deletes only those keys. An
+empty prefix is allowed for get/set/delete, but clear() then refuses to run,
+because it would flush the whole Redis database, including data that other
+applications keep there.
 """
 
 from __future__ import annotations
@@ -17,6 +22,8 @@ from pydantic import BaseModel
 from redis.asyncio import Redis, from_url
 
 from .base_cache_backend import BaseCacheBackend
+
+DEFAULT_KEY_PREFIX = "patera:cache:"
 
 if TYPE_CHECKING:
     from patera import Patera
@@ -32,7 +39,7 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         url: str,
         password: Optional[str] = None,
         default_ttl: int = 300,
-        key_prefix: str = "",
+        key_prefix: str = DEFAULT_KEY_PREFIX,
     ) -> None:
         if not url:
             raise ValueError("CACHE_REDIS_URL must be set for RedisCacheBackend")
@@ -47,24 +54,31 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._prefix = key_prefix
 
     @classmethod
-    def configure_from_app(  # type: ignore[override]
-        cls, app: AppT, configs: dict[str, Any] | BaseModel
-    ) -> "RedisCacheBackend":
+    def from_configs(
+        cls,
+        app: AppT,
+        configs: dict[str, Any] | BaseModel,
+        namespace: str = "cache",
+    ) -> "RedisCacheBackend[AppT]":
         """
         Creates a backend from a config mapping or a CachingConfig
-        (REDIS_URL, REDIS_PASSWORD, DURATION, KEY_PREFIX).
+        (REDIS_URL, REDIS_PASSWORD, DURATION, KEY_PREFIX). KEY_PREFIX
+        defaults to "patera:<application>:<namespace>:" (see
+        default_key_prefix), so caches sharing a Redis database stay apart;
+        set it to "" explicitly to use no namespace.
         """
-        if isinstance(configs, BaseModel):
-            configs = configs.model_dump()
-        url = configs.get("REDIS_URL", "")
-        password = configs.get("REDIS_PASSWORD", None)
-        ttl = configs.get("DURATION")
-        key_prefix = configs.get("KEY_PREFIX", "") or ""
+        values = cls._config_values(configs)
+        ttl = values.get("DURATION")
+        key_prefix = values.get("KEY_PREFIX")
         return cls(
-            url=url,
-            password=password,
+            url=values.get("REDIS_URL", ""),
+            password=values.get("REDIS_PASSWORD", None),
             default_ttl=int(ttl) if ttl is not None else 300,
-            key_prefix=key_prefix,
+            key_prefix=(
+                cls.default_key_prefix(app, namespace)
+                if key_prefix is None
+                else key_prefix
+            ),
         )
 
     async def connect(self) -> None:
@@ -140,18 +154,20 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         return deleted
 
     async def clear(self) -> None:
+        """
+        Deletes every key under this backend's prefix. Without a prefix it
+        raises RuntimeError rather than flushing the whole Redis database.
+        """
+        if not self._prefix:
+            raise RuntimeError(
+                "RedisCacheBackend has no key prefix, so clear() would delete "
+                "every key in the Redis database. Set KEY_PREFIX (the default "
+                "is 'patera:cache:'), or flush the database explicitly."
+            )
         client = await self._ensure()
-        if self._prefix and self._prefix != "":
-            keys: List[bytes] = []
-            async for k in client.scan_iter(match=f"{self._prefix}*"):
-                keys.append(k)
-            if keys:
-                # Pipeline deletion in chunks to avoid huge payloads
-                # pylint: disable-next=C0103
-                CHUNK = 1000
-                for i in range(0, len(keys), CHUNK):
-                    chunk = keys[i : i + CHUNK]
-                    await client.delete(*chunk)
-        else:
-            # flushes entire Redis db in case no namespace prefix is configured
-            await client.flushdb()
+        keys: List[bytes] = []
+        async for k in client.scan_iter(match=f"{self._prefix}*"):
+            keys.append(k)
+        # Delete in chunks to avoid huge payloads.
+        for i in range(0, len(keys), 1000):
+            await client.delete(*keys[i : i + 1000])

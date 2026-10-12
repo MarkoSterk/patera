@@ -9,12 +9,18 @@ from ..media_types import MediaType
 from ..http_statuses import HttpStatus
 from ..injectable import Injectable
 from ..utilities import run_sync_or_async
+from ..exceptions.runtime_exceptions import DuplicateRouteError
 
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
 T = TypeVar("T", bound="Controller[Any]")
+
+
+def _same_function(first: Callable, second: Callable) -> bool:
+    """True if two (bound) callables wrap the same underlying function."""
+    return getattr(first, "__func__", first) is getattr(second, "__func__", second)
 
 
 def path(
@@ -69,7 +75,12 @@ class Controller(Injectable, Generic[AppT]):
                 method()
 
     def get_endpoint_methods(self) -> dict[str, dict[str, str | Callable]]:
-        """Returns a dictionery with all endpoint methods"""
+        """
+        Returns the controller's endpoints by HTTP method and path.
+
+        Raises DuplicateRouteError if two different methods are registered
+        for the same HTTP method and path.
+        """
         owner_cls: "type[Controller]|None" = self.__class__ or None
         endpoints: dict[str, dict] = {
             "GET": {},
@@ -101,6 +112,17 @@ class Controller(Injectable, Generic[AppT]):
                         *self._open_api_tags,
                     ]
                 http_method: str = handler_info.get("http_method")  # type: ignore
+                existing = endpoints[http_method.upper()].get(handler_info["path"])
+                if existing is not None and _same_function(existing["method"], method):
+                    # The same function reachable under a second attribute name.
+                    continue
+                if existing is not None:
+                    raise DuplicateRouteError(
+                        f"{owner_cls.__name__}: methods "
+                        f"{existing['method'].__name__!r} and {name!r} are both "
+                        f"registered for {http_method.upper()} "
+                        f"{handler_info['path']!r}."
+                    )
                 endpoints[http_method.upper()][handler_info["path"]] = {
                     "method": method,
                     "base_path": self._path,

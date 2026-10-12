@@ -418,7 +418,7 @@
 
       const payload = await response.json();
 
-      showEmailSuccess(payload.message || "{{ translate('email_sent_successfully') }}");
+      showEmailSuccess("{{ translate('email_queued_for_sending') }}");
       emailForm.reset();
       hideRecipientSuggestions();
     } catch {

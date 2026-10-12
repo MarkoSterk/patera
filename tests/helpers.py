@@ -76,6 +76,7 @@ class AppFactory:
         config.setdefault("DEFAULT_LOGGER", QUIET_LOGGER)
         config.setdefault("LOG_FILES", SYNC_LOG_FILES)
         config.setdefault("APP_NAME", "Test app")
+        config.setdefault("STARTUP_BANNER", False)
         annotations = {key: Any for key in config}
         config_cls = type(
             "TestConfig",

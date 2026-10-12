@@ -2,6 +2,7 @@
 OpenAPI controller
 """
 
+import inspect
 import re
 from typing import Any, Dict, Optional, Set, Type, Tuple, List, cast, Callable
 from pydantic import BaseModel, TypeAdapter
@@ -189,6 +190,26 @@ def _convert_path_and_extract_params(path: str) -> Tuple[str, List[Dict[str, Any
     return converted, params
 
 
+def _split_docstring(func: Callable) -> Tuple[str, str]:
+    """
+    Returns an OpenAPI summary and description from a handler's docstring:
+    the summary is its first line, the description the whole text.
+    """
+    doc = inspect.getdoc(func) or ""
+    return doc.partition("\n")[0].strip(), doc
+
+
+def _unique_operation_id(operation_id: str, used: Set[str]) -> str:
+    """Returns operation_id, suffixed with a number if it is already used."""
+    candidate = operation_id
+    counter = 2
+    while candidate in used:
+        candidate = f"{operation_id}_{counter}"
+        counter += 1
+    used.add(candidate)
+    return candidate
+
+
 def build_openapi(
     controllers: Dict[str, "Controller"],
     *,
@@ -199,7 +220,10 @@ def build_openapi(
     description: str = "",
 ) -> Dict[str, Any]:
     """
-    controllers structure: {
+    Builds the OpenAPI document for the registered controllers.
+
+    ``controllers`` maps controller names to controller instances. Each
+    instance's ``endpoints_map`` has this structure: {
         "<base_path>": {
             "<HTTP_METHOD>": {
                 "<endpoint_path>": {
@@ -235,7 +259,7 @@ def build_openapi(
     components = spec["components"]
     paths = spec["paths"]
 
-    referenced_models: Set[Type] = set()
+    used_operation_ids: Set[str] = set()
 
     for controller in controllers.values():
         if not controller.open_api_spec:
@@ -266,23 +290,29 @@ def build_openapi(
                 op_obj: Dict[str, Any] = {}
                 paths[full_path][http_method.lower()] = op_obj
 
-                # Summary / description
-                op_obj["summary"] = cast(dict, ep_cfg).get("summary", "")
-                op_obj["description"] = cast(dict, ep_cfg).get(
-                    "method"
-                ).__doc__ or cast(dict, ep_cfg).get("description", "")
+                # Summary / description: explicit settings win, otherwise
+                # the docstring's first line is the summary and the whole
+                # docstring the description.
+                handler = cast(Callable, cast(dict, ep_cfg).get("method"))
+                doc_summary, doc_description = _split_docstring(handler)
+                op_obj["summary"] = cast(dict, ep_cfg).get("summary") or doc_summary
+                op_obj["description"] = (
+                    cast(dict, ep_cfg).get("description") or doc_description
+                )
 
                 # Tags
                 tags = cast(dict, ep_cfg).get("tags")
                 if tags:
                     op_obj["tags"] = tags
 
-                # operationId
-                op_obj["operationId"] = cast(
-                    Callable, cast(dict[str, Callable], ep_cfg).get("method")
-                ).__name__ or (
-                    f"{http_method.lower()}_{base_path.strip('/').replace('/', '_')}_{endpoint_path.strip('/').replace('/', '_')}"
-                    or f"{http_method.lower()}_root"
+                # operationId: unique across the document. Handler names
+                # repeat between controllers (index, get, ...), so the
+                # controller's class name is part of the default.
+                operation_id = cast(dict, ep_cfg).get("operation_id") or (
+                    f"{controller.__class__.__name__}_{handler.__name__}"
+                )
+                op_obj["operationId"] = _unique_operation_id(
+                    operation_id, used_operation_ids
                 )
 
                 # Path parameters
@@ -295,11 +325,6 @@ def build_openapi(
                 if consumes or consumes_type:
                     mt = _as_media_type(consumes) if consumes else "application/json"
                     schema_ref = _ensure_schema(components, consumes_type)
-                    if consumes_type:
-                        try:
-                            referenced_models.add(consumes_type)
-                        except TypeError:
-                            pass
                     op_obj["requestBody"] = {
                         "required": True if consumes_type else False,
                         "content": {mt: {"schema": schema_ref or {"type": "object"}}},
@@ -320,11 +345,6 @@ def build_openapi(
                 resp_schema_ref = (
                     _ensure_schema(components, response_type) if response_type else None
                 )
-                if response_type:
-                    try:
-                        referenced_models.add(response_type)
-                    except TypeError:
-                        pass
 
                 responses[default_status] = {
                     "description": cast(str, cast(dict, ep_cfg).get("description", ""))
@@ -348,11 +368,6 @@ def build_openapi(
                     err_desc = getattr(desc, "description", None) or ""
 
                     schema_ref = _ensure_schema(components, body_model)
-                    if body_model:
-                        try:
-                            referenced_models.add(body_model)
-                        except TypeError:
-                            pass
 
                     if status_code not in responses:
                         responses[status_code] = {

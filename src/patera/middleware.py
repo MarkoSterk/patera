@@ -52,14 +52,13 @@ def middleware(
     """
     Decorator to mark a middleware implementation as middleware to be used by the application.
 
-    The order of the middleware can be set optionally. If provided, the order number must be > 0.
-
-    If order is not set, the next available order number will be assigned at registration.
-    Because registration order depends on module discovery, this can lead to unexpected behavior.
-    Therefore, it is recommended to set the desired order number of the middleware.
-
-    Some middleware implementations have default internal orders. These orders should not be changed
-    unless absolutely necessary.
+    ``order`` sets the middleware's position in the chain; lower orders run
+    first on the way in. It must be greater than 0, because negative orders
+    are reserved for the framework's own middleware (CORS -101, database
+    sessions -100, authentication -99). A middleware registered without an
+    order, here or in ``register_middleware``, raises ValueError. If two
+    classes ask for the same order, the later one moves to the next free
+    number and a warning is logged.
     """
     if order is not None and order <= 0:
         raise ValueError("Middleware order must be greater than 0.")
@@ -84,8 +83,6 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     Base class for middleware
     """
 
-    __ignore__: bool = True
-
     def __init__(
         self, app: AppT, next_app: "Callable[[Request], Awaitable[Response]]"
     ) -> None:
@@ -105,8 +102,9 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
 
     async def __call__(self, req: "Request") -> "Response":
         """
-        Middleware call method
-        Must call next middleware in chain with self.next(req)
+        Runs this middleware's ``middleware`` method. That method continues
+        the chain by awaiting ``self.next(req)``, or returns a response
+        without calling it to short-circuit the request.
         """
         return await run_sync_or_async(self.middleware, req)
 

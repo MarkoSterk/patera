@@ -148,6 +148,38 @@ def test_password_hashing():
     assert not AuthUtils.check_password_hash("wrong", hashed)
 
 
+def test_long_passwords_are_hashed_in_full():
+    long_password = "correct horse battery staple " * 5  # 145 bytes
+    hashed = AuthUtils.create_password_hash(long_password)
+    assert AuthUtils.check_password_hash(long_password, hashed)
+    # A password differing only after byte 72 must not match
+    assert not AuthUtils.check_password_hash(long_password[:-1] + "!", hashed)
+    assert AuthUtils.check_password_hash(
+        "čšž-ünïcode", AuthUtils.create_password_hash("čšž-ünïcode")
+    )
+
+
+def test_password_hashes_from_earlier_versions_still_verify():
+    import bcrypt
+
+    legacy = bcrypt.hashpw(b"old-secret", bcrypt.gensalt(4)).decode()
+    assert AuthUtils.check_password_hash("old-secret", legacy)
+    assert not AuthUtils.check_password_hash("wrong", legacy)
+    assert not AuthUtils.check_password_hash("x" * 100, legacy)  # > 72 bytes
+    assert AuthUtils.password_hash_needs_update(legacy)
+
+    current = AuthUtils.create_password_hash("old-secret")
+    assert current.startswith("bcrypt-sha256$$2b$")
+    assert not AuthUtils.password_hash_needs_update(current)
+
+
+@pytest.mark.parametrize(
+    "stored", ["", "plain-text", "$2b$12$tooshort", "bcrypt-sha256$garbage", "ž"]
+)
+def test_malformed_password_hashes_do_not_match(stored):
+    assert AuthUtils.check_password_hash("s3cret", stored) is False
+
+
 def test_signed_cookies():
     signed = AuthUtils.create_signed_cookie_value(42, SECRET)
     assert AuthUtils.decode_signed_cookie(signed, SECRET) == "42"
@@ -168,3 +200,48 @@ def test_jwt_tokens():
         )
     with pytest.raises(ValueError):
         AuthUtils.create_jwt_token("not a dict", SECRET)  # type: ignore[arg-type]
+
+
+def test_signed_cookie_values_carry_a_timestamp():
+    signed = AuthUtils.create_signed_cookie_value("user|7", SECRET)
+    value, timestamp, _ = signed.rsplit("|", 2)
+    assert value == "user|7"  # a "|" in the value survives
+    assert abs(int(timestamp) - time.time()) < 5
+    assert AuthUtils.decode_signed_cookie(signed, SECRET, max_age=60) == "user|7"
+
+
+def test_signed_cookie_max_age(monkeypatch):
+    signed = AuthUtils.create_signed_cookie_value("42", SECRET)
+    now = time.time()
+    monkeypatch.setattr(time, "time", lambda: now + 120)
+    with pytest.raises(ValueError, match="expired"):
+        AuthUtils.decode_signed_cookie(signed, SECRET, max_age=60)
+    assert AuthUtils.decode_signed_cookie(signed, SECRET, max_age=600) == "42"
+    assert AuthUtils.decode_signed_cookie(signed, SECRET) == "42"
+
+    # Signed far in the future (beyond clock skew) is rejected too
+    monkeypatch.setattr(time, "time", lambda: now - 3600)
+    with pytest.raises(ValueError):
+        AuthUtils.decode_signed_cookie(signed, SECRET, max_age=60)
+
+
+def test_signed_cookie_tampering_is_rejected():
+    signed = AuthUtils.create_signed_cookie_value("42", SECRET)
+    value, timestamp, signature = signed.rsplit("|", 2)
+    for forged in (
+        f"43|{timestamp}|{signature}",
+        f"42|{int(timestamp) + 1000}|{signature}",
+        f"42|{timestamp}|{signature[:-4]}AAAA",
+        "42",
+        "",
+    ):
+        with pytest.raises(ValueError):
+            AuthUtils.decode_signed_cookie(forged, SECRET)
+
+
+def test_signed_cookies_without_a_timestamp_are_rejected():
+    import base64
+
+    signature = base64.urlsafe_b64encode(AuthUtils._sign("42", SECRET)).decode()
+    with pytest.raises(ValueError):
+        AuthUtils.decode_signed_cookie(f"42|{signature}", SECRET)

@@ -19,6 +19,8 @@ from patera.controller import Controller
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from .request_keys import TRANSACTION_OPEN
+
 if TYPE_CHECKING:
     from patera import Patera, Request, Response
     from .sql_database import SqlDatabase
@@ -33,7 +35,7 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
 
     Responsibilities:
         - initialize configured SqlDatabase extensions
-        - store database instances by db_name and class name
+        - store database instances by db_name
         - expose get_database(...)
         - register SqlDatabaseManagerMiddleware automatically
         - provide request-session commit/rollback/close helpers
@@ -75,12 +77,6 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
 
             self._db_instances[db_instance.db_name] = db_instance
 
-            # Backwards-compatible direct lookup by database name.
-            # Example:
-            #     app.extensions["main"]
-            self.app._extensions[db_instance.db_name] = db_instance
-            self.app._extensions[db_instance.__class__.__name__] = db_instance
-
         self._register_request_middleware()
 
     def _register_request_middleware(self) -> None:
@@ -92,12 +88,10 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
 
         In CLI mode this registration is cheap and harmless because build()
         is not called unless the app receives ASGI traffic.
+
+        The middleware finds this manager in its own application's
+        registry, so applications in one process never share a manager.
         """
-        setattr(
-            SqlDatabaseManagerMiddleware,
-            "_sql_database_manager_name",
-            self.__class__.__name__,
-        )
         self.app.register_middleware(SqlDatabaseManagerMiddleware)
 
     def get_database(self, db_name: str) -> "SqlDatabase[AppT]":
@@ -221,18 +215,18 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
     _order: int = -100
     _middleware = True
 
-    _sql_database_manager_name: str = ""
-
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         super().__init__(app, next_app)
         self._manager = self._get_manager()
 
     def _get_manager(self) -> SqlDatabaseManager[AppT]:
+        """
+        Returns this application's database manager. Request sessions of
+        every database live in the request context, so any manager of the
+        application can commit, roll back and close them.
+        """
         for extension in self.app.extensions.values():
-            if (
-                isinstance(extension, SqlDatabaseManager)
-                and extension.__class__.__name__ == self._sql_database_manager_name
-            ):
+            if isinstance(extension, SqlDatabaseManager):
                 return cast(SqlDatabaseManager[AppT], extension)
 
         raise RuntimeError(
@@ -260,6 +254,9 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
         """
         ctx = get_request_context()
         is_transactional = self.is_transactional(req)
+        # Read by in_transactional_request(): work joins the request's
+        # transaction only while its commit is still ahead.
+        ctx.extras[TRANSACTION_OPEN] = is_transactional
 
         try:
             res = await self.next(req)
@@ -285,6 +282,7 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
             raise
 
         finally:
+            ctx.extras.pop(TRANSACTION_OPEN, None)
             await self._manager.close_all_sessions(ctx)
 
 

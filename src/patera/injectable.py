@@ -16,6 +16,7 @@ from typing import (
 from pydantic import BaseModel, ValidationError
 
 from .utilities import pascal_to_upper_snake
+from .exceptions.runtime_exceptions import CircularDependencyError
 
 
 T = TypeVar("T")
@@ -39,9 +40,9 @@ class _ConfigVar:
 
     Example:
         class ChatController(Controller[App]):
-            app_name: str = ConfigVar("SECRET_KEY")
+            secret_key: str = ConfigVar("SECRET_KEY")
 
-        controller.app_name
+        controller.secret_key
         # internally calls:
         # controller.app.get_conf("SECRET_KEY")
     """
@@ -206,28 +207,32 @@ class Injectable:
         name: str = pascal_to_upper_snake(target_type.__name__)
         value = app._extensions.get(name, None)
         if value is None:
-            value = target_type(app)
+            # Types whose construction is in progress, outermost first. A type
+            # that is requested again while it is being constructed is a cycle.
+            resolving: list[type] = app.__dict__.setdefault(
+                "_resolving_dependencies", []
+            )
+            if target_type in resolving:
+                cycle = [*resolving[resolving.index(target_type) :], target_type]
+                raise CircularDependencyError(
+                    "Circular dependency: "
+                    + " -> ".join(t.__name__ for t in cycle)
+                    + ". Split one of the classes or inject lazily."
+                )
+            resolving.append(target_type)
+            try:
+                value = target_type(app)
+            finally:
+                resolving.pop()
             app._extensions[name] = value
-        return value
-
-    def _resolve_config_var(
-        self,
-        config_name: str,
-        declared_type: type[Any],
-    ) -> Any:
-        """Reads a configuration value and coerces it to ``declared_type``."""
-        value = self.app.get_conf(config_name)  # type: ignore[attr-defined]
-
-        if isinstance(value, declared_type):
-            return value
-
-        try:
-            return declared_type(value)
-        except Exception as exc:
+        if not isinstance(value, target_type):
             raise TypeError(
-                f"Config variable {config_name!r} must be of type "
-                f"{declared_type.__name__}, got {type(value).__name__}"
-            ) from exc
+                f"Cannot inject {target_type.__module__}.{target_type.__qualname__}: "
+                f"the registry slot {name!r} holds an instance of "
+                f"{type(value).__module__}.{type(value).__qualname__}. "
+                "Two classes with the same name cannot both be injected."
+            )
+        return value
 
     @property
     def configs_name(self) -> str:

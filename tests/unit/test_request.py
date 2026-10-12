@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from patera.exceptions import InvalidRequestBody, RequestBodyTooLarge
 from patera.request import UploadedFile, extract_boundary
 
 from tests.helpers import make_request
@@ -39,9 +40,17 @@ async def test_json_body_and_caching(app):
     assert await req.body() == b'{"a": 1}'
 
 
-async def test_invalid_or_empty_json_is_none(app):
-    assert await make_request(app, "POST", body=b"{not json").json() is None
+async def test_empty_json_is_none(app):
     assert await make_request(app, "POST").json() is None
+
+
+async def test_malformed_json_raises_bad_request(app):
+    with pytest.raises(InvalidRequestBody) as exc:
+        await make_request(app, "POST", body=b"{not json").json()
+    assert exc.value.status_code == 400
+    assert exc.value.message == "Malformed JSON body"
+    with pytest.raises(InvalidRequestBody):
+        await make_request(app, "POST", body=b"\xff\xfe").json()
 
 
 async def test_body_stops_on_client_disconnect(app):
@@ -128,3 +137,127 @@ def test_uploaded_file_pydantic_roundtrip(tmp_path):
     assert target.read_bytes() == b"hi"
     dumped = model.model_dump()
     assert dumped["file"]["filename"] == "a.txt"
+
+
+def _chunked_request(app, *chunks: bytes, headers=None):
+    from patera.request import Request
+    from tests.helpers import make_receive, make_scope
+
+    async def send(message):
+        pass
+
+    return Request(
+        make_scope("POST", "/", headers=headers),
+        make_receive(*chunks),
+        send,
+        app,
+        {},
+        lambda: None,
+    )
+
+
+async def test_body_limit_applies_while_reading(make_app):
+    app = make_app(MAX_CONTENT_LENGTH=10)
+    # No Content-Length: the limit is enforced as chunks arrive.
+    req = _chunked_request(app, b"12345", b"67890", b"x")
+    with pytest.raises(RequestBodyTooLarge) as exc:
+        await req.body()
+    assert exc.value.status_code == 413
+    assert exc.value.data == {"max_content_length": 10}
+    assert await _chunked_request(app, b"12345", b"67890").body() == b"1234567890"
+
+
+async def test_declared_content_length_is_refused_before_reading(make_app):
+    from patera.request import Request
+    from tests.helpers import make_scope
+
+    app = make_app(MAX_CONTENT_LENGTH=10)
+
+    async def receive():
+        raise AssertionError("the body must not be read")
+
+    async def send(message):
+        pass
+
+    req = Request(
+        make_scope("POST", "/", headers={"content-length": "11"}),
+        receive,
+        send,
+        app,
+        {},
+        lambda: None,
+    )
+    with pytest.raises(RequestBodyTooLarge):
+        await req.body()
+
+
+async def test_max_content_length_can_be_changed_per_request(make_app):
+    app = make_app(MAX_CONTENT_LENGTH=4)
+    req = _chunked_request(app, b"123456")
+    assert req.max_content_length == 4
+    req.max_content_length = None
+    assert await req.body() == b"123456"
+    with pytest.raises(ValueError):
+        req.max_content_length = -1
+
+
+def test_max_content_length_decorator_rejects_negative_values():
+    from patera.controller import max_content_length
+
+    with pytest.raises(ValueError):
+        max_content_length(-1)
+
+
+def test_repeated_headers_are_combined_and_listed(app):
+    req = make_request(app, headers={"accept": "text/html"})
+    req.scope["headers"] += [
+        (b"accept", b"application/json"),
+        (b"cookie", b"a=1"),
+        (b"cookie", b"b=2"),
+    ]
+    assert req.headers["accept"] == "text/html, application/json"
+    assert req.headers["cookie"] == "a=1; b=2"
+    assert req.header_list("Accept") == ["text/html", "application/json"]
+    assert req.header_list("x-missing") == []
+
+
+def test_cookies_are_parsed_and_malformed_pairs_skipped(app):
+    req = make_request(app, headers={"cookie": 'session=abc; theme="dark"; ;bad pair'})
+    req.scope["headers"].append((b"cookie", b"lang=sl"))
+    assert req.cookies == {"session": "abc", "theme": "dark", "lang": "sl"}
+    assert make_request(app).cookies == {}
+
+
+def test_blank_query_values_are_kept(app):
+    req = make_request(app, query_string=b"q=&tag=a&tag=&flag")
+    assert req.query_parameters["q"] == ""
+    assert req.query_parameters["tag"] == ["a", ""]
+    assert req.query_list("tag") == ["a", ""]
+    assert req.query_list("q") == [""]
+    assert req.query_list("missing") == []
+
+
+async def test_blank_form_values_are_kept(app):
+    req = make_request(
+        app,
+        "POST",
+        body=b"name=&tag=a&tag=b",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+    form = await req.form()
+    assert form["name"] == ""
+    assert await req.form_list("tag") == ["a", "b"]
+    assert await req.form_list("name") == [""]
+    assert await req.form_list("missing") == []
+
+
+async def test_form_with_invalid_utf8_is_a_bad_request(app):
+    req = make_request(
+        app,
+        "POST",
+        body=b"name=\xff\xfe",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+    with pytest.raises(InvalidRequestBody) as exc:
+        await req.form()
+    assert exc.value.status_code == 400

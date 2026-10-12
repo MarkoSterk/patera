@@ -2,9 +2,8 @@ import os
 from typing import TYPE_CHECKING, Any, Optional, cast
 from patera import Request, Response, MediaType, HttpStatus
 from werkzeug.security import safe_join
-import mimetypes
 
-from patera.utilities import get_file, get_range_file
+from patera.utilities import file_response
 from patera.utilities import run_sync_or_async
 from patera.controller import Controller, post, consumes, produces, get
 from patera.static import static_resource
@@ -61,8 +60,8 @@ class _FrontendInterfaceController(Controller):
     @static_resource
     async def static(self, req: Request, filename: str) -> Response:
         """
-        Endpoint for static files with HTTP Range support,
-        falling back to get_file for full-content requests.
+        Endpoint for static files with HTTP Range and conditional request
+        support.
         """
         # Checks if file exists
         file_path = None
@@ -72,18 +71,8 @@ class _FrontendInterfaceController(Controller):
         if not file_path:
             return req.res.no_content().status(HttpStatus.NOT_FOUND)
 
-        # checks/guesses mimetype
-        guessed, _ = mimetypes.guess_type(file_path)
-        content_type = guessed or "application/octet-stream"
-
-        # Checks range header and returns range if header is present
-        range_header = req.headers.get("range")
-        if not range_header:
-            status, headers, body = await get_file(file_path, content_type=content_type)
-            headers["Accept-Ranges"] = "bytes"
-            return req.res.send_file(body, headers).status(status)
-
-        return await get_range_file(req.res, file_path, range_header, content_type)
+        # Full files, ranges and conditional requests (ETag, If-Modified-Since)
+        return file_response(req.res, file_path, req.headers)
 
     @property
     def frontend(self) -> "Frontend":

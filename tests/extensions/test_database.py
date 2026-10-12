@@ -60,6 +60,18 @@ class NoteRepository(Repository[Note]):
     @query("SELECT id, title FROM notes ORDER BY id")
     async def rows(self) -> list[dict]: ...
 
+    @query("UPDATE notes SET title = :title WHERE id = :note_id")
+    async def rename(self, note_id: int, title: str) -> None: ...
+
+    @query("DELETE FROM notes WHERE title LIKE :pattern")
+    async def delete_matching(self, pattern: str) -> int: ...
+
+    @query("DELETE FROM notes WHERE id = :note_id")
+    async def delete_unannotated(self, note_id: int): ...
+
+    @query("UPDATE notes SET title = title")
+    async def touch_rows(self) -> list[dict]: ...
+
 
 @path("/notes")
 class NoteController(Controller):
@@ -120,6 +132,26 @@ class NoteController(Controller):
             }
         )
 
+    @post("/dml")
+    @transactional
+    async def dml(self, req: Request) -> Response:
+        renamed = await self.notes.rename(1, "renamed")
+        deleted = await self.notes.delete_matching("b%")
+        unannotated = await self.notes.delete_unannotated(999)
+        try:
+            await self.notes.touch_rows()
+            error = None
+        except TypeError as exc:
+            error = str(exc)
+        return req.res.json(
+            {
+                "renamed": renamed,
+                "deleted": deleted,
+                "unannotated": unannotated,
+                "error": error,
+            }
+        )
+
 
 @pytest.fixture
 async def app(make_app, tmp_path, client_for):
@@ -138,7 +170,8 @@ async def _create_schema(app):
     db = app.get_extension(Databases).get_database("main")
     await db.connect()
     async with db.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # Only this module's table: all models share one metadata object.
+        await conn.run_sync(Base.metadata.create_all, tables=[Note.__table__])
 
 
 async def test_transactional_requests(app, client_for):
@@ -184,6 +217,22 @@ async def test_queries_and_repository(app, client_for):
         assert data["missing"] is None
         assert data["rows"][0] == {"id": 1, "title": "a"}
         assert data["session_is_shared"] is True
+
+
+async def test_query_methods_run_dml_statements(app, client_for):
+    async with client_for(app) as client:
+        await _create_schema(app)
+        for title in ("a", "b1", "b2", "c"):
+            await client.post("/notes/", json={"title": title})
+
+        data = (await client.post("/notes/dml")).json()
+        assert data["renamed"] is None
+        assert data["deleted"] == 2
+        assert data["unannotated"] == 0
+        assert "-> None, or -> int" in data["error"]
+
+        res = await client.get("/notes/")
+        assert [n["title"] for n in res.json()] == ["renamed", "c"]
 
 
 async def test_order_by_strings_rejects_unknown_columns(app, client_for):

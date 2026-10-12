@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .sql_database import (
     SqlDatabase,
     SqlDatabaseConfig,
+    background_session,
     cli_session,
+    in_transactional_request,
 )
 from .sqlalchemy_async_query import AsyncQuery
 from .declarative_base import DeclarativeBaseModel
@@ -28,6 +30,8 @@ __all__ = [
     "Repository",
     "query",
     "cli_session",
+    "background_session",
+    "in_transactional_request",
     "SqlDatabaseManager",
     "transactional",
 ]

@@ -13,7 +13,9 @@ from .api_interface import (
     timeout,
     auth,
     no_auth,
+    forward_request,
     MissingApiInterfaceConfigurations,
+    ApiInterfaceResponseError,
     ApiInterface,
 )
 
@@ -28,6 +30,8 @@ __all__ = [
     "timeout",
     "auth",
     "no_auth",
+    "forward_request",
     "MissingApiInterfaceConfigurations",
+    "ApiInterfaceResponseError",
     "ApiInterface",
 ]

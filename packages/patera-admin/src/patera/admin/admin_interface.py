@@ -2,10 +2,13 @@
 Admin extension
 """
 
+from datetime import datetime
 from enum import StrEnum
+import importlib.metadata
+import importlib.util
 import os
-from typing import Generic, Optional, Type, TypeVar, Any
-from pydantic import BaseModel, Field
+from typing import Generic, Iterator, Optional, Type, TypeVar, Any
+from pydantic import BaseModel, Field, field_validator
 
 from patera import Patera, BaseExtension, MediaType
 from patera.controller import path
@@ -22,7 +25,18 @@ class Permissions(StrEnum):
     ADMIN_CAN_CREATE = "admin_can_create"
 
 
-ADMIN_INTERFACE_VERSION: str = "1.0.0"
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("patera-admin")
+    except importlib.metadata.PackageNotFoundError:  # pragma: no cover
+        return "unknown"
+
+
+# Version of the installed patera-admin package, shown in the footer.
+ADMIN_INTERFACE_VERSION: str = _package_version()
+
+# Cookie holding the time of the newest notification an admin has seen.
+NOTIFICATIONS_SEEN_COOKIE: str = "patera_admin_notifications_seen"
 
 
 def admin_ignore(cls: Type[Injectable]):
@@ -43,8 +57,14 @@ class AdminConfig(BaseModel):
     )
     DEFAULT_LANGUAGE: str = Field(
         "en",
-        description="Default language of the interface",
+        description="Default language of the interface (en, de, sl or es)",
     )
+
+    @field_validator("DEFAULT_LANGUAGE", mode="after")
+    @classmethod
+    def _language_code(cls, value: str) -> str:
+        return value.strip().lower()
+
     URL_FOR_FOR_LOGIN: str = Field(
         description="URL_FOR string for the application login"
     )
@@ -71,12 +91,23 @@ AppT = TypeVar("AppT", bound="Patera[Any]")
 class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     """
     Main Admin class
+
+    Extensions are discovered when they are needed, not once at startup:
+    menus and panels read the application's current extensions on every
+    request, so it does not matter whether a database, email client or task
+    manager is created before or after Admin. The panels' routes are
+    registered up front, whenever the package they need is installed, and
+    show an empty state when nothing is configured.
+
+    Notifications, such as an email from the panel that could not be sent,
+    are written to the application's JSON Lines log files and shown in the
+    Admin header, so they reach every worker and survive restarts.
     """
 
     MANAGED_MODELS: list[Type] = []
     TRANSLATIONS_MAP = TRANSLATIONS_MAP
 
-    _supported_languages: list[str] = ["en", "de", "si", "es"]
+    _supported_languages: list[str] = ["en", "de", "sl", "es"]
     _supported_extensions: list[str] = ["sqldatabase"]
 
     def init(self):
@@ -86,9 +117,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         # Per-instance state (class-level containers would be shared between
         # every AdminInterface instance and every app in the process).
         self._admin_menu: list[dict[str, str]] = []
-        self._databases_menu: list[dict[str, str | Any]] = []
-        self._task_managers: dict[str, Any] = {}
-        self._email_services: dict[str, Any] = {}
         self._models_map: dict[str, Type] = {}
         self._translation_maps: dict[str, dict[str, str]] = {}
 
@@ -99,7 +127,18 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._register_admin_exception_handler()
         self._register_admin_controller()
         self._register_admin_file_explorer()
-        self._find_injected_extensions()
+        self._register_extension_panels()
+
+    def _register_extension_panels(self) -> None:
+        """
+        Registers the routes of the extension panels whose packages are
+        installed. Which extensions the panels show is decided per request.
+        """
+        self._register_email_controller()
+        if _is_installed("patera.taskmanager"):
+            self._register_tm_controller()
+        if self.managed_models and _is_installed("patera.database"):
+            self._register_db_controller()
 
     def _register_admin_exception_handler(self) -> None:
         """
@@ -179,64 +218,106 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         ctrl_instance: _AdminTMController = self._app.get_controller(_AdminTMController)  # type: ignore
         ctrl_instance.admin_interface = self
 
-    def _register_models_controller(self) -> None:
-        if self.managed_models is None or len(self.managed_models) == 0:
-            return
-
-    def _find_database_extensions(self) -> list[dict[str, str | Any]]:
-        databases = []
-        doubled = []
-        for extInst in list(self.app.extensions.values()):
-            extMro = [cl.__name__.lower() for cl in extInst.__class__.mro()]
-            if "admininterface" in extMro or "sqldatabase" not in extMro:
-                continue
-            if getattr(extInst, "_admin_ignore", False):
-                continue
-            if (
-                len(set(extMro).intersection(self.__class__._supported_extensions)) > 0
-                and extInst.__class__.__name__ not in doubled
-            ):
-                databases.append(
-                    {
-                        "extension": extInst,
-                        "db_name": extInst.db_name,  # type: ignore
-                        "name": extInst.nice_name,  # type: ignore, # type: ignore
-                        "url_for": "_AdminDbController.database_overview",
-                    }
-                )
-                doubled.append(extInst.__class__.__name__)
-        if len(databases) > 0:
-            self._register_db_controller()
-        return databases
-
-    def _find_injected_extensions(self) -> None:
+    def _extensions(self) -> Iterator[tuple[str, Any]]:
         """
-        Finds injected extensions available for use in the dashboard
+        Yields each registered extension once, with its registry name, in
+        registration order. Extensions marked with @admin_ignore are skipped.
         """
-        # print("Injected extensions: ", self.app.extensions)
-        for name, ext in self.app.extensions.items():
+        seen: set[int] = set()
+        for name, ext in list(self.app.extensions.items()):
+            if id(ext) in seen or ext is self:
+                continue
+            seen.add(id(ext))
             if getattr(ext, "_admin_ignore", False):
                 continue
-            ext_cls_mro = [ext_cls.__name__ for ext_cls in ext.__class__.mro()]
-            if "EmailClient" in ext_cls_mro:
-                self._email_services[name] = ext
-            if "TaskManager" in ext_cls_mro:
-                self._task_managers[name] = ext
-        if len(self._email_services) > 0:
-            self._register_email_controller()
-        if len(self._task_managers) > 0:
-            self._register_tm_controller()
+            yield getattr(ext, "configs_name", name), ext
 
-    def _collect_models(self) -> dict[str, list[Any]]:
+    def _extensions_of(self, class_name: str) -> dict[str, Any]:
         """
-        Collects models and orders them according to databases
+        Returns the extensions with ``class_name`` in their class hierarchy.
+        Names are compared so Admin does not import optional packages.
         """
-        collected_models: dict[str, list[Any]] = {}
-        for model in self.managed_models:
-            if model.__db_name__ not in collected_models:
-                collected_models[model.__db_name__] = []
-            collected_models[model.__db_name__].append(model)
-        return collected_models
+        return {
+            name: ext
+            for name, ext in self._extensions()
+            if class_name in [cls.__name__ for cls in type(ext).__mro__]
+        }
+
+    def _find_database_extensions(self) -> list[dict[str, str | Any]]:
+        if not self._models_map:
+            return []
+        databases = []
+        for _, ext in self._extensions():
+            ext_mro = [cls.__name__.lower() for cls in type(ext).__mro__]
+            if "sqldatabase" not in ext_mro:
+                continue
+            if not set(ext_mro).intersection(self.__class__._supported_extensions):
+                continue
+            databases.append(
+                {
+                    "extension": ext,
+                    "db_name": ext.db_name,
+                    "name": ext.nice_name,
+                    "url_for": "_AdminDbController.database_overview",
+                }
+            )
+        return databases
+
+    # ---- Notifications -------------------------------------------------------
+
+    def notify(
+        self, kind: str, message: str, level: str = "ERROR", **data: Any
+    ) -> None:
+        """
+        Records a notification for the Admin header. It is written to the
+        application's log files as a log record carrying ``admin_notification``
+        (the kind) and ``notification_data``, so every worker sees it.
+
+        Applications can use it for their own events, for example
+        ``admin.notify("import_failed", "Nightly import failed", file=name)``.
+        """
+        self.app.logger.bind(admin_notification=kind, notification_data=data).log(
+            level.upper(), message
+        )
+
+    async def notifications(self, limit: int = 50) -> list[dict[str, Any]]:
+        """
+        Returns the newest notifications from the log files, newest first.
+        Each has ``time``, ``kind``, ``level``, ``message`` and ``data``.
+        """
+        if not self.app.log_files.enabled:
+            return []
+        items: list[dict[str, Any]] = []
+        for record in await self.app.log_files.read_async():
+            extra = record.get("extra") or {}
+            kind = extra.get("admin_notification")
+            if not kind:
+                continue
+            items.append(
+                {
+                    "time": record.get("time"),
+                    "kind": kind,
+                    "level": record.get("level"),
+                    "message": record.get("message"),
+                    "data": extra.get("notification_data") or {},
+                }
+            )
+        items.sort(key=lambda item: _timestamp(item["time"]), reverse=True)
+        return items[:limit]
+
+    def notifications_seen_at(self, req: Any) -> Optional[datetime]:
+        """Time of the newest notification this browser marked as read."""
+        return _parse_time(req.cookies.get(NOTIFICATIONS_SEEN_COOKIE))
+
+    @staticmethod
+    def count_unread(
+        notifications: list[dict[str, Any]], seen_at: Optional[datetime]
+    ) -> int:
+        """Counts notifications newer than ``seen_at`` (all, if None)."""
+        if seen_at is None:
+            return len(notifications)
+        seen = seen_at.timestamp()
+        return sum(1 for item in notifications if _timestamp(item["time"]) > seen)
 
     def translate(
         self,
@@ -267,16 +348,20 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     def _create_models_map(self) -> None:
         for model in self.managed_models:
             self._models_map[model.__name__] = model
-        if len(self._models_map) > 0:
-            self._databases_menu = self._find_database_extensions()
 
     @property
     def admin_menu(self) -> list[dict[str, str]]:
         return self._admin_menu
 
     @property
-    def databases_menu(self) -> list[dict[str, str]]:
-        return self._databases_menu
+    def databases_menu(self) -> list[dict[str, str | Any]]:
+        """Databases with managed models, looked up on every access."""
+        return self._find_database_extensions()
+
+    @property
+    def email_services(self) -> dict[str, Any]:
+        """Email clients of the application, looked up on every access."""
+        return self._extensions_of("EmailClient")
 
     @property
     def supported_languages(self) -> list[str]:
@@ -288,15 +373,16 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
 
     @property
     def has_email_services(self) -> bool:
-        return len(self._email_services.keys()) > 0
+        return bool(self.email_services)
 
     @property
     def has_task_managers(self) -> bool:
-        return len(self._task_managers.keys()) > 0
+        return bool(self.task_managers)
 
     @property
     def task_managers(self) -> dict[str, Any]:
-        return self._task_managers
+        """Task managers of the application, looked up on every access."""
+        return self._extensions_of("TaskManager")
 
     @property
     def managed_models(self) -> list[Type]:
@@ -336,12 +422,13 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             "admin_interface": self,
             "admin_url_for": self.url_for,
             "url_for_for_login": self.configs.URL_FOR_FOR_LOGIN,
-            "url_for_for_logut": self.configs.URL_FOR_FOR_LOGOUT,
+            "url_for_for_logout": self.configs.URL_FOR_FOR_LOGOUT,
             "show_remember_me": self.configs.SHOW_REMEMBER_ME,
             "show_forgot_password": self.configs.SHOW_FORGOT_PASSWORD,
             "available_langs": self.supported_languages,
             "translation_map": self.get_language_map(),
             "admin_interface_version": ADMIN_INTERFACE_VERSION,
+            "application_version": self.app.configs.VERSION,
         }
 
     def url_for(self, target: str, **kwargs) -> str:
@@ -358,3 +445,27 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
             language_map[key] = self.translate(key, self.current_language)
         self._translation_maps[self.current_language] = language_map
         return language_map
+
+
+def _is_installed(module: str) -> bool:
+    """True if an optional package can be imported."""
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _parse_time(value: Any) -> Optional[datetime]:
+    """Parses an ISO timestamp as written by the log files."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def _timestamp(value: Any) -> float:
+    """POSIX timestamp of an ISO time, or 0 when it cannot be parsed."""
+    parsed = _parse_time(value)
+    return parsed.timestamp() if parsed is not None else 0.0

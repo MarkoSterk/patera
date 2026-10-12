@@ -25,14 +25,13 @@ def exception_handler(exc_cls: Type["ExceptionHandler"]) -> Type["ExceptionHandl
 
 class ExceptionHandler(Injectable, Generic[AppT]):
     def __init__(self, app: AppT):
-        self._exception_mapping: dict[str, Callable] = {}
         self._app = app
         self._resolve_injections()
 
-    def get_exception_mapping(self) -> dict[str, Callable]:
-        """Produces exception mapping"""
+    def get_exception_mapping(self) -> dict[type[BaseException], Callable]:
+        """Maps each handled exception class to its handler method."""
         owner_cls: "type[ExceptionHandler]|None" = self.__class__ or None
-        handlers: dict[str, Callable] = {}
+        handlers: dict[type[BaseException], Callable] = {}
         if owner_cls is None:
             return handlers
 
@@ -44,9 +43,8 @@ class ExceptionHandler(Injectable, Generic[AppT]):
                 continue
             handled_exceptions = getattr(method, "_handled_exceptions", []) or []
             for handled_exception in handled_exceptions:
-                handlers[handled_exception.__name__] = method
+                handlers[handled_exception] = method
 
-        self._exception_mapping = handlers
         return handlers
 
     @property

@@ -6,12 +6,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Dict, Any
 from collections.abc import AsyncIterator
-import httpx
 
 if TYPE_CHECKING:
-    from ..ai_service import AiService
-
-from patera import Request
+    from ..ai_service import AiServiceConfig
 
 from .chat_response import (
     ChatResponse,
@@ -48,200 +45,52 @@ def from_ollama(data: dict[str, Any], session_id: Any = None) -> ChatResponse:
 
 
 class OllamaServiceProvider(BaseServiceProvider):
-    async def chat(
-        self,
-        req: Request,
-        system_prompt: str,
-        user_prompt: str,
-        use_history: bool,
-        use_augmentation: bool,
-        ext: AiService,
-        **kwargs,
-    ) -> ChatResponse:
-        """
-        Builds and sends chat prompt with chat service configs
-        """
-        if (
-            use_augmentation
-            and hasattr(ext, "augmentation_provider")
-            and ext.augmentation_provider is None
-        ):
-            raise ValueError(
-                f"If you wish to use chat augmentation please implement the Augmentation Provider ({ext.__class__.__name__})"
-            )
+    """Ollama chat API (/api/chat)."""
 
-        if (
-            use_history
-            and hasattr(ext, "history_provider")
-            and ext.history_provider is None
-        ):
-            raise ValueError(
-                f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
-            )
-
-        session_id: Any = None
-
-        url = ext.configs.BASE_URL
-        url = url.rstrip("/") + "/api/chat"
-
-        msg = self.format_message(user_prompt, **kwargs)
-
-        messages: list[dict[str, str]] = []
-        if use_history:
-            session_id, messages = await ext.history_provider.get_history_messages(req)  # type: ignore
-
-        if use_augmentation:
-            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
-            msg = msg + "\n\n----AUGMENTATION---:\n\n" + "\n\n".join(augmenting_info)
-
-        headers = {
-            "Content-Type": "application/json",
-        }
-
-        if ext.configs.API_KEY:
-            headers["Authorization"] = f"Bearer {ext.configs.API_KEY}"
-
-        if len(messages) == 0:
-            sys_message = {"role": "system", "content": system_prompt}
-            messages.append(sys_message)
-            if use_history:
-                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
-
-        messages.append({"role": "user", "content": msg})
-
+    def _request(
+        self, configs: AiServiceConfig, messages: list[ChatMessage], stream: bool
+    ):
+        url = configs.BASE_URL.rstrip("/") + "/api/chat"
+        headers = {"Content-Type": "application/json"}
+        if configs.API_KEY:
+            headers["Authorization"] = f"Bearer {configs.API_KEY}"
         payload: Dict[str, Any] = {
-            "model": ext.configs.MODEL,
-            "messages": messages,
-            "stream": False,
-            "options": {},
+            "model": configs.MODEL,
+            "messages": self.message_dicts(messages),
+            "stream": stream,
         }
+        if configs.TEMPERATURE is not None:
+            payload["options"] = {"temperature": configs.TEMPERATURE}
+        response_format = configs.RESPONSE_FORMAT
+        if response_format is not None:
+            # Ollama takes "json" or a JSON schema in "format".
+            if response_format.get("type") == "json_schema":
+                payload["format"] = response_format.get("json_schema", {}).get(
+                    "schema", {}
+                )
+            else:
+                payload["format"] = "json"
+        return url, headers, payload
 
-        if ext.configs.TEMPERATURE is not None:
-            payload["options"]["temperature"] = ext.configs.TEMPERATURE
-
-        if not payload["options"]:
-            payload.pop("options")
-
-        timeout = ext.configs.TIMEOUT
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
+    async def complete(
+        self, messages: list[ChatMessage], configs: AiServiceConfig
+    ) -> ChatResponse:
+        url, headers, payload = self._request(configs, messages, stream=False)
+        async with self.create_client(configs) as client:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
-            json_response = response.json()
-
-        if use_history:
-            ext.history_provider.save_message(  # type: ignore
-                session_id, messages[len(messages) - 1], len(messages) - 1
-            )  # type: ignore
-
-        ollama_response = from_ollama(json_response, session_id)
-        if use_history:
-            ext.history_provider.save_message(  # type: ignore
-                session_id, ollama_response.message.to_dict(), len(messages)
-            )  # type: ignore
-        return ollama_response
+            return from_ollama(response.json())
 
     async def stream(
-        self,
-        req: Request,
-        system_prompt: str,
-        user_prompt: str,
-        use_history: bool,
-        use_augmentation: bool,
-        ext: AiService,
-        **kwargs,
+        self, messages: list[ChatMessage], configs: AiServiceConfig
     ) -> AsyncIterator[ChatResponse]:
-        """
-        Builds and sends chat prompt with chat service configs and streaming response
-        """
-        if (
-            use_augmentation
-            and hasattr(ext, "augmentation_provider")
-            and ext.augmentation_provider is None
-        ):
-            raise ValueError(
-                f"If you wish to use chat augmentation please implement the Augmentation Provider ({ext.__class__.__name__})"
-            )
-
-        if (
-            use_history
-            and hasattr(ext, "history_provider")
-            and ext.history_provider is None
-        ):
-            raise ValueError(
-                f"If you wish to use chat history please implement the History Provider ({ext.__class__.__name__})"
-            )
-
-        session_id: Any = None
-        messages: list[Any] = []
-        if use_history:
-            # get_history_messages returns (session_id, messages)
-            session_id, history = await ext.history_provider.get_history_messages(req)  # type: ignore
-            messages = list(history)
-
-        url = ext.configs.BASE_URL
-        url = url.rstrip("/") + "/api/chat"
-        headers = {
-            "Content-Type": "application/json",
-        }
-
-        msg = self.format_message(user_prompt, **kwargs)
-
-        if use_augmentation:
-            augmenting_info = await ext.augmentation_provider._augment_prompt(req, msg)  # type: ignore
-            msg = msg + "\n\n----AUGMENTATION---:\n\n" + "\n\n".join(augmenting_info)
-
-        if ext.configs.API_KEY:
-            headers["Authorization"] = f"Bearer {ext.configs.API_KEY}"
-
-        if len(messages) == 0:
-            sys_message = {"role": "system", "content": system_prompt}
-            messages.append(sys_message)
-            if use_history:
-                ext.history_provider.save_message(session_id, sys_message, 0)  # type: ignore
-
-        messages.append({"role": "user", "content": msg})
-
-        payload: Dict[str, Any] = {
-            "model": ext.configs.MODEL,
-            "messages": messages,
-            "stream": True,
-            "options": {},
-        }
-
-        if ext.configs.TEMPERATURE is not None:
-            payload["options"]["temperature"] = ext.configs.TEMPERATURE
-
-        if not payload["options"]:
-            payload.pop("options")
-
-        timeout = ext.configs.TIMEOUT
-        accumulated_content: list[str] = []
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        """Yields the answer as it arrives (one JSON object per line)."""
+        url, headers, payload = self._request(configs, messages, stream=True)
+        async with self.create_client(configs) as client:
             async with client.stream(
                 "POST", url, headers=headers, json=payload
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
-                    if line:
-                        chunk = from_ollama(json.loads(line), session_id)
-                        if chunk.message.content:
-                            accumulated_content.append(chunk.message.content)
-                        yield chunk
-
-        if use_history:
-            ext.history_provider.save_message(  # type: ignore
-                session_id, messages[len(messages) - 1], len(messages) - 1
-            )
-            ext.history_provider.save_message(  # type: ignore
-                session_id,
-                {"role": "assistant", "content": "".join(accumulated_content)},
-                len(messages),
-            )
-
-    def format_message(self, user_prompt: str, **kwargs) -> str:
-        if kwargs:
-            for key, value in kwargs.items():
-                user_prompt = user_prompt.replace(f"<:{key}>", str(value))
-        return user_prompt
+                    if line.strip():
+                        yield from_ollama(json.loads(line))

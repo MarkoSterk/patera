@@ -13,7 +13,7 @@ from patera.controller import (
     post,
     produces,
 )
-from patera.open_api import _convert_path_and_extract_params
+from patera.open_api import _convert_path_and_extract_params, _unique_operation_id
 
 
 class Pet(BaseModel):
@@ -135,3 +135,49 @@ def test_tags_do_not_accumulate_across_apps(make_app):
 def test_base_url_is_part_of_server_url(make_app):
     app = make_app(controllers=[PetController], base_url="/v2")
     assert app.json_spec["servers"][0]["url"].endswith("/v2")
+
+
+@path("/first")
+class FirstController(Controller):
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        """Lists the first things.
+
+        A longer explanation that belongs in the description.
+        """
+        return req.res.json([])
+
+
+@path("/second")
+class SecondController(Controller):
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        return req.res.json([])
+
+
+def test_operation_ids_are_unique_across_controllers(make_app):
+    app = make_app(controllers=[FirstController, SecondController])
+    paths = app.json_spec["paths"]
+    first = paths["/first/"]["get"]["operationId"]
+    second = paths["/second/"]["get"]["operationId"]
+    assert first == "FirstController_index"
+    assert second == "SecondController_index"
+
+
+def test_unique_operation_id_adds_a_suffix():
+    used: set[str] = set()
+    assert _unique_operation_id("Items_index", used) == "Items_index"
+    assert _unique_operation_id("Items_index", used) == "Items_index_2"
+    assert _unique_operation_id("Items_index", used) == "Items_index_3"
+
+
+def test_summary_comes_from_the_docstring(make_app):
+    app = make_app(controllers=[FirstController, SecondController, PetController])
+    paths = app.json_spec["paths"]
+    first = paths["/first/"]["get"]
+    assert first["summary"] == "Lists the first things."
+    assert "longer explanation" in first["description"]
+    assert paths["/pets/"]["get"]["summary"] == "List all pets"
+    # No docstring: empty summary and description.
+    assert paths["/second/"]["get"]["summary"] == ""
+    assert paths["/second/"]["get"]["description"] == ""

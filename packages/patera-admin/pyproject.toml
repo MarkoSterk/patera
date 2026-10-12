@@ -1,11 +1,41 @@
 [project]
 name = "patera-admin"
-version = "0.10.0"
+version = "0.11.0"
+description = "Admin dashboard for Patera applications: logs, databases, files, e-mail and task managers"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Marko Šterk", email = "marko_sterk@hotmail.com" }]
 requires-python = ">=3.13"
-dependencies = [
+keywords = [
     "patera",
-    "patera-auth",
+    "admin",
+    "dashboard",
 ]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dependencies = [
+    "patera>=0.121",
+    "patera-auth>=0.11",
+    "markupsafe>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MarkoSterk/Patera"
+Documentation = "https://github.com/MarkoSterk/Patera#readme"
+Repository = "https://github.com/MarkoSterk/Patera"
+Issues = "https://github.com/MarkoSterk/Patera/issues"
+Changelog = "https://github.com/MarkoSterk/Patera/blob/main/CHANGELOG.md"
 
 [tool.uv.sources]
 patera = { workspace = true }
@@ -15,5 +45,5 @@ patera-auth = { workspace = true }
 module-name = "patera.admin"
 
 [build-system]
-requires = ["uv_build>=0.10.9,<0.11.0"]
+requires = ["uv_build>=0.10.9,<0.13.0"]
 build-backend = "uv_build"

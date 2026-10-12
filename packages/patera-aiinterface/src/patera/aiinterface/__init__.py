@@ -1,27 +1,33 @@
 """
-Ai interface module
+AI interface for Patera applications (experimental).
 """
 
 from .ai_service import (
     AiService,
-    ChatResponse,
-    tool,
+    AiServiceConfig,
+    HistorySummaryConfig,
+    augmentation,
+    history,
     system_prompt,
     user_prompt,
-    history,
-    augmentation,
-    session_id,
-    AiServiceConfig,
 )
+from .augmentation_provider.config import AugmentationConfig
+from .history_provider import BaseHistoryProvider, HistorySummary, SqlHistoryProvider
+from .service_provider import BaseServiceProvider, ChatMessage, ChatResponse
 
 __all__ = [
     "AiService",
-    "ChatResponse",
-    "tool",
     "AiServiceConfig",
-    "system_prompt",
-    "session_id",
-    "user_prompt",
-    "history",
+    "AugmentationConfig",
+    "BaseHistoryProvider",
+    "BaseServiceProvider",
+    "ChatMessage",
+    "ChatResponse",
+    "HistorySummary",
+    "HistorySummaryConfig",
+    "SqlHistoryProvider",
     "augmentation",
+    "history",
+    "system_prompt",
+    "user_prompt",
 ]

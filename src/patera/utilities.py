@@ -7,6 +7,7 @@ from typing import (
     Any,
     Callable,
     Iterable,
+    Mapping,
     List,
     Optional,
     Type,
@@ -17,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
 )
 import asyncio
+import functools
 import importlib
 import importlib.util
 import inspect
@@ -26,18 +28,16 @@ import re
 import sys
 from pathlib import Path
 from base64 import b64decode
+from email.utils import formatdate, parsedate_to_datetime
 from asyncio import Task
 
 import aiofiles
 
 from .exceptions import StaticAssetNotFound
+from .http_statuses import HttpStatus
 
 if TYPE_CHECKING:
     from .response import Response
-
-
-def supress():
-    raise NotImplementedError()
 
 
 def to_kebab_case(text: str) -> str:
@@ -45,11 +45,6 @@ def to_kebab_case(text: str) -> str:
     # replace non-alphanumeric with spaces, trim, replace whitespace with dash
     text = re.sub(r"[^a-zA-Z0-9]+", " ", text).strip()
     return re.sub(r"\s+", "-", text).lower()
-
-
-def to_upper_snake_case(name: str) -> str:
-    """Returns the UPPER_SNAKE_CASE version of the given name."""
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
 
 
 def pascal_to_upper_snake(name: str) -> str:
@@ -115,12 +110,9 @@ def _compute_response_type(func) -> Optional[Type[Any]]:
 
 
 def import_module(import_string: str):
+    """Imports ``module:attribute`` and returns the attribute."""
     module_path, obj_name = import_string.split(":")
-    try:
-        module = importlib.import_module(module_path)
-    # pylint: disable-next=W0706,W0612
-    except Exception as e:  # noqa: F841
-        raise
+    module = importlib.import_module(module_path)
     return getattr(module, obj_name)
 
 
@@ -156,15 +148,31 @@ def get_app_root_path(import_name: str) -> str:
     return os.path.dirname(os.path.abspath(filepath))
 
 
+def is_async_callable(func: Any) -> bool:
+    """
+    True for coroutine functions, including functools.partial objects
+    wrapping one and objects whose __call__ is a coroutine function.
+    """
+    while isinstance(func, functools.partial):
+        func = func.func
+    return inspect.iscoroutinefunction(func) or inspect.iscoroutinefunction(
+        getattr(func, "__call__", None)
+    )
+
+
 async def run_sync_or_async(func: Callable, *args, **kwargs):
     """
-    Support for sync or async methods
-    Runs async method directly or a sync method in a threadpool
+    Runs an async callable directly and a sync callable in a worker thread.
+    A sync callable that returns an awaitable (a lambda returning a
+    coroutine, for example) has that awaitable awaited too.
     """
-    if inspect.iscoroutinefunction(func):
+    if is_async_callable(func):
         return await func(*args, **kwargs)
 
-    return await asyncio.to_thread(func, *args, **kwargs)
+    result = await asyncio.to_thread(func, *args, **kwargs)
+    if inspect.isawaitable(result):
+        return await result
+    return result
 
 
 def run_in_background(func: Callable[..., Any], *args, **kwargs) -> Task:
@@ -177,12 +185,7 @@ def run_in_background(func: Callable[..., Any], *args, **kwargs) -> Task:
     - If database access is needed, open a fresh session inside the task.
     """
 
-    async def runner():
-        if inspect.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        return await asyncio.to_thread(func, *args, **kwargs)
-
-    task = asyncio.create_task(runner())
+    task = asyncio.create_task(run_sync_or_async(func, *args, **kwargs))
     # Keep a strong reference: the event loop only keeps weak references to
     # tasks, so an unreferenced task may be garbage collected mid-execution.
     _BACKGROUND_TASKS.add(task)
@@ -202,6 +205,32 @@ def run_in_background(func: Callable[..., Any], *args, **kwargs) -> Task:
 
 
 _BACKGROUND_TASKS: set[Task] = set()
+
+
+async def wait_for_background_tasks(timeout: Optional[float]) -> tuple[int, int]:
+    """
+    Waits for the background tasks started with run_in_background() on the
+    running event loop. Tasks still running after ``timeout`` seconds are
+    cancelled (None waits without a limit).
+
+    Returns (finished, cancelled) counts. Called by the application on
+    shutdown, before its shutdown methods close databases and clients.
+    """
+    loop = asyncio.get_running_loop()
+    current = asyncio.current_task()
+    pending = {
+        task
+        for task in _BACKGROUND_TASKS
+        if task.get_loop() is loop and not task.done() and task is not current
+    }
+    if not pending:
+        return 0, 0
+    done, still_running = await asyncio.wait(pending, timeout=timeout)
+    for task in still_running:
+        task.cancel()
+    if still_running:
+        await asyncio.gather(*still_running, return_exceptions=True)
+    return len(done), len(still_running)
 
 
 async def get_file(
@@ -234,44 +263,121 @@ async def get_file(
     return 200, headers, data
 
 
-async def get_range_file(res, file_path: str, range_header: str, content_type: str):
-    """Returns a ranged response. Useful for large static files, video streaming etc."""
-    total = os.path.getsize(file_path)
-    m = re.fullmatch(r"\s*bytes=(\d*)-(\d*)\s*", range_header)
-    if not m or (not m.group(1) and not m.group(2)):
-        # Missing/unsupported (e.g. multi-range) header: send the whole file.
-        start, end, status = 0, total - 1, 200
-    elif not m.group(1):
-        # Suffix range: "bytes=-500" -> the last 500 bytes.
-        suffix = int(m.group(2))
-        start, end, status = max(total - suffix, 0), total - 1, 206
-    else:
-        start = int(m.group(1))
-        end = int(m.group(2)) if m.group(2) else total - 1
-        end = min(end, total - 1)
-        status = 206
+def _file_etag(stat: os.stat_result) -> str:
+    """Strong ETag for the whole file, from its modification time and size."""
+    return f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
 
-    if status == 206 and (start >= total or start > end):
-        res.status(416)
-        res.set_headers({"content-range": f"bytes */{total}", "accept-ranges": "bytes"})
-        return res
 
-    length = end - start + 1
+def _etag_matches(header: str, etag: str) -> bool:
+    """True if an If-None-Match / If-Range header names this ETag (or "*")."""
+    candidates = [part.strip() for part in header.split(",")]
+    return "*" in candidates or any(
+        candidate.removeprefix("W/") == etag for candidate in candidates
+    )
+
+
+def _parse_http_date(value: str) -> Optional[float]:
+    try:
+        return parsedate_to_datetime(value).timestamp()
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def file_response(
+    res,
+    file_path: str,
+    request_headers: Mapping[str, str],
+    content_type: Optional[str] = None,
+    *,
+    cache_control: str = "public, max-age=300",
+):
+    """
+    Prepares a response that streams a file from disk.
+
+    The same rules apply to every file response:
+
+    - ``ETag`` (from the file's modification time and size), ``Last-Modified``,
+      ``Accept-Ranges`` and ``Cache-Control`` are always sent.
+    - ``If-None-Match`` / ``If-Modified-Since`` answer 304 Not Modified.
+    - A ``Range`` header gives 206 Partial Content (or 416 when it cannot be
+      satisfied), unless ``If-Range`` names an older version of the file, in
+      which case the whole file is sent.
+    - The body is never read into memory: the response records the file, the
+      start and the length, and the application streams it while sending.
+    """
+    stat = os.stat(file_path)
+    total = stat.st_size
+    etag = _file_etag(stat)
+    if content_type is None:
+        guessed, _ = mimetypes.guess_type(file_path)
+        content_type = guessed or "application/octet-stream"
+
     headers = {
         "Content-Type": content_type,
         "Accept-Ranges": "bytes",
-        "Content-Length": str(length),
-        "Cache-Control": "public, max-age=300",
-        "ETag": f'"{os.path.getmtime(file_path):.0f}-{length}"',
+        "ETag": etag,
+        "Last-Modified": formatdate(stat.st_mtime, usegmt=True),
+        "Cache-Control": cache_control,
     }
+
+    if_none_match = request_headers.get("if-none-match")
+    if_modified_since = request_headers.get("if-modified-since")
+    not_modified = (
+        _etag_matches(if_none_match, etag)
+        if if_none_match is not None
+        else (
+            if_modified_since is not None
+            and (since := _parse_http_date(if_modified_since)) is not None
+            and int(stat.st_mtime) <= since
+        )
+    )
+    if not_modified:
+        headers.pop("Content-Type")
+        res.status(HttpStatus.NOT_MODIFIED)
+        res.set_headers(headers)
+        return res
+
+    range_header = request_headers.get("range")
+    if_range = request_headers.get("if-range")
+    if range_header and if_range:
+        if if_range.strip().startswith(('"', "W/")):
+            fresh = if_range.strip() == etag
+        else:
+            since = _parse_http_date(if_range)
+            fresh = since is not None and int(stat.st_mtime) <= since
+        if not fresh:
+            range_header = None
+
+    start, end, status = 0, total - 1, 200
+    if range_header:
+        m = re.fullmatch(r"\s*bytes=(\d*)-(\d*)\s*", range_header)
+        if m and (m.group(1) or m.group(2)):
+            if not m.group(1):
+                # Suffix range: "bytes=-500" -> the last 500 bytes.
+                start, end = max(total - int(m.group(2)), 0), total - 1
+            else:
+                start = int(m.group(1))
+                end = min(int(m.group(2)), total - 1) if m.group(2) else total - 1
+            status = 206
+            if start >= total or start > end:
+                res.status(416)
+                res.set_headers(
+                    {
+                        "Content-Range": f"bytes */{total}",
+                        "Accept-Ranges": "bytes",
+                        "ETag": etag,
+                    }
+                )
+                return res
+        # A missing or unsupported (e.g. multi-range) header sends the file.
+
+    length = max(end - start + 1, 0)
     if status == 206:
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
 
-    # **Don’t** read the bytes here.  Just stash info on `res`.
     res.status(status)
     # set_headers normalizes header names (and syncs the media type)
     res.set_headers(headers)
-    # mark zero-copy parameters
     res.set_zero_copy({"file_path": file_path, "start": start, "length": length})
     return res
 

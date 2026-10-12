@@ -15,11 +15,13 @@ from typing import (
     TypeVar,
 )
 import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
 import binascii
+import time
 from cryptography.hazmat.primitives.hmac import HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
@@ -32,19 +34,6 @@ from patera.controller import Controller
 from patera.middleware import AppCallableType, MiddlewareBase
 
 from .exceptions import AuthenticationException, AuthorizationException
-
-REQUEST_ARGS_ERROR_MSG: str = (
-    "Injected argument 'req' of route handler is not an instance "
-    "of the Request class. If you used additional decorators "
-    "make sure the order of arguments was not changed. "
-    "The Request argument must always come first."
-)
-
-USER_LOADER_ERROR_MSG: str = (
-    "Undefined user loader method. Please define a user loader "
-    "method with the @user_loader decorator before using "
-    "the login_required decorator"
-)
 
 
 class AuthenticationConfig(BaseModel):
@@ -74,10 +63,27 @@ class AuthUtils:
     1. create_signed_cookie_value
     2. decode_signed_cookie
     3. create_password_hash
-    4. check_password_hash
+    4. check_password_hash / password_hash_needs_update
     5. create_jwt_token
     6. validate_jwt_token
     """
+
+    @staticmethod
+    def _sign(message: str, secret_key: str) -> bytes:
+        hmac_instance = HMAC(secret_key.encode("utf-8"), hashes.SHA256())
+        hmac_instance.update(message.encode("utf-8"))
+        return hmac_instance.finalize()
+
+    @staticmethod
+    def _verify(message: str, signature: str, secret_key: str) -> bool:
+        try:
+            signature_bytes = base64.urlsafe_b64decode(signature)
+            hmac_instance = HMAC(secret_key.encode("utf-8"), hashes.SHA256())
+            hmac_instance.update(message.encode("utf-8"))
+            hmac_instance.verify(signature_bytes)
+            return True
+        except (ValueError, binascii.Error, InvalidSignature):
+            return False
 
     @staticmethod
     def create_signed_cookie_value(value: str | int, secret_key: str) -> str:
@@ -87,60 +93,114 @@ class AuthUtils:
         value: The string value to be signed
         secret_key: The application's secret key for signing
 
-        Returns a base64-encoded signed value.
+        Returns ``value|timestamp|signature``. The signature covers the value
+        and the time of signing, so decode_signed_cookie() can reject values
+        older than a maximum age.
         """
-        if isinstance(value, int):
-            value = f"{value}"
-
-        hmac_instance = HMAC(secret_key.encode("utf-8"), hashes.SHA256())
-        hmac_instance.update(value.encode("utf-8"))
-        signature = hmac_instance.finalize()
-        signed_value = f"{value}|{base64.urlsafe_b64encode(signature).decode('utf-8')}"
-        return signed_value
+        value = f"{value}"
+        timestamp = str(int(time.time()))
+        signature = AuthUtils._sign(f"{value}|{timestamp}", secret_key)
+        encoded = base64.urlsafe_b64encode(signature).decode("utf-8")
+        return f"{value}|{timestamp}|{encoded}"
 
     @staticmethod
-    def decode_signed_cookie(cookie_value: str, secret_key: str) -> str:
+    def decode_signed_cookie(
+        cookie_value: str, secret_key: str, max_age: Optional[int] = None
+    ) -> str:
         """
         Decodes and verifies a signed cookie value.
 
         cookie_value: The signed cookie value to be verified and decoded
         secret_key: The application's secret key for verification
+        max_age: Maximum age in seconds. Older values are rejected; values
+            signed in the future (beyond 60 seconds of clock skew) too.
+            None accepts any age.
 
         Returns the original string value if the signature is valid.
-        Raises a ValueError if the signature is invalid.
+        Raises a ValueError if the format, the signature or the age is
+        invalid.
         """
-        try:
-            value, signature = cookie_value.rsplit("|", 1)
-            signature_bytes = base64.urlsafe_b64decode(signature)
-            hmac_instance = HMAC(secret_key.encode("utf-8"), hashes.SHA256())
-            hmac_instance.update(value.encode("utf-8"))
-            hmac_instance.verify(signature_bytes)  # Throws an exception if invalid
-            return value
-        except (ValueError, IndexError, binascii.Error, InvalidSignature):
-            # pylint: disable-next=W0707
-            raise ValueError("Invalid signed cookie format or signature.")
+        parts = cookie_value.rsplit("|", 2)
+        if len(parts) == 3 and parts[1].isdigit():
+            value, timestamp, signature = parts
+            if AuthUtils._verify(f"{value}|{timestamp}", signature, secret_key):
+                if max_age is not None:
+                    age = time.time() - int(timestamp)
+                    if age > max_age or age < -60:
+                        raise ValueError("Signed cookie has expired.")
+                return value
+
+        raise ValueError("Invalid signed cookie format or signature.")
+
+    # Hashes from create_password_hash() start with this marker; plain bcrypt
+    # hashes ("$2b$...") are from versions before 0.11 and still verify.
+    PASSWORD_HASH_PREFIX: str = "bcrypt-sha256$"
+
+    @staticmethod
+    def _password_digest(password: str) -> bytes:
+        """
+        SHA-256 of the password, base64-encoded (44 bytes). bcrypt reads at
+        most 72 bytes and rejects longer input, so passwords of any length are
+        reduced to this digest first; every character still counts.
+        """
+        digest = hashlib.sha256(password.encode("utf-8")).digest()
+        return base64.b64encode(digest)
 
     @staticmethod
     def create_password_hash(password: str) -> str:
         """
-        Creates a secure hash for a given password.
+        Creates a hash for a password of any length:
+        "bcrypt-sha256$" followed by a bcrypt hash of the password's SHA-256
+        digest.
 
         password: The plain text password to be hashed
         Returns the hashed password as a string.
         """
-        hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-        return hashed.decode("utf-8")
+        hashed = bcrypt.hashpw(AuthUtils._password_digest(password), bcrypt.gensalt())
+        return AuthUtils.PASSWORD_HASH_PREFIX + hashed.decode("utf-8")
 
     @staticmethod
     def check_password_hash(password: str, hashed_password: str) -> bool:
         """
-        Verifies a given password against a hashed password.
+        Verifies a password against a stored hash.
+
+        Accepts hashes made by create_password_hash() and plain bcrypt hashes
+        made by earlier versions (use password_hash_needs_update() to replace
+        those after a successful login).
 
         password: The plain text password provided by the user
         hashed_password: The stored hashed password
-        Returns True if the password matches, False otherwise.
+        Returns True if the password matches, False otherwise, including
+        for a stored value that is not a valid hash.
         """
-        return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
+        try:
+            if hashed_password.startswith(AuthUtils.PASSWORD_HASH_PREFIX):
+                stored = hashed_password[len(AuthUtils.PASSWORD_HASH_PREFIX) :]
+                return bcrypt.checkpw(
+                    AuthUtils._password_digest(password), stored.encode("utf-8")
+                )
+            if hashed_password.startswith("$2"):
+                # Plain bcrypt (earlier versions). bcrypt never accepted more
+                # than 72 bytes, so a longer password cannot match such a hash.
+                raw = password.encode("utf-8")
+                if len(raw) > 72:
+                    return False
+                return bcrypt.checkpw(raw, hashed_password.encode("utf-8"))
+        except (ValueError, UnicodeEncodeError):
+            return False
+        return False
+
+    @staticmethod
+    def password_hash_needs_update(hashed_password: str) -> bool:
+        """
+        True for a hash in an older format. After check_password_hash()
+        succeeds, store create_password_hash(password) in its place:
+
+            if AuthUtils.check_password_hash(password, user.password_hash):
+                if AuthUtils.password_hash_needs_update(user.password_hash):
+                    user.password_hash = AuthUtils.create_password_hash(password)
+        """
+        return not hashed_password.startswith(AuthUtils.PASSWORD_HASH_PREFIX)
 
     @staticmethod
     def create_jwt_token(payload: Dict, secret_key: str, expires_in: int = 3600) -> str:

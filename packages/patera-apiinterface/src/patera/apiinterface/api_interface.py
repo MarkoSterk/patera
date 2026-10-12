@@ -4,9 +4,11 @@ Interface for declarative external API integrations.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import inspect
 import json
+import re
 from collections.abc import Mapping
 from enum import StrEnum
 from functools import wraps
@@ -18,7 +20,9 @@ from typing import (
     TypeVar,
     cast,
     get_type_hints,
+    overload,
 )
+from urllib.parse import quote
 
 import httpx
 from httpx import Response
@@ -64,6 +68,12 @@ AppT = TypeVar(
 
 _NO_AUTH = object()
 _MISSING_BODY = object()
+
+# "<name>" or "<converter:name>" placeholders in resource URLs.
+_PLACEHOLDER_RE = re.compile(r"<(?:[^<>:]+:)?(\w+)>")
+
+# Methods whose leftover arguments become query parameters, not a body.
+_QUERY_METHODS = frozenset({HttpMethod.GET, HttpMethod.HEAD})
 
 
 def _set_api_interface_config(
@@ -359,6 +369,48 @@ def auth(
     return decorator
 
 
+@overload
+def forward_request(target: DecoratorTargetT) -> DecoratorTargetT: ...
+@overload
+def forward_request(
+    target: bool = True,
+) -> Callable[[DecoratorTargetT], DecoratorTargetT]: ...
+def forward_request(
+    target: DecoratorTargetT | bool = True,
+) -> DecoratorTargetT | Callable[[DecoratorTargetT], DecoratorTargetT]:
+    """
+    Forward the incoming request's route parameters and query string.
+
+    By default an interface method takes URL placeholders and query
+    parameters only from its own arguments. With @forward_request (on the
+    class or a method) a call made during a request also uses that request:
+    placeholders without a matching argument take the route parameter of the
+    same name, and the request's query parameters are sent along, with the
+    method's own query arguments taking precedence. Outside a request there
+    is nothing to forward. ``@forward_request(False)`` turns a class-level
+    setting off for one method.
+
+    Usage:
+    ```
+        @method(HttpMethod.GET)
+        @resource("/items/<item_id>")
+        @forward_request
+        async def item(self) -> Item: ...
+    ```
+    """
+    if isinstance(target, bool):
+        enabled = target
+
+        def decorator(inner: DecoratorTargetT) -> DecoratorTargetT:
+            return _set_api_interface_config(
+                inner, "forward_request", enabled, allow_class=True
+            )
+
+        return decorator
+
+    return _set_api_interface_config(target, "forward_request", True, allow_class=True)
+
+
 def no_auth(
     func: F,
 ) -> F:
@@ -379,6 +431,30 @@ class MissingApiInterfaceConfigurations(Exception):
     """
 
 
+class ApiInterfaceResponseError(Exception):
+    """
+    Raised when the external API answers with a 4xx or 5xx status.
+
+    status_code: the response's status code
+    body: the decoded response body (by the method's @produces media type),
+        or the raw text if it could not be decoded
+    response: the httpx.Response, for headers and anything else
+
+    Annotate a method with ``-> httpx.Response`` to receive every response
+    unchecked and handle the status yourself.
+    """
+
+    def __init__(self, method_name: str, response: Response, body: Any):
+        self.status_code: int = response.status_code
+        self.body: Any = body
+        self.response: Response = response
+        request = response.request
+        super().__init__(
+            f"{method_name}: {request.method} {request.url} answered "
+            f"{response.status_code} {response.reason_phrase}"
+        )
+
+
 class ApiInterface(
     BaseExtension[AppT],
     Generic[AppT],
@@ -386,9 +462,18 @@ class ApiInterface(
     """
     Base extension for declarative external API integrations.
 
-    API interface methods obtain the active Patera Request through
-    patera.ctx.current_request.
+    A method's arguments fill the ``<name>`` placeholders of its resource URL.
+    The remaining arguments become query parameters for GET and HEAD, and the
+    request body for other methods. The incoming request is used only when a
+    method or class is marked with @forward_request.
+
+    All calls of one interface share one HTTPX client, so connections are
+    reused. It is created on first use and closed when the application shuts
+    down. Override create_client() to configure it.
     """
+
+    _client: Optional[httpx.AsyncClient] = None
+    _client_loop: Optional[asyncio.AbstractEventLoop] = None
 
     def init(self) -> None:
         service_url = getattr(
@@ -407,6 +492,40 @@ class ApiInterface(
             service_url,
             service_url,
         )
+        self._client = None
+        self._client_loop = None
+        self._app.add_on_shutdown_method(self.aclose)
+
+    def create_client(self) -> httpx.AsyncClient:
+        """
+        Creates the HTTPX client shared by this interface's calls. Override
+        to set connection limits, proxies, a transport or default headers.
+        Per-call settings (timeout, redirects, headers) are applied on each
+        request.
+        """
+        return httpx.AsyncClient()
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """
+        The shared HTTPX client, created on first use.
+
+        A client belongs to the event loop it was created in. When a call
+        runs in another loop (each CLI command, for example, starts one) a
+        new client is created for it.
+        """
+        loop = asyncio.get_running_loop()
+        if self._client is None or self._client_loop is not loop:
+            self._client = self.create_client()
+            self._client_loop = loop
+        return self._client
+
+    async def aclose(self) -> None:
+        """Closes the shared client. Runs automatically at shutdown."""
+        client, self._client, self._client_loop = self._client, None, None
+        close = getattr(client, "aclose", None)
+        if close is not None:
+            await close()
 
     @classmethod
     def _wrap_method(
@@ -507,29 +626,22 @@ class ApiInterface(
                 f"API interface method {func.__name__} is missing @resource."
             )
 
-        # The active request (if any) supplies route parameters for <name>
-        # placeholders in the resource URL and the forwarded query string.
-        # Without a request context (background tasks, CLI) neither is used.
+        # The incoming request is used only when forwarding is enabled.
         req: Optional[Request] = (
-            cast(Request, current_request.req) if has_request_context() else None
+            cast(Request, current_request.req)
+            if configs.get("forward_request", False) and has_request_context()
+            else None
         )
+        arguments = self._bind_arguments(func, args, kwargs)
 
         try:
             return_type = get_type_hints(func).get("return")
         except Exception:
             return_type = None
 
-        url = cast(
-            str,
-            self._service_url,
-        ) + cast(
-            str,
-            target,
-        )
-
-        url = self._format_url(
-            req,
-            url,
+        # Only the resource path is formatted, never the service URL.
+        url = cast(str, self._service_url) + self._format_url(
+            func, cast(str, target), arguments, req
         )
 
         follow_redirects = cast(
@@ -555,19 +667,22 @@ class ApiInterface(
 
         request_headers = self._construct_headers(configs)
 
-        request_body = self._extract_request_body(
-            func,
-            args,
-            kwargs,
+        query_params: dict[str, Any] = (
+            dict(req.query_parameters) if req is not None else {}
         )
+        if http_method in _QUERY_METHODS:
+            query_params.update(self._query_from_arguments(arguments))
+            request_body: Any = _MISSING_BODY
+        else:
+            request_body = self._body_from_arguments(arguments)
 
         request_options: dict[str, Any] = {
             "headers": request_headers,
             "timeout": request_timeout,
             "follow_redirects": follow_redirects,
         }
-        if req is not None:
-            request_options["params"] = req.query_parameters
+        if query_params:
+            request_options["params"] = query_params
 
         if http_method != HttpMethod.GET and request_body is not _MISSING_BODY:
             consumes_media = configs.get(
@@ -594,20 +709,25 @@ class ApiInterface(
                 if files is not None:
                     request_options["files"] = files
 
-        async with httpx.AsyncClient() as client:
-            response = await client.request(
-                http_method,
-                url,
-                **request_options,
-            )
-
-        response_body = self._get_response_body(
-            response,
-            configs.get(
-                "produces",
-                MediaType.APPLICATION_JSON,
-            ),
+        response = await self.client.request(
+            http_method,
+            url,
+            **request_options,
         )
+
+        if return_type is Response:
+            # The caller asked for the raw response, status unchecked.
+            return response
+
+        produces_media = configs.get("produces", MediaType.APPLICATION_JSON)
+        if response.is_error:
+            try:
+                error_body = self._get_response_body(response, produces_media)
+            except ValueError:
+                error_body = response.text
+            raise ApiInterfaceResponseError(func.__name__, response, error_body)
+
+        response_body = self._get_response_body(response, produces_media)
 
         if (
             return_type
@@ -621,14 +741,25 @@ class ApiInterface(
 
         return response_body
 
-    def _extract_request_body(
+    def _bind_arguments(
         self,
         func: Callable[..., Any],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
-    ) -> Any:
+    ) -> dict[str, Any]:
         """
-        Build the outgoing body from interface method arguments.
+        Returns the call's arguments by parameter name, without ``self``.
+        Positional and keyword arguments are both supported.
+        """
+        bound = inspect.signature(func).bind_partial(self, *args, **kwargs)
+        arguments = dict(bound.arguments)
+        arguments.pop("self", None)
+        return arguments
+
+    def _body_from_arguments(self, arguments: dict[str, Any]) -> Any:
+        """
+        Build the outgoing body from the arguments left after URL
+        placeholders were filled.
 
         No arguments:
             No outgoing body.
@@ -638,24 +769,7 @@ class ApiInterface(
 
         Multiple arguments:
             A dictionary is created using the method parameter names.
-
-        Positional and keyword arguments are both supported.
         """
-        signature = inspect.signature(func)
-
-        bound = signature.bind_partial(
-            self,
-            *args,
-            **kwargs,
-        )
-
-        arguments = dict(bound.arguments)
-
-        arguments.pop(
-            "self",
-            None,
-        )
-
         if not arguments:
             return _MISSING_BODY
 
@@ -663,6 +777,30 @@ class ApiInterface(
             return next(iter(arguments.values()))
 
         return arguments
+
+    def _query_from_arguments(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """
+        Build query parameters from the arguments left after URL placeholders
+        were filled. A single mapping or Pydantic model argument supplies its
+        items; otherwise each argument is one parameter. None values are
+        left out; lists become repeated parameters.
+        """
+        values: Mapping[str, Any] = arguments
+        if len(arguments) == 1:
+            only = next(iter(arguments.values()))
+            if isinstance(only, BaseModel):
+                values = only.model_dump(mode="json")
+            elif isinstance(only, Mapping):
+                values = only
+
+        params: dict[str, Any] = {}
+        for key, value in values.items():
+            if value is None:
+                continue
+            if isinstance(value, StrEnum):
+                value = str(value)
+            params[str(key)] = value
+        return params
 
     def _prepare_json_body(
         self,
@@ -769,18 +907,36 @@ class ApiInterface(
 
     def _format_url(
         self,
-        req: Optional[Request],
+        func: Callable[..., Any],
         url: str,
+        arguments: dict[str, Any],
+        req: Optional[Request] = None,
     ) -> str:
-        if req is None:
-            return url
-        for key, value in req.route_parameters.items():
-            url = url.replace(
-                f"<{key}>",
-                str(value),
-            )
+        """
+        Fills the ``<name>`` placeholders of the URL. Each placeholder takes
+        the method argument of the same name, which is then no longer part
+        of the body or query. With forwarding enabled, a placeholder without
+        an argument takes the incoming request's route parameter. Values are
+        percent-encoded. A placeholder without a value raises
+        MissingApiInterfaceConfigurations.
+        """
 
-        return url
+        def replace(match: re.Match[str]) -> str:
+            name = match.group(1)
+            if name in arguments:
+                value = arguments.pop(name)
+            elif req is not None and name in req.route_parameters:
+                value = req.route_parameters[name]
+            else:
+                raise MissingApiInterfaceConfigurations(
+                    f"No value for the URL placeholder <{name}> of "
+                    f"{func.__name__}. Add a parameter named {name!r} to the "
+                    "method, or mark it with @forward_request to use the "
+                    "incoming request's route parameter."
+                )
+            return quote(str(value), safe="")
+
+        return _PLACEHOLDER_RE.sub(replace, url)
 
     def _get_form_and_files(
         self,
@@ -928,6 +1084,12 @@ class ApiInterface(
             if not response.content:
                 # e.g. 204 No Content
                 return None
+            if media_type == MediaType.APPLICATION_X_NDJSON:
+                return [
+                    json.loads(line)
+                    for line in response.text.splitlines()
+                    if line.strip()
+                ]
             return response.json()
 
         if media_type in {

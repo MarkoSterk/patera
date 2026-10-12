@@ -48,6 +48,22 @@
           <input type="hidden" name="count" value="{{ logs_count }}">
           <input type="hidden" name="order_by" value="{{ logs_order_by }}">
 
+          <label for="logs-severity" class="visually-hidden">{{ translate('minimum_severity') }}</label>
+          <select
+            id="logs-severity"
+            name="severity"
+            class="form-select form-select-sm"
+            style="width: auto;"
+            title="{{ translate('minimum_severity') }}"
+            onchange="this.form.submit()"
+          >
+            {% for level_name in log_levels %}
+              <option value="{{ level_name }}" {% if level_name == logs_severity %}selected{% endif %}>
+                {{ level_name }}{% if level_name != 'CRITICAL' %}+{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+
           <div class="input-group input-group-sm" style="max-width: 280px;">
             <span class="input-group-text">
               <i class="bi bi-search"></i>
@@ -76,7 +92,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-time' if logs_order_by == 'time' else 'time') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-time' if logs_order_by == 'time' else 'time') }}"
                   >
                     {{ translate('time') }}
                     {% if logs_order_by == 'time' %}
@@ -90,7 +106,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-level' if logs_order_by == 'level' else 'level') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-level' if logs_order_by == 'level' else 'level') }}"
                   >
                     {{ translate('level') }}
                     {% if logs_order_by == 'level' %}
@@ -104,7 +120,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-logger_name' if logs_order_by == 'logger_name' else 'logger_name') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-logger_name' if logs_order_by == 'logger_name' else 'logger_name') }}"
                   >
                     {{ translate('logger') }}
                     {% if logs_order_by == 'logger_name' %}
@@ -118,7 +134,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-name' if logs_order_by == 'name' else 'name') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-name' if logs_order_by == 'name' else 'name') }}"
                   >
                     {{ translate('module') }}
                     {% if logs_order_by == 'name' %}
@@ -132,7 +148,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-file' if logs_order_by == 'file' else 'file') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-file' if logs_order_by == 'file' else 'file') }}"
                   >
                     {{ translate('file') }}
                     {% if logs_order_by == 'file' %}
@@ -146,7 +162,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-line' if logs_order_by == 'line' else 'line') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-line' if logs_order_by == 'line' else 'line') }}"
                   >
                     {{ translate('line') }}
                     {% if logs_order_by == 'line' %}
@@ -160,7 +176,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-function' if logs_order_by == 'function' else 'function') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-function' if logs_order_by == 'function' else 'function') }}"
                   >
                     {{ translate('function') }}
                     {% if logs_order_by == 'function' %}
@@ -174,7 +190,7 @@
                 <th scope="col">
                   <a
                     class="text-decoration-none text-dark"
-                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=1, count=logs_count, order_by='-message' if logs_order_by == 'message' else 'message') }}"
+                    href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=1, count=logs_count, order_by='-message' if logs_order_by == 'message' else 'message') }}"
                   >
                     {{ translate('message') }}
                     {% if logs_order_by == 'message' %}
@@ -265,6 +281,7 @@
             class="d-flex align-items-center gap-2"
           >
             <input type="hidden" name="query" value="{{ logs_query }}">
+            <input type="hidden" name="severity" value="{{ logs_severity }}">
             <input type="hidden" name="page" value="1">
             <input type="hidden" name="order_by" value="{{ logs_order_by }}">
 
@@ -293,7 +310,7 @@
             <li class="page-item {% if logs_page <= 1 %}disabled{% endif %}">
               <a
                 class="page-link"
-                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page - 1, count=logs_count, order_by=logs_order_by) }}"
+                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=logs_page - 1, count=logs_count, order_by=logs_order_by) }}"
               >
                 {{ translate('previous') }}
               </a>
@@ -303,7 +320,7 @@
               <li class="page-item {% if page_number == logs_page %}active{% endif %}">
                 <a
                   class="page-link"
-                  href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=page_number, count=logs_count, order_by=logs_order_by) }}"
+                  href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=page_number, count=logs_count, order_by=logs_order_by) }}"
                 >
                   {{ page_number }}
                 </a>
@@ -313,7 +330,7 @@
             <li class="page-item {% if logs_page >= logs_total_pages %}disabled{% endif %}">
               <a
                 class="page-link"
-                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, page=logs_page + 1, count=logs_count, order_by=logs_order_by) }}"
+                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=logs_page + 1, count=logs_count, order_by=logs_order_by) }}"
               >
                 {{ translate('next') }}
               </a>

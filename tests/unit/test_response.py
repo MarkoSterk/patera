@@ -136,3 +136,43 @@ async def test_stream_text_encodes_chunks(res):
 
 class Model(BaseModel):
     a: int
+
+
+@pytest.mark.parametrize("value", ["a b", "a;b", "a,b", 'a"b', "a\\b", "a\nb"])
+def test_set_cookie_rejects_values_browsers_would_change(res, value):
+    with pytest.raises(ValueError, match="base64"):
+        res.set_cookie("session", value)
+
+
+@pytest.mark.parametrize("name", ["", "a b", "a=b", "a;b"])
+def test_set_cookie_rejects_invalid_names(res, name):
+    with pytest.raises(ValueError):
+        res.set_cookie(name, "1")
+
+
+def test_set_cookie_rejects_injected_attributes(res):
+    with pytest.raises(ValueError):
+        res.set_cookie("a", "1", path="/; Secure")
+    with pytest.raises(ValueError):
+        res.set_cookie("a", "1", domain="example.com\r\nX: y")
+
+
+def test_same_site_is_normalized_and_none_requires_secure(res):
+    with pytest.raises(ValueError, match="secure=True"):
+        res.set_cookie("a", "1", same_site="None")
+    with pytest.raises(ValueError):
+        res.set_cookie("a", "1", same_site="sometimes")
+    res.set_cookie("a", "1", same_site="none", secure=True)
+    res.set_cookie("b", "2", same_site="strict")
+    res.set_cookie("c", "3", same_site=None)
+    assert res.cookies[0].endswith("Secure; HttpOnly; SameSite=None")
+    assert res.cookies[1].endswith("SameSite=Strict")
+    assert "SameSite" not in res.cookies[2]
+
+
+def test_delete_cookie_matches_secure_cookies(res):
+    res.delete_cookie("a", same_site="None", secure=True)
+    assert "; Secure" in res.cookies[0]
+    assert res.cookies[0].endswith("SameSite=None")
+    with pytest.raises(ValueError):
+        res.delete_cookie("b", same_site="None")

@@ -3,8 +3,14 @@ Test client class
 """
 
 from typing import TYPE_CHECKING, Any, cast
-from asgi_lifespan import LifespanManager
-from httpx import AsyncClient, ASGITransport
+
+try:
+    from asgi_lifespan import LifespanManager
+    from httpx import AsyncClient, ASGITransport
+except ImportError as exc:  # pragma: no cover - depends on the installed extra
+    raise ImportError(
+        'The test client needs the "testing" extra: pip install "patera[testing]"'
+    ) from exc
 
 if TYPE_CHECKING:
     from ..patera import Patera
