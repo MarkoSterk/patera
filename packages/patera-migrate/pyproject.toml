@@ -27,7 +27,8 @@ classifiers = [
 dependencies = [
     "patera>=0.121",
     "patera-database>=0.11",
-    "pyway>=0.3.32",
+    # Migration file naming adapts pyway internals (see MigrationNaming).
+    "pyway>=0.3.32,<0.4",
 ]
 
 [project.urls]

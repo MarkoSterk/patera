@@ -7,6 +7,7 @@ import importlib
 import importlib.metadata
 import json
 import os
+import re
 import inspect
 from collections.abc import AsyncIterator, Iterable, Mapping
 from enum import StrEnum
@@ -1456,10 +1457,14 @@ class Patera(Injectable, Generic[ConfT]):
                         alias_name = f"{ctrl_alias}.{method_name}"
                         names.append(alias_name)
 
+                    # "/" + "/hello" is "/hello", not "//hello".
+                    rule = re.sub(
+                        r"/{2,}", "/", base_path + ctrl_instance.path + url_path
+                    )
                     for name in names:
                         self._add_route_function(
                             http_method,
-                            base_path + ctrl_instance.path + url_path,
+                            rule,
                             cast(Callable, cast(dict, method)["method"]),
                             name,
                         )
@@ -1556,10 +1561,10 @@ class Patera(Injectable, Generic[ConfT]):
             title=self.app_name,
             version=self.version,
             openapi_version=OPEN_API_VERSION,
-            servers=[
-                f"{self._configs.PROTOCOL}://{self._configs.HOST}:{self._configs.PORT}"
-                f"{self.url_prefix}"
-            ],
+            # Relative to wherever the document is served, so "Try it out"
+            # calls the same origin in development, production and behind a
+            # proxy (an absolute HOST:PORT would point at the bind address).
+            servers=[self.url_prefix or "/"],
             description=self._configs.OPEN_API_DESCRIPTION,
         )
         return self._json_spec

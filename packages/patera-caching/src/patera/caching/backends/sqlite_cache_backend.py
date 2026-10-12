@@ -1,13 +1,13 @@
 """
 SQLite cache backend
 
-Indicated values are defaults
-CACHE_SQLITE_PATH: str = "./patera_cache.db" # file path (required for persistence)
-CACHE_SQLITE_TABLE: str = "cache_entries" # table name
-CACHE_KEY_PREFIX: str = "patera:cache:" # optional key namespace
-CACHE_DURATION: int = 300 # default TTL seconds
-CACHE_SQLITE_WAL_CHECKPOINT_MODE: str = "PASSIVE" #PASSIVE|FULL|RESTART|TRUNCATE
-CACHE_SQLITE_WAL_CHECKPOINT_EVERY: int = 100 #run checkpoint every N write ops
+Settings of the cache extension that uses it (defaults shown):
+SQLITE_PATH = "./patera_cache.db"            # file path
+SQLITE_TABLE = "cache_entries"               # table name
+KEY_PREFIX = "patera:<app>:<cache>:"         # key namespace ("" for none)
+DURATION = 300                               # default TTL in seconds
+SQLITE_WAL_CHECKPOINT_MODE = "PASSIVE"       # PASSIVE|FULL|RESTART|TRUNCATE
+SQLITE_WAL_CHECKPOINT_EVERY = 100            # checkpoint every N writes
 """
 
 from __future__ import annotations
@@ -43,9 +43,7 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         checkpoint_every: int = 100,
     ) -> None:
         if not db_path:
-            raise ValueError(
-                "CACHE_SQLITE_PATH must be provided for SQLiteCacheBackend"
-            )
+            raise ValueError("SQLITE_PATH must be provided for SQLiteCacheBackend")
         self._db_path = db_path
         self._table = table
         self.default_ttl = int(default_ttl)
@@ -61,7 +59,7 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         self._checkpoint_mode = checkpoint_mode.upper()
         if self._checkpoint_mode not in {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}:
             raise ValueError(
-                "CACHE_SQLITE_WAL_CHECKPOINT_MODE must be one of PASSIVE|FULL|RESTART|TRUNCATE"
+                "SQLITE_WAL_CHECKPOINT_MODE must be one of PASSIVE|FULL|RESTART|TRUNCATE"
             )
         self._checkpoint_every = max(1, int(checkpoint_every))
         self._write_ops = 0

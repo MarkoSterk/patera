@@ -116,7 +116,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         """
         # Per-instance state (class-level containers would be shared between
         # every AdminInterface instance and every app in the process).
-        self._admin_menu: list[dict[str, str]] = []
         self._models_map: dict[str, Type] = {}
         self._translation_maps: dict[str, dict[str, str]] = {}
 
@@ -348,10 +347,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     def _create_models_map(self) -> None:
         for model in self.managed_models:
             self._models_map[model.__name__] = model
-
-    @property
-    def admin_menu(self) -> list[dict[str, str]]:
-        return self._admin_menu
 
     @property
     def databases_menu(self) -> list[dict[str, str | Any]]:

@@ -14,6 +14,7 @@ from .chat_response import (
     ChatResponse,
     ChatMessage,
     UsageStats,
+    iso_timestamp,
 )
 from .base_service_provider import BaseServiceProvider
 
@@ -36,7 +37,8 @@ def from_openai(data: dict[str, Any]) -> ChatResponse:
             content=message_data.get("content", "") or "",
         ),
         finish_reason=first_choice.get("finish_reason"),
-        created_at=data.get("created"),
+        request_id=data.get("id"),
+        created_at=iso_timestamp(data.get("created")),
         usage=UsageStats(
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
@@ -71,7 +73,8 @@ def from_openai_chunk(data: dict[str, Any]) -> Optional[ChatResponse]:
             content=content or "",
         ),
         finish_reason=finish_reason,
-        created_at=data.get("created"),
+        request_id=data.get("id"),
+        created_at=iso_timestamp(data.get("created")),
         usage=UsageStats(
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),

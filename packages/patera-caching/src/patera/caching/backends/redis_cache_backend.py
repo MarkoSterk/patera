@@ -1,10 +1,11 @@
 """
 Redis cache implementation
 
-CACHE_REDIS_URL       = "redis://localhost:6379/0"   # required
-CACHE_REDIS_PASSWORD  = None                          # optional
-CACHE_DURATION        = 300                           # optional (default TTL)
-CACHE_KEY_PREFIX      = "patera:<app>:<cache>:"      # optional prefix/namespace
+Settings of the cache extension that uses it:
+REDIS_URL       = "redis://localhost:6379/0"   # required
+REDIS_PASSWORD  = None                          # optional
+DURATION        = 300                           # optional (default TTL)
+KEY_PREFIX      = "patera:<app>:<cache>:"      # optional prefix/namespace
 
 Every key lives under the prefix, and clear() deletes only those keys. An
 empty prefix is allowed for get/set/delete, but clear() then refuses to run,
@@ -42,7 +43,7 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         key_prefix: str = DEFAULT_KEY_PREFIX,
     ) -> None:
         if not url:
-            raise ValueError("CACHE_REDIS_URL must be set for RedisCacheBackend")
+            raise ValueError("REDIS_URL must be set for RedisCacheBackend")
         self._url = url
         self._password = password
         self._client: Optional[Redis] = None

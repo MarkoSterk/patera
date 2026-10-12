@@ -87,7 +87,8 @@ def test_spec_contents(make_app):
         "version": "1.0",
         "description": "Pet store",
     }
-    assert spec["servers"] == [{"url": "http://localhost:9000"}]
+    # A relative server: Swagger calls the origin that served the document.
+    assert spec["servers"] == [{"url": "/"}]
 
     paths = spec["paths"]
     assert "/other/" not in paths
@@ -134,7 +135,7 @@ def test_tags_do_not_accumulate_across_apps(make_app):
 
 def test_url_prefix_is_part_of_server_url(make_app):
     app = make_app(controllers=[PetController], URL_PREFIX="/v2")
-    assert app.json_spec["servers"][0]["url"].endswith("/v2")
+    assert app.json_spec["servers"] == [{"url": "/v2"}]
 
 
 @path("/first")

@@ -3,21 +3,18 @@ Chat service provider
 """
 
 from __future__ import annotations
-from typing import Any, Literal, TypeVar
+from datetime import datetime, timezone
+from typing import Any, Literal
 from dataclasses import dataclass, asdict
 
 
-Role = Literal["system", "user", "assistant", "tool"]
-T = TypeVar("T")
+Role = Literal["system", "user", "assistant"]
 
 
 @dataclass(slots=True)
 class ChatMessage:
     role: Role
     content: str
-    thinking: str | None = None
-    name: str | None = None
-    tool_call_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -50,6 +47,7 @@ class ChatResponse:
     usage: UsageStats | None = None
 
     request_id: str | None = None
+    # ISO 8601 time at which the provider created the answer.
     created_at: str | None = None
 
     session_id: Any = None
@@ -78,3 +76,10 @@ class ChatResponse:
             created_at=data.get("created_at"),
             session_id=data.get("session_id"),
         )
+
+
+def iso_timestamp(value: Any) -> str | None:
+    """A Unix timestamp (OpenAI) or an ISO string (Ollama) as ISO 8601 text."""
+    if value is None or isinstance(value, str):
+        return value
+    return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()

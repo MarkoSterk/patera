@@ -908,3 +908,37 @@ async def test_streamed_history_is_saved_after_a_transactional_request(
         (sid, 0, "user", "hello"),
         (sid, 1, "assistant", "part 1"),
     ]
+
+
+def test_provider_responses_carry_reason_id_and_iso_time():
+    from patera.aiinterface.service_provider.ollama import from_ollama
+    from patera.aiinterface.service_provider.openai import from_openai
+
+    cut_off = from_ollama(
+        {
+            "model": "m",
+            "created_at": "2026-10-12T13:00:00Z",
+            "message": {"role": "assistant", "content": "Once upon"},
+            "done": True,
+            "done_reason": "length",
+        }
+    )
+    assert cut_off.finish_reason == "length"
+    assert cut_off.created_at == "2026-10-12T13:00:00Z"
+    partial = from_ollama({"model": "m", "message": {"content": "x"}, "done": False})
+    assert partial.finish_reason is None
+
+    answer = from_openai(
+        {
+            "id": "chatcmpl-1",
+            "created": 0,
+            "model": "m",
+            "choices": [{"message": {"role": "assistant", "content": "Hi"}}],
+        }
+    )
+    assert answer.request_id == "chatcmpl-1"
+    assert answer.created_at == "1970-01-01T00:00:00+00:00"
+
+
+def test_chat_messages_have_only_role_and_content():
+    assert ChatMessage.__slots__ == ("role", "content")

@@ -18,7 +18,7 @@ from .chat_response import (
 from .base_service_provider import BaseServiceProvider
 
 
-def from_ollama(data: dict[str, Any], session_id: Any = None) -> ChatResponse:
+def from_ollama(data: dict[str, Any]) -> ChatResponse:
     message_data = data.get("message", {})
 
     return ChatResponse(
@@ -28,7 +28,8 @@ def from_ollama(data: dict[str, Any], session_id: Any = None) -> ChatResponse:
             role=message_data.get("role", "assistant"),
             content=message_data.get("content", ""),
         ),
-        finish_reason="stop" if data.get("done") else None,
+        # "length" when the answer was cut off at the token limit.
+        finish_reason=(data.get("done_reason") or "stop") if data.get("done") else None,
         created_at=data.get("created_at"),
         usage=UsageStats(
             input_tokens=data.get("prompt_eval_count"),
@@ -40,7 +41,6 @@ def from_ollama(data: dict[str, Any], session_id: Any = None) -> ChatResponse:
                 else None
             ),
         ),
-        session_id=session_id,
     )
 
 

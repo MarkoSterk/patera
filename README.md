@@ -174,7 +174,7 @@ package is not called `app`.
 | `patera dev [--app app:App] [--env-file .env]` | development server (uvicorn) with auto-reload. Loads `.env`, `.env.dev` or `.env.local` if no file is given. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `localhost:3000`). |
 | `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the core package), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
 | `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
-| `patera test [--env-file .env.test] [pytest args...]` | runs pytest after loading the test environment file. |
+| `patera test [--env-file FILE] [pytest args...]` | runs pytest after loading the test environment file (`.env.test` when the project has one). Pytest options may come in any order (`patera test -k login -q`); everything after `--` goes to pytest unchanged. |
 | `patera desktop [--mode dev\|prod]` | runs the app as a desktop application (needs `patera-desktop`). |
 
 The application class is an ASGI application factory, so any ASGI server works, e.g.
@@ -665,7 +665,9 @@ With `OPEN_API=True` the specification is served at `/openapi/specs.json` and a 
 `/openapi/docs`. It is generated from your controllers: paths and path parameters, request bodies
 from `@consumes` + Pydantic parameters, responses from `@produces` and `Response[Model]`
 annotations, error responses from `@open_api_docs`, tags from `@path(tags=...)` and descriptions
-from docstrings. Exclude a controller or endpoint with `open_api_spec=False`.
+from docstrings. Exclude a controller or endpoint with `open_api_spec=False`. The document's server
+is relative (`URL_PREFIX`, or `/`), so "Try it out" calls the origin that served the page, behind a
+proxy too.
 
 ## Logging
 
@@ -815,7 +817,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 ```
 
-and run `uv run patera test` (loads `.env.test`) or `uv run pytest`.
+and run `uv run patera test` (loads `.env.test` if present) or `uv run pytest`.
 
 ## Extensions
 
@@ -937,8 +939,13 @@ class MainDb(SqlDatabase, Migrate):
 
 Migration settings are part of the database configuration: `MIGRATE_CLI_NAME` (`"migrate"`),
 `MIGRATE_DATABASE_MIGRATION_DIR` (`"migrations"`, relative to the application package),
-`MIGRATE_TABLE` (`"pyway_migrations"`), `MIGRATE_SQL_MIGRATION_PREFIX` (`"V"`),
-`MIGRATE_SQL_MIGRATION_SEPARATOR` (`"__"`), `MIGRATE_SQL_MIGRATION_SUFFIXES` (`".sql"`).
+`MIGRATE_TABLE` (`"pyway_migrations"`), and the migration file names:
+`MIGRATE_SQL_MIGRATION_PREFIX` (`"V"`), `MIGRATE_SQL_MIGRATION_SEPARATOR` (`"__"`) and
+`MIGRATE_SQL_MIGRATION_SUFFIXES` (`".sql"`, several separated by commas). A migration is named
+`<prefix><version><separator><description><suffix>`, for example `V1_0__create_notes.sql`; the
+version has at least two numbers (`1_0`, `2.1`, `3_0_1`). Files with another ending, such as a
+`README.md`, are ignored; a file with a migration ending but another name stops the command with an
+error, so a misnamed migration is never skipped silently.
 `migrate:init` writes `.pyway.conf` into the migration directory (`app/migrations/.pyway.conf` by
 default). Each developer generates their own copy, so add it to `.gitignore`. The file holds only
 migration settings: the connection (including the password) is read from `DATABASE_URI` each time a

@@ -27,6 +27,11 @@ together.
 - **patera-database:** `@query` methods annotated `-> None` return `None`; `-> int` on a statement
   without result rows returns the number of affected rows.
 - **Core:** blank query and form values (`?q=`) are kept as `""` instead of being dropped.
+- **Core:** the OpenAPI document's server is relative (`URL_PREFIX`, or `/`) instead of
+  `PROTOCOL://HOST:PORT`, so Swagger's "Try it out" calls the origin that served the page.
+- **Core:** `patera test` loads `.env.test` only when it exists (an explicit `--env-file` must
+  exist), runs pytest without arguments by default so pytest's own configuration (`testpaths`)
+  applies, and no longer has the unused `--app` option.
 - **Core:** `Response.set_cookie()` raises `ValueError` for names or values a browser would change
   (spaces, `;`, `,`, quotes, backslashes, control characters) and for `SameSite=None` without
   `secure=True`.
@@ -99,10 +104,22 @@ together.
   `clear()` treats `_` and `%` in the prefix literally; Redis `clear()` refuses to run without a
   prefix.
 - **patera-database:** `@query` INSERT, UPDATE and DELETE statements no longer crash.
+- **patera-database:** removed `DeclarativeBaseModel.db_configs_name()`, which always raised
+  `AttributeError`.
 - **patera-database:** `disconnect()` forgets the session factory, so a later session reconnects
   instead of opening connections on the disposed engine that were never closed.
 - **patera-migrate:** per-database command prefixes; percent-encoded credentials in the URI are
   decoded.
+- **Core:** `patera test` accepts pytest options in any order (`patera test -k login -q` failed with
+  "unrecognized arguments"), and a missing environment file is a one-line error instead of a
+  traceback.
+- **Core:** when auto-discovery finds no application because a module failed to import, the error
+  names that module instead of asking for an import string.
+- **Core:** routes joined from `@path("/")` and `@get("/hello")` are stored as `/hello`, not
+  `//hello`.
+- **patera-migrate:** `MIGRATE_SQL_MIGRATION_PREFIX`, `_SEPARATOR` and `_SUFFIXES` now take effect
+  (they were ignored); files in the migration folder with another ending are skipped, and a
+  misnamed migration is an error. pyway is limited to `<0.4`.
 - **patera-taskmanager:** the scheduler is the single source of truth for job state; APScheduler is
   limited to version 3 (`<4`), since version 4 changes its API.
 
@@ -145,6 +162,10 @@ together.
   `embed()`, `search()` and `relevant_texts()` are public.
 - `REWRITE_QUERY`: with history, the model first rewrites a follow-up question into a standalone
   one for the search (`REWRITE_PROMPT`).
+- `ChatMessage` has only `role` and `content` (the unused `thinking`, `name` and `tool_call_id`
+  fields and the `"tool"` role are gone). Ollama reports `finish_reason="length"` for an answer cut
+  off at the token limit; OpenAI answers fill `request_id`, and `created_at` is ISO 8601 text for
+  both providers.
 - `augmentation_provider.embeddings` keeps only `VectorColumn`; its Python distance helpers were
   removed.
 - Methods without `@history` work outside a request, and a missing history or augmentation

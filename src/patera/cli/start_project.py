@@ -222,9 +222,12 @@ def iter_candidate_files(root: Path) -> Iterator[Path]:
 def find_patera_app_import(
     patera_class: Type,
     root: Path,
+    failed_modules: Optional[list[str]] = None,
 ) -> Optional[str]:
     """
     Find the first class that subclasses `patera_class` and return its import string.
+    Modules that fail to import are reported on standard error and, when
+    ``failed_modules`` is given, added to it.
 
     Example return values:
         "app:App"
@@ -258,6 +261,8 @@ def find_patera_app_import(
 
             print(f"Failed to import module '{module_name}'", file=sys.stderr)
             traceback.print_exc()
+            if failed_modules is not None:
+                failed_modules.append(module_name)
             continue
 
         for name, obj in inspect.getmembers(module, inspect.isclass):
@@ -306,7 +311,17 @@ def _resolve_app_path(
         app_path = os.environ.get("PATERA_IMPORT", None)
 
     if app_path is None:
-        app_path = find_patera_app_import(patera_class, root)
+        failed: list[str] = []
+        app_path = find_patera_app_import(patera_class, root, failed)
+        if app_path is None and failed:
+            # The application is most likely in a module that failed to
+            # import: point at that error rather than at the import string.
+            cli_fail(
+                "No Patera application found: "
+                f"{', '.join(repr(name) for name in failed)} failed to import "
+                "(see the error above). Fix the error, or name the application "
+                "with --app (example: 'app:App')."
+            )
 
     return app_path
 
@@ -377,7 +392,6 @@ def resolve_server_address(app_path: str, *, production: bool) -> tuple[str, int
 
 def _start_prod(
     cwd: str,
-    debug: bool,
     app: Optional[str] = None,
     env_file: Optional[str] = None,
 ):
@@ -486,7 +500,7 @@ def start_prod(
     env_file: Optional[str] = None,
 ):
     try:
-        _start_prod(cwd, False, app, env_file)
+        _start_prod(cwd, app, env_file)
     except Exception as e:
         cli_fail(f"Failed to start Patera app in production mode: {e}")
 
@@ -523,11 +537,13 @@ def start_cli(
 def start_testing(
     cwd: str,
     command: str,
-    *args,
-    app: Optional[str] = None,
-    env_file: str = ".env.test",
-    **kwargs,
-):
+    env_file: Optional[str] = None,
+    pytest_args: Optional[list[str]] = None,
+) -> int:
+    """
+    Runs pytest after loading the test environment: the given env_file
+    (which must exist), or .env.test when the project has one.
+    """
     try:
         import pytest  # type: ignore
     except ImportError:
@@ -536,14 +552,15 @@ def start_testing(
             "Run: 'pip install patera[testing]'"
         )
 
-    load_env_file(cwd, env_file)
+    if env_file is None and (Path(cwd) / ".env.test").is_file():
+        env_file = ".env.test"
+    if env_file is not None:
+        try:
+            load_env_file(cwd, env_file)
+        except RuntimeError as exc:
+            cli_fail(str(exc))
 
-    pytest_args = kwargs.pop("pytest_args", []) or []
-
-    if not pytest_args:
-        pytest_args = [str(cwd)]
-
-    return pytest.main(pytest_args)  # type: ignore
+    return pytest.main(list(pytest_args or []))  # type: ignore
 
 
 def start_desktop(

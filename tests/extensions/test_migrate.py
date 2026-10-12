@@ -171,3 +171,75 @@ def test_two_databases_with_the_same_migration_name_conflict(make_app):
     MigratedDb(app)
     with pytest.raises(ValueError, match="Set a different MIGRATE_CLI_NAME"):
         ReportsDb(app)
+
+
+def _sqlite_app(make_app, tmp_path, **settings):
+    database = tmp_path / "app.db"
+    app = make_app(
+        cli_mode=True,
+        MIGRATED_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{database}", **settings
+        ),
+    )
+    db = MigratedDb(app)
+    return db._migrate, database
+
+
+def _tables(database) -> set[str]:
+    import sqlite3
+    from contextlib import closing
+
+    with closing(sqlite3.connect(database)) as conn:
+        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        return {name for (name,) in rows}
+
+
+async def test_migrations_run_with_the_default_names(make_app, tmp_path, capsys):
+    mig, database = _sqlite_app(make_app, tmp_path)
+    (mig._migrations_path / "V1_0__notes.sql").write_text(
+        "CREATE TABLE notes (id INTEGER PRIMARY KEY);"
+    )
+    (mig._migrations_path / "README.md").write_text("Not a migration.")
+    await mig._cli_controller.migrate()
+    assert "notes" in _tables(database)
+    assert "V1_0__notes.sql SUCCESS" in capsys.readouterr().out
+
+
+async def test_migration_naming_settings(make_app, tmp_path, capsys):
+    mig, database = _sqlite_app(
+        make_app,
+        tmp_path,
+        MIGRATE_SQL_MIGRATION_PREFIX="R",
+        MIGRATE_SQL_MIGRATION_SEPARATOR="--",
+        MIGRATE_SQL_MIGRATION_SUFFIXES=".up.sql, .ddl",
+    )
+    (mig._migrations_path / "R1_0--notes.up.sql").write_text(
+        "CREATE TABLE notes (id INTEGER PRIMARY KEY);"
+    )
+    (mig._migrations_path / "R1_1--tags.ddl").write_text(
+        "CREATE TABLE tags (id INTEGER PRIMARY KEY);"
+    )
+    (mig._migrations_path / "notes.txt").write_text("ignored")
+    await mig._cli_controller.migrate()
+    assert {"notes", "tags"} <= _tables(database)
+    output = capsys.readouterr().out
+    assert "R1_0--notes.up.sql SUCCESS" in output
+    assert "R1_1--tags.ddl SUCCESS" in output
+
+    # A file with a migration ending but another naming is an error,
+    # never silently skipped.
+    (mig._migrations_path / "R1_2__wrong.up.sql").write_text("SELECT 1;")
+    with pytest.raises(ValueError, match="does not match the configured naming"):
+        await mig._cli_controller.migrate()
+
+
+async def test_pyway_names_are_restored_after_a_command(make_app, tmp_path):
+    from pyway import settings
+    from pyway.helpers import Utils
+
+    mig, _ = _sqlite_app(make_app, tmp_path, MIGRATE_SQL_MIGRATION_PREFIX="R")
+    original = Utils.__dict__["get_version_from_name"]
+    await mig._cli_controller.info()
+    assert settings.SQL_MIGRATION_PREFIX == "V"
+    assert Utils.__dict__["get_version_from_name"] is original
+    assert Utils.get_version_from_name("V2_1__x.sql") == "2.1"

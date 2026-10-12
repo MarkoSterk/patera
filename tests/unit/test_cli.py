@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 import pytest
@@ -196,7 +197,7 @@ def test_prod_loads_only_an_explicit_env_file(tmp_path, monkeypatch):
     )
     monkeypatch.delenv("PATERA_PORT", raising=False)
 
-    _start_prod(str(tmp_path), False, app="app:App")
+    _start_prod(str(tmp_path), app="app:App")
     assert "PATERA_TEST_PROD_VALUE" not in os.environ  # .env.dev is not searched
     assert os.environ["PATERA_DEBUG"] == "0"
     assert served[-1][1]["address"] == "0.0.0.0"
@@ -205,7 +206,7 @@ def test_prod_loads_only_an_explicit_env_file(tmp_path, monkeypatch):
     # Each CLI run is a separate process: forget the address written back above.
     monkeypatch.delenv("PATERA_PORT")
     monkeypatch.delenv("PATERA_HOST")
-    _start_prod(str(tmp_path), False, app="app:App", env_file=".env.prod")
+    _start_prod(str(tmp_path), app="app:App", env_file=".env.prod")
     assert os.environ["PATERA_TEST_PROD_VALUE"] == "prod"
     assert served[-1][0] == "app:App"
     assert served[-1][1]["port"] == 8123
@@ -334,6 +335,57 @@ def test_start_testing_returns_the_pytest_exit_code(tmp_path, monkeypatch):
     assert start_project.start_testing(str(tmp_path), "test", env_file=None) == 3
 
 
+@pytest.mark.parametrize(
+    ("argv", "env_file", "pytest_args"),
+    [
+        ([], None, []),
+        (["-k", "login", "-q"], None, ["-k", "login", "-q"]),
+        (["-q", "--env-file", ".env.ci", "tests"], ".env.ci", ["-q", "tests"]),
+        (["--env-file=.env.ci", "-x"], ".env.ci", ["-x"]),
+        (["--", "-q", "--env-file", "x"], None, ["-q", "--env-file", "x"]),
+    ],
+)
+def test_patera_test_passes_options_in_any_order(
+    monkeypatch, argv, env_file, pytest_args
+):
+    from patera.cli import cli as cli_module
+
+    captured = {}
+    monkeypatch.setitem(
+        cli_module.methods, "test", lambda cwd, **kwargs: captured.update(kwargs) or 0
+    )
+    monkeypatch.setattr(sys, "argv", ["patera", "test", *argv])
+    assert cli_module.main() == 0
+    assert captured == {
+        "command": "test",
+        "env_file": env_file,
+        "pytest_args": pytest_args,
+    }
+
+
+def test_patera_test_loads_env_test_only_when_present(tmp_path, monkeypatch):
+    from patera.cli import start_project
+
+    seen = []
+    monkeypatch.setattr(pytest, "main", lambda args: seen.append(args) or 0)
+    monkeypatch.delenv("PATERA_FROM_TEST_ENV", raising=False)
+    # No .env.test: tests still run.
+    assert start_project.start_testing(str(tmp_path), "test") == 0
+    (tmp_path / ".env.test").write_text("PATERA_FROM_TEST_ENV=yes\n")
+    assert start_project.start_testing(str(tmp_path), "test", pytest_args=["-q"]) == 0
+    assert os.environ.pop("PATERA_FROM_TEST_ENV") == "yes"
+    assert seen == [[], ["-q"]]
+
+
+def test_patera_test_with_a_missing_env_file_exits_cleanly(tmp_path, capsys):
+    from patera.cli import start_project
+
+    with pytest.raises(SystemExit) as exc:
+        start_project.start_testing(str(tmp_path), "test", env_file=".env.missing")
+    assert exc.value.code == 1
+    assert "Environment file not found" in capsys.readouterr().err
+
+
 @cli_controller(name="db")
 class DbCLI(CLIController):
     @command("seed", help="Load example data")
@@ -392,3 +444,25 @@ def test_cli_controller_names_must_be_unique(cli_app):
     # Registering the same instance again is harmless.
     existing = cli_app._cli_controllers["tools"]
     cli_app.register_cli_controller(existing)
+
+
+def test_auto_discovery_names_modules_that_failed_to_import(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("PATERA_APP_PACKAGE", "broken_app")
+    monkeypatch.delenv("PATERA_IMPORT", raising=False)
+    (tmp_path / "broken_app").mkdir()
+    (tmp_path / "broken_app" / "__init__.py").write_text(
+        "import a_module_that_does_not_exist\n"
+    )
+    from patera import Patera
+
+    with pytest.raises(SystemExit) as exc:
+        from patera.cli.start_project import _resolve_app_path
+
+        _resolve_app_path(None, tmp_path, Patera)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "ModuleNotFoundError" in err  # the real error is shown
+    assert "'broken_app' failed to import" in err
+    assert "Failed to locate Patera implementation" not in err

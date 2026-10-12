@@ -392,3 +392,28 @@ async def test_same_controller_in_two_apps(make_app, client_for):
     for application in (app1, app2):
         async with client_for(application) as client:
             assert (await client.get("/api/users/stats")).status_code == 200
+
+
+@path("/")
+class RootController(Controller):
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        return req.res.json({"page": "index"})
+
+    @get("/hello")
+    async def hello(self, req: Request) -> Response:
+        return req.res.json({"page": "hello"})
+
+
+@pytest.mark.parametrize("prefix", ["", "/v1"])
+async def test_joined_route_paths_have_no_double_slashes(make_app, client_for, prefix):
+    app = make_app(controllers=[RootController], URL_PREFIX=prefix)
+    rules = sorted(
+        r.rule
+        for r in app.router.url_map.iter_rules()
+        if "RootController" in r.endpoint
+    )
+    assert rules == sorted([f"{prefix}/", f"{prefix}/hello"])
+    assert app.url_for("RootController.hello") == f"{prefix}/hello"
+    async with client_for(app) as client:
+        assert (await client.get(f"{prefix}/hello")).json() == {"page": "hello"}

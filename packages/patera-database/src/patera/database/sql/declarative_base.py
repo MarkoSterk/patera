@@ -64,7 +64,6 @@ class DeclarativeBaseModel(DeclarativeBase):
     __abstract__ = True
 
     __db_name__: str
-    __db_configs_name__: str
 
     Meta: ClassVar[type[ModelMeta]] = ModelMeta
 
@@ -189,10 +188,6 @@ class DeclarativeBaseModel(DeclarativeBase):
     @classmethod
     def db_name(cls) -> str:
         return cls.__db_name__
-
-    @classmethod
-    def db_configs_name(cls) -> str:
-        return cls.__db_configs_name__
 
     @classmethod
     def primary_key_names(cls) -> list[str | None] | None:

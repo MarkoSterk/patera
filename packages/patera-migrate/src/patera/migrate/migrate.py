@@ -3,8 +3,10 @@ Pyway implementation for Patera
 """
 
 import os
+import re
+from contextlib import contextmanager
 from urllib.parse import unquote, urlparse
-from typing import Any, Dict, Generic, Optional, TypeVar
+from typing import Any, Dict, Generic, Iterator, Optional, TypeVar
 from patera import Patera
 from patera.cli import CLIController, command, cli_controller
 from patera.database.sql import SqlDatabase
@@ -12,7 +14,9 @@ from patera.database.sql import SqlDatabase
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 
+from pyway import settings as pyway_settings
 from pyway.configfile import ConfigFile as PywayConfigFile
+from pyway.helpers import Utils as PywayUtils
 from pyway.info import Info as PywayInfo
 from pyway.migrate import Migrate as PywayMigrate
 from pyway.validate import Validate as PywayValidate
@@ -26,14 +30,101 @@ class _PateraPywayConfigs(BaseModel):
         "migrate", description="Name of the cli command prefix"
     )
     MIGRATE_DATABASE_MIGRATION_DIR: str = Field("migrations", description="")
-    MIGRATE_SQL_MIGRATION_PREFIX: str = Field("V", description="")
-    MIGRATE_SQL_MIGRATION_SEPARATOR: str = Field("__", description="")
-    MIGRATE_SQL_MIGRATION_SUFFIXES: str = Field(".sql", description="")
+    MIGRATE_SQL_MIGRATION_PREFIX: str = Field(
+        "V", description="Start of every migration file name (V1_0__init.sql)"
+    )
+    MIGRATE_SQL_MIGRATION_SEPARATOR: str = Field(
+        "__", min_length=1, description="Text between the version and the description"
+    )
+    MIGRATE_SQL_MIGRATION_SUFFIXES: str = Field(
+        ".sql",
+        min_length=1,
+        description="File endings of migrations; several are separated by commas",
+    )
     MIGRATE_TABLE: str = Field("pyway_migrations", description="")
     MIGRATE_CONFIG_FILE: str = Field(".pyway.conf", description="")
 
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
+
+
+class MigrationNaming:
+    """
+    The file names of one database's migrations:
+    <PREFIX><version><SEPARATOR><description><SUFFIX>, for example
+    V1_0__create_notes.sql. The version has at least two numbers separated
+    by "_" or "." (1_0, 2.1, 3_0_1).
+
+    Pyway itself reads every file in the folder and expects V and __, so the
+    commands run inside ``applied()``, which makes Pyway use these names.
+    """
+
+    def __init__(self, prefix: str, separator: str, suffixes: str) -> None:
+        self.prefix = prefix
+        self.separator = separator
+        self.suffixes = tuple(
+            part.strip() for part in suffixes.split(",") if part.strip()
+        )
+        self._pattern = re.compile(
+            rf"^{re.escape(prefix)}(?P<version>\d+(?:[._]\d+)+)"
+            rf"{re.escape(separator)}.+$"
+        )
+
+    def example(self) -> str:
+        return f"{self.prefix}1_0{self.separator}description{self.suffixes[0]}"
+
+    def is_migration_file(self, name: str) -> bool:
+        """Files with another ending (README.md, notes.txt) are not migrations."""
+        return not name.startswith(".") and name.lower().endswith(
+            tuple(suffix.lower() for suffix in self.suffixes)
+        )
+
+    def version(self, name: str) -> str:
+        """The version of a migration file name, as Pyway stores it (1.0)."""
+        match = self._pattern.match(name)
+        if match is None:
+            raise ValueError(
+                f"Migration file {name!r} does not match the configured naming "
+                f"(for example {self.example()!r}): MIGRATE_SQL_MIGRATION_PREFIX="
+                f"{self.prefix!r}, MIGRATE_SQL_MIGRATION_SEPARATOR={self.separator!r}."
+            )
+        return match.group("version").replace("_", ".")
+
+    @contextmanager
+    def applied(self) -> Iterator[None]:
+        """Pyway uses these names while the block runs, then its own again."""
+        naming = self
+        saved_settings = (
+            pyway_settings.SQL_MIGRATION_PREFIX,
+            pyway_settings.SQL_MIGRATION_SEPARATOR,
+            pyway_settings.SQL_MIGRATION_SUFFIXES,
+        )
+        saved_files = PywayUtils.__dict__["get_local_files"]
+        saved_version = PywayUtils.__dict__["get_version_from_name"]
+        original_files = saved_files.__func__
+
+        def get_local_files(directory: str) -> list[str]:
+            return [
+                name
+                for name in original_files(directory)
+                if naming.is_migration_file(name)
+            ]
+
+        pyway_settings.SQL_MIGRATION_PREFIX = self.prefix
+        pyway_settings.SQL_MIGRATION_SEPARATOR = self.separator
+        pyway_settings.SQL_MIGRATION_SUFFIXES = self.suffixes[0]
+        PywayUtils.get_local_files = staticmethod(get_local_files)  # type: ignore[method-assign]
+        PywayUtils.get_version_from_name = staticmethod(self.version)  # type: ignore[method-assign]
+        try:
+            yield
+        finally:
+            (
+                pyway_settings.SQL_MIGRATION_PREFIX,
+                pyway_settings.SQL_MIGRATION_SEPARATOR,
+                pyway_settings.SQL_MIGRATION_SUFFIXES,
+            ) = saved_settings
+            PywayUtils.get_local_files = saved_files  # type: ignore[method-assign]
+            PywayUtils.get_version_from_name = saved_version  # type: ignore[method-assign]
 
 
 class PywayCLIController(CLIController[AppT]):
@@ -65,6 +156,17 @@ class PywayCLIController(CLIController[AppT]):
         os.environ.pop("PYWAY_DATABASE_MIGRATION_DIR", None)
         os.environ.pop("PYWAY_CONFIG_FILE", None)
 
+    def _run(self, command_class: Any, checksum_file: Optional[str] = None) -> None:
+        """Runs one Pyway command with this database's settings and file names."""
+        pyway_configs = self._get_configs_from_file()
+        if checksum_file is not None:
+            pyway_configs.checksum_file = checksum_file  # type: ignore[assignment]
+        try:
+            with self._ext.naming.applied():
+                print(command_class(pyway_configs).run())
+        finally:
+            self._clear_env_vars()
+
     @command("init", help="Initilizes Patera migration extension for database")
     def init(self) -> None:
         """Initilizes pyway configs"""
@@ -72,46 +174,25 @@ class PywayCLIController(CLIController[AppT]):
 
     @command("info", help="Provides information about current migrations and db status")
     def info(self) -> None:
-        pyway_configs = self._get_configs_from_file()
-        try:
-            pyway_info = PywayInfo(pyway_configs)
-            print(pyway_info.run())
-        finally:
-            self._clear_env_vars()
+        self._run(PywayInfo)
 
     @command(
         "validate",
         help="Validate helps you verify that the migrations applied to the database match the ones available locally.",
     )
     def validate(self) -> None:
-        pyway_configs = self._get_configs_from_file()
-        try:
-            pyway_validate = PywayValidate(pyway_configs)
-            print(pyway_validate.run())
-        finally:
-            self._clear_env_vars()
+        self._run(PywayValidate)
 
     @command("migrate", help="Perform database migration")
     def migrate(self) -> None:
-        pyway_configs = self._get_configs_from_file()
-        try:
-            pyway_migrate = PywayMigrate(pyway_configs)
-            print(pyway_migrate.run())
-        finally:
-            self._clear_env_vars()
+        self._run(PywayMigrate)
 
     @command(
         "checksum",
         help="Updates a checksum in the database. This is for advanced use only, as it could put the pyway database out of sync with reality. ",
     )
     def checksum(self, checksum_file: str) -> None:
-        pyway_configs = self._get_configs_from_file()
-        pyway_configs.checksum_file = checksum_file  # type: ignore
-        try:
-            pyway_checksum = PywayChecksum(pyway_configs)
-            print(pyway_checksum.run())
-        finally:
-            self._clear_env_vars()
+        self._run(PywayChecksum, checksum_file)
 
 
 class Migrate(Generic[AppT]):
@@ -150,6 +231,11 @@ class Migrate(Generic[AppT]):
         self._migrations_path.mkdir(parents=True, exist_ok=True)
         self._configs_path: Path = (
             self._migrations_path / self._configs.MIGRATE_CONFIG_FILE
+        )
+        self.naming = MigrationNaming(
+            self._configs.MIGRATE_SQL_MIGRATION_PREFIX,
+            self._configs.MIGRATE_SQL_MIGRATION_SEPARATOR,
+            self._configs.MIGRATE_SQL_MIGRATION_SUFFIXES,
         )
 
     def pyway_settings(self) -> Dict[str, str]:

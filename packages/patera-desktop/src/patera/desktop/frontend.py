@@ -7,14 +7,12 @@ from typing import (
     TypeAlias,
     TypeVar,
     Generic,
-    cast,
     Any,
     get_type_hints,
     get_origin,
     get_args,
 )
 from patera import Patera, BaseExtension
-import webview
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
 
@@ -43,8 +41,6 @@ class Frontend(BaseExtension[AppT], Generic[AppT]):
     __exposes__: dict[str, ExposeDef] = {}
 
     def __init__(self, app: AppT) -> None:
-        self._window: webview.Window = cast(webview.Window, None)
-        self._active_windows: list[webview.Window] = []
         self._exposed_tools: list[Callable[..., Any]] = []
         self._exposed_tools_map: dict[str, Callable] = {}
         self._desktop_root_path: str = os.path.dirname(__file__)
