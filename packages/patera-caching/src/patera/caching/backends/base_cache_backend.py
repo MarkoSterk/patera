@@ -3,6 +3,7 @@ Base/Blueprint class for cache implementation
 """
 
 from __future__ import annotations
+import json
 import re
 from abc import ABC, abstractmethod
 from typing import Generic, Optional, Any, Self, TypeVar
@@ -74,6 +75,24 @@ class BaseCacheBackend(ABC, Generic[AppT]):
             return configs.model_dump()
         return dict(configs)
 
+    @staticmethod
+    def encode_payload(value: dict) -> bytes:
+        """
+        A cached payload as stored by backends outside the process: JSON.
+        Payloads hold only JSON values (the response body is already encoded
+        and stored as base64 text), so reading a cache entry never runs code.
+        """
+        return json.dumps(value, separators=(",", ":")).encode("utf-8")
+
+    @staticmethod
+    def decode_payload(raw: bytes | str) -> Optional[dict]:
+        """The payload of a stored entry, or None if it cannot be read."""
+        try:
+            value = json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+        return value if isinstance(value, dict) else None
+
     @abstractmethod
     async def connect(self) -> None:
         """Establish any required connections (no-op for memory)."""
@@ -88,7 +107,10 @@ class BaseCacheBackend(ABC, Generic[AppT]):
 
     @abstractmethod
     async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
-        """Store payload dict under key with optional TTL in seconds."""
+        """
+        Store payload dict under key with optional TTL in seconds. The dict
+        holds only JSON values; see encode_payload().
+        """
 
     @abstractmethod
     async def delete(

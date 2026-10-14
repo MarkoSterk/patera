@@ -337,3 +337,113 @@ async def test_generic_handlers_do_not_capture_builtin_exceptions(make_app, clie
         assert res.json()["message"] == "Endpoint not found"
         res = await client.get("/builtin/html")
         assert res.text == "Conflict: conflict"
+
+
+def test_middleware_order_zero_is_kept(make_app):
+    from patera.middleware import MiddlewareBase
+
+    class ZeroOrder(MiddlewareBase):
+        _middleware = True
+
+        async def middleware(self, req):
+            return await self.next(req)
+
+    app = make_app()
+    app.register_middleware(ZeroOrder, order=0)
+    assert app._middleware_classes[0] is ZeroOrder
+
+
+def test_framework_middleware_declare_their_default_order():
+    from patera.cors.cors_mw import CORSMiddleware
+    from patera.auth import Authentication
+    from patera.database.sql.sql_database_manager import SqlDatabaseManagerMiddleware
+
+    # One attribute for framework positions; "_order" is set by @middleware.
+    assert CORSMiddleware._order_ == -101
+    assert SqlDatabaseManagerMiddleware._order_ == -100
+    assert Authentication._order_ == -99
+    assert "_order" not in vars(SqlDatabaseManagerMiddleware)
+
+
+# ---- Controllers: properties, same names, sockets -------------------------------
+
+
+@path("/with-property")
+class ControllerWithProperty(Controller):
+    @property
+    def user(self):
+        from patera.ctx import current_request
+
+        # Needs a request: must not be read while the controller registers.
+        return current_request.user
+
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        return req.res.json({"user": self.user})
+
+
+async def test_controller_properties_are_not_read_at_registration(make_app, client_for):
+    app = make_app(controllers=[ControllerWithProperty])
+    async with client_for(app) as client:
+        res = await client.get("/with-property/")
+    assert res.json() == {"user": None}
+
+
+def _api(prefix: str) -> type:
+    @path(prefix)
+    class Api(Controller):
+        @get("/")
+        async def index(self, req: Request) -> Response:
+            return req.res.json({})
+
+    return Api
+
+
+def test_two_controllers_with_one_name_are_refused(make_app):
+    with pytest.raises(ValueError, match="Two controllers are named 'Api'"):
+        make_app(controllers=[_api("/users"), _api("/posts")])
+
+
+def test_registering_the_same_controller_twice_is_harmless(make_app):
+    api = _api("/users")
+    app = make_app(controllers=[api])
+    app.register_controller(api)
+    assert app.get_controller("Api").__class__ is api
+
+
+def test_socket_handlers_refuse_middleware_decorators(make_app):
+    from patera.controller import socket
+
+    def protected(func):
+        # What @login_required() / @role_required(...) leave on a handler.
+        func._authentication = {"required": True}
+        return func
+
+    @path("/ws")
+    class LoginSocket(Controller):
+        @socket("/chat")
+        @protected
+        async def chat(self, req: Request) -> None: ...
+
+    with pytest.raises(ValueError, match="HTTP middleware does not run"):
+        make_app(controllers=[LoginSocket])
+
+    @path("/ws2")
+    class TransactionalSocket(Controller):
+        @socket("/chat")
+        async def chat(self, req: Request) -> None: ...
+
+    TransactionalSocket._transactional = True  # type: ignore[attr-defined]
+    with pytest.raises(ValueError, match="@transactional"):
+        make_app(controllers=[TransactionalSocket])
+
+
+def test_the_missing_configuration_error_names_the_app_decorator():
+    from patera import Patera
+    from patera.patera import MissingAppConfigurations
+
+    class Undecorated(Patera):  # type: ignore[type-arg]
+        pass
+
+    with pytest.raises(MissingAppConfigurations, match=r"@app\(__name__"):
+        Undecorated()

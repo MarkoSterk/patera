@@ -4,7 +4,7 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Iterator, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -134,6 +134,37 @@ def request_context(*, app=None, request=None, controller=None) -> Any:
         request=request,
         controller=controller,
     )
+    token: Token = _current_context.set(ctx)
+    try:
+        yield ctx
+    finally:
+        _current_context.reset(token)
+
+
+@contextmanager
+def child_context(*, app: Any = None) -> Iterator[RequestContextData]:
+    """
+    A context of its own for a block of work, such as a database session
+    scope.
+
+    Inside a request it keeps the request's app, request, controller, user,
+    roles and a copy of its extras, so the block still sees who is asking,
+    but it has sessions of its own: the block never replaces the request's
+    sessions, and the request never sees the block's. Outside a request it
+    is a fresh context for ``app``.
+    """
+    parent = _current_context.get()
+    if parent is None:
+        ctx = RequestContextData(app=app)
+    else:
+        ctx = RequestContextData(
+            app=parent.app if parent.app is not None else app,
+            request=parent.request,
+            controller=parent.controller,
+            user=parent.user,
+            roles=parent.roles,
+            extras=dict(parent.extras),
+        )
     token: Token = _current_context.set(ctx)
     try:
         yield ctx

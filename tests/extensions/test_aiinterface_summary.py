@@ -403,13 +403,14 @@ async def test_only_one_first_summary_is_saved(chat):
 
 
 async def test_two_worker_processes_do_not_collide(chat, make_app):
-    """Two applications stand in for two worker processes (PostgreSQL only)."""
+    """
+    Two applications with engines of their own stand in for two worker
+    processes. Only the database lock keeps their writes apart.
+    """
     db = chat.app.get_extension(SumDatabases).get_database("summaries")
-    if db.engine.dialect.name != "postgresql":
-        pytest.skip("SQLite applications run in one process")
     other_app = make_app(
         extensions=[SumDatabases],
-        SUM_DB=SqlDatabaseConfig(DATABASE_URI=os.environ["PATERA_TEST_PG_URI"]),
+        SUM_DB=SqlDatabaseConfig(DATABASE_URI=db.db_uri),
         CHAT=chat.configs,
     )
     other = Chat(other_app)
@@ -431,3 +432,69 @@ async def test_two_worker_processes_do_not_collide(chat, make_app):
     stored = await chat.history_provider.load_since("s", None, None)
     assert [item.position for item in stored] == list(range(16))
     assert sorted(firsts) == [False, True]
+
+
+async def _transactional_request(app, work) -> None:
+    """Runs ``work`` the way a @transactional request does: commit at the end."""
+    from patera.ctx import request_context
+    from patera.database.sql.request_keys import TRANSACTION_OPEN
+
+    manager = app.get_extension(SumDatabases)
+    with request_context(app=app) as ctx:
+        ctx.extras[TRANSACTION_OPEN] = True
+        try:
+            await work()
+            ctx.extras.pop(TRANSACTION_OPEN)
+            await manager.commit_all_sessions(ctx.sessions)
+        finally:
+            await manager.close_all_sessions(ctx)
+
+
+async def test_overlapping_transactional_requests_on_one_chat(chat):
+    """
+    The first request writes, works on, writes again and only then commits.
+    The second writes in between: it must wait for that commit instead of
+    reusing order numbers it cannot see yet, and must not block the first
+    request's second write while it waits.
+    """
+    history_provider = chat.history_provider
+    first_wrote = asyncio.Event()
+
+    async def first() -> None:
+        await history_provider.append("s", _pair(1))
+        first_wrote.set()
+        await asyncio.sleep(0.3)
+        await history_provider.append("s", _pair(2))
+
+    async def second() -> None:
+        await first_wrote.wait()
+        await history_provider.append("s", _pair(3))
+
+    await asyncio.wait_for(
+        asyncio.gather(
+            _transactional_request(chat.app, first),
+            _transactional_request(chat.app, second),
+        ),
+        timeout=10,
+    )
+    stored = await history_provider.load_since("s", None, None)
+    assert [item.position for item in stored] == list(range(6))
+    assert [item.message.content for item in stored] == [
+        "q1",
+        "a1",
+        "q2",
+        "a2",
+        "q3",
+        "a3",
+    ]
+
+
+async def test_databases_without_a_lock_take_turns_in_process(chat, monkeypatch):
+    """MySQL and others: the in-process lock is held until each write commits."""
+    from patera.aiinterface.history_provider import base_history_provider
+
+    monkeypatch.setattr(base_history_provider, "_LOCKING_DIALECTS", frozenset())
+    history_provider = chat.history_provider
+    await asyncio.gather(*(history_provider.append("s", _pair(n)) for n in range(6)))
+    stored = await history_provider.load_since("s", None, None)
+    assert [item.position for item in stored] == list(range(12))

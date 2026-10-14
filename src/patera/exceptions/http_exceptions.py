@@ -3,6 +3,9 @@ Collection of http exceptions that can be raised
 """
 
 from typing import Any, Optional
+
+from pydantic import ValidationError
+
 from ..http_statuses import HttpStatus
 
 
@@ -108,6 +111,33 @@ class RequestBodyTooLarge(BaseHttpException):
             message, status_code, status, {"max_content_length": max_content_length}
         )
         self.max_content_length = max_content_length
+
+
+class RequestValidationError(BaseHttpException):
+    """
+    Raised when @consumes cannot build the declared model from the request
+    body. Answered with 422 Unprocessable Content; ``data`` (and ``errors``)
+    lists each problem's location, message and type. The submitted values are
+    left out, so a rejected password is never sent back.
+
+    The original Pydantic error is ``validation_error``. A ValidationError
+    raised anywhere else (in handler code, or validating data from a database
+    or another service) is a server error, answered with 500.
+    """
+
+    def __init__(
+        self,
+        validation_error: ValidationError,
+        message: str = "Validation failed",
+        status_code: int = 422,
+        status: str = "error",
+    ):
+        errors = validation_error.errors(
+            include_url=False, include_input=False, include_context=False
+        )
+        super().__init__(message, status_code, status, errors)
+        self.validation_error = validation_error
+        self.errors: list[Any] = list(errors)
 
 
 class HtmlAborterException(BaseHttpException):

@@ -39,6 +39,22 @@ def path(
     return decorator
 
 
+def _methods(obj: Any) -> list[tuple[str, Callable]]:
+    """
+    The callable attributes of ``obj`` by name. Properties are skipped
+    without being read, so a property that needs a request (such as one
+    returning current_request.user) does not fail at registration.
+    """
+    found: list[tuple[str, Callable]] = []
+    for name in dir(obj):
+        if isinstance(inspect.getattr_static(obj, name, None), property):
+            continue
+        value = getattr(obj, name, None)
+        if value is not None and callable(value):
+            found.append((name, value))
+    return found
+
+
 class Controller(Injectable, Generic[AppT]):
     # _controller_decorator_methods: list[Callable]
 
@@ -66,10 +82,7 @@ class Controller(Injectable, Generic[AppT]):
         self._after_init_methods()
 
     def _after_init_methods(self):
-        for name in dir(self):
-            method = getattr(self, name, None)
-            if method is None or not callable(method):
-                continue
+        for _, method in _methods(self):
             after_init_handler = getattr(method, "_after_init", False)
             if after_init_handler:
                 method()
@@ -93,10 +106,7 @@ class Controller(Injectable, Generic[AppT]):
         if owner_cls is None:
             return endpoints
 
-        for name in dir(self):
-            method = getattr(self, name, None)
-            if method is None or not callable(method):
-                continue
+        for name, method in _methods(self):
             endpoint_handler = getattr(method, "_handler", None)
             if endpoint_handler:
                 dev_only: bool = getattr(method, "_development", False)
@@ -136,10 +146,7 @@ class Controller(Injectable, Generic[AppT]):
         if owner_cls is None:
             return
 
-        for name in dir(self):
-            method = getattr(self, name, None)
-            if method is None or not callable(method):
-                continue
+        for _, method in _methods(self):
             handler = getattr(method, "_before_request", None)
             if handler:
                 self._before_request_methods.append(method)
@@ -149,10 +156,7 @@ class Controller(Injectable, Generic[AppT]):
         if owner_cls is None:
             return
 
-        for name in dir(self):
-            method = getattr(self, name, None)
-            if method is None or not callable(method):
-                continue
+        for _, method in _methods(self):
             handler = getattr(method, "_after_request", None)
             if handler:
                 self._after_request_methods.append(method)

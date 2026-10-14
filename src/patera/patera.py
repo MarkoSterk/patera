@@ -27,7 +27,7 @@ from typing import (
 import aiofiles
 from loguru import logger
 from loguru._logger import Logger
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 from werkzeug.routing import WebsocketMismatch, RequestRedirect
 
@@ -70,6 +70,7 @@ from .logger import DefaultLogger
 from .ctx import request_context
 from .controller import Controller
 from .exceptions import ExceptionHandler
+from .exceptions.runtime_exceptions import ClientDisconnected
 from .configuration_base import BaseConfig
 from .middleware import MiddlewareBase, AppCallableType
 from .cors.cors_mw import CORSMiddleware
@@ -174,8 +175,8 @@ class MissingAppConfigurations(Exception):
         self,
         msg: str = (
             "Missing application configurations. "
-            "Please make sure to use the @app_configs "
-            "decorator with appropriate arguments."
+            "Decorate the application class with "
+            "@app(__name__, configs=YourConfig)."
         ),
     ):
         super().__init__(msg)
@@ -213,7 +214,7 @@ class Patera(Injectable, Generic[ConfT]):
 
         if not inspect.isclass(config_type) or not issubclass(config_type, BaseConfig):
             raise MissingAppConfigurations(
-                "Missing valid configs object in @app_configs. "
+                "Missing valid configs object in @app(...). "
                 "Configuration class must inherit from patera.BaseConfig"
             )
         self._cli_mode = cli_mode
@@ -1032,56 +1033,29 @@ class Patera(Injectable, Generic[ConfT]):
 
                     return await self.send_response(res, req.send, response_type)
 
-                except ResponseRendererException:
-                    req.res.reset()
-                    raise
-
-                except HtmlAborterException as exc:
-                    req.res.reset()
-                    handler = self._find_exception_handler(
-                        exc, stop_at=HtmlAborterException
-                    )
-                    if handler is not None:
-                        res = await run_sync_or_async(handler, req, exc)
-                        return await self.send_response(
-                            res, req.send, res.expected_body_type()
-                        )
-                    res = (await req.res.html(exc.template, context=exc.data)).status(
-                        exc.status_code
-                    )
-                    return await self.send_response(res, req.send, None)
-                except StaticPageNotFound as exc:
-                    # A request for a static page that does not exist. Unless
-                    # the application handles StaticPageNotFound itself, it is
-                    # answered as a normal 404 - Not Found response.
-                    req.res.reset()
-                    handler = self._find_exception_handler(
-                        exc, stop_at=StaticPageNotFound
-                    )
-                    if handler is not None:
-                        res = await run_sync_or_async(handler, req, exc)
-                        return await self.send_response(
-                            res, req.send, res.expected_body_type()
-                        )
-                    return await self.abort_route_not_found(req.send)
                 except Exception as exc:
-                    req.res.reset()
-
-                    handler = self._find_exception_handler(exc)
-
-                    if handler is not None:
-                        res = await run_sync_or_async(handler, req, exc)
-                    else:
-                        default_res = self.default_exception_response(req, exc)
-                        if default_res is None:
-                            raise
-                        res = default_res
-
-                    return await self.send_response(
-                        res, req.send, res.expected_body_type()
-                    )
+                    if req.response_started or isinstance(exc, ClientDisconnected):
+                        raise
+                    return await self._send_exception_response(req, exc)
 
         except Exception as exc:
+            if isinstance(exc, ClientDisconnected):
+                # Nobody is left to receive a response.
+                self.logger.info(f"({req.method}) {req.path}: {exc}")
+                return
+
+            if req.response_started:
+                # The status and headers are already out, so the error cannot
+                # be answered any more. Raising lets the server close the
+                # connection: the client sees an incomplete response rather
+                # than one that looks complete.
+                self.logger.error(
+                    f"Error after the response started: ({req.method}) {req.path}. "
+                    "The connection is closed."
+                )
+                self.logger.exception(exc)
+                raise
+
             req.res.reset()
 
             if not self.configs.DEBUG:
@@ -1101,6 +1075,60 @@ class Patera(Injectable, Generic[ConfT]):
                 return await self.send_response(res, req.send, None)
 
             raise
+
+    async def _send_exception_response(self, req: Request, exc: Exception) -> None:
+        """
+        Answers an exception raised before the response started, with the
+        application's handler for it or with the default response. An
+        exception without either is raised again, as an unhandled error.
+        """
+        req.res.reset()
+
+        if isinstance(exc, ResponseRendererException):
+            raise exc
+
+        if isinstance(exc, HtmlAborterException):
+            handler = self._find_exception_handler(exc, stop_at=HtmlAborterException)
+            if handler is None:
+                res = (await req.res.html(exc.template, context=exc.data)).status(
+                    exc.status_code
+                )
+                return await self.send_response(res, req.send, None)
+        elif isinstance(exc, StaticPageNotFound):
+            # A static page that does not exist is a normal 404 - Not Found,
+            # unless the application handles StaticPageNotFound itself.
+            handler = self._find_exception_handler(exc, stop_at=StaticPageNotFound)
+            if handler is None:
+                return await self.abort_route_not_found(req.send)
+        else:
+            handler = self._find_exception_handler(exc)
+
+        if handler is not None:
+            res = await run_sync_or_async(handler, req, exc)
+        else:
+            default_res = self.default_exception_response(req, exc)
+            if default_res is None:
+                raise exc
+            res = default_res
+
+        return await self.send_response(res, req.send, res.expected_body_type())
+
+    async def _close_context_sessions(self, ctx: Any) -> None:
+        """
+        Closes database sessions a WebSocket handler opened through the
+        request context (Model.query(), repositories). HTTP requests have
+        the database middleware for that; sockets do not. Work that was not
+        committed explicitly is rolled back by the close.
+        """
+        sessions = ctx.sessions
+        if sessions is None:
+            return
+        for session in list(sessions.sessions.values()):
+            try:
+                await session.close()
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.exception(exc)
+        ctx.sessions = None
 
     def _match_automatic_options(
         self,
@@ -1159,13 +1187,14 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Fallback responses for exceptions without a registered handler.
 
-        - BaseHttpException subclasses (abort(), auth exceptions, ...) become a
-          JSON response with the exception's status code.
-        - Pydantic ValidationError (request body validation with @consumes)
-          becomes a 422 response listing the validation errors.
+        BaseHttpException subclasses (abort(), RequestValidationError from
+        @consumes, auth exceptions, ...) become a JSON response with the
+        exception's status code.
 
         Returns None for any other exception, which is then treated as an
-        unhandled error. Override in the app class to customize.
+        unhandled error (500). That includes a Pydantic ValidationError
+        raised outside request-body validation: it is the server's data that
+        failed. Override in the app class to customize.
         """
         if isinstance(exc, BaseHttpException):
             return req.res.json(
@@ -1175,15 +1204,6 @@ class Patera(Injectable, Generic[ConfT]):
                     "data": exc.data,
                 }
             ).status(exc.status_code)
-
-        if isinstance(exc, ValidationError):
-            return req.res.json(
-                {
-                    "status": "error",
-                    "message": "Validation failed",
-                    "errors": json.loads(exc.json(include_url=False)),
-                }
-            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
         return None
 
@@ -1197,7 +1217,7 @@ class Patera(Injectable, Generic[ConfT]):
             f"SCHEME: {scope['scheme']}, "
             f"METHOD: {method}, "
             f"PATH: {url_path}, "
-            f"QUERY_STRING: {scope['query_string'].decode('utf-8')}"
+            f"QUERY_STRING: {scope['query_string'].decode('utf-8', 'replace')}"
         )
 
     def _log_response(self, req: Request, status_code: int) -> None:
@@ -1280,7 +1300,15 @@ class Patera(Injectable, Generic[ConfT]):
                             but has set order {decorator_order or here_set_order}. This can lead to unexpected problems.
                             It is suggested that the order on middleware with default order number is not reset.""")
 
-        original_order = here_set_order or decorator_order or default_order
+        # "is not None", not "or": an explicit order of 0 is a valid position.
+        original_order = next(
+            (
+                value
+                for value in (here_set_order, decorator_order, default_order)
+                if value is not None
+            ),
+            None,
+        )
         if original_order is None:
             raise ValueError(
                 f"Middleware {middleware_class.__name__} has no set order."
@@ -1424,8 +1452,16 @@ class Patera(Injectable, Generic[ConfT]):
 
             # Controllers are keyed by class name (the same name used for
             # endpoint names), so several controllers may share a base path.
-            if ctrl.__name__ in self._controllers:
-                continue
+            registered = self._controllers.get(ctrl.__name__)
+            if registered is not None:
+                if registered.__class__ is ctrl:
+                    continue
+                raise ValueError(
+                    f"Two controllers are named {ctrl.__name__!r} "
+                    f"({registered.__class__.__module__} and {ctrl.__module__}). "
+                    "Endpoint names (url_for) are built from the class name, so "
+                    "rename one of them."
+                )
 
             ctrl_instance = ctrl(
                 self,
@@ -1442,6 +1478,13 @@ class Patera(Injectable, Generic[ConfT]):
             endpoint_methods: dict[str, dict[str, str | Callable]] = (
                 ctrl_instance.get_endpoint_methods()
             )
+
+            for url_path, method in endpoint_methods.get(
+                HttpMethod.SOCKET.value, {}
+            ).items():
+                self._check_socket_handler(
+                    ctrl, cast(Callable, cast(dict, method)["method"])
+                )
 
             for http_method, endpoints in endpoint_methods.items():
                 for url_path, method in endpoints.items():
@@ -1468,6 +1511,29 @@ class Patera(Injectable, Generic[ConfT]):
                             cast(Callable, cast(dict, method)["method"]),
                             name,
                         )
+
+    # Decorators that work through HTTP middleware (authentication and
+    # database transactions), which does not run for WebSocket handlers.
+    _MIDDLEWARE_DECORATORS: dict[str, str] = {
+        "_authentication": "@login_required / @role_required",
+        "_transactional": "@transactional",
+    }
+
+    def _check_socket_handler(self, ctrl: type, handler: Callable) -> None:
+        """
+        Refuses a WebSocket handler that carries a decorator that only works
+        through HTTP middleware: it would be silently ignored, and a socket
+        meant to require a login would be open to everyone.
+        """
+        for attribute, decorator in self._MIDDLEWARE_DECORATORS.items():
+            if getattr(handler, attribute, None) or getattr(ctrl, attribute, None):
+                raise ValueError(
+                    f"{ctrl.__name__}.{handler.__name__} is a WebSocket handler "
+                    f"with {decorator} (on the handler or its controller). HTTP "
+                    "middleware does not run for WebSockets, so it would have no "
+                    "effect. Check the user or open a session inside the handler, "
+                    "and keep sockets in a controller of their own."
+                )
 
     def get_controller(self, ctrl: "type[Controller] | str") -> Optional[Controller]:
         """
@@ -1865,12 +1931,15 @@ class Patera(Injectable, Generic[ConfT]):
                 app=self,
                 request=req,
                 controller=route_handler.__self__,  # type: ignore
-            ):
-                await run_sync_or_async(
-                    route_handler,  # type: ignore
-                    req,
-                    **path_kwargs,
-                )
+            ) as ctx:
+                try:
+                    await run_sync_or_async(
+                        route_handler,  # type: ignore
+                        req,
+                        **path_kwargs,
+                    )
+                finally:
+                    await self._close_context_sessions(ctx)
 
         except Exception as exc:
             await send(

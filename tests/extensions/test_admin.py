@@ -8,6 +8,14 @@ from patera.admin.admin_interface import AdminConfig, Permissions
 from patera.auth import Authentication
 from patera.middleware import middleware
 from patera.taskmanager import TaskManager
+from patera.database.sql import (
+    DeclarativeBaseModel,
+    SqlDatabase,
+    SqlDatabaseConfig,
+    SqlDatabaseManager,
+)
+from sqlalchemy import Integer
+from sqlalchemy.orm import Mapped, mapped_column
 
 pytestmark = pytest.mark.integration
 
@@ -18,7 +26,15 @@ class HeaderAuth(Authentication):
         return req.headers.get("x-user")
 
     async def roles_loader(self, user):
-        return [Permissions.ADMIN_CAN_ENTER] if user == "admin" else []
+        if user == "admin":
+            return list(Permissions)
+        if user == "viewer":
+            # May enter and look, but not change anything.
+            return [Permissions.ADMIN_CAN_ENTER, Permissions.ADMIN_CAN_VIEW]
+        if user == "outsider":
+            # May view records, but not enter the dashboard.
+            return [Permissions.ADMIN_CAN_VIEW]
+        return []
 
 
 class Admin(AdminInterface):
@@ -135,17 +151,54 @@ async def test_file_explorer_requires_admin_permission(files_app, client_for):
         res = await client.get(
             "/admin/en/files/", headers=REGULAR_USER, follow_redirects=False
         )
-        assert res.status_code in (303, 401)
+        assert res.status_code in (303, 403)
         res = await client.post(
             "/admin/en/files/folder",
             json={"path": "", "folder_name": "hacked"},
             headers={**REGULAR_USER, "content-type": "application/json"},
             follow_redirects=False,
         )
-        assert res.status_code in (303, 401)
+        # Signed in without the permission: 403 Forbidden, with an error body.
+        assert res.status_code == 403
+        assert res.json()["status"] == "error"
     from pathlib import Path
 
     assert not (Path(files_app.static_files_path) / "hacked").exists()
+
+
+async def test_admin_actions_need_entry_and_their_own_permission(files_app, client_for):
+    from pathlib import Path
+
+    static = Path(files_app.static_files_path)
+    viewer = {"x-user": "viewer"}
+    async with client_for(files_app) as client:
+        res = await client.get("/admin/en/files/", headers=viewer)
+        assert res.status_code == 200
+        # ADMIN_CAN_ENTER alone no longer allows creating or deleting.
+        res = await client.post(
+            "/admin/en/files/folder",
+            json={"path": "", "folder_name": "made_by_viewer"},
+            headers={**viewer, "content-type": "application/json"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 403
+        assert not (static / "made_by_viewer").exists()
+        res = await client.request(
+            "DELETE",
+            "/admin/en/files/",
+            json={"path": "", "files": ["existing.txt"]},
+            headers={**viewer, "content-type": "application/json"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 403
+        assert (static / "existing.txt").exists()
+        # ADMIN_CAN_VIEW without ADMIN_CAN_ENTER does not open the panel.
+        res = await client.get(
+            "/admin/en/files/",
+            headers={"x-user": "outsider"},
+            follow_redirects=False,
+        )
+        assert res.status_code in (303, 403)
 
 
 async def test_file_explorer_operations_and_path_traversal(files_app, client_for):
@@ -525,3 +578,46 @@ async def test_admin_under_a_url_prefix(make_app, client_for):
         assert "/v1/admin/en/_static/patera_logo.png" in res.text
         logo = await client.get("/v1/admin/en/_static/patera_logo.png")
         assert logo.status_code == 200
+
+
+class NoteBase(DeclarativeBaseModel):
+    __abstract__ = True
+    __db_name__ = "notes"
+
+
+class AdminNote(NoteBase):
+    __tablename__ = "admin_notes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class NotesDb(SqlDatabase):
+    __db_name__ = "notes"
+
+
+class NoteDatabases(SqlDatabaseManager):
+    databases = [NotesDb]
+
+
+class NotesAdmin(AdminInterface):
+    MANAGED_MODELS = [AdminNote]
+
+
+async def test_database_pages_only_accept_databases(make_app, client_for, tmp_path):
+    app = make_app(
+        extensions=[NoteDatabases, Jobs, NotesAdmin],
+        middleware=[HeaderAuth],
+        NOTES_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'notes.db'}"
+        ),
+        NOTES_ADMIN=ADMIN_CONFIG,
+    )
+    async with client_for(app) as client:
+        res = await client.get("/admin/en/databases/notes", headers={"x-user": "admin"})
+        assert res.status_code == 200
+        # Other extensions and unknown names are not databases.
+        for name in ("NOTES_ADMIN", "JOBS", "missing"):
+            res = await client.get(
+                f"/admin/en/databases/{name}", headers={"x-user": "admin"}
+            )
+            assert res.status_code == 404
+            assert res.json()["status"] == "error"

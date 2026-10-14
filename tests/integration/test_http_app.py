@@ -202,7 +202,9 @@ async def test_consumes_validates_body(app, client_for):
         assert res.status_code == 422
         body = res.json()
         assert body["message"] == "Validation failed"
-        assert body["errors"][0]["loc"] == ["age"]
+        assert body["data"][0]["loc"] == ["age"]
+        # The submitted values are not sent back.
+        assert "input" not in body["data"][0]
 
         res = await client.post(
             "/api/users/", content=b"name=x", headers={"content-type": "text/plain"}

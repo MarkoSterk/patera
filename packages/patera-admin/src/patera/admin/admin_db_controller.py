@@ -65,6 +65,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -72,10 +73,7 @@ class _AdminDbController(Controller[Patera]):
         """
         Database overview page.
         """
-        db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
-
-        if db is None:
-            raise AdminUnknownDatabaseException(db_name)
+        db: SqlDatabase = self.get_db(db_name)
 
         db_models = [
             model
@@ -99,6 +97,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -196,6 +195,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -263,6 +263,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_CREATE,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -329,6 +330,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_DELETE,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -384,6 +386,7 @@ class _AdminDbController(Controller[Patera]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_EDIT,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -507,12 +510,15 @@ class _AdminDbController(Controller[Patera]):
         return list(range(start, end + 1))
 
     def get_db(self, db_name: str) -> SqlDatabase:
-        db: Optional[SqlDatabase] = self.app.extensions.get(db_name, None)
-
-        if db is None:
-            raise AdminUnknownDatabaseException(db_name)
-
-        return db
+        """
+        The database Admin shows under ``db_name``. Only databases with
+        managed models count, so a name from the URL can never select
+        another extension of the application.
+        """
+        for entry in self.admin_interface.databases_menu:
+            if entry["db_name"] == db_name:
+                return cast(SqlDatabase, entry["extension"])
+        raise AdminUnknownDatabaseException(db_name)
 
     def get_model(
         self,

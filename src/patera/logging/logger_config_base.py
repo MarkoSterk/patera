@@ -39,7 +39,6 @@ class Writable(Protocol):
     def write(self, s: str) -> Any: ...
 
 
-SinkType = Union[str, Path, IO[str], IO[bytes], Callable[[str], Any]]
 SinkInput = Union[str, Path, IO[str], IO[bytes], Callable[[str], Any], Writable]
 SinkAccepted = Union[str, Writable, Callable[[str], None]]
 RotationType = Union[str, int, timedelta, Callable[[str, Any], Any]]

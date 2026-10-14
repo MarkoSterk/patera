@@ -27,13 +27,12 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 from base64 import b64decode
 from email.utils import formatdate, parsedate_to_datetime
 from asyncio import Task
 
-import aiofiles
 
-from .exceptions import StaticAssetNotFound
 from .http_statuses import HttpStatus
 
 if TYPE_CHECKING:
@@ -233,34 +232,26 @@ async def wait_for_background_tasks(timeout: Optional[float]) -> tuple[int, int]
     return len(done), len(still_running)
 
 
-async def get_file(
-    path: str, filename: Optional[str] = None, content_type: Optional[str] = None
-):
+def content_disposition(filename: str, disposition: str = "attachment") -> str:
     """
-    Asynchronously opens the file at `path`.
-    - `filename` is optional (used for Content-Disposition).
-    - `content_type` is optional (guess using `mimetypes` if not provided).
+    A Content-Disposition header value for a file name in any language
+    (RFC 6266): a plain ``filename`` that every client understands, with
+    characters outside ASCII and quotes replaced, and ``filename*`` with the
+    exact UTF-8 name, which current browsers prefer.
 
-    Returns a tuple (status_code, headers, body_bytes).
+        content_disposition("poročilo.pdf")
+        # 'attachment; filename="poro_ilo.pdf"; filename*=UTF-8\'\'poro%C4%8Dilo.pdf'
     """
-
-    # Guess the MIME type if none is provided
-    guessed_type, _ = mimetypes.guess_type(path)
-    content_type = content_type or (guessed_type or "application/octet-stream")
-
-    headers = {"Content-Type": content_type}
-    if filename:
-        # For file download if filename is provided
-        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    try:
-        async with aiofiles.open(path, mode="rb") as f:
-            data = await f.read()
-    except FileNotFoundError:
-        # pylint: disable-next=W0707,E0710
-        raise StaticAssetNotFound()
-
-    return 200, headers, data
+    if disposition not in ("attachment", "inline"):
+        raise ValueError("disposition must be 'attachment' or 'inline'")
+    name = os.path.basename(filename.replace("\\", "/")) or "download"
+    fallback = "".join(
+        ch if " " <= ch <= "~" and ch not in '"\\' else "_" for ch in name
+    )
+    value = f'{disposition}; filename="{fallback}"'
+    if fallback != name:
+        value += f"; filename*=UTF-8''{quote(name, safe='')}"
+    return value
 
 
 def _file_etag(stat: os.stat_result) -> str:
@@ -290,9 +281,14 @@ def file_response(
     content_type: Optional[str] = None,
     *,
     cache_control: str = "public, max-age=300",
+    download_name: Optional[str] = None,
 ):
     """
     Prepares a response that streams a file from disk.
+
+    With ``download_name``, browsers save the file under that name instead of
+    showing it (``Content-Disposition: attachment``); any language works,
+    see content_disposition().
 
     The same rules apply to every file response:
 
@@ -319,6 +315,8 @@ def file_response(
         "Last-Modified": formatdate(stat.st_mtime, usegmt=True),
         "Cache-Control": cache_control,
     }
+    if download_name is not None:
+        headers["Content-Disposition"] = content_disposition(download_name)
 
     if_none_match = request_headers.get("if-none-match")
     if_modified_since = request_headers.get("if-modified-since")

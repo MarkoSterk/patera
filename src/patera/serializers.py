@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import (
     Any,
     Optional,
@@ -13,7 +13,8 @@ from typing import (
     runtime_checkable,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
+from pydantic_core import to_json
 
 from .http_statuses import HttpStatus
 from .media_types import MediaType
@@ -100,23 +101,7 @@ class JsonSerializer:
         response_type: Optional[Type[Any]] = None,
     ) -> bytes | None:
         charset = response.charset or self.DEFAULT_CHARSET
-        body = response.body
-
-        if (
-            response_type
-            and isinstance(response_type, type)
-            and issubclass(response_type, BaseModel)
-            and isinstance(body, dict)
-        ):
-            model_instance = response_type(**body)
-            return model_instance.model_dump_json().encode(charset)
-
-        if isinstance(body, BaseModel):
-            return body.model_dump_json().encode(charset)
-
-        return json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode(
-            charset
-        )
+        return _encode(json_bytes(response.body, response_type), charset)
 
 
 @dataclass(slots=True)
@@ -143,26 +128,56 @@ class NdjsonSerializer:
         ).encode(charset)
 
 
+def _mentions_model(response_type: Any) -> bool:
+    """True for a Pydantic model, or a type built from one (list[Model], ...)."""
+    if isinstance(response_type, type) and issubclass(response_type, BaseModel):
+        return True
+    return any(_mentions_model(arg) for arg in get_args(response_type))
+
+
+@lru_cache(maxsize=512)
+def _adapter(response_type: Any) -> TypeAdapter[Any]:
+    return TypeAdapter(response_type)
+
+
+def json_bytes(value: Any, response_type: Any = None) -> bytes:
+    """
+    The JSON encoding of a response body, as UTF-8.
+
+    When the declared response type involves a Pydantic model, such as
+    ``PostOut``, ``list[PostOut]`` or ``dict[str, PostOut]``, the body is
+    validated through it first: fields the model does not declare are left
+    out, and dictionaries, model instances and objects with matching
+    attributes are all accepted. Otherwise the value is encoded as it is.
+    Either way, models, dates, times, UUIDs, decimals, enums and sets are
+    encoded the way Pydantic encodes them.
+    """
+    if response_type is not None and _mentions_model(response_type):
+        try:
+            adapter = _adapter(response_type)
+        except TypeError:  # an unhashable annotation: build the adapter each time
+            adapter = TypeAdapter(response_type)
+        return adapter.dump_json(adapter.validate_python(value, from_attributes=True))
+    return to_json(value)
+
+
+def _encode(data: bytes, charset: str) -> bytes:
+    if charset.replace("-", "").lower() == "utf8":
+        return data
+    return data.decode("utf-8").encode(charset)
+
+
 def ndjson_line(item: Any, response_type: Optional[Type[Any]] = None) -> str:
     """
     Serializes one NDJSON record, terminated by a newline as the format
-    requires. Dictionaries are validated through ``response_type`` when it
-    is a Pydantic model, the same way JSON bodies are.
+    requires. Records are validated through the declared row type, the same
+    way JSON bodies are: ``Response[list[Model]]`` and
+    ``Response[AsyncIterator[Model]]`` describe rows of ``Model``.
     """
-    if isinstance(item, BaseModel):
-        return item.model_dump_json() + "\n"
-    # Response[list[Model]] or Response[AsyncIterator[Model]] describes rows.
     if get_origin(response_type) is not None:
         args = get_args(response_type)
         response_type = args[0] if len(args) == 1 else None
-    if (
-        response_type
-        and isinstance(response_type, type)
-        and issubclass(response_type, BaseModel)
-        and isinstance(item, dict)
-    ):
-        return response_type(**item).model_dump_json() + "\n"
-    return json.dumps(item, ensure_ascii=False, separators=(",", ":")) + "\n"
+    return json_bytes(item, response_type).decode("utf-8") + "\n"
 
 
 class SerializerRegistry:

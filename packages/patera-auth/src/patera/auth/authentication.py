@@ -329,12 +329,21 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
             if required_roles:
                 user_role_set: set[Any] = set(user_roles)
 
-                controller_authorized = not controller_roles or bool(
-                    user_role_set.intersection(controller_roles)
+                controller_authorized = _has_roles(
+                    user_role_set,
+                    controller_roles,
+                    bool(
+                        controller_authentication_attributes
+                        and controller_authentication_attributes.get("require_all")
+                    ),
                 )
-
-                handler_authorized = not handler_roles or bool(
-                    user_role_set.intersection(handler_roles)
+                handler_authorized = _has_roles(
+                    user_role_set,
+                    handler_roles,
+                    bool(
+                        handler_authentication_attributes
+                        and handler_authentication_attributes.get("require_all")
+                    ),
                 )
 
                 if not controller_authorized or not handler_authorized:
@@ -369,19 +378,54 @@ class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[Ap
         pass
 
 
+def _has_roles(user_roles: set[Any], required: set[Any], require_all: bool) -> bool:
+    """
+    True if nothing is required, or the user has every required role
+    (``require_all``) or at least one of them.
+    """
+    if not required:
+        return True
+    if require_all:
+        return required <= user_roles
+    return bool(user_roles & required)
+
+
+def _set_exception(
+    attributes: dict[str, Any],
+    key: str,
+    given: Optional[Type[Exception]],
+    default: Type[Exception],
+) -> None:
+    """
+    An exception class passed to a decorator wins. Otherwise one that another
+    decorator on the same handler already chose is kept, so the order in
+    which @login_required and @role_required are stacked does not matter.
+    """
+    if given is not None:
+        attributes[key] = given
+    else:
+        attributes.setdefault(key, default)
+
+
 def login_required(
     *,
-    raise_authentication_exception: Type[Exception] = AuthenticationException,
+    raise_authentication_exception: Optional[Type[Exception]] = None,
 ) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
-    Decorator for login required
+    Requires a signed-in user. ``raise_authentication_exception`` replaces
+    AuthenticationException (401) when nobody is signed in.
     """
 
     def decorator(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
         # Copy: the dict may be inherited from a parent controller class.
         attributes: dict[str, Any] = dict(getattr(handler, "_authentication", {}))
         attributes["required"] = True
-        attributes["authentication_exception"] = raise_authentication_exception
+        _set_exception(
+            attributes,
+            "authentication_exception",
+            raise_authentication_exception,
+            AuthenticationException,
+        )
         setattr(handler, "_authentication", attributes)
         return handler
 
@@ -390,20 +434,37 @@ def login_required(
 
 def role_required(
     *roles,
-    raise_authentication_exception: Type[Exception] = AuthenticationException,
-    raise_authorization_exception: Type[Exception] = AuthorizationException,
+    require_all: bool = False,
+    raise_authentication_exception: Optional[Type[Exception]] = None,
+    raise_authorization_exception: Optional[Type[Exception]] = None,
 ) -> Callable[[Callable | Type[Controller]], Callable | Type[Controller]]:
     """
-    Decorator for role required
+    Requires a signed-in user with at least one of ``roles``, or with all of
+    them when ``require_all`` is True. The exception classes replace
+    AuthenticationException (401) and AuthorizationException (403).
+
+    A controller's and an endpoint's requirements are checked separately and
+    must both be met.
     """
 
     def decorator(handler: "Callable|Type[Controller]") -> "Callable|Type[Controller]":
         # Copy: the dict may be inherited from a parent controller class.
         attributes: dict[str, Any] = dict(getattr(handler, "_authentication", {}))
         attributes["roles"] = list(roles)
+        attributes["require_all"] = require_all
         attributes["required"] = True
-        attributes["authentication_exception"] = raise_authentication_exception
-        attributes["authorization_exception"] = raise_authorization_exception
+        _set_exception(
+            attributes,
+            "authentication_exception",
+            raise_authentication_exception,
+            AuthenticationException,
+        )
+        _set_exception(
+            attributes,
+            "authorization_exception",
+            raise_authorization_exception,
+            AuthorizationException,
+        )
         setattr(handler, "_authentication", attributes)
         return handler
 

@@ -5,6 +5,7 @@ CLI controller module for Patera.
 import inspect
 import asyncio
 import sys
+from types import NoneType, UnionType
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -14,8 +15,11 @@ from typing import (
     TypeVar,
     Generic,
     Any,
+    get_args,
+    get_origin,
     get_type_hints,
     NamedTuple,
+    Union,
     overload,
 )
 from functools import wraps
@@ -167,6 +171,16 @@ class CLIController(Injectable, Generic[AppT]):
         """
         if annotation is inspect.Parameter.empty or annotation is str:
             return value
+
+        # Optional[int] / int | None: convert to the type that is not None.
+        if get_origin(annotation) in (Union, UnionType):
+            options = [arg for arg in get_args(annotation) if arg is not NoneType]
+            if len(options) == 1:
+                return self.convert_value(value, options[0])
+            raise ValueError(
+                f"Cannot convert '{value}' to {annotation}: use a single type "
+                "(optionally with None)."
+            )
 
         if annotation is int:
             return int(value)

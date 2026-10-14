@@ -13,7 +13,6 @@ SQLITE_WAL_CHECKPOINT_EVERY = 100            # checkpoint every N writes
 from __future__ import annotations
 
 import os
-import pickle
 import re
 import time
 from fnmatch import fnmatchcase
@@ -31,7 +30,7 @@ AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
-    """SQLite-backed cache using pickled payloads (async via aiosqlite)."""
+    """SQLite-backed cache storing JSON payloads (async via aiosqlite)."""
 
     def __init__(
         self,
@@ -179,14 +178,15 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
             # count deletion as a write op for checkpoint cadence
             await self._maybe_checkpoint()
             return None
-        try:
-            return cast(dict, pickle.loads(raw))
-        except Exception:
-            # Drop corrupt entry
-            await self._conn.execute(f"DELETE FROM {self._table} WHERE k = ?", (k,))
-            await self._conn.commit()
-            await self._maybe_checkpoint()
-            return None
+        payload = self.decode_payload(raw)
+        if payload is not None:
+            return payload
+        # Drop an entry that cannot be read (corrupt, or written by an older
+        # version).
+        await self._conn.execute(f"DELETE FROM {self._table} WHERE k = ?", (k,))
+        await self._conn.commit()
+        await self._maybe_checkpoint()
+        return None
 
     async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
         if self._conn is None:
@@ -195,7 +195,7 @@ class SQLiteCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         ttl = int(duration) if duration is not None else self.default_ttl
         expire = time.time() + ttl
         k = self._k(key)
-        raw = pickle.dumps(value)
+        raw = self.encode_payload(value)
         # Upsert with ON CONFLICT
         await self._conn.execute(
             f"""

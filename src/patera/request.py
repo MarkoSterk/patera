@@ -3,32 +3,29 @@
 
 from __future__ import annotations
 
-import re
 import json
 import base64
 from io import BytesIO
 from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs
-from typing import Callable, Any, TYPE_CHECKING, Mapping, Optional, cast
+from typing import Callable, Any, TYPE_CHECKING, Mapping, Optional, TypeVar, cast
 
 import python_multipart as pm
+from python_multipart.exceptions import FormParserError
+from pydantic import BaseModel, ValidationError
 from pydantic_core import core_schema
 
 from .response import Response
 from .ctx import current_request, CurrentContextProxy
-from .exceptions.http_exceptions import InvalidRequestBody, RequestBodyTooLarge
+from .exceptions.http_exceptions import (
+    InvalidRequestBody,
+    RequestBodyTooLarge,
+    RequestValidationError,
+)
+from .exceptions.runtime_exceptions import ClientDisconnected
 
 if TYPE_CHECKING:
     from .patera import Patera
-
-
-def extract_boundary(content_type: str) -> str:
-    match = re.search(r'boundary="?([^";]+)"?', content_type)
-
-    if not match:
-        raise ValueError("No boundary found in Content-Type")
-
-    return match.group(1)
 
 
 def add_multi_value(target: dict[str, Any], key: str, value: Any) -> None:
@@ -65,11 +62,20 @@ class UploadedFile:
         self._content = content
         self._stream = BytesIO(content)
 
-    def read(self, size: int = -1) -> bytes:
+    def read(self, size: Optional[int] = -1) -> bytes:
+        """
+        Reads like a file: from the current position, up to ``size`` bytes
+        (everything that is left without a size), and moves the position on.
+        An empty result means the end was reached, so chunked readers such as
+        shutil.copyfileobj() work. Use seek(0) to read again from the start.
+        """
         if size is None or size < 0:
-            return self._content
+            return self._stream.read()
 
-        return self._content[:size]
+        return self._stream.read(size)
+
+    def tell(self) -> int:
+        return self._stream.tell()
 
     def seek(self, pos: int, whence: int = 0) -> int:
         return self._stream.seek(pos, whence)
@@ -217,76 +223,22 @@ class UploadedFile:
         }
 
 
-def _normalize_multipart_part_headers(raw: bytes) -> bytes:
+def _decode_part_name(value: Any) -> str:
     """
-    Normalize multipart part header names to canonical casing within each part
-    header block.
+    Field and file names of a multipart part. Browsers send them as UTF-8;
+    Latin-1 is the fallback for bytes that are not valid UTF-8.
     """
-    out = bytearray()
-    i = 0
-    n = len(raw)
-
-    while i < n:
-        hdr_end = raw.find(b"\r\n\r\n", i)
-
-        if hdr_end == -1:
-            out.extend(raw[i:])
-            break
-
-        header_block = raw[i:hdr_end]
-        rest_start = hdr_end + 4
-
-        if b"\r\n" in header_block and b":" in header_block:
-            lines = header_block.split(b"\r\n")
-            new_lines = [lines[0]]
-
-            for line in lines[1:]:
-                colon = line.find(b":")
-
-                if colon == -1:
-                    new_lines.append(line)
-                    continue
-
-                name = line[:colon].strip()
-                value = line[colon + 1 :].lstrip()
-
-                lname = name.lower()
-
-                if lname == b"content-disposition":
-                    cname = b"Content-Disposition"
-                elif lname == b"content-type":
-                    cname = b"Content-Type"
-                elif lname == b"content-length":
-                    cname = b"Content-Length"
-                elif lname == b"content-transfer-encoding":
-                    cname = b"Content-Transfer-Encoding"
-                else:
-                    cname = b"-".join(
-                        part[:1].upper() + part[1:].lower()
-                        for part in lname.split(b"-")
-                    )
-
-                new_lines.append(cname + b": " + value)
-
-            out.extend(b"\r\n".join(new_lines))
-            out.extend(b"\r\n\r\n")
-        else:
-            out.extend(raw[i:rest_start])
-
-        i = rest_start
-        next_boundary = raw.find(b"\r\n--", i)
-
-        if next_boundary == -1:
-            out.extend(raw[i:])
-            break
-
-        out.extend(raw[i : next_boundary + 2])
-        i = next_boundary + 2
-
-    return bytes(out)
+    if not isinstance(value, bytes):
+        return value
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError:
+        return value.decode("latin1")
 
 
 _NO_LIMIT_SET: Any = object()
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class Request:
@@ -306,7 +258,8 @@ class Request:
         self._app = app
         self.scope = scope
         self._receive = receive
-        self._send: Callable = send
+        self._response_started = False
+        self._send: Callable = self._tracking_send(send)
 
         self._body: bytes | None = None
         self._json: Any = None
@@ -326,6 +279,24 @@ class Request:
         # Set for OPTIONS requests to routes without an explicit OPTIONS
         # handler; holds the methods allowed on the route.
         self.automatic_options: Optional[list[str]] = None
+
+    def _tracking_send(self, send: Callable[..., Any]) -> Callable[..., Any]:
+        """Wraps the ASGI send channel to note when the response has started."""
+
+        async def tracking_send(message: dict) -> None:
+            if message.get("type") == "http.response.start":
+                self._response_started = True
+            await send(message)
+
+        return tracking_send
+
+    @property
+    def response_started(self) -> bool:
+        """
+        True once the response's status and headers have been sent. After
+        that, an error can no longer be answered with an error response.
+        """
+        return self._response_started
 
     @property
     def route_handler(self) -> Callable:
@@ -357,7 +328,9 @@ class Request:
 
     @property
     def query_string(self) -> str:
-        return self.scope.get("query_string", b"").decode("utf-8")
+        # Query strings are percent-encoded ASCII; stray raw bytes must not
+        # fail the request.
+        return self.scope.get("query_string", b"").decode("utf-8", "replace")
 
     @property
     def headers(self) -> dict[str, str]:
@@ -426,6 +399,22 @@ class Request:
     def query_list(self, name: str) -> list[str]:
         """Every value of a query parameter (an empty list if absent)."""
         return list(self._parsed_query().get(name, []))
+
+    def validate(self, model: type[ModelT], data: Any) -> ModelT:
+        """
+        Validates data the client sent, which the handler reads itself
+        (query parameters, route values, a header), with a Pydantic model:
+
+            query = req.validate(SearchQuery, req.query_parameters)
+
+        Invalid data raises RequestValidationError, answered with 422 like an
+        invalid @consumes body. A ValidationError raised any other way is the
+        server's own data failing and is answered with 500.
+        """
+        try:
+            return model.model_validate(data)
+        except ValidationError as exc:
+            raise RequestValidationError(exc) from exc
 
     @property
     def user(self) -> Any:
@@ -500,8 +489,11 @@ class Request:
                 if not msg.get("more_body", False):
                     break
             elif msg["type"] == "http.disconnect":
-                # Client went away before the body was complete.
-                break
+                # The client went away before the body was complete: what
+                # arrived must not be handled as if it were the whole body.
+                raise ClientDisconnected(
+                    f"Client disconnected after {received} bytes of the request body"
+                )
 
         self._body = b"".join(parts)
 
@@ -599,41 +591,12 @@ class Request:
     async def accept(self) -> None:
         await self._send({"type": "websocket.accept"})
 
-    @staticmethod
-    def _get_header_case_insensitive(hdrs: Any, key: str) -> str | None:
-        if not isinstance(hdrs, dict):
-            return None
-
-        candidates: list[Any] = [
-            key,
-            key.lower(),
-            key.upper(),
-            key.encode("latin1"),
-            key.lower().encode("latin1"),
-            key.upper().encode("latin1"),
-        ]
-
-        for candidate_key in candidates:
-            value = hdrs.get(candidate_key)
-
-            if value is None:
-                continue
-
-            if isinstance(value, bytes):
-                return value.decode("latin1")
-
-            if isinstance(value, str):
-                return value
-
-        return None
-
     async def _parse_multipart(
         self, content_type: str
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        raw = await self.body()
-        raw = _normalize_multipart_part_headers(raw)
-
-        stream = BytesIO(raw)
+        # The body is parsed as received: python-multipart reads part header
+        # names case-insensitively, and file content is never touched.
+        stream = BytesIO(await self.body())
 
         form_data: dict[str, Any] = {}
         files: dict[str, Any] = {}
@@ -645,9 +608,7 @@ class Request:
                 return
 
             value = getattr(field, "value", None)
-
-            if isinstance(name, bytes):
-                name = name.decode("latin1")
+            name = _decode_part_name(name)
 
             if isinstance(value, bytes):
                 value = value.decode("utf-8", "replace")
@@ -662,15 +623,8 @@ class Request:
 
             raw_filename = getattr(f, "file_name", b"") or b""
 
-            name = (
-                raw_name.decode("latin1") if isinstance(raw_name, bytes) else raw_name
-            )
-
-            filename = (
-                raw_filename.decode("latin1")
-                if isinstance(raw_filename, bytes)
-                else raw_filename
-            )
+            name = _decode_part_name(raw_name)
+            filename = _decode_part_name(raw_filename)
 
             fileobj = f.file_object
             fileobj.seek(0)
@@ -681,11 +635,6 @@ class Request:
             part_content_type = getattr(f, "content_type", None)
             if isinstance(part_content_type, bytes):
                 part_content_type = part_content_type.decode("latin1")
-            if not part_content_type:
-                headers = getattr(f, "headers", {}) or {}
-                part_content_type = self._get_header_case_insensitive(
-                    headers, "Content-Type"
-                )
             part_content_type = part_content_type or "application/octet-stream"
 
             uploaded_file = UploadedFile(
@@ -696,15 +645,22 @@ class Request:
 
             add_multi_value(files, name, uploaded_file)
 
-        pm.parse_form(
-            headers={
-                "Content-Type": content_type.encode(),
-                "content-type": content_type.encode(),
-            },
-            input_stream=stream,
-            on_field=on_field,
-            on_file=on_file,
-        )
+        try:
+            pm.parse_form(
+                headers={
+                    "Content-Type": content_type.encode(),
+                    "content-type": content_type.encode(),
+                },
+                input_stream=stream,
+                on_field=on_field,
+                on_file=on_file,
+            )
+        except (FormParserError, ValueError) as exc:
+            # A missing or wrong boundary, or a broken part, is the client's
+            # error.
+            raise InvalidRequestBody(
+                "Malformed multipart body", data={"detail": str(exc)}
+            ) from exc
 
         return form_data, files
 

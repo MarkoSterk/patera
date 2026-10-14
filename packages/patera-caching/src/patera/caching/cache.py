@@ -4,6 +4,7 @@ Caching extension and the @cache route handler decorator.
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Mapping
 from functools import wraps
 from typing import (
@@ -84,10 +85,19 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     async def set(
         self, key: str, value: Response, duration: Optional[int] = None
     ) -> None:
+        """
+        Caches a response as it will be sent: the body is serialized first
+        (through the handler's Response[Model] annotation, like every
+        response) and stored as bytes. The cache therefore holds no Python
+        objects, and backends store plain JSON.
+        """
+        body = await self.app.response_renderer.render_body(
+            value, value.expected_body_type()
+        )
         cached_value = {
             "status_code": int(value.status_code),
             "headers": dict(value.headers),
-            "body": value.body,
+            "body": None if body is None else base64.b64encode(body).decode("ascii"),
             "media_type": value.media_type,
             "charset": value.charset,
         }
@@ -134,7 +144,8 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
         return str(user)
 
     async def _make_cached_response(self, cached_data: dict, req: Request) -> Response:
-        req.res.body = cached_data["body"]
+        body = cached_data.get("body")
+        req.res.body = None if body is None else base64.b64decode(body)
         req.res.status_code = cached_data["status_code"]
         req.res.headers = dict(cached_data["headers"])
         req.res.media_type = cached_data["media_type"]

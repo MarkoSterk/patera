@@ -17,10 +17,13 @@ import asyncio
 import uuid
 import weakref
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, cast
 
-from sqlalchemy import func, select, text
+from sqlalchemy import false, func, select, text, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from patera.database.sql import DeclarativeBaseModel, SqlDatabase
@@ -114,6 +117,10 @@ class BaseHistoryProvider(ABC):
         raise NotImplementedError(f"{type(self).__name__} does not store summaries.")
 
 
+# Databases on which _lock_in_database() locks a chat session until commit.
+_LOCKING_DIALECTS = frozenset({"postgresql", "sqlite"})
+
+
 class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
     """
     History stored in a SQL table, one row per message:
@@ -139,10 +146,13 @@ class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
     "summary" and the order number of the last message it covers, so
     (session_id, order_number) must not be a unique key.
 
-    Writes to one chat session never overlap: within a process they take
-    turns, and on PostgreSQL a transaction-level advisory lock on the session
-    also covers other worker processes (held until the transaction commits,
-    so it also covers @transactional requests).
+    Writes to one chat session never overlap, even inside @transactional
+    requests whose rows commit only when the request ends. On PostgreSQL
+    (an advisory lock on the chat session) and SQLite (the database's write
+    lock), each write first takes a database lock that is held until its
+    transaction commits, so the next writer reads the last order number only
+    after that commit, in any worker process. Other databases take turns on
+    an in-process lock per chat session.
     """
 
     model: Type[ModelT]
@@ -188,13 +198,57 @@ class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
             self._locks[session_id] = lock
         return lock
 
+    @asynccontextmanager
+    async def _writing(self, session_id: Any) -> AsyncIterator[AsyncSession]:
+        """
+        The session for one write to a chat session, with that chat session
+        locked until the write commits.
+
+        On PostgreSQL and SQLite the database lock does it, also across
+        worker processes and inside @transactional requests. It is taken
+        before anything else, so a writer that waits for it holds nothing
+        another writer needs. Other databases take turns on the in-process
+        lock, held until the work session has committed.
+        """
+        database = self._database()
+        if make_url(database.db_uri).get_backend_name() in _LOCKING_DIALECTS:
+            async with database.work_session() as session:
+                await self._lock_in_database(session, session_id)
+                yield session
+        else:
+            async with (
+                self._lock_for(session_id),
+                database.work_session() as session,
+            ):
+                yield session
+
     async def _lock_in_database(self, session: AsyncSession, session_id: Any) -> None:
-        """On PostgreSQL, locks the chat session until the transaction ends."""
-        if session.bind.dialect.name == "postgresql":
+        """
+        Locks the chat session until the transaction ends, so the next writer
+        reads the last order number after this one has committed.
+
+        - PostgreSQL: a transaction-level advisory lock on this chat session.
+        - SQLite: the database's write lock, taken by an UPDATE that matches
+          no rows. SQLite has one writer at a time, and a transaction that
+          has written keeps the lock until it commits; taking it before the
+          read makes another writer wait (up to the busy timeout) instead of
+          reading a number that is about to be used.
+        - Other databases: nothing; the in-process lock still applies.
+        """
+        dialect = session.bind.dialect.name
+        if dialect == "postgresql":
             key = f"{self.model.__tablename__}:{session_id}"
             await session.execute(
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
                 {"key": key},
+            )
+        elif dialect == "sqlite":
+            order = self._column(self.order_column)
+            await session.execute(
+                update(self.model)
+                .where(false())
+                .values({order: order})
+                .execution_options(synchronize_session=False)
             )
 
     def _column(self, name: str) -> Any:
@@ -242,11 +296,7 @@ class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
         last = select(func.max(order)).where(
             self._in_session(session_id), self._is_message()
         )
-        async with (
-            self._lock_for(session_id),
-            self._database().work_session() as session,
-        ):
-            await self._lock_in_database(session, session_id)
+        async with self._writing(session_id) as session:
             current = await session.scalar(last)
             number = -1 if current is None else int(current)
             for message in messages:
@@ -285,11 +335,7 @@ class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
         summary: HistorySummary,
         replaces: Optional[HistorySummary],
     ) -> bool:
-        async with (
-            self._lock_for(session_id),
-            self._database().work_session() as session,
-        ):
-            await self._lock_in_database(session, session_id)
+        async with self._writing(session_id) as session:
             row = (await session.execute(self._summary_query(session_id))).scalar()
             current = None if row is None else getattr(row, self.order_column)
             expected = None if replaces is None else replaces.covers_up_to

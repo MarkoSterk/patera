@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from pydantic import BaseModel
-from sqlalchemy import Column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import DeclarativeBase
@@ -175,17 +174,6 @@ class DeclarativeBaseModel(DeclarativeBase):
         return cls.get_database().request_session()
 
     @classmethod
-    def get_standalone_session(cls) -> AsyncSession:
-        """
-        Creates and returns a standalone AsyncSession.
-
-        This session is not taken from and not stored to the request context.
-        The caller is responsible for closing it.
-        """
-        database = cls.get_database()
-        return database.create_session()
-
-    @classmethod
     def db_name(cls) -> str:
         return cls.__db_name__
 
@@ -198,16 +186,6 @@ class DeclarativeBaseModel(DeclarativeBase):
             return None
 
         return [pk.key for pk in pks]
-
-    @classmethod
-    def primary_keys(cls) -> tuple[Column[Any], ...] | None:
-        mapper = inspect(cls)
-        pks = mapper.primary_key
-
-        if not pks:
-            return None
-
-        return cast(tuple[Column[Any], ...], tuple(pks))
 
     @classmethod
     def exclude_from_create_form(cls) -> list[str]:

@@ -210,7 +210,7 @@ def consumes(media_type: MediaType) -> _EndpointDecorator:
 
                 ann = _unwrap_annotated(hints.get(name, param.annotation))
                 if _is_pydantic_model(ann):
-                    kwargs[name] = _build_model(ann, payload)
+                    kwargs[name] = _build_model(ann, payload, media_type)
 
             return await run_sync_or_async(func, self, *args, **kwargs)
 

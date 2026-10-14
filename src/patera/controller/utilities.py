@@ -2,16 +2,21 @@
 Utility methods for controller related things
 """
 
+from collections.abc import Collection
+from types import NoneType, UnionType
 from typing import (
     Any,
     Annotated,
     Type,
+    Union,
     get_origin,
     get_args,
     Mapping,
 )
 import inspect
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+
+from ..exceptions.http_exceptions import RequestValidationError
 
 from ..request import Request
 from ..media_types import MediaType
@@ -36,8 +41,61 @@ def _is_pydantic_model(tp: Any) -> bool:
     return _is_subclass(tp, BaseModel)
 
 
-def _build_model(model_cls: Type[BaseModel], data: Any) -> BaseModel:
-    return model_cls.model_validate(data)  # type: ignore[attr-defined]
+def _is_collection_type(annotation: Any) -> bool:
+    """True for list[str], set[int], tuple[str, ...], Optional[list[str]], ..."""
+    annotation = _unwrap_annotated(annotation)
+    origin = get_origin(annotation)
+    if origin in (Union, UnionType):
+        return any(
+            _is_collection_type(arg)
+            for arg in get_args(annotation)
+            if arg is not NoneType
+        )
+    target = origin or annotation
+    return (
+        inspect.isclass(target)
+        and issubclass(target, Collection)
+        and not issubclass(target, (str, bytes, bytearray, Mapping))
+    )
+
+
+def _form_values_for_model(
+    model_cls: Type[BaseModel], data: Mapping[str, Any]
+) -> dict[str, Any]:
+    """
+    A form sends a field once per value, so a multi-select with one option
+    chosen arrives as a single value. Fields the model declares as lists
+    (or sets, tuples) get that value wrapped in a list.
+    """
+    values = dict(data)
+    for name, field in model_cls.model_fields.items():
+        if not _is_collection_type(field.annotation):
+            continue
+        for key in {name, field.alias, field.validation_alias}:
+            if isinstance(key, str) and key in values:
+                if not isinstance(values[key], list):
+                    values[key] = [values[key]]
+    return values
+
+
+def _build_model(
+    model_cls: Type[BaseModel],
+    data: Any,
+    media_type: "MediaType | None" = None,
+) -> BaseModel:
+    """
+    Builds the @consumes model from the request data. Invalid data raises
+    RequestValidationError (422).
+    """
+    if media_type in (
+        MediaType.APPLICATION_X_WWW_FORM_URLENCODED,
+        MediaType.MULTIPART_FORM_DATA,
+    ) and isinstance(data, Mapping):
+        data = _form_values_for_model(model_cls, data)
+    try:
+        return model_cls.model_validate(data)  # type: ignore[attr-defined]
+    except ValidationError as exc:
+        raise RequestValidationError(exc) from exc
 
 
 def _content_type_matches(incoming: str, expected: "MediaType") -> bool:

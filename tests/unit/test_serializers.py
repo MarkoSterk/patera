@@ -107,3 +107,75 @@ async def test_replace_and_unregister(app, registry):
 async def test_ndjson_rows_use_the_item_model_of_a_list_annotation(app, registry):
     res = make_request(app).res.ndjson([{"id": "1", "name": "a", "extra": True}])
     assert await registry.serialize(res, list[User]) == b'{"id":1,"name":"a"}\n'
+
+
+# ---- JSON encoding of common Python values ----------------------------------
+
+import datetime as _dt  # noqa: E402
+import decimal as _decimal  # noqa: E402
+import uuid as _uuid  # noqa: E402
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+from patera.serializers import json_bytes, ndjson_line  # noqa: E402
+
+
+class _Row(_BaseModel):
+    name: str
+
+
+def test_json_encodes_models_dates_uuids_and_decimals():
+    value = {
+        "rows": [_Row(name="a")],
+        "when": _dt.datetime(2026, 1, 2, 3, 4),
+        "day": _dt.date(2026, 1, 2),
+        "id": _uuid.UUID(int=1),
+        "price": _decimal.Decimal("1.50"),
+        "text": "Šola",
+    }
+    assert (
+        json_bytes(value)
+        == (
+            '{"rows":[{"name":"a"}],"when":"2026-01-02T03:04:00","day":"2026-01-02",'
+            '"id":"00000000-0000-0000-0000-000000000001","price":"1.50","text":"Šola"}'
+        ).encode()
+    )
+
+
+def test_declared_types_filter_lists_dicts_and_objects():
+    secret_rows = [
+        {"name": "a", "password_hash": "x"},
+        {"name": "b", "password_hash": "y"},
+    ]
+    assert json_bytes(secret_rows, list[_Row]) == b'[{"name":"a"},{"name":"b"}]'
+    assert json_bytes({"k": secret_rows[0]}, dict[str, _Row]) == b'{"k":{"name":"a"}}'
+
+    class Orm:  # e.g. a SQLAlchemy model instance
+        name = "c"
+        password_hash = "z"
+
+    assert json_bytes(Orm(), _Row) == b'{"name":"c"}'
+    assert json_bytes(None, _Row | None) == b"null"
+
+
+def test_ndjson_rows_use_the_same_encoding():
+    assert ndjson_line({"day": _dt.date(2026, 1, 2)}) == '{"day":"2026-01-02"}\n'
+    assert ndjson_line({"name": "a", "x": 1}, list[_Row]) == '{"name":"a"}\n'
+
+
+async def test_declared_type_only_shapes_success_bodies(app):
+    # Response[Out] describes the success body. Error bodies, such as the
+    # 415 that @consumes returns, keep their own fields.
+    error = {"status": "error", "message": "Unsupported media type", "data": {"x": 1}}
+    ok = make_request(app).res.json(dict(error))
+    assert await app.response_renderer.render_body(ok, _Message) == (
+        b'{"message":"Unsupported media type"}'
+    )
+    failed = make_request(app).res.json(dict(error)).status(415)
+    assert await app.response_renderer.render_body(failed, _Message) == (
+        b'{"status":"error","message":"Unsupported media type","data":{"x":1}}'
+    )
+
+
+class _Message(_BaseModel):
+    message: str

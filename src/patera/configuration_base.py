@@ -158,7 +158,13 @@ class BaseConfig(BaseSettings):
         ["Authorization", "Content-Type"], description="List of allowed headers"
     )
     CORS_EXPOSE_HEADERS: Sequence[str] = Field([], description="Expose headers")
-    CORS_ALLOW_CREDENTIALS: bool = Field(True, description="Allow credentials")
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        False,
+        description=(
+            "Allow credentials (cookies, Authorization) on cross-origin requests; "
+            "list CORS_ALLOW_ORIGINS explicitly when turning it on"
+        ),
+    )
     CORS_MAX_AGE: Optional[int] = Field(
         None, description="Max age in seconds. None to disable."
     )

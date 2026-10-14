@@ -327,3 +327,69 @@ async def test_cli_session(make_app, tmp_path):
     overview = await db.collect_db_overview()
     assert overview
     await db.disconnect()
+
+
+class _FakeSession:
+    """Stands in for another database's session opened inside a scope."""
+
+    closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@path("/scoped")
+class ScopedController(Controller):
+    @get("/")
+    async def index(self, req: Request) -> Response:
+        from patera.ctx import get_request_context
+
+        req.set_user("ana")
+        db = self.app.get_extension(Databases).get_database("main")
+        request_session = Note.get_session()
+        other = _FakeSession()
+        async with db.session_scope() as session:
+            inside = {
+                "user": current_request.user,
+                "same_request": current_request.request is req,
+                "scope_session_bound": Note.get_session() is session,
+            }
+            session.add(Note(title="from scope"))
+            get_request_context().sessions.set_session("other", other)  # type: ignore[union-attr, arg-type]
+        return req.res.json(
+            {
+                **inside,
+                "request_session_kept": Note.get_session() is request_session,
+                "other_closed": other.closed,
+                "other_not_in_request": current_request.session("other") is None,
+            }
+        )
+
+
+async def test_session_scope_inside_a_request(make_app, tmp_path, client_for):
+    app = make_app(
+        controllers=[ScopedController],
+        extensions=[Databases],
+        DEBUG=False,
+        MAIN_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'scoped.db'}"
+        ),
+    )
+    async with client_for(app) as client:
+        await _create_schema(app)
+        res = await client.get("/scoped/")
+    assert res.json() == {
+        "user": "ana",
+        "same_request": True,
+        "scope_session_bound": True,
+        "request_session_kept": True,
+        "other_closed": True,
+        "other_not_in_request": True,
+    }
+    db = app.get_extension(Databases).get_database("main")
+    try:
+        async with db.session_scope() as session:
+            titles = (await session.execute(select(Note.title))).scalars().all()
+    finally:
+        await db.disconnect()
+    assert titles == ["from scope"]  # committed by the scope, not the request

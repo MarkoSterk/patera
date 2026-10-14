@@ -9,12 +9,14 @@ from .http_exceptions import (
     StaticPageNotFound,
     InvalidRequestBody,
     RequestBodyTooLarge,
+    RequestValidationError,
     abort,
     html_abort,
 )
 
 from .runtime_exceptions import (
     CustomException,
+    ClientDisconnected,
     MethodNotControllerMethod,
     UnexpectedDecorator,
     DuplicateRouteError,
@@ -32,6 +34,8 @@ __all__ = [
     "AborterException",
     "InvalidRequestBody",
     "RequestBodyTooLarge",
+    "RequestValidationError",
+    "ClientDisconnected",
     "abort",
     "html_abort",
     "MethodNotControllerMethod",

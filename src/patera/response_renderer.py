@@ -31,7 +31,13 @@ class ResponseRenderer:
     ) -> bytes | None:
         """
         Applies default Content-Type inference and serializes the body.
+
+        The declared response type describes the success body, so it is
+        applied only to 2xx responses. Error bodies, such as the 415 that
+        ``@consumes`` returns, keep their own shape.
         """
+        if not 200 <= int(response.status_code) < 300:
+            response_type = None
         try:
             self.apply_default_content_type(response)
             return await self.serializers.serialize(response, response_type)

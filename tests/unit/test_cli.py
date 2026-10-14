@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any, Optional
 
 import pytest
 
@@ -51,6 +52,18 @@ def test_prepare_cli_args_with_string_annotations(cli_app):
         ctrl.prepare_cli_args(ctrl.add, ["1", "2", "3"])
     with pytest.raises(ValueError):
         ctrl.convert_value("maybe", bool)
+
+
+class PagingCLI(CLIController):
+    @command("page")
+    def page(self, number: Optional[int] = None, size: int | None = None) -> Any:
+        return number, size
+
+
+def test_optional_arguments_are_converted(make_app):
+    ctrl = PagingCLI(make_app(cli_mode=True))
+    assert ctrl.prepare_cli_args(ctrl.page, ["3", "20"]) == [3, 20]
+    assert ctrl.prepare_cli_args(ctrl.page, []) == [None, None]
 
 
 def test_run_command(cli_app):

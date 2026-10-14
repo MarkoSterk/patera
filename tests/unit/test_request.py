@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from patera.exceptions import InvalidRequestBody, RequestBodyTooLarge
-from patera.request import UploadedFile, extract_boundary
+from patera.exceptions import (
+    ClientDisconnected,
+    InvalidRequestBody,
+    RequestBodyTooLarge,
+)
+from patera.request import UploadedFile
 
 from tests.helpers import make_request
 
@@ -53,11 +57,6 @@ async def test_malformed_json_raises_bad_request(app):
         await make_request(app, "POST", body=b"\xff\xfe").json()
 
 
-async def test_body_stops_on_client_disconnect(app):
-    req = make_request(app, "POST", body=b"partial", disconnect=True)
-    assert await req.body() == b"partial"
-
-
 async def test_urlencoded_form(app):
     req = make_request(
         app,
@@ -78,7 +77,7 @@ def _multipart(boundary: str, parts: list[tuple[str, str | None, bytes, str | No
         disposition = f'form-data; name="{name}"'
         if filename:
             disposition += f'; filename="{filename}"'
-        # lower-case header names on purpose (normalized by the parser)
+        # lower-case header names on purpose (the parser ignores case)
         out += f"content-disposition: {disposition}\r\n".encode()
         if ctype:
             out += f"content-type: {ctype}\r\n".encode()
@@ -116,10 +115,73 @@ async def test_multipart_form_and_files(app):
     assert len(combined["doc"]) == 2
 
 
-def test_extract_boundary():
-    assert extract_boundary('multipart/form-data; boundary="abc"') == "abc"
-    with pytest.raises(ValueError):
-        extract_boundary("multipart/form-data")
+async def test_uploaded_bytes_are_kept_exactly(app):
+    # Content that looks like a part boundary followed by headers must not be
+    # rewritten: a Markdown file with front matter (CRLF lines) looks like this.
+    content = b"line one\r\n---\r\ntitle:Hello\r\nx-y-z:  spaced\r\n\r\nbody\r\n--\r\n"
+    boundary = "XyZ123"
+    body = _multipart(boundary, [("doc", "notes.md", content, "text/markdown")])
+    req = make_request(
+        app,
+        "POST",
+        body=body,
+        headers={"content-type": f"multipart/form-data; boundary={boundary}"},
+    )
+    files = await req.files()
+    assert files["doc"].read() == content
+
+
+async def test_multipart_names_are_utf8(app):
+    boundary = "XyZ123"
+    body = _multipart(boundary, [("dokument", "poročilo.pdf", b"%PDF", None)])
+    req = make_request(
+        app,
+        "POST",
+        body=body,
+        headers={"content-type": f"multipart/form-data; boundary={boundary}"},
+    )
+    upload = (await req.files())["dokument"]
+    assert upload.filename == "poročilo.pdf"
+    assert upload.content_type == "application/octet-stream"
+
+
+@pytest.mark.parametrize(
+    "content_type, body",
+    [
+        ("multipart/form-data; boundary=xyz", b"garbage"),
+        ("multipart/form-data", b"garbage"),
+    ],
+)
+async def test_malformed_multipart_is_a_bad_request(app, content_type, body):
+    req = make_request(app, "POST", body=body, headers={"content-type": content_type})
+    with pytest.raises(InvalidRequestBody):
+        await req.form()
+
+
+async def test_disconnect_before_the_body_is_complete(app):
+    req = make_request(app, "POST", body=b"abc", disconnect=True)
+    with pytest.raises(ClientDisconnected):
+        await req.body()
+
+
+def test_uploaded_file_reads_like_a_file(tmp_path):
+    import shutil
+
+    upload = UploadedFile("a.bin", b"0123456789", "application/octet-stream")
+    assert upload.read(4) == b"0123"
+    assert upload.read(4) == b"4567"
+    assert upload.read() == b"89"
+    assert upload.read(4) == b""
+    upload.seek(0)
+    target = tmp_path / "copy.bin"
+    with target.open("wb") as out:
+        shutil.copyfileobj(upload, out, 3)
+    assert target.read_bytes() == b"0123456789"
+
+
+def test_raw_bytes_in_the_query_string(app):
+    req = make_request(app, query_string=b"a=\xff")
+    assert req.query_string == "a=\ufffd"
 
 
 def test_uploaded_file_pydantic_roundtrip(tmp_path):
@@ -261,3 +323,20 @@ async def test_form_with_invalid_utf8_is_a_bad_request(app):
     with pytest.raises(InvalidRequestBody) as exc:
         await req.form()
     assert exc.value.status_code == 400
+
+
+def test_validate_turns_invalid_client_data_into_a_422(app):
+    from pydantic import BaseModel
+
+    from patera.exceptions import RequestValidationError
+
+    class Query(BaseModel):
+        page: int
+
+    req = make_request(app, query_string=b"page=2")
+    assert req.validate(Query, req.query_parameters).page == 2
+    with pytest.raises(RequestValidationError) as exc:
+        req.validate(Query, {"page": "two"})
+    assert exc.value.status_code == 422
+    assert exc.value.errors[0]["loc"] == ("page",)
+    assert "input" not in exc.value.errors[0]

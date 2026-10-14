@@ -16,6 +16,14 @@ class MethodNotControllerMethod(CustomException):
         self.message = message
 
 
+class ClientDisconnected(CustomException):
+    """
+    Raised when the client disconnects before its request body has arrived
+    completely. The handler is stopped (and a transaction rolled back), and
+    no response is sent, since nobody is left to receive it.
+    """
+
+
 class DuplicateRouteError(CustomException, ValueError):
     """
     Raised when two different handlers are registered for the same HTTP

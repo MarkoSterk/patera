@@ -176,3 +176,9 @@ def test_delete_cookie_matches_secure_cookies(res):
     assert res.cookies[0].endswith("SameSite=None")
     with pytest.raises(ValueError):
         res.delete_cookie("b", same_site="None")
+
+
+@pytest.mark.parametrize("value", ["hello", b'{"a": 1}', bytearray(b"[]")])
+def test_json_refuses_strings_and_bytes(res, value):
+    with pytest.raises(TypeError, match="res.text"):
+        res.json(value)

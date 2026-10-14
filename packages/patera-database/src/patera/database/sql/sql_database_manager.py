@@ -183,13 +183,6 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
         ctx.sessions = None
 
     @property
-    def databases_map(self) -> dict[str, "SqlDatabase[Any]"]:
-        """
-        Returns registered database instances by database name.
-        """
-        return dict(self._db_instances)
-
-    @property
     def databases_list(self) -> list["SqlDatabase[Any]"]:
         """
         Returns registered database instances as a list.
@@ -212,7 +205,7 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
     It delegates session lifecycle operations to SqlDatabaseManager.
     """
 
-    _order: int = -100
+    _order_: int = -100
     _middleware = True
 
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:

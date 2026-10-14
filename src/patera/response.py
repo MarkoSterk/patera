@@ -93,8 +93,22 @@ class Response(Generic[U]):
 
     def json(self, data: Any) -> Self:
         """
-        Creates a JSON response. Actual JSON serialization is done later by a serializer.
+        Creates a JSON response from Python data (a dictionary, list, model,
+        ...). Actual JSON serialization is done later by a serializer.
+
+        Strings and bytes raise TypeError: whether "hello" is meant as text or
+        as an already encoded document is ambiguous, and sending it as it is
+        would not be valid JSON. Use text() for text, or
+        bytes(data, MediaType.APPLICATION_JSON.value) for JSON that is
+        already encoded.
         """
+        if isinstance(data, (str, builtins.bytes, bytearray, memoryview)):
+            raise TypeError(
+                "res.json() takes Python data to encode (a dict, list, model, "
+                f"...), not {type(data).__name__}. Use res.text() for text, or "
+                "res.bytes(data, MediaType.APPLICATION_JSON.value) for "
+                "already encoded JSON."
+            )
         self.body = cast(U, data)
         self.media_type = MediaType.APPLICATION_JSON.value
         self.charset = "utf-8"
@@ -280,25 +294,6 @@ class Response(Generic[U]):
         self.body = cast(U, rendered)
         self.media_type = MediaType.TEXT_HTML.value
         self.charset = "utf-8"
-        return self
-
-    def send_file(
-        self, body: builtins.bytes | bytearray, headers: dict[str, str]
-    ) -> Self:
-        """
-        Creates a file response. The caller can pass precomputed headers such as Content-Disposition.
-
-        If Content-Type is present in headers, it is mirrored into response.media_type.
-        """
-        for key, value in headers.items():
-            self.set_header(key, value)
-
-        self.body = cast(U, bytes(body))
-
-        header_content_type = self.headers.get("content-type")
-        if header_content_type:
-            self.media_type = header_content_type.split(";", 1)[0].strip()
-
         return self
 
     def set_header(self, key: str, value: str) -> Self:

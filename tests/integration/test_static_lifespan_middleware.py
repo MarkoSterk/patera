@@ -440,3 +440,36 @@ async def test_shutdown_cancels_background_tasks_after_the_timeout(
     assert task.cancelled()
     messages = [r["message"] for r in app.log_files.read()]
     assert any("Cancelled 1 background task" in m for m in messages)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("report.pdf", 'attachment; filename="report.pdf"'),
+        (
+            "poročilo.pdf",
+            "attachment; filename=\"poro_ilo.pdf\"; filename*=UTF-8''poro%C4%8Dilo.pdf",
+        ),
+        ('a"b.pdf', "attachment; filename=\"a_b.pdf\"; filename*=UTF-8''a%22b.pdf"),
+    ],
+)
+async def test_file_response_download_name(
+    make_app, client_for, tmp_path, name, expected
+):
+    from patera.utilities import file_response
+
+    target = tmp_path / "data.bin"
+    target.write_bytes(b"0123456789")
+
+    @path("/dl")
+    class Downloads(Controller):
+        @get("/")
+        async def download(self, req: Request) -> Response:
+            return file_response(req.res, str(target), req.headers, download_name=name)
+
+    app = make_app(controllers=[Downloads])
+    async with client_for(app) as client:
+        res = await client.get("/dl/")
+    assert res.status_code == 200
+    assert res.content == b"0123456789"
+    assert res.headers["content-disposition"] == expected

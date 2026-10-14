@@ -15,7 +15,6 @@ applications keep there.
 
 from __future__ import annotations
 
-import pickle
 import re
 from typing import Generic, Optional, TypeVar, cast, List, TYPE_CHECKING, Any
 
@@ -33,7 +32,7 @@ AppT = TypeVar("AppT", bound="Patera", default="Patera")
 
 
 class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
-    """Redis-backed cache using binary pickled payloads."""
+    """Redis-backed cache storing JSON payloads."""
 
     def __init__(
         self,
@@ -84,7 +83,7 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
 
     async def connect(self) -> None:
         if not self._client:
-            # decode_responses=False -> bytes in/out, good for pickled values
+            # decode_responses=False -> bytes in/out
             self._client = await from_url(
                 self._url,
                 encoding="utf-8",
@@ -113,7 +112,9 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
         raw = await client.get(self._k(key))
         if not raw:
             return None
-        return cast(dict, pickle.loads(cast(bytes, raw)))
+        # An entry that cannot be read (e.g. written by an older version)
+        # counts as a miss and is replaced on the next set().
+        return self.decode_payload(cast(bytes, raw))
 
     async def set(self, key: str, value: dict, duration: Optional[int] = None) -> None:
         client = await self._ensure()
@@ -122,7 +123,7 @@ class RedisCacheBackend(BaseCacheBackend[AppT], Generic[AppT]):
             # Redis rejects non-positive expiry times; nothing to cache.
             await client.delete(self._k(key))
             return
-        await client.set(self._k(key), pickle.dumps(value), ex=ttl)
+        await client.set(self._k(key), self.encode_payload(value), ex=ttl)
 
     async def delete(
         self, key: str, *, regex: bool = False, wildcard: bool = False

@@ -245,3 +245,56 @@ def test_signed_cookies_without_a_timestamp_are_rejected():
     signature = base64.urlsafe_b64encode(AuthUtils._sign("42", SECRET)).decode()
     with pytest.raises(ValueError):
         AuthUtils.decode_signed_cookie(f"42|{signature}", SECRET)
+
+
+def test_stacked_decorators_keep_a_custom_exception_in_either_order():
+    from patera.auth import login_required, role_required
+
+    class Custom(Exception):
+        pass
+
+    @role_required("admin")
+    @login_required(raise_authentication_exception=Custom)
+    def handler_a():
+        pass
+
+    @login_required(raise_authentication_exception=Custom)
+    @role_required("admin")
+    def handler_b():
+        pass
+
+    for handler in (handler_a, handler_b):
+        attributes = handler._authentication
+        assert attributes["authentication_exception"] is Custom
+        assert attributes["roles"] == ["admin"]
+
+
+@path("/reports")
+class ReportsController(Controller):
+    @get("/")
+    @role_required("admin", "editor")
+    async def any_of(self, req: Request) -> Response:
+        return req.res.json({"ok": True})
+
+    @get("/all")
+    @role_required("admin", "editor", require_all=True)
+    async def all_of(self, req: Request) -> Response:
+        return req.res.json({"ok": True})
+
+
+async def test_role_required_any_or_all(make_app, client_for):
+    USERS["both"] = ["admin", "editor"]
+    try:
+        app = make_app(controllers=[ReportsController], middleware=[TokenAuth])
+        async with client_for(app) as client:
+            assert (
+                await client.get("/reports/", headers=token("bo"))
+            ).status_code == 200
+            assert (
+                await client.get("/reports/all", headers=token("bo"))
+            ).status_code == 403
+            assert (
+                await client.get("/reports/all", headers=token("both"))
+            ).status_code == 200
+    finally:
+        USERS.pop("both")

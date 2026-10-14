@@ -275,4 +275,6 @@ async def test_disconnect_forgets_the_session_factory(make_app, tmp_path):
         await db.disconnect()  # and closes everything again
         gc.collect()
     assert db._engine is None
-    assert not [w for w in caught if issubclass(w.category, ResourceWarning)]
+    assert not [
+        str(w.message) for w in caught if issubclass(w.category, ResourceWarning)
+    ]

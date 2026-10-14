@@ -234,7 +234,7 @@ Built-in options:
 | `CORS_ALLOW_METHODS` | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed methods. |
 | `CORS_ALLOW_HEADERS` | `["Authorization", "Content-Type"]` | Allowed request headers. |
 | `CORS_EXPOSE_HEADERS` | `[]` | Response headers exposed to the browser. |
-| `CORS_ALLOW_CREDENTIALS` | `True` | Allow credentials (the request origin is echoed instead of `*`). |
+| `CORS_ALLOW_CREDENTIALS` | `False` | Allow credentials: cookies and `Authorization` on cross-origin requests (the request origin is echoed instead of `*`). Turn it on only together with an explicit `CORS_ALLOW_ORIGINS` list. |
 | `CORS_MAX_AGE` | `None` | Preflight cache time in seconds. |
 | `DEFAULT_LOGGER` | `DefaultLoggerConfig()` | Default console sink, see [Logging](#logging). |
 | `LOG_FILES` | `LogFilesConfig()` | Rotating JSON Lines log files read by the admin dashboard, see [Logging](#logging). |
@@ -372,13 +372,18 @@ class UserApi(Controller[App]):
   `<name>`, `<int:id>`, `<float:x>`, `<uuid:key>`, `<path:rest>` (matches slashes), ...
 - `@consumes(MediaType)` – the request must have this content type (otherwise `415`). Parameters
   annotated with a Pydantic model are validated from the JSON body, url-encoded form or multipart
-  form (including `UploadedFile` fields). Invalid data returns `422` with the validation errors
-  unless you [handle](#exception-handling) `pydantic.ValidationError` yourself.
+  form (including `UploadedFile` fields). For forms, a single value of a field the model declares
+  as a list (checkboxes, multi-selects) arrives as a one-item list. Invalid data raises
+  `RequestValidationError`: `422` with the validation errors, without the submitted values, unless
+  you [handle](#exception-handling) it yourself. Validate other client data (query parameters,
+  route values) with `req.validate(Model, data)`, which raises the same error.
 - `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
   explicitly set content type/status wins). Documented in OpenAPI.
-- `-> Response[Model]` – a dict body is validated and serialized through `Model`, which filters
-  out undeclared fields (e.g. `password_hash` above). The annotation (also generic ones like
-  `list[Model]`) documents the response in OpenAPI.
+- `-> Response[Model]` – the body is validated and serialized through `Model`, which filters
+  out undeclared fields (e.g. `password_hash` above). Generic annotations such as `list[Model]` or
+  `dict[str, Model]` filter every item. Dictionaries, model instances and objects with matching
+  attributes (ORM rows) are accepted. Only 2xx bodies are shaped this way; error bodies keep their
+  own fields. The annotation also documents the response in OpenAPI.
 - `@before_request` / `@after_request` – controller level hooks. `@after_init` methods run once after
   the controller is created.
 - `@open_api_docs(Descriptor(status, description, media_type, body))` – document error responses.
@@ -405,7 +410,10 @@ class ChatSocket(Controller[App]):
 ```
 
 Websocket handlers receive the raw ASGI messages through `req.receive()`/`req.send()`; HTTP
-middleware is not applied to them.
+middleware is not applied to them. A socket handler (or its controller) marked with
+`@login_required`, `@role_required` or `@transactional` is therefore refused at startup: check the
+user inside the handler and keep sockets in a controller of their own. Database sessions a socket
+handler opens through `Model.query()` or a repository are closed when it returns.
 
 ## Requests and responses
 
@@ -416,8 +424,9 @@ middleware is not applied to them.
 | `method`, `path`, `query_string`, `headers` (lower-case keys) | request line and headers |
 | `query_parameters` | dict; repeated keys become lists |
 | `route_parameters` | parsed route parameters |
-| `await body()`, `await json()` | raw body / parsed JSON (`None` if empty or invalid) |
-| `await form()`, `await files()`, `await form_and_files()` | url-encoded and multipart data; files are `UploadedFile` objects (`filename`, `content_type`, `size`, `read()`, `save(path)`, `stream`) |
+| `await body()`, `await json()` | raw body / parsed JSON (`None` if empty; malformed JSON is `400`). A client that disconnects mid-body raises `ClientDisconnected`: the handler stops and no response is sent |
+| `await form()`, `await files()`, `await form_and_files()` | url-encoded and multipart data; files are `UploadedFile` objects (`filename`, `content_type`, `size`, `read()`/`seek()` like a file, `save(path)`, `stream`); a broken multipart body is `400` |
+| `validate(Model, data)` | validates client data the handler reads itself; invalid data raises `RequestValidationError` (`422`) |
 | `await get_data(location)` | `"json"`, `"form"`, `"files"`, `"form_and_files"` or `"query"` |
 | `user`, `roles`, `set_user()`, `set_roles()` | authenticated user (see [Authentication](#authentication)) |
 | `context` | request-scoped storage (`req.context.set(key, value)`, `req.context.get(key)`) |
@@ -434,12 +443,12 @@ return req.res.json({"ok": True}).status(HttpStatus.CREATED).set_header("x-id", 
 
 | Method | Description |
 | --- | --- |
-| `json(data)` | JSON body (dicts, lists, Pydantic models, ...) |
+| `json(data)` | JSON body: dicts, lists, Pydantic models and values inside them such as dates, UUIDs and decimals, encoded as Pydantic encodes them. A `str` or `bytes` raises `TypeError` (use `text()`, or `bytes(data, MediaType.APPLICATION_JSON.value)` for encoded JSON) |
 | `text()`, `html_body()`, `xml()`, `csv()`, `yaml()`, `ndjson(rows)`, `bytes(data, media_type)` | other bodies |
 | `await html(template, context)`, `await html_from_string(source, context)` | rendered [templates](#templates) |
 | `problem(title, detail, status, type_="about:blank", instance=None, extra=None)` | RFC 9457 problem details |
-| `stream(iterable, media_type)`, `stream_text(iterable)` | streaming responses (sync or async iterables) |
-| `send_file(bytes, headers)` | file download |
+| `stream(iterable, media_type)`, `stream_text(iterable)` | streaming responses (sync or async iterables); an error after the first chunk is logged and the connection closed, since the status is already sent |
+| `file_response(res, path, req.headers, download_name=...)` (from `patera.utilities`) | stream a file from disk, with ranges, `ETag` and 304; `download_name` makes it a download under any file name |
 | `redirect(location, status=303)`, `no_content()` | redirects and `204` |
 | `status(code)` | status code (`int` or `HttpStatus`) |
 | `set_header()`, `set_headers()` | headers |
@@ -526,10 +535,14 @@ only under `TYPE_CHECKING`).
 Exception handlers are classes with methods mapped to exception types:
 
 ```python
-from pydantic import ValidationError
-
 from patera import HttpStatus, Request, Response
-from patera.exceptions import BaseHttpException, ExceptionHandler, exception_handler, handles
+from patera.exceptions import (
+    BaseHttpException,
+    ExceptionHandler,
+    RequestValidationError,
+    exception_handler,
+    handles,
+)
 
 
 class EntityNotFound(BaseHttpException):
@@ -540,10 +553,9 @@ class EntityNotFound(BaseHttpException):
 @exception_handler
 class ApiExceptionHandler(ExceptionHandler):
 
-    @handles(ValidationError)
-    async def validation_error(self, req: Request, exc: ValidationError) -> Response:
-        details = exc.errors(include_url=False, include_context=False)
-        return req.res.json({"message": "Invalid data", "details": details}).status(422)
+    @handles(RequestValidationError)
+    async def validation_error(self, req: Request, exc: RequestValidationError) -> Response:
+        return req.res.json({"message": "Invalid data", "details": exc.errors}).status(422)
 
     @handles(BaseHttpException)          # also handles subclasses, e.g. EntityNotFound
     async def http_error(self, req: Request, exc: BaseHttpException) -> Response:
@@ -559,8 +571,8 @@ Without a matching handler:
 | Exception | Response |
 | --- | --- |
 | `BaseHttpException` and subclasses (`abort()`, authentication errors, ...) | JSON `{"status", "message", "data"}` with the exception's status code |
-| `pydantic.ValidationError` | `422` with `{"status": "error", "message": "Validation failed", "errors": [...]}` |
-| anything else | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
+| `RequestValidationError` (from `@consumes` or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
+| anything else, including a `pydantic.ValidationError` from your own code or data | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
 
 Override `default_exception_response(req, exc)` on the application class to change this fallback.
 
@@ -1001,6 +1013,10 @@ class AccountApi(Controller[App]):
     @get("/admin")
     @role_required("admin", "owner")    # any of the listed roles
     async def admin(self, req: Request) -> Response: ...
+
+    @get("/audit")
+    @role_required("admin", "auditor", require_all=True)    # every listed role
+    async def audit(self, req: Request) -> Response: ...
 ```
 
 Routes without the decorators do not load the user. A missing user raises
@@ -1045,8 +1061,9 @@ class StatsApi(Controller[App]):
 
 Register `PublicCache` in `app_extensions`. Put `@cache` directly above the handler (below
 `@get`). The key combines the handler name, method, path and query string (or pass `key=...`).
-Only successful (`< 400`), non-streaming responses without cookies are cached; the status, headers
-and media type are restored on a hit. Cache only public data or include the user in the key.
+Only successful (`< 400`), non-streaming responses without cookies are cached. The body is stored
+as it is sent, already serialized (through `Response[Model]`), and replayed with the status, headers
+and media type on a hit. Cache only public data or include the user in the key.
 
 Manual use: `await cache.get(key, req)`, `await cache.set(key, response, duration)`,
 `await cache.delete(key)`, `await cache.delete("users:*", wildcard=True)`,
@@ -1068,8 +1085,9 @@ Keys in Redis and SQLite live under `KEY_PREFIX`, by default `patera:<app name>:
 `clear()` only removes its own keys. To build a backend yourself, assign `self.backend` in `init()`
 before calling `super().init()`.
 
-The Redis and SQLite backends store pickled data – only use storage that you control. Custom
-backends implement `patera.caching.BaseCacheBackend`.
+The Redis and SQLite backends store JSON (the serialized body as base64 text), so reading an entry
+never runs code; an entry that cannot be read counts as a miss. Custom backends implement
+`patera.caching.BaseCacheBackend` (`encode_payload()`/`decode_payload()` convert a payload).
 
 ### Task manager
 
@@ -1214,8 +1232,10 @@ is iterated directly, without `await`; the others return one `ChatResponse`.
   the request's session, so the messages commit or roll back with the request; anywhere else it uses
   a short transaction of its own, so it works in plain requests, CLI commands and scheduled jobs
   without a commit by the caller (a streamed answer, saved after the request's transaction has
-  ended, also gets its own). Writes to one chat session take turns, and on PostgreSQL an advisory
-  lock covers several worker processes too. Implement `load()` and `append()` of
+  ended, also gets its own). Writes to one chat session never overlap, also across worker processes
+  and inside `@transactional` requests that commit later: each write first locks the chat session
+  until it commits (an advisory lock on PostgreSQL, the database's write lock on SQLite). Other
+  databases take turns within a process. Implement `load()` and `append()` of
   `BaseHistoryProvider` for other storage.
 - `HISTORY_SUMMARY = HistorySummaryConfig(EVERY=10, MAX_WORDS=250)` keeps a rolling summary of
   long conversations. Each call sends the summary, then the messages it does not cover; once
@@ -1271,8 +1291,9 @@ is iterated directly, without `await`; the others return one `ChatResponse`.
 
 `patera-admin` provides a web dashboard for logs, database models, files in the static folder, task
 managers and e-mail clients. It requires an [authentication](#authentication) middleware: users need
-the roles from `patera.admin.Permissions` (`ADMIN_CAN_ENTER` plus
-`ADMIN_CAN_VIEW`/`CREATE`/`EDIT`/`DELETE`).
+the roles from `patera.admin.Permissions`: `ADMIN_CAN_ENTER` opens the dashboard, and each action
+needs it together with `ADMIN_CAN_VIEW`, `ADMIN_CAN_CREATE`, `ADMIN_CAN_EDIT` or
+`ADMIN_CAN_DELETE`. A user with `ENTER` and `VIEW` can look around but not change anything.
 
 ```python
 from patera.admin import AdminConfig, AdminInterface

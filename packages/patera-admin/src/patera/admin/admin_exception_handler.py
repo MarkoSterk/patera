@@ -11,6 +11,7 @@ from .exceptions import (
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
     AdminUnknownEmailClientException,
+    AdminUnknownDatabaseException,
 )
 from .admin_interface import AdminInterface, Permissions
 
@@ -41,7 +42,7 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
                 "message": f"Missing required permission for '{exc.permission}'",
                 "status": "error",
             }
-        ).status(HttpStatus.UNAUTHORIZED)
+        ).status(HttpStatus.FORBIDDEN)
 
     @handles(AdminLoginRequiredException)
     async def login_required_exc(
@@ -58,7 +59,9 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
         self, req: Request, exc: AdminAuthorizationRequiredException
     ) -> Response:
         if req.headers.get("content-type", "text/html").lower() == "text/html":
-            if Permissions.ADMIN_CAN_ENTER in exc.roles:
+            # Without the entry permission the dashboard is closed; with it,
+            # only this action is.
+            if Permissions.ADMIN_CAN_ENTER not in (req.roles or []):
                 return req.res.redirect(
                     self.admin_interface.url_for("_AdminController.unauthorized_entry")
                 )
@@ -70,14 +73,14 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
                         "error_title": "Unauthorized",
                         "error_message": "Missing authorization for action.",
                         "error_status": exc.msg,
-                        "status_code": HttpStatus.UNAUTHORIZED,
+                        "status_code": HttpStatus.FORBIDDEN,
                         "error_details": None,
                     },
                 )
-            ).status(HttpStatus.UNAUTHORIZED)
+            ).status(HttpStatus.FORBIDDEN)
         return req.res.json(
-            {"message": "Missing required role", "status": "success"}
-        ).status(HttpStatus.UNAUTHORIZED)
+            {"message": "Missing required role", "status": "error"}
+        ).status(HttpStatus.FORBIDDEN)
 
     @handles(AdminUnknownEmailClientException)
     async def unknown_email_client(
@@ -90,6 +93,14 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
                 "status": "error",
             }
         ).status(HttpStatus.BAD_REQUEST)
+
+    @handles(AdminUnknownDatabaseException)
+    async def unknown_database(
+        self, req: Request, exc: AdminUnknownDatabaseException
+    ) -> Response:
+        return req.res.json(
+            {"message": f"Unknown database: {exc.db_name}", "status": "error"}
+        ).status(HttpStatus.NOT_FOUND)
 
     @property
     def admin_interface(self) -> AdminInterface:

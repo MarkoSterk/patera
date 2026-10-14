@@ -182,15 +182,15 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
 
     def _start_initial_jobs(self) -> None:
         """
-        Starts all scheduled jobs declared with @schedule_job.
+        Adds the jobs declared with @schedule_job. Runs at every startup, so
+        an application whose lifespan runs again (a second test client, for
+        example) gets its jobs again. A job with an id replaces the stored
+        job of that id, so a persistent job store never holds it twice.
         """
-        if not self._initial_jobs_methods_list:
-            return
-
         for func, args, kwargs in self._initial_jobs_methods_list:
+            if "id" in kwargs:
+                kwargs = {"replace_existing": True, **kwargs}
             self.scheduler.add_job(func, *args, **kwargs)
-
-        self._initial_jobs_methods_list = []
 
     def run_background_task(self, func: Callable, *args, **kwargs) -> None:
         """

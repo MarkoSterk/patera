@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import datetime
+
 import pytest
+from pydantic import BaseModel
 
 from patera import MediaType, Request, Response
 from patera.caching import Caching, CachingConfig, MemoryCacheBackend, cache
@@ -417,3 +420,62 @@ async def test_sqlite_clear_treats_like_wildcards_literally(tmp_path):
     finally:
         await narrow.disconnect()
         await other.disconnect()
+
+
+class Item(BaseModel):
+    name: str
+    added: datetime.date
+
+
+@path("/stored")
+class StoredController(Controller):
+    @get("/")
+    @cache("SQLITE_CACHE", key="items")
+    async def items(self, req: Request) -> Response[list[Item]]:
+        CALLS["stored"] = CALLS.get("stored", 0) + 1
+        return req.res.json(
+            [{"name": "a", "added": datetime.date(2026, 1, 2), "secret": "x"}]
+        )
+
+
+async def test_cache_stores_the_sent_bytes_as_json(make_app, client_for, tmp_path):
+    import base64
+    import json
+    import sqlite3
+
+    CALLS.clear()
+    app = make_app(
+        controllers=[StoredController],
+        extensions=[SqliteCache],
+        SQLITE_CACHE=CachingConfig(
+            SQLITE_PATH=str(tmp_path / "cache.db"), KEY_PREFIX="t"
+        ),
+    )
+    expected = [{"name": "a", "added": "2026-01-02"}]
+    async with client_for(app) as client:
+        first = await client.get("/stored/")
+        second = await client.get("/stored/")
+    assert first.json() == second.json() == expected
+    assert second.headers["content-type"] == "application/json; charset=utf-8"
+    assert CALLS["stored"] == 1
+
+    with sqlite3.connect(tmp_path / "cache.db") as conn:
+        (raw,) = conn.execute("SELECT v FROM cache_entries").fetchone()
+    payload = json.loads(raw)  # plain JSON, not pickle
+    # The stored body is what was sent: filtered through Response[list[Item]].
+    assert json.loads(base64.b64decode(payload["body"])) == expected
+
+
+async def test_unreadable_entries_are_misses(tmp_path):
+    backend = SQLiteCacheBackend(db_path=str(tmp_path / "c.db"))
+    await backend.connect()
+    try:
+        await backend.set("k", {"a": 1})
+        assert backend._conn is not None
+        await backend._conn.execute(
+            "UPDATE cache_entries SET v = ?", (b"\x80\x04 not json",)
+        )
+        await backend._conn.commit()
+        assert await backend.get("k") is None
+    finally:
+        await backend.disconnect()

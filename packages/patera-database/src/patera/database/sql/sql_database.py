@@ -43,6 +43,7 @@ from patera.utilities import run_sync_or_async
 from patera.ctx import (
     ActiveSessions,
     bind_session,
+    child_context,
     get_request_context,
     has_request_context,
     request_context,
@@ -367,9 +368,11 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         Opens a managed session outside a request: in a scheduled job, a
         background task or a service called from one.
 
-        The block runs in its own lightweight request context with the
-        session bound under this database's session name, so models and
-        repositories find it exactly as they do during a request. With
+        The block runs in a context of its own with the session bound under
+        this database's session name, so models and repositories find it
+        exactly as they do during a request. Inside a request that context
+        keeps the request's user, roles and request object; the request's own
+        sessions are untouched. With
         ``transactional=True`` (the default) the block runs in a transaction
         that commits when it exits normally and rolls back on an exception.
         The session is always closed. The engine is connected if it is not
@@ -382,15 +385,33 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         if self._session_factory is None:
             await self.connect()
 
-        with request_context(app=self.app):
-            async with self.create_session() as session:
-                if transactional:
-                    async with session.begin():
+        with child_context(app=self.app) as ctx:
+            # Work in the block commits with the block, never with a request.
+            ctx.extras.pop(TRANSACTION_OPEN, None)
+            try:
+                async with self.create_session() as session:
+                    if transactional:
+                        async with session.begin():
+                            with bind_session(self.session_name, session):
+                                yield session
+                    else:
                         with bind_session(self.session_name, session):
                             yield session
-                else:
-                    with bind_session(self.session_name, session):
-                        yield session
+            finally:
+                # Sessions of other databases opened in the block (by
+                # Model.query() or a repository) belong to the block too;
+                # closing them returns their connections. Their uncommitted
+                # work is rolled back: use each database's own scope for it.
+                await _close_sessions(ctx)
+
+
+async def _close_sessions(ctx: Any) -> None:
+    sessions = ctx.sessions
+    if sessions is None:
+        return
+    for session in list(sessions.sessions.values()):
+        await session.close()
+    ctx.sessions = None
 
 
 def in_transactional_request() -> bool:

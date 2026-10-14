@@ -134,10 +134,6 @@ class Frontend(BaseExtension[AppT], Generic[AppT]):
         }
 
     @property
-    def exposed_tools(self) -> list[Callable]:
-        return self._exposed_tools
-
-    @property
     def exposed_tools_map(self) -> dict[str, Callable]:
         return self._exposed_tools_map
 

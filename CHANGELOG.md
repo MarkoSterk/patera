@@ -38,12 +38,37 @@ together.
 - **Core:** a request header sent several times is combined into one comma-separated value
   (`Cookie` with `; `); use `Request.header_list()` for the separate values.
 - **Core:** loggers read their settings only under the UPPER_SNAKE_CASE name of their class.
-- **Core:** removed `patera.utilities.get_range_file()`; use `file_response()`.
+- **Core:** removed `patera.utilities.get_range_file()`, `get_file()` and `Response.send_file()`;
+  use `file_response()`, which streams the file and takes a `download_name`.
+- **Core:** `CORS_ALLOW_CREDENTIALS` defaults to `False`: by default no website may make
+  cross-origin requests with the user's cookies. Set it to `True` together with an explicit
+  `CORS_ALLOW_ORIGINS` list for a frontend on another origin.
+- **patera-admin:** a signed-in user without the needed Admin permission gets 403 instead of 401
+  (with `"status": "error"`), and an unknown database name gets 404.
 - **Core:** the `@app_path` decorator is replaced by the `URL_PREFIX` setting (`PATERA_URL_PREFIX`),
   so the prefix can differ per environment: `@app_path("/demo")` becomes `URL_PREFIX: str = "/demo"`
   in the configuration class. The value must start with `/`; a trailing `/` is removed.
   `Patera.url_prefix` returns it, and `register_controller(with_base_path=...)` is now
   `with_url_prefix=...`.
+- **Core:** invalid `@consumes` data raises `RequestValidationError` (a `BaseHttpException`):
+  `422` with `{"status", "message", "data": [errors]}`, without the submitted values. Handle
+  `RequestValidationError` instead of `pydantic.ValidationError`; its `errors` attribute is the list.
+  A `ValidationError` raised anywhere else (handler code, data from a database or another service)
+  is a server error (`500`) instead of a `422` that echoed the values. Validate query parameters and
+  other client data with the new `req.validate(Model, data)`.
+- **Core:** `res.json()` raises `TypeError` for `str` and `bytes`; use `text()`, or
+  `bytes(data, MediaType.APPLICATION_JSON.value)` for already encoded JSON.
+- **Core:** `UploadedFile.read(size)` reads like a file, from the current position onwards
+  (it always returned the first bytes, so chunked readers never finished).
+- **Core:** two controller classes with the same name raise `ValueError` at startup (the second was
+  silently skipped). A WebSocket handler, or its controller, marked with `@login_required`,
+  `@role_required` or `@transactional` raises `ValueError` at startup: middleware does not run for
+  sockets, so these had no effect.
+- **Core:** removed the unused `patera.request.extract_boundary()`.
+- **patera-admin:** every action needs `ADMIN_CAN_ENTER` and its own permission (`VIEW`, `CREATE`,
+  `EDIT`, `DELETE`); `ADMIN_CAN_ENTER` alone allowed every action. Give administrators all five.
+- **patera-caching:** responses are cached as the bytes that are sent, and the Redis and SQLite
+  backends store JSON instead of pickle. Existing entries are treated as misses.
 - **Core:** dropped the unused dependencies h11, httpcore, idna, mako and markupsafe; websockets
   moved to the `dev` extra (used by the uvicorn development server). httpx and asgi-lifespan, used
   only by the test client, moved to the `testing` extra: install `patera[testing]` to use
@@ -68,6 +93,9 @@ together.
   `replace()` and `unregister()`.
 - **Core:** `DuplicateRouteError` and `CircularDependencyError` with clear messages.
 - **Core:** `is_async_callable()` and `wait_for_background_tasks()` utilities; `py.typed` marker.
+- **Core:** `Request.validate()`, `RequestValidationError`, `ClientDisconnected` and
+  `Request.response_started`.
+- **patera-auth:** `role_required(..., require_all=True)` requires every listed role.
 - **patera-auth:** `decode_signed_cookie(..., max_age=...)` rejects old values.
 - **patera-auth:** new password hashes are `bcrypt-sha256$` + bcrypt over a SHA-256 digest, so
   passwords of any length count in full. Plain bcrypt hashes from earlier versions still verify;
@@ -89,6 +117,36 @@ together.
 
 ### Fixed
 
+- **Core:** uploaded files are no longer altered: the body is parsed as received (part headers
+  were rewritten anywhere in the body, including inside file content). Field and file names are
+  decoded as UTF-8.
+- **Core:** JSON bodies may contain models, lists of models, dates, UUIDs, decimals and enums
+  (they failed with 500), and `Response[list[Model]]` and other generic annotations filter every
+  item like `Response[Model]` does; ORM objects are accepted too. NDJSON rows are encoded the
+  same way. The declared type shapes only 2xx bodies, so error bodies such as the `415` from
+  `@consumes` keep their own fields.
+- **Core:** `file_response(download_name=...)` writes a correct `Content-Disposition` for names in
+  any language (`content_disposition()`).
+- **Core:** an explicit middleware order of `0` is kept.
+- **Core:** an error after a streamed or file response has started is logged and the connection is
+  closed, instead of a second response being attempted.
+- **Core:** a client that disconnects before its body has arrived raises `ClientDisconnected`; the
+  truncated body was handled as if it were complete. No response is sent.
+- **Core:** a malformed multipart body (missing or wrong boundary) answers `400` instead of `500`.
+- **Core:** a form field the `@consumes` model declares as a list accepts a single value.
+- **Core:** a controller property that needs a request (`current_request.user`) no longer fails
+  at registration.
+- **Core:** raw non-UTF-8 bytes in a query string no longer fail the request before a response.
+- **Core:** CLI arguments annotated `Optional[int]` or `int | None` are converted.
+- **Core:** the missing-configuration error names the `@app(...)` decorator.
+- **Core:** database sessions opened in a WebSocket handler are closed when it returns.
+- **patera-database:** `session_scope()` (and `work_session()` outside `@transactional`) inside a
+  request keeps the request's user and request object, leaves the request's sessions alone, and
+  closes other databases' sessions opened in the block (they leaked).
+- **patera-auth:** `@login_required` and `@role_required` keep a custom exception class in either
+  stacking order.
+- **patera-taskmanager:** jobs declared with `@schedule_job` are added again when the application's
+  lifespan runs again.
 - **Core:** an environment variable for one field of a nested setting
   (`PATERA_ASSISTANT__API_KEY`) keeps the other fields of the class default instead of failing
   them as missing.
@@ -174,8 +232,12 @@ together.
   "database is locked" on SQLite; they commit or roll back with the request). A streamed answer,
   saved after the request's transaction has ended, uses a transaction of its own.
 - Concurrent writes to one chat session (two quick messages, or two summary updates) no longer get
-  the same position or a second summary row: they take turns within a process, and on PostgreSQL an
-  advisory lock on the session also covers other worker processes.
+  the same position or a second summary row, also across worker processes and inside
+  `@transactional` requests that commit later: each write first locks the chat session until it
+  commits, with an advisory lock on PostgreSQL and the database's write lock on SQLite. That lock is
+  taken before the in-process one, so a write waiting for another request's commit no longer
+  deadlocks that request's next write (on PostgreSQL it waited forever). Other databases take turns
+  within a process.
 - `<:name>` placeholders are filled in one pass: text inserted by an argument, such as a user's
   message, can no longer pull other arguments into the prompt.
 - The embedding model is loaded on first use, in a worker thread, instead of when the application

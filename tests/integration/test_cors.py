@@ -55,7 +55,8 @@ async def test_preflight(app, client_for):
             assert res.status_code == 204
             assert res.headers["access-control-allow-origin"] == "https://app.example"
             assert "POST" in res.headers["access-control-allow-methods"]
-            assert res.headers["access-control-allow-credentials"] == "true"
+            # Credentials are off unless the application turns them on.
+            assert "access-control-allow-credentials" not in res.headers
 
 
 async def test_preflight_from_disallowed_origin(app, client_for):
@@ -131,3 +132,22 @@ async def test_cors_can_be_disabled(make_app, client_for):
         )
         assert res.status_code == 204
         assert "allow" in res.headers
+
+
+async def test_credentials_are_off_by_default_and_can_be_enabled(make_app, client_for):
+    default = make_app(controllers=[CorsController])
+    async with client_for(default) as client:
+        res = await client.get("/api/items", headers={"origin": "https://any.example"})
+    # Any origin may read public responses, but no cookies are allowed.
+    assert res.headers["access-control-allow-origin"] in ("*", "https://any.example")
+    assert "access-control-allow-credentials" not in res.headers
+
+    trusted = make_app(
+        controllers=[CorsController],
+        CORS_ALLOW_ORIGINS=["https://app.example"],
+        CORS_ALLOW_CREDENTIALS=True,
+    )
+    async with client_for(trusted) as client:
+        res = await client.get("/api/items", headers={"origin": "https://app.example"})
+    assert res.headers["access-control-allow-origin"] == "https://app.example"
+    assert res.headers["access-control-allow-credentials"] == "true"

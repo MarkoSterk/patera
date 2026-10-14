@@ -236,6 +236,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -256,6 +257,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -280,6 +282,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -305,6 +308,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_CREATE,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -335,6 +339,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_CREATE,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -365,6 +370,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_DELETE,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -395,6 +401,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_EDIT,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -425,6 +432,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_EDIT,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )
@@ -454,6 +462,7 @@ class _AdminFileController(Controller[Patera[BaseConfig]]):
     @role_required(
         Permissions.ADMIN_CAN_ENTER,
         Permissions.ADMIN_CAN_VIEW,
+        require_all=True,
         raise_authentication_exception=AdminLoginRequiredException,
         raise_authorization_exception=AdminAuthorizationRequiredException,
     )

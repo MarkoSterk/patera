@@ -136,3 +136,10 @@ async def test_jobs_in_a_second_job_store_are_listed(make_app, client_for):
         assert jobs.get_job("old").next_run_time is None
         jobs.resume_job("old")
         assert jobs.get_job("old").next_run_time is not None
+
+
+async def test_jobs_return_when_the_lifespan_runs_again(app, client_for):
+    jobs = app.get_extension(Jobs)
+    for _ in range(2):
+        async with client_for(app):
+            assert list(jobs.jobs) == ["hourly"]
