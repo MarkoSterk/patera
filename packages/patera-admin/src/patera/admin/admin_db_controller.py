@@ -35,6 +35,7 @@ from patera.database.sql import DeclarativeBaseModel, SqlDatabase
 from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
+from .form_values import AdminFormError, form_values, primary_key_values
 from .exceptions import (
     AdminUnknownModelException,
     AdminUnknownDatabaseException,
@@ -219,7 +220,7 @@ class _AdminDbController(Controller[Patera]):
             model: Type[DeclarativeBaseModel] = self.get_model(model_name, db_name)
 
             async with db.create_session() as session:
-                record = await model.query(session).filter_by(**pk_values).first()
+                record = await self.find_record(session, model, pk_values)
 
             if record is None:
                 raise AdminRecordNotFound(db_name, model_name)
@@ -246,6 +247,8 @@ class _AdminDbController(Controller[Patera]):
                 }
             ).status(HttpStatus.NOT_FOUND)
 
+        except (AdminUnknownDatabaseException, AdminUnknownModelException):
+            raise
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
@@ -291,6 +294,13 @@ class _AdminDbController(Controller[Patera]):
 
             if validation_schema:
                 form_data = validation_schema.model_validate(form_data).model_dump()
+            else:
+                form_data = form_values(
+                    model,
+                    self.get_admin_create_form_fields(model),
+                    form_data,
+                    creating=True,
+                )
 
             async with db.create_session() as session:
                 async with session.begin():
@@ -311,9 +321,19 @@ class _AdminDbController(Controller[Patera]):
                 {
                     "message": "Invalid record data.",
                     "status": "error",
-                    "details": e.errors(),
+                    "details": e.errors(include_input=False, include_context=False),
                 }
             ).status(HttpStatus.UNPROCESSABLE_ENTITY)
+        except AdminFormError as e:
+            return req.res.json(
+                {
+                    "message": "Invalid record data.",
+                    "status": "error",
+                    "details": e.errors,
+                }
+            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
+        except (AdminUnknownDatabaseException, AdminUnknownModelException):
+            raise
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
@@ -348,7 +368,7 @@ class _AdminDbController(Controller[Patera]):
 
             async with db.create_session() as session:
                 async with session.begin():
-                    record = await model.query(session).filter_by(**pk_values).first()
+                    record = await self.find_record(session, model, pk_values)
 
                     if record is None:
                         raise AdminRecordNotFound(db_name, model_name)
@@ -370,6 +390,8 @@ class _AdminDbController(Controller[Patera]):
                     "status": "error",
                 }
             ).status(HttpStatus.NOT_FOUND)
+        except (AdminUnknownDatabaseException, AdminUnknownModelException):
+            raise
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
@@ -416,10 +438,17 @@ class _AdminDbController(Controller[Patera]):
 
             if validation_schema:
                 form_data = validation_schema.model_validate(form_data).model_dump()
+            else:
+                form_data = form_values(
+                    model,
+                    self.get_admin_update_form_fields(model),
+                    form_data,
+                    creating=False,
+                )
 
             async with db.create_session() as session:
                 async with session.begin():
-                    record = await model.query(session).filter_by(**pk_values).first()
+                    record = await self.find_record(session, model, pk_values)
 
                     if record is None:
                         raise AdminRecordNotFound(db_name, model_name)
@@ -440,7 +469,15 @@ class _AdminDbController(Controller[Patera]):
                 {
                     "message": "Invalid record data.",
                     "status": "error",
-                    "details": e.errors(),
+                    "details": e.errors(include_input=False, include_context=False),
+                }
+            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
+        except AdminFormError as e:
+            return req.res.json(
+                {
+                    "message": "Invalid record data.",
+                    "status": "error",
+                    "details": e.errors,
                 }
             ).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
@@ -452,6 +489,8 @@ class _AdminDbController(Controller[Patera]):
                 }
             ).status(HttpStatus.NOT_FOUND)
 
+        except (AdminUnknownDatabaseException, AdminUnknownModelException):
+            raise
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(
@@ -463,6 +502,22 @@ class _AdminDbController(Controller[Patera]):
                     "status": "error",
                 }
             ).status(HttpStatus.INTERNAL_SERVER_ERROR)
+
+    async def find_record(
+        self,
+        session: Any,
+        model: Type[DeclarativeBaseModel],
+        pk_values: dict[str, str],
+    ) -> Optional[DeclarativeBaseModel]:
+        """
+        The record with the key from the URL, converted to the key columns'
+        types (PostgreSQL does not compare "5" with an integer), or None when
+        the key does not name the model's key columns or does not fit them.
+        """
+        key = primary_key_values(model, pk_values)
+        if key is None:
+            return None
+        return await model.query(session).filter_by(**key).first()
 
     def path_pairs_to_dict(self, value: str) -> dict[str, str]:
         """
@@ -485,7 +540,8 @@ class _AdminDbController(Controller[Patera]):
         parts = value.split("/")
 
         if len(parts) % 2 != 0:
-            raise ValueError("Input must contain an even number of path parts")
+            # Not a key of any record.
+            raise AdminRecordNotFound("", "")
 
         return {parts[i]: parts[i + 1] for i in range(0, len(parts), 2)}
 

@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Optional, Sequence, Type, TypeVar, cast
 
 from sqlalchemy import Select, select
+from sqlalchemy.engine import make_url
 
 from patera import Request
 from patera.database.sql import DeclarativeBaseModel, SqlDatabase
@@ -190,11 +191,15 @@ class BaseAugmentationProvider(Generic[ModelT]):
         return select(self.model)
 
     def uses_database_search(self) -> bool:
-        """True when the search runs as a pgvector query in the database."""
+        """
+        True when the search runs as a pgvector query in the database. With
+        RETRIEVAL "auto", decided from the database URI, so it works before
+        the database has connected (in a CLI command, for example).
+        """
         mode = self._configs.RETRIEVAL
         if mode != "auto":
             return mode == "database"
-        return self._database().engine.dialect.name == "postgresql"
+        return make_url(self._database().db_uri).get_backend_name() == "postgresql"
 
     async def search(self, query: str, req: Optional[Request] = None) -> list[ModelT]:
         """

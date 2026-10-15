@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import datetime
+import os
+from typing import Optional
+
 import pytest
 
 from patera import Request
@@ -14,7 +18,8 @@ from patera.database.sql import (
     SqlDatabaseConfig,
     SqlDatabaseManager,
 )
-from sqlalchemy import Integer
+from patera.database.sql.declarative_base import ModelMeta
+from sqlalchemy import Boolean, Date, Integer, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 pytestmark = pytest.mark.integration
@@ -621,3 +626,124 @@ async def test_database_pages_only_accept_databases(make_app, client_for, tmp_pa
             )
             assert res.status_code == 404
             assert res.json()["status"] == "error"
+
+
+class MemberBase(DeclarativeBaseModel):
+    __abstract__ = True
+    __db_name__ = "members"
+
+
+class Member(MemberBase):
+    __tablename__ = "admin_form_members"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    age: Mapped[int] = mapped_column(Integer)
+    joined: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[str] = mapped_column(String(20), default="member")
+
+    class Meta(ModelMeta):
+        exclude_from_create_form = ["role"]
+        exclude_from_update_form = ["role"]
+
+
+class MembersDb(SqlDatabase):
+    __db_name__ = "members"
+
+
+class MemberDatabases(SqlDatabaseManager):
+    databases = [MembersDb]
+
+
+class MembersAdmin(AdminInterface):
+    MANAGED_MODELS = [Member]
+
+
+MEMBER_BACKENDS = ["sqlite"] + (
+    ["postgresql"] if os.environ.get("PATERA_TEST_PG_URI") else []
+)
+
+
+@pytest.mark.parametrize("backend", MEMBER_BACKENDS)
+async def test_admin_forms_without_a_schema(make_app, client_for, tmp_path, backend):
+    uri = (
+        f"sqlite+aiosqlite:///{tmp_path / 'members.db'}"
+        if backend == "sqlite"
+        else os.environ["PATERA_TEST_PG_URI"]
+    )
+    app = make_app(
+        extensions=[MemberDatabases, Jobs, MembersAdmin],
+        middleware=[HeaderAuth],
+        MEMBERS_DB=SqlDatabaseConfig(DATABASE_URI=uri),
+        MEMBERS_ADMIN=ADMIN_CONFIG,
+    )
+    db = app.get_extension(MemberDatabases).get_database("members")
+    await db.connect()
+    async with db.engine.begin() as conn:
+        await conn.run_sync(MemberBase.metadata.drop_all, tables=[Member.__table__])
+        await conn.run_sync(MemberBase.metadata.create_all, tables=[Member.__table__])
+    base = "/admin/en/databases/members/model/Member"
+    try:
+        async with client_for(app) as client:
+            # Values arrive as text, as a browser form sends them; "role" is
+            # not in the form and must not be settable.
+            res = await client.post(
+                base + "/create",
+                headers=ADMIN,
+                files={
+                    "name": (None, "Ana"),
+                    "age": (None, "31"),
+                    "joined": (None, "2026-01-02"),
+                    "active": (None, "true"),
+                    "role": (None, "owner"),
+                },
+                follow_redirects=False,
+            )
+            assert res.status_code == 303, res.text
+            res = await client.post(
+                base + "/create",
+                headers=ADMIN,
+                files={"name": (None, "Bo"), "age": (None, "old")},
+            )
+            assert res.status_code == 422
+            assert res.json()["details"][0]["loc"] == ["age"]
+
+            # The key in the URL is converted too (PostgreSQL compares types).
+            record = await client.get(base + "/pk/id/1", headers=ADMIN)
+            assert record.status_code == 200, record.text
+            assert record.json()["data"]["age"] == 31
+
+            # An unticked checkbox is not sent: it switches the value off.
+            res = await client.put(
+                base + "/pk/id/1",
+                headers=ADMIN,
+                files={
+                    "name": (None, "Ana"),
+                    "age": (None, "32"),
+                    "joined": (None, ""),
+                },
+                follow_redirects=False,
+            )
+            assert res.status_code == 303, res.text
+
+            for url in (
+                base + "/pk/id/x",
+                base + "/pk/other/1",
+                base + "/pk/id",
+                "/admin/en/databases/members/model/Missing/pk/id/1",
+                "/admin/en/databases/missing/model/Member/pk/id/1",
+            ):
+                assert (await client.get(url, headers=ADMIN)).status_code == 404, url
+        async with db.session_scope() as session:
+            member = (await session.execute(select(Member))).scalar_one()
+        assert (member.name, member.age, member.joined, member.active, member.role) == (
+            "Ana",
+            32,
+            None,
+            False,
+            "member",
+        )
+    finally:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(MemberBase.metadata.drop_all, tables=[Member.__table__])
+        await db.disconnect()

@@ -143,3 +143,57 @@ async def test_jobs_return_when_the_lifespan_runs_again(app, client_for):
     for _ in range(2):
         async with client_for(app):
             assert list(jobs.jobs) == ["hourly"]
+
+
+STORED_RUNS: list[str] = []
+
+
+def _persistent_jobs(path) -> type:
+    from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+
+    class StoredJobs(TaskManager):
+        job_stores = {"default": SQLAlchemyJobStore(url=f"sqlite:///{path}")}
+
+        @schedule_job("interval", hours=1)
+        async def nightly(self, label: str = "nightly") -> None:
+            """Cleans up once an hour."""
+            STORED_RUNS.append(label)
+
+    return StoredJobs
+
+
+async def test_jobs_work_with_a_persistent_job_store(make_app, client_for, tmp_path):
+    from patera.taskmanager.task_manager import run_scheduled_job
+
+    path = tmp_path / "jobs.db"
+    for _ in range(2):  # a restart finds the stored job and replaces it
+        stored_jobs = _persistent_jobs(path)
+        app = make_app(extensions=[stored_jobs])
+        jobs = app.get_extension(stored_jobs)
+        STORED_RUNS.clear()
+        async with client_for(app):
+            assert list(jobs.jobs) == ["StoredJobs.nightly"]
+            job = jobs.get_job("StoredJobs.nightly")
+            # Stored by name: the bound method would drag the app into the store.
+            assert job.func is run_scheduled_job
+            assert jobs.job_callable(job).__doc__ == "Cleans up once an hour."
+            jobs.run_job_now(job)
+            await asyncio.sleep(0.05)
+            assert STORED_RUNS == ["nightly"]
+
+            # Methods added by hand are stored by name too, with their arguments.
+            jobs.add_job(jobs.nightly, "interval", ["manual"], minutes=5, id="manual")
+            jobs.run_job_now("manual")
+            await asyncio.sleep(0.05)
+            assert STORED_RUNS == ["nightly", "manual"]
+            jobs.remove_job("manual")
+
+
+async def test_declared_jobs_get_a_default_id(make_app, client_for):
+    class Named(TaskManager):
+        @schedule_job("interval", hours=1)
+        async def cleanup(self) -> None: ...
+
+    app = make_app(extensions=[Named])
+    async with client_for(app):
+        assert list(app.get_extension(Named).jobs) == ["Named.cleanup"]

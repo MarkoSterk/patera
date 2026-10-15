@@ -67,6 +67,11 @@ together.
 - **Core:** removed the unused `patera.request.extract_boundary()`.
 - **patera-admin:** every action needs `ADMIN_CAN_ENTER` and its own permission (`VIEW`, `CREATE`,
   `EDIT`, `DELETE`); `ADMIN_CAN_ENTER` alone allowed every action. Give administrators all five.
+- **patera-admin:** record forms of models without a validation schema are converted to the column
+  types, and only the fields the form shows are written: a field excluded from the form can no
+  longer be set by adding it to the request. An unticked checkbox sets `False`.
+- **patera-taskmanager:** `@schedule_job` jobs without an `id` get `<class>.<method>` instead of a
+  random id, and every declared job replaces its stored copy at startup.
 - **patera-caching:** responses are cached as the bytes that are sent, and the Redis and SQLite
   backends store JSON instead of pickle. Existing entries are treated as misses.
 - **Core:** dropped the unused dependencies h11, httpcore, idna, mako and markupsafe; websockets
@@ -138,6 +143,21 @@ together.
   at registration.
 - **Core:** raw non-UTF-8 bytes in a query string no longer fail the request before a response.
 - **Core:** CLI arguments annotated `Optional[int]` or `int | None` are converted.
+- **Core:** `@produces(..., status_code)` no longer overrides an explicit `.status(200)`
+  (`Response.status_set`).
+- **Core:** every response of a route with CORS enabled carries `Vary: Origin`, also without an
+  `Origin` header, for a refused origin and for routing errors, so shared caches keep the
+  variants apart.
+- **Core:** logging works again when the application's lifespan runs a second time (the shutdown
+  removed the sinks for good).
+- **patera-admin:** record forms of models without a validation schema failed for boolean columns
+  (always) and number and date columns (PostgreSQL); records with an integer key could not be
+  viewed, edited or deleted on PostgreSQL. Values and keys are converted to the column types.
+- **patera-admin:** an unknown database or model on a record page answers 404, and an unknown
+  e-mail sender 400, instead of 500.
+- **patera-taskmanager:** a persistent job store (`SQLAlchemyJobStore`, ...) made startup fail,
+  because jobs were stored as bound methods. Methods of the task manager are now stored by name
+  (`run_scheduled_job`); `job_callable(job)` returns the method a job runs.
 - **Core:** the missing-configuration error names the `@app(...)` decorator.
 - **Core:** database sessions opened in a WebSocket handler are closed when it returns.
 - **patera-database:** `session_scope()` (and `work_session()` outside `@transactional`) inside a
@@ -242,5 +262,24 @@ together.
   message, can no longer pull other arguments into the prompt.
 - The embedding model is loaded on first use, in a worker thread, instead of when the application
   starts (CLI commands no longer load it); `load_embedding_model()` can be overridden.
+- Document search decides between pgvector and Python from the database URI, so it works before
+  the database has connected (it failed with "Engine not initialized", e.g. in CLI commands).
 
-`patera-desktop` 0.11.0 is required with `patera` 0.121 (earlier versions import the removed `get_range_file()`).
+**patera-desktop:** rewritten, with only one feature for now. The `Desktop` extension adds the CLI
+command `desktop:run [dev|prod]`: it starts the application in a separate process, as `patera dev`
+or `patera prod` would (on `127.0.0.1` and the `PORT` setting), shows `DESKTOP.INDEX_PAGE` (default
+`/`) in a pywebview window, and stops the application when the window is closed. The launcher, the
+frontend bridge, frontend tools and the `PATERA_DESKTOP_*` settings are gone, and so is the core
+command `patera desktop`. `python -m patera.cli` now runs the `patera` command.
+`desktop:package [folder]` packages the application as a program with PyInstaller (extra
+`patera-desktop[pyinstaller]`), by default into `dist/desktop/<APP_NAME>/`: the program runs the
+server in a background thread with `run_in_window(App)`, on a free port, and writes its log files to
+`user_data_dir(APP_NAME)`. Before the application starts, `run_in_window` loads the
+installation's settings file, `settings_file(APP_NAME)` (`settings.env` in that folder), like
+`.env` during development. The package ships a PyInstaller hook so the `patera.*` extensions are
+found also in editable (workspace) installs. `desktop:spec [path]` writes a PyInstaller spec file
+(default `desktop.spec`) with the defaults as settings to edit (hidden imports, data files, icon,
+console, one file, own entry script). The application package is copied without what running and
+developing it leave there (`__pycache__`, log files, SQLite databases, `.env`, tool caches;
+`PACKAGE_EXCLUDES` in the spec file). `desktop:package [folder] [spec]` builds with the spec file
+when it exists, otherwise with a generated one in `build/desktop/`. patera-desktop now depends on uvicorn.

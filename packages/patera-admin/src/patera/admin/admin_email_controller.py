@@ -164,6 +164,10 @@ class _AdminEmailClientController(Controller[Patera]):
                 }
             ).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
+        except AdminUnknownEmailClientException:
+            # Answered by the Admin exception handler (400).
+            raise
+
         except Exception as e:
             self.app.logger.exception(e)
             return req.res.json(

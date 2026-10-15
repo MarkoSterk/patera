@@ -96,6 +96,7 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
         )
         cached_value = {
             "status_code": int(value.status_code),
+            "status_set": value.status_set,
             "headers": dict(value.headers),
             "body": None if body is None else base64.b64encode(body).decode("ascii"),
             "media_type": value.media_type,
@@ -147,6 +148,9 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
         body = cached_data.get("body")
         req.res.body = None if body is None else base64.b64decode(body)
         req.res.status_code = cached_data["status_code"]
+        # Keeps a decorator default such as @produces' status code working
+        # the same on a hit as on a miss.
+        req.res._status_set = bool(cached_data.get("status_set", False))
         req.res.headers = dict(cached_data["headers"])
         req.res.media_type = cached_data["media_type"]
         req.res.charset = cached_data["charset"]

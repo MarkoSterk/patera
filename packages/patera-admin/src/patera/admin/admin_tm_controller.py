@@ -308,11 +308,13 @@ class _AdminTMController(Controller[Patera[BaseConfig]]):
         )
 
     def job_to_dict(self, job: Job, task_manager: Any) -> dict[str, Any]:
+        # A job in a persistent store runs its method by name; show the method.
+        target = task_manager.job_callable(job)
         return {
             "id": job.id,
             "name": job.name,
-            "func_ref": job.func_ref,
-            "description": inspect.getdoc(job.func) or "",
+            "func_ref": f"{target.__module__}:{target.__qualname__}",
+            "description": inspect.getdoc(target) or "",
             "trigger": str(job.trigger),
             "next_run_time": str(job.next_run_time) if job.next_run_time else None,
             "paused": job.next_run_time is None,

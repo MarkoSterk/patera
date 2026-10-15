@@ -237,6 +237,9 @@ class Patera(Injectable, Generic[ConfT]):
         }
 
         self._logger_sink_ids: list[int] = []
+        # Loggers whose sinks are attached now and again at every startup
+        # (shutdown removes them).
+        self._loggers: list[LoggerBase] = []
         self._registered_loggers: set[type] = set()
 
         self._jinja_environment: Environment = Environment(
@@ -256,6 +259,7 @@ class Patera(Injectable, Generic[ConfT]):
         )
 
         default_logger = DefaultLogger(self)
+        self._loggers.append(default_logger)
         self._logger_sink_ids.append(default_logger.configure())
 
         self._router: Router = Router(self._configs.STRICT_SLASHES)
@@ -479,8 +483,9 @@ class Patera(Injectable, Generic[ConfT]):
                         continue
                     self._registered_loggers.add(obj)
                     self.logger.info(f"Registering logger sink: {obj.__name__}")
-                    sink_id = obj(self).configure()
-                    self._logger_sink_ids.append(sink_id)
+                    logger_component = obj(self)
+                    self._loggers.append(logger_component)
+                    self._logger_sink_ids.append(logger_component.configure())
                     continue
 
     def _enable_cors(self) -> None:
@@ -878,6 +883,8 @@ class Patera(Injectable, Generic[ConfT]):
             message = await receive()
 
             if message["type"] == "lifespan.startup":
+                # A second lifespan (another test client, say) logs again.
+                self._attach_logger_sinks()
                 try:
                     for method in self._on_startup_methods:
                         await run_sync_or_async(method)
@@ -924,6 +931,19 @@ class Patera(Injectable, Generic[ConfT]):
                 f"Cancelled {cancelled} background task(s) still running after "
                 f"{timeout} seconds (BACKGROUND_TASKS_SHUTDOWN_TIMEOUT)"
             )
+
+    def _attach_logger_sinks(self) -> None:
+        """
+        Attaches the loggers' sinks and the log files again after a shutdown
+        removed them. Does nothing while they are attached.
+        """
+        if self._logger_sink_ids:
+            return
+        for logger_component in self._loggers:
+            self._logger_sink_ids.append(logger_component.configure())
+        log_files_sink_id = self.log_files.attach()
+        if log_files_sink_id is not None:
+            self._logger_sink_ids.append(log_files_sink_id)
 
     def _remove_logger_sinks(self) -> None:
         """Removes all logger sinks registered by this application."""

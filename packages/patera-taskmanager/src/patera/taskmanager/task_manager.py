@@ -48,6 +48,34 @@ class TaskManagerConfig(BaseModel):
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
+# The running task managers by class ("module:QualName"), so a job stored in
+# a persistent job store can find its task manager again when it runs.
+_TASK_MANAGERS: dict[str, "TaskManager[Any]"] = {}
+
+
+def _manager_key(cls: type) -> str:
+    return f"{cls.__module__}:{cls.__qualname__}"
+
+
+async def run_scheduled_job(
+    manager: str, method: str, *args: Any, **kwargs: Any
+) -> Any:
+    """
+    Runs ``method`` of the running task manager ``manager``.
+
+    Jobs in a job store that serializes them (SQLAlchemy, Redis, MongoDB) are
+    stored as a call of this function with those two names, instead of the
+    method itself: a bound method would carry the task manager, and through
+    it the whole application, into the store, which cannot be serialized.
+    """
+    task_manager = _TASK_MANAGERS.get(manager)
+    if task_manager is None:
+        raise RuntimeError(
+            f"Task manager {manager!r} is not running in this process; "
+            "its stored job cannot run."
+        )
+    return await run_sync_or_async(getattr(task_manager, method), *args, **kwargs)
+
 
 class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     """
@@ -104,6 +132,9 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
             if self.executors is not None
             else {"default": AsyncIOExecutor()}
         )
+
+        self._job_stores: dict[str, BaseJobStore] = job_stores
+        _TASK_MANAGERS[_manager_key(type(self))] = self
 
         self._scheduler = self.scheduler_cls(
             jobstores=job_stores,
@@ -177,20 +208,26 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
 
             if scheduler_method:
                 self._initial_jobs_methods_list.append(
-                    (method, scheduler_method["args"], scheduler_method["kwargs"])
+                    (name, scheduler_method["args"], scheduler_method["kwargs"])
                 )
 
     def _start_initial_jobs(self) -> None:
         """
         Adds the jobs declared with @schedule_job. Runs at every startup, so
         an application whose lifespan runs again (a second test client, for
-        example) gets its jobs again. A job with an id replaces the stored
-        job of that id, so a persistent job store never holds it twice.
+        example) gets its jobs again. Every job has an id, by default
+        "<TaskManager class>.<method>", and replaces the stored job of that
+        id, so a persistent job store never holds it twice.
         """
-        for func, args, kwargs in self._initial_jobs_methods_list:
-            if "id" in kwargs:
-                kwargs = {"replace_existing": True, **kwargs}
-            self.scheduler.add_job(func, *args, **kwargs)
+        for name, args, kwargs in self._initial_jobs_methods_list:
+            default_id = f"{type(self).__name__}.{name}"
+            kwargs = {
+                "id": default_id,
+                "name": default_id,
+                "replace_existing": True,
+                **kwargs,
+            }
+            self.add_job(getattr(self, name), *args, **kwargs)
 
     def run_background_task(self, func: Callable, *args, **kwargs) -> None:
         """
@@ -204,8 +241,46 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     def add_job(self, func: Callable, *args, **kwargs) -> Job:
         """
         Adds a job manually. Arguments are passed to the scheduler's add_job().
+
+        A method of this task manager works with every job store: for a store
+        that serializes its jobs, it is stored by name (see
+        run_scheduled_job) instead of as a bound method.
         """
+        if (
+            inspect.ismethod(func)
+            and func.__self__ is self
+            and self._serializes_jobs(kwargs.get("jobstore"))
+        ):
+            args, kwargs = self._by_name(func.__name__, args, kwargs)
+            kwargs.setdefault("name", f"{type(self).__name__}.{func.__name__}")
+            func = run_scheduled_job
         return self.scheduler.add_job(func, *args, **kwargs)
+
+    def _serializes_jobs(self, alias: Optional[str]) -> bool:
+        """True unless the job store keeps jobs in memory as they are."""
+        store = self._job_stores.get(alias or "default")
+        return store is not None and not isinstance(store, MemoryJobStore)
+
+    def _by_name(
+        self, method: str, args: tuple, kwargs: dict[str, Any]
+    ) -> tuple[tuple, dict[str, Any]]:
+        """
+        Arguments of scheduler.add_job() for run_scheduled_job: the task
+        manager's key and the method name come first in the job's ``args``.
+        """
+        positional = list(args)
+        kwargs = dict(kwargs)
+        # add_job(func, trigger, args, kwargs, ...): the job's own arguments
+        # may be given positionally after the trigger.
+        job_args = positional.pop(1) if len(positional) > 1 else kwargs.pop("args", ())
+        kwargs["args"] = [_manager_key(type(self)), method, *(job_args or ())]
+        return tuple(positional), kwargs
+
+    def job_callable(self, job: Job) -> Callable:
+        """The method or function a job runs (also for a job stored by name)."""
+        if job.func is run_scheduled_job and len(job.args) >= 2:
+            return cast(Callable, getattr(self, job.args[1]))
+        return cast(Callable, job.func)
 
     def remove_job(self, job: str | Job, job_store: Optional[str] = None) -> None:
         """

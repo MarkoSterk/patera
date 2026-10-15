@@ -1,5 +1,21 @@
-from .frontend import Frontend, Expose
-from .frontend_tools import FrontendTools, frontend_tool
-from .desktop_launcher import DesktopLauncher
+"""
+Desktop applications with Patera and pywebview (experimental).
+"""
 
-__all__ = ["Frontend", "Expose", "FrontendTools", "frontend_tool", "DesktopLauncher"]
+from .desktop import (
+    Desktop,
+    DesktopCLIController,
+    DesktopConfig,
+    run_in_window,
+    settings_file,
+    user_data_dir,
+)
+
+__all__ = [
+    "Desktop",
+    "DesktopCLIController",
+    "DesktopConfig",
+    "run_in_window",
+    "settings_file",
+    "user_data_dir",
+]

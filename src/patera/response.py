@@ -44,6 +44,9 @@ class Response(Generic[U]):
         self._request = request
 
         self.status_code: int | HttpStatus = HttpStatus.OK
+        # True once status() was called: a default such as @produces'
+        # status code then no longer applies.
+        self._status_set: bool = False
         self.headers: dict[str, str] = {}
         self.body: Optional[U] = None
 
@@ -64,7 +67,13 @@ class Response(Generic[U]):
         Sets the response status code.
         """
         self.status_code = status_code
+        self._status_set = True
         return self
+
+    @property
+    def status_set(self) -> bool:
+        """True if the status was set with status() (or a builder that sets it)."""
+        return self._status_set
 
     def redirect(
         self,
@@ -75,7 +84,7 @@ class Response(Generic[U]):
         Redirects the client to the provided location.
         """
         self.set_header("location", location)
-        self.status_code = status_code
+        self.status(status_code)
         self.body = None
         self.media_type = None
         self.charset = None
@@ -459,6 +468,7 @@ class Response(Generic[U]):
         The app and request references are intentionally preserved.
         """
         self.status_code = HttpStatus.OK
+        self._status_set = False
         self.headers.clear()
         self.body = None
 

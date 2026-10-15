@@ -12,6 +12,7 @@ from .exceptions import (
     AdminAuthorizationRequiredException,
     AdminUnknownEmailClientException,
     AdminUnknownDatabaseException,
+    AdminUnknownModelException,
 )
 from .admin_interface import AdminInterface, Permissions
 
@@ -100,6 +101,17 @@ class _AdminExceptionHandler(ExceptionHandler[Patera]):
     ) -> Response:
         return req.res.json(
             {"message": f"Unknown database: {exc.db_name}", "status": "error"}
+        ).status(HttpStatus.NOT_FOUND)
+
+    @handles(AdminUnknownModelException)
+    async def unknown_model(
+        self, req: Request, exc: AdminUnknownModelException
+    ) -> Response:
+        return req.res.json(
+            {
+                "message": f"Unknown model {exc.model_name} in database {exc.db_name}",
+                "status": "error",
+            }
         ).status(HttpStatus.NOT_FOUND)
 
     @property

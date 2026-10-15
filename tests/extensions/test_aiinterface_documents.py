@@ -225,3 +225,14 @@ async def test_the_embedding_model_is_loaded_on_first_use_only(librarian):
     assert Documents.loads == loads + 1  # once, even for concurrent first uses
     await fresh.augmentation_provider.relevant_texts("car")
     assert Documents.loads == loads + 1
+
+
+async def test_search_works_before_the_database_connects(librarian):
+    """A CLI command, for example, searches before anything connected."""
+    backend, service = librarian
+    db = service.app.get_extension(DocsDatabases).get_database("docs")
+    await db.disconnect()
+    provider = service.augmentation_provider
+    assert provider.uses_database_search() is (backend == "postgresql")
+    texts = await provider.relevant_texts("cat")
+    assert texts and all("cat" in text.lower() for text in texts)

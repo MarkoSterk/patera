@@ -1,0 +1,364 @@
+"""
+Desktop applications with Patera and pywebview.
+
+Register the extension:
+
+    class App(Patera):
+        app_extensions = [Desktop]
+
+During development, ``patera cli desktop:run`` (or ``desktop:run prod``)
+starts the application in a separate process, as ``patera dev`` or
+``patera prod`` would, and shows it in a window; closing the window stops
+the application.
+
+For a packaged application, ``run_in_window(App)`` runs the server inside
+the same process, on a background thread, and the window on the main
+thread. ``patera cli desktop:package`` builds such an application with
+PyInstaller, and ``patera cli desktop:spec`` writes the spec file it builds
+with, for editing.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field
+
+from patera.base_extension import BaseExtension
+from patera.cli import CLIController, cli_controller, command
+
+from .packaging import DEFAULT_SPEC_FILE
+
+if TYPE_CHECKING:
+    from patera import Patera
+
+AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
+
+#: The application only listens on this computer.
+HOST = "127.0.0.1"
+#: Seconds to wait for the application to answer.
+STARTUP_TIMEOUT = 60.0
+#: Seconds the application gets to shut down before it is killed.
+SHUTDOWN_TIMEOUT = 10.0
+#: Output folder of ``desktop:package``, relative to the project folder.
+DEFAULT_PACKAGE_FOLDER = "dist/desktop"
+#: File in the user's data folder with the settings of one installation.
+SETTINGS_FILE_NAME = "settings.env"
+
+
+class DesktopConfig(BaseModel):
+    """Settings of the Desktop extension (``DESKTOP``)."""
+
+    INDEX_PAGE: str = Field(
+        "/",
+        description=(
+            "Page the window opens: a path of the application, relative to "
+            "URL_PREFIX ('/', '/dashboard'), or an absolute URL."
+        ),
+    )
+
+
+class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
+    """Adds the ``desktop:run`` and ``desktop:package`` commands."""
+
+    def init(self) -> None:
+        self.app.register_cli_controller(DesktopCLIController(self.app, self))
+
+    def index_url(self, port: int) -> str:
+        """The URL the window opens."""
+        return index_url(self.app, port)
+
+    def server_command(self, mode: str) -> list[str]:
+        """``patera dev`` or ``patera prod`` for this application."""
+        app_class = type(self.app)
+        return [
+            sys.executable,
+            "-m",
+            "patera.cli",
+            mode,
+            "--app",
+            f"{app_class.__module__}:{app_class.__qualname__}",
+        ]
+
+    def start_server(self, mode: str, port: int) -> subprocess.Popen[bytes]:
+        """
+        Starts the application in its own process group, so stopping it also
+        stops the processes it starts (the reloader's worker, for example).
+        """
+        environment = {**os.environ, "PATERA_HOST": HOST, "PATERA_PORT": str(port)}
+        if sys.platform == "win32":
+            return subprocess.Popen(
+                self.server_command(mode),
+                env=environment,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
+        return subprocess.Popen(
+            self.server_command(mode), env=environment, start_new_session=True
+        )
+
+    def wait_until_ready(self, server: subprocess.Popen[bytes], port: int) -> None:
+        """Waits until the application accepts connections."""
+        deadline = time.monotonic() + STARTUP_TIMEOUT
+        while time.monotonic() < deadline:
+            if server.poll() is not None:
+                raise RuntimeError(
+                    f"The application stopped while starting (exit code {server.returncode})."
+                )
+            try:
+                with socket.create_connection((HOST, port), timeout=0.5):
+                    return
+            except OSError:
+                time.sleep(0.2)
+        raise RuntimeError(
+            f"The application did not answer on {HOST}:{port} within "
+            f"{STARTUP_TIMEOUT:g} seconds."
+        )
+
+    def show_window(self, url: str) -> None:
+        """Shows ``url`` in a window; returns when the window is closed."""
+        show_window(self.app.app_name, url)
+
+    def stop_server(self, server: subprocess.Popen[bytes]) -> None:
+        """Stops the application as Ctrl+C would, and kills it if it hangs."""
+        if server.poll() is not None:
+            return
+        if sys.platform == "win32":
+            server.send_signal(signal.CTRL_BREAK_EVENT)
+        else:
+            os.killpg(server.pid, signal.SIGINT)
+        try:
+            server.wait(timeout=SHUTDOWN_TIMEOUT)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(server.pid)],
+                capture_output=True,
+                check=False,
+            )
+        else:
+            os.killpg(server.pid, signal.SIGKILL)
+        server.wait()
+
+    def run(self, mode: str = "dev") -> None:
+        """Runs the application and shows it until the window is closed."""
+        if mode not in ("dev", "prod"):
+            raise ValueError(f"Mode must be 'dev' or 'prod', not {mode!r}.")
+        port = int(self.app.configs.PORT)
+        server = self.start_server(mode, port)
+        try:
+            self.wait_until_ready(server, port)
+            self.show_window(self.index_url(port))
+        finally:
+            self.stop_server(server)
+
+    def package(
+        self, output: str = DEFAULT_PACKAGE_FOLDER, spec: str = DEFAULT_SPEC_FILE
+    ) -> Path:
+        """
+        Packages the application with PyInstaller into ``output``, with the
+        spec file ``spec`` (both relative to the current folder), and returns
+        ``output``. Without the default spec file, a generated one is used.
+        """
+        from .packaging import package
+
+        return package(self.app, Path(output), Path(spec))
+
+    def write_spec(self, path: str = DEFAULT_SPEC_FILE) -> Path:
+        """Writes a PyInstaller spec file with the default settings, to edit."""
+        from .packaging import write_spec
+
+        return write_spec(self.app, Path(path))
+
+
+@cli_controller(name="desktop")
+class DesktopCLIController(CLIController[Any]):
+    def __init__(self, app: Any, desktop: Desktop[Any]) -> None:
+        super().__init__(app)
+        self._desktop = desktop
+
+    @command("run", help="Run the application in a desktop window (mode: dev or prod)")
+    async def run(self, mode: str = "dev") -> None:
+        # Directly, not in a worker thread: GUI toolkits need the main thread.
+        self._desktop.run(mode)
+
+    @command(
+        "package",
+        help=(
+            "Package the application with PyInstaller "
+            f"(default output: {DEFAULT_PACKAGE_FOLDER}; builds with {DEFAULT_SPEC_FILE} when it exists)"
+        ),
+    )
+    async def package(
+        self, output: str = DEFAULT_PACKAGE_FOLDER, spec: str = DEFAULT_SPEC_FILE
+    ) -> None:
+        folder = self._desktop.package(output, spec)
+        print(f"Packaged application in {folder}")
+
+    @command(
+        "spec",
+        help=f"Write a PyInstaller spec file to edit (default: {DEFAULT_SPEC_FILE})",
+    )
+    async def spec(self, path: str = DEFAULT_SPEC_FILE) -> None:
+        spec_file = self._desktop.write_spec(path)
+        print(
+            f"Wrote {spec_file}. Edit it for what the program needs (hidden imports, "
+            "data files, an icon); desktop:package builds with it."
+        )
+
+
+def index_url(app: Any, port: int) -> str:
+    """The URL a window opens: DESKTOP.INDEX_PAGE of the application."""
+    page = _desktop_configs(app).INDEX_PAGE
+    if urlparse(page).scheme:
+        return page
+    return f"http://{HOST}:{port}{app.url_prefix}/{page.lstrip('/')}"
+
+
+def _desktop_configs(app: Any) -> DesktopConfig:
+    for extension in app.extensions.values():
+        if isinstance(extension, Desktop):
+            return extension.configs
+    return DesktopConfig.model_validate({})
+
+
+def show_window(title: str, url: str) -> None:
+    """Shows ``url`` in a pywebview window; returns when it is closed."""
+    import webview
+
+    webview.create_window(title, url)
+    webview.start()
+
+
+def free_port() -> int:
+    """A port on HOST that nothing listens on right now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((HOST, 0))
+        return int(sock.getsockname()[1])
+
+
+_UNSAFE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+
+
+def user_data_dir(app_name: str) -> Path:
+    """
+    The folder where an installed application keeps its data (logs, a
+    SQLite database, ...), created if needed:
+
+    - Windows: %APPDATA%\\<app name>
+    - macOS: ~/Library/Application Support/<app name>
+    - Linux: $XDG_DATA_HOME/<app name>, by default ~/.local/share/<app name>
+
+    A packaged application's own folder may not be writable (Program Files)
+    and is replaced by every update, so data belongs here.
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    name = _UNSAFE_NAME.sub("_", app_name).strip(" .") or "Patera app"
+    folder = base / name
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def settings_file(app_name: str) -> Path:
+    """
+    The settings file of an installed application:
+    ``user_data_dir(app_name) / "settings.env"``. ``run_in_window`` loads it
+    before the application starts, like ``.env`` during development, so it
+    holds what differs per user or installation. The file uses the same
+    names as environment variables (``PATERA_...``); real environment
+    variables win over it. The application may create or edit it, for
+    example from a settings page; changes apply at the next start.
+    """
+    return user_data_dir(app_name) / SETTINGS_FILE_NAME
+
+
+def _ensure_streams() -> None:
+    """
+    A windowed (console-less) executable has no standard output or error;
+    logging to them would fail, so they are replaced by the null device.
+    """
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
+def run_in_window(app_class: "type[Patera[Any]]") -> None:
+    """
+    Runs the application in this process and shows it in a window until the
+    window is closed: the entry point of a packaged desktop application.
+
+    Before the application is created, the settings file of this
+    installation is loaded when it exists (see settings_file()).
+
+    The server (uvicorn) runs on a background thread, on 127.0.0.1 and a
+    free port; the window needs the main thread. The application runs in
+    production mode unless PATERA_DEBUG says otherwise. In a packaged
+    (frozen) application, the log files go to user_data_dir() unless
+    PATERA_LOG_FILES__PATH names another file.
+    """
+    import uvicorn
+    from dotenv import load_dotenv
+
+    _ensure_streams()
+    app_name = app_class._app_configs["configs"]().APP_NAME  # type: ignore[attr-defined]
+    installation_settings = settings_file(app_name)
+    if installation_settings.is_file():
+        # Real environment variables win, as they do over .env.
+        load_dotenv(installation_settings, override=False)
+    os.environ.setdefault("PATERA_DEBUG", "0")
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault(
+            "PATERA_LOG_FILES__PATH",
+            str(user_data_dir(app_name) / "logs" / "patera.jsonl"),
+        )
+
+    port = free_port()
+    # The settings then report the address the application really uses.
+    os.environ["PATERA_HOST"] = HOST
+    os.environ["PATERA_PORT"] = str(port)
+    application = app_class()
+    server = uvicorn.Server(
+        uvicorn.Config(
+            application,
+            host=HOST,
+            port=port,
+            lifespan="on",
+            log_config=None,
+            access_log=False,
+        )
+    )
+    thread = threading.Thread(
+        target=server.run, name="patera-desktop-server", daemon=True
+    )
+    thread.start()
+    try:
+        deadline = time.monotonic() + STARTUP_TIMEOUT
+        while not server.started:
+            if not thread.is_alive():
+                raise RuntimeError("The application stopped while starting.")
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    f"The application did not start within {STARTUP_TIMEOUT:g} seconds."
+                )
+            time.sleep(0.05)
+        show_window(application.app_name, index_url(application, port))
+    finally:
+        server.should_exit = True
+        thread.join(timeout=SHUTDOWN_TIMEOUT)

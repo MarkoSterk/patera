@@ -419,3 +419,24 @@ async def test_joined_route_paths_have_no_double_slashes(make_app, client_for, p
     assert app.url_for("RootController.hello") == f"{prefix}/hello"
     async with client_for(app) as client:
         assert (await client.get(f"{prefix}/hello")).json() == {"page": "hello"}
+
+
+@path("/statuses")
+class StatusController(Controller):
+    @post("/")
+    @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
+    async def create(self, req: Request) -> Response:
+        data = await req.json() or {}
+        if data.get("exists"):
+            # Nothing was created: an explicit 200 must win over the default.
+            return req.res.json({"created": False}).status(HttpStatus.OK)
+        return req.res.json({"created": True})
+
+
+async def test_an_explicit_status_wins_over_produces(make_app, client_for):
+    app = make_app(controllers=[StatusController])
+    async with client_for(app) as client:
+        assert (await client.post("/statuses/", json={})).status_code == 201
+        assert (
+            await client.post("/statuses/", json={"exists": True})
+        ).status_code == 200

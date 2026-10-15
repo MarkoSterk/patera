@@ -6,6 +6,9 @@ Handles Cross-Origin Resource Sharing (CORS) by adding appropriate headers to HT
 from typing import Any, Callable, Optional, TYPE_CHECKING, cast
 from ..middleware import MiddlewareBase
 
+# CORS responses differ by the request's Origin; caches must key on it.
+_VARY_ORIGIN = (b"vary", b"Origin")
+
 if TYPE_CHECKING:
     from ..request import Request
     from ..response import Response
@@ -27,39 +30,46 @@ class CORSMiddleware(MiddlewareBase):
             self._get_header(scope, "access-control-request-method")
         )
 
-        if cors_opts["enabled"] and origin:
-            if not self._origin_allowed(origin, cors_opts["allow_origins"]):
-                if is_preflight:
-                    return req.res.json(
-                        {"status": "error", "message": "CORS origin not allowed"}
-                    ).status(403)
-                # Simple/actual requests are passed through without CORS
-                # headers; the browser then blocks cross-origin reads. Same-origin
-                # requests (browsers also send Origin on them) keep working.
-                return await self.next(req)
+        if not cors_opts["enabled"]:
+            return await self.next(req)
 
+        if origin and self._origin_allowed(origin, cors_opts["allow_origins"]):
             if is_preflight:
+                # pylint: disable-next=W0212
+                req._send = self._wrap_vary_send(req._send)
                 return self._handle_preflight(scope, req, origin, cors_opts)
-
             # Wrap send to inject CORS headers on normal responses
             # pylint: disable-next=W0212
             req._send = self._wrap_cors_send(req._send, origin, cors_opts)
+            return await self.next(req)
 
+        # No Origin, or one that is not allowed: no CORS headers, but the
+        # response still varies by Origin, so a shared cache must not hand it
+        # to an allowed origin (or the other way round).
+        # pylint: disable-next=W0212
+        req._send = self._wrap_vary_send(req._send)
+        if origin and is_preflight:
+            return req.res.json(
+                {"status": "error", "message": "CORS origin not allowed"}
+            ).status(403)
+        # Simple/actual requests are passed through without CORS headers; the
+        # browser then blocks cross-origin reads. Same-origin requests
+        # (browsers also send Origin on them) keep working.
         return await self.next(req)
 
     def wrap_send_without_route(self, scope: dict, send: Callable) -> Callable:
         """
         Wraps ``send`` with the global CORS headers for a response that has no
         route handler, such as a routing error. Returns ``send`` unchanged when
-        CORS is disabled, the request has no Origin, or the origin is not
-        allowed.
+        CORS is disabled; without an allowed Origin only ``Vary: Origin`` is
+        added.
         """
         opts = self._resolve_cors_options(None)
         origin = self._get_header(scope, "origin")
-        if not opts["enabled"] or not origin:
+        if not opts["enabled"]:
             return send
-        if not self._origin_allowed(origin, opts["allow_origins"]):
-            return send
+        if not origin or not self._origin_allowed(origin, opts["allow_origins"]):
+            return self._wrap_vary_send(send)
         return self._wrap_cors_send(send, origin, opts)
 
     def _get_header(self, scope, name: str) -> Optional[str]:
@@ -148,7 +158,6 @@ class CORSMiddleware(MiddlewareBase):
 
         headers: dict[str, str] = {
             "access-control-allow-origin": allow_origin_value,
-            "vary": "Origin",
             "access-control-allow-methods": ", ".join(allow_methods),
             "access-control-allow-headers": ", ".join(allow_headers),
         }
@@ -174,7 +183,7 @@ class CORSMiddleware(MiddlewareBase):
 
         headers: list[tuple[bytes, bytes]] = [
             (b"access-control-allow-origin", allow_origin_value.encode("latin1")),
-            (b"vary", b"Origin"),
+            _VARY_ORIGIN,
         ]
         if opts["allow_credentials"]:
             headers.append((b"access-control-allow-credentials", b"true"))
@@ -206,6 +215,16 @@ class CORSMiddleware(MiddlewareBase):
             opts=cors_opts,
         )
         return req.res.no_content().set_headers(headers)
+
+    def _wrap_vary_send(self, send):
+        """Adds ``Vary: Origin`` to the response's start message."""
+
+        async def vary_send(event):
+            if event.get("type") == "http.response.start":
+                event = {**event, "headers": [*event.get("headers", []), _VARY_ORIGIN]}
+            await send(event)
+
+        return vary_send
 
     def _wrap_cors_send(self, send, origin: str, cors_opts: dict):
         cors_headers = self._build_cors_headers_for_response(

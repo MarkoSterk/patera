@@ -473,3 +473,14 @@ async def test_file_response_download_name(
     assert res.status_code == 200
     assert res.content == b"0123456789"
     assert res.headers["content-disposition"] == expected
+
+
+async def test_logging_works_again_after_a_second_startup(make_app, client_for):
+    app = make_app()
+    async with client_for(app):
+        app.logger.info("first run")
+    async with client_for(app):
+        app.logger.info("second run")
+    messages = [record["message"] for record in app.log_files.read()]
+    assert "first run" in messages
+    assert "second run" in messages

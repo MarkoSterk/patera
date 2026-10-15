@@ -249,10 +249,9 @@ def produces(
             if res.media_type is None and res.content_type is None:
                 res.media_type = media_type.value
 
-            if (
-                int(res.status_code) == int(HttpStatus.OK)
-                and status_code != HttpStatus.OK
-            ):
+            # The default status applies unless the handler chose one, even
+            # an explicit 200.
+            if not res.status_set and int(res.status_code) == int(HttpStatus.OK):
                 res.status(status_code)
 
             return res

@@ -11,7 +11,7 @@ application services, and typed configuration objects.
 The core package handles routing, requests/responses, validation, templates, static files, CORS,
 middleware, OpenAPI documentation, logging, a CLI and a test client. Optional packages add SQL
 databases, migrations, authentication, caching, scheduled tasks, e-mail, declarative API clients,
-an AI interface, an admin dashboard and a desktop launcher.
+an AI interface, an admin dashboard and desktop windows.
 
 > Patera is in beta. Until version 1.0, a minor release may contain breaking changes; each one is
 > listed in the [changelog](https://github.com/MarkoSterk/Patera/blob/main/CHANGELOG.md). The AI
@@ -73,7 +73,7 @@ Optional features are installed with extras:
 | `apiinterface` | `patera-apiinterface` | declarative clients for external HTTP APIs |
 | `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental; `patera-aiinterface[augmentation]` adds the embedding libraries) |
 | `admin` | `patera-admin` | admin dashboard |
-| `desktop` | `patera-desktop` | run the app as a desktop application (pywebview) |
+| `desktop` | `patera-desktop` | show the app in a desktop window (pywebview) and package it as a program |
 | `all` | all of the above except `aiinterface` and `desktop` | |
 
 ```sh
@@ -175,7 +175,6 @@ package is not called `app`.
 | `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the core package), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
 | `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
 | `patera test [--env-file FILE] [pytest args...]` | runs pytest after loading the test environment file (`.env.test` when the project has one). Pytest options may come in any order (`patera test -k login -q`); everything after `--` goes to pytest unchanged. |
-| `patera desktop [--mode dev\|prod]` | runs the app as a desktop application (needs `patera-desktop`). |
 
 The application class is an ASGI application factory, so any ASGI server works, e.g.
 `uvicorn app:App --factory --lifespan on`. Keep lifespan enabled: startup/shutdown hooks
@@ -378,7 +377,7 @@ class UserApi(Controller[App]):
   you [handle](#exception-handling) it yourself. Validate other client data (query parameters,
   route values) with `req.validate(Model, data)`, which raises the same error.
 - `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
-  explicitly set content type/status wins). Documented in OpenAPI.
+  explicitly set content type or status wins, also `.status(HttpStatus.OK)`). Documented in OpenAPI.
 - `-> Response[Model]` – the body is validated and serialized through `Model`, which filters
   out undeclared fields (e.g. `password_hash` above). Generic annotations such as `list[Model]` or
   `dict[str, Model]` filter every item. Dictionaries, model instances and objects with matching
@@ -624,7 +623,8 @@ CORS is enabled by default and configured with the `CORS_*` options. The middlew
 preflight requests (`OPTIONS` with `Access-Control-Request-Method`) and adds CORS headers to all
 responses of allowed origins, including error responses. Requests from origins that are not allowed
 are processed normally but without CORS headers, so the browser blocks cross-origin reads while
-same-origin requests keep working; preflights from such origins get `403`.
+same-origin requests keep working; preflights from such origins get `403`. Every response of a route
+with CORS enabled carries `Vary: Origin`, so shared caches keep the variants apart.
 
 Per endpoint:
 
@@ -1107,12 +1107,17 @@ class Jobs(TaskManager):
     async def nightly(self) -> None: ...
 ```
 
-Register `Jobs` in `app_extensions`; the scheduler starts and stops with the application. Optional
+Register `Jobs` in `app_extensions`; the scheduler starts and stops with the application. A job
+without an `id` gets `<class>.<method>` (`Jobs.cleanup`), and a job is replaced at every start, so it
+is never stored twice. Optional
 configuration: `JOBS: TaskManagerConfig = TaskManagerConfig(NICE_NAME="Jobs", DAEMON=True)`.
 At runtime: `add_job(func, trigger, **kwargs)`, `remove_job(job)`, `pause_job(job)`,
 `resume_job(job)`, `run_job_now(job)`, `get_job(id)`, `jobs`, `is_job_running(job)` and
 `run_background_task(func, *args)` for fire-and-forget work. Customize the scheduler with the class
-attributes `scheduler_cls`, `job_stores`, `executors` and `job_defaults`.
+attributes `scheduler_cls`, `job_stores`, `executors` and `job_defaults`. With a job store that
+keeps jobs outside the process, such as `SQLAlchemyJobStore`, declared jobs and task manager methods
+passed to `add_job()` are stored by name and find the running task manager when they run (one
+application per process).
 
 ### E-mail
 
@@ -1311,14 +1316,46 @@ class Config(BaseConfig):
 ```
 
 Admin looks up the extensions it manages (databases, task managers, e-mail clients) on every page
-load, so their order in `app_extensions` does not matter. The dashboard is served at
+load, so their order in `app_extensions` does not matter. Record forms are validated with the
+model's `Meta.create_validation_schema` / `update_validation_schema` when it has them. Otherwise the
+values are converted to the column types (an unticked checkbox is `False`, an empty optional field
+`None`), and only fields the form shows are written: fields in `exclude_from_create_form` /
+`exclude_from_update_form` cannot be set through a request. The dashboard is served at
 `/admin/<lang>/` (`en`, `de`, `sl`, `es`).
 
 ### Desktop applications
 
-`patera-desktop` runs the application in a native window ([pywebview](https://pywebview.flowrl.com)):
-`uv run patera desktop --mode dev`. Window options are read from `PATERA_DESKTOP_*` environment
-variables (`TITLE`, `WIDTH`, `HEIGHT`, `RESIZABLE`, `FULLSCREEN`, `ICON`, ...).
+`patera-desktop` shows the application in a native window ([pywebview](https://pywebview.flowrl.com)).
+Register the extension; it adds the CLI command `desktop:run`:
+
+```python
+from patera.desktop import Desktop, DesktopConfig
+
+
+class Config(BaseConfig):
+    ...
+    DESKTOP: DesktopConfig = DesktopConfig(INDEX_PAGE="/")  # optional
+
+
+@app(__name__, configs=Config)
+class App(Patera):
+    app_extensions = [Desktop]
+```
+
+`uv run patera cli desktop:run` (or `desktop:run prod`) starts the application in a separate
+process, as `patera dev` (or `patera prod`) would, listening on `127.0.0.1` and the `PORT` setting.
+Once it answers, a window titled with `APP_NAME` opens `INDEX_PAGE`: a path relative to `URL_PREFIX`
+(default `/`) or an absolute URL. Closing the window stops the application.
+
+`uv run patera cli desktop:package [folder]` packages the application as a program with PyInstaller
+(install `patera-desktop[pyinstaller]`), by default into `dist/desktop/<APP_NAME>/`. The program runs
+the server in a background thread on a free port, in production mode, through `run_in_window(App)`, and
+keeps its log files in `user_data_dir(APP_NAME)` (for example `%APPDATA%\<name>`), the place for its
+other data too. A program does not read `.env`: settings come from the configuration class and from
+the installation's `settings.env` in that folder (`settings_file(APP_NAME)`), which `run_in_window`
+loads like `.env`. The application must live in a package, which is copied next to the executable.
+For hidden imports, data files, an icon or a single-file program, `uv run patera cli desktop:spec`
+writes a PyInstaller spec file, `desktop.spec`, to edit; `desktop:package` builds with it. See the [patera-desktop README](packages/patera-desktop/README.md) for details.
 
 ## Developing Patera
 

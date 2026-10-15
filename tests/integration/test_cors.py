@@ -151,3 +151,34 @@ async def test_credentials_are_off_by_default_and_can_be_enabled(make_app, clien
         res = await client.get("/api/items", headers={"origin": "https://app.example"})
     assert res.headers["access-control-allow-origin"] == "https://app.example"
     assert res.headers["access-control-allow-credentials"] == "true"
+
+
+async def test_every_cors_response_varies_by_origin(app, client_for):
+    """
+    Responses differ by Origin (with or without CORS headers), so a shared
+    cache must key on it, also when the request has no Origin, comes from a
+    refused origin, or ends in a routing error.
+    """
+    async with client_for(app) as client:
+        for headers in (
+            {},
+            {"origin": "https://evil.example"},
+            {"origin": "https://app.example"},
+        ):
+            res = await client.get("/api/items", headers=headers)
+            assert res.headers.get_list("vary") == ["Origin"], headers
+        missing = await client.get(
+            "/api/missing", headers={"origin": "https://evil.example"}
+        )
+        assert missing.status_code == 404
+        assert missing.headers.get("vary") == "Origin"
+        preflight = await client.options(
+            "/api/items",
+            headers={
+                "origin": "https://app.example",
+                "access-control-request-method": "POST",
+            },
+        )
+        assert preflight.headers.get_list("vary") == ["Origin"]
+        # Routes without CORS do not vary.
+        assert "vary" not in (await client.get("/api/private")).headers
