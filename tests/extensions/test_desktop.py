@@ -26,6 +26,25 @@ from patera.desktop import desktop as desktop_module  # noqa: E402
 pytestmark = pytest.mark.integration
 
 
+@pytest.fixture(autouse=True)
+def isolated_data(monkeypatch, tmp_path):
+    """
+    The user's data folder is a temporary one, on every platform. The
+    environment is restored afterwards: the program's settings files are
+    loaded into it directly, past monkeypatch.
+    """
+    saved = dict(os.environ)
+    for name in ("PATERA_DATA_DIR", "PATERA_SECRET_KEY"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "appdata"))
+    monkeypatch.setattr(desktop_module.Path, "home", lambda: tmp_path / "home")
+    yield
+    os.environ.clear()
+    os.environ.update(saved)
+
+
 def _desktop(make_app, **config: Any) -> Desktop:
     app = make_app(extensions=[Desktop], cli_mode=True, **config)
     return app.get_extension(Desktop)
@@ -190,10 +209,7 @@ def test_a_real_server_starts_answers_and_stops(make_app, monkeypatch, tmp_path,
 
 @pytest.fixture
 def window_env(monkeypatch, tmp_path):
-    """
-    run_in_window sets these; monkeypatch restores them afterwards. The
-    user's data folder is a temporary one, on every platform.
-    """
+    """run_in_window sets these; monkeypatch restores them afterwards."""
     for name in (
         "PATERA_DEBUG",
         "PATERA_HOST",
@@ -202,9 +218,6 @@ def window_env(monkeypatch, tmp_path):
     ):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
-    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "appdata"))
-    monkeypatch.setattr(desktop_module.Path, "home", lambda: tmp_path / "home")
     return monkeypatch
 
 
@@ -577,3 +590,16 @@ def test_run_in_window_works_without_a_settings_file(make_app, window_env, tmp_p
     window_env.setattr(desktop_module, "show_window", lambda app, url, dev_tools: None)
     desktop_module.run_in_window(app_class)
     assert os.environ["PATERA_DEBUG"] == "0"
+
+
+def test_the_spec_file_bundles_desktop_env(packaged, tmp_path, monkeypatch):
+    application, _, _, calls = packaged
+    application.run_cli("desktop:package")
+    spec_file = tmp_path / "build" / "desktop" / "desktop.spec"
+    assert 'ENV_FILE = "../../desktop.env"' in spec_file.read_text(encoding="utf-8")
+    run = _SpecRun(spec_file, tmp_path / "work", monkeypatch)
+    assert not [d for d in run.analysis()["datas"] if d[0].endswith("desktop.env")]
+
+    (tmp_path / "desktop.env").write_text("PATERA_THEME=dark\n", encoding="utf-8")
+    run = _SpecRun(spec_file, tmp_path / "work", monkeypatch)
+    assert (str(tmp_path / "desktop.env"), ".") in run.analysis()["datas"]

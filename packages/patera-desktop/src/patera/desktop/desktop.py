@@ -37,6 +37,13 @@ from pydantic import BaseModel, Field, model_validator
 from patera.base_extension import BaseExtension
 from patera.cli import CLIController, cli_controller, command
 
+from .envfile import (
+    DEFAULT_ENV_FILE,
+    bundled_env_file,
+    ensure_secret_key,
+    load_program_env,
+    program_app_name,
+)
 from .packaging import DEFAULT_SPEC_FILE
 from .window import open_window
 
@@ -155,6 +162,9 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
 
     def init(self) -> None:
         self.app.register_cli_controller(DesktopCLIController(self.app, self))
+        # The program's window settings and name, read by load_program_env().
+        self._window_configs: Optional[DesktopConfig] = None
+        self._window_app_name: Optional[str] = None
 
     def index_url(self, port: int) -> str:
         """The URL the window opens."""
@@ -208,7 +218,13 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
 
     def show_window(self, url: str, dev_tools: bool = False) -> None:
         """Shows ``url`` in a window; returns when the window is closed."""
-        show_window(self.app, url, dev_tools=dev_tools)
+        show_window(
+            self.app,
+            url,
+            dev_tools=dev_tools,
+            app_name=self._window_app_name,
+            configs=self._window_configs,
+        )
 
     def stop_server(self, server: subprocess.Popen[bytes]) -> None:
         """Stops the application as Ctrl+C would, and kills it if it hangs."""
@@ -237,6 +253,7 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
         """Runs the application and shows it until the window is closed."""
         if mode not in ("dev", "prod"):
             raise ValueError(f"Mode must be 'dev' or 'prod', not {mode!r}.")
+        self.load_program_env()
         port = int(self.app.configs.PORT)
         server = self.start_server(mode, port)
         try:
@@ -244,6 +261,25 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
             self.show_window(self.index_url(port), dev_tools=self.dev_tools(mode))
         finally:
             self.stop_server(server)
+
+    def load_program_env(self) -> None:
+        """
+        Loads the project's desktop.env into the environment, under what is
+        already set (the development .env included), so the server and the
+        window see the program's settings. The window's settings are then
+        read again, since the application was built before.
+        """
+        config_class = type(self.app.configs)
+        env_file = Path.cwd() / DEFAULT_ENV_FILE
+        app_name = program_app_name(config_class, env_file)
+        load_program_env(config_class, env_file, user_data_dir(app_name))
+        configs = config_class()
+        value = getattr(configs, self.configs_name, None)
+        if value is not None:
+            self._window_configs = DesktopConfig.model_validate(
+                value.model_dump() if isinstance(value, BaseModel) else value
+            )
+        self._window_app_name = str(configs.APP_NAME)
 
     def dev_tools(self, mode: str) -> bool:
         """Whether ``desktop:run`` in ``mode`` enables the web inspector."""
@@ -261,6 +297,12 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
         from .packaging import package
 
         return package(self.app, Path(output), Path(spec))
+
+    def write_env(self, path: str = DEFAULT_ENV_FILE) -> Path:
+        """Writes the packaged program's settings file, desktop.env, to edit."""
+        from .envfile import write_env_file
+
+        return write_env_file(self.app, Path(path))
 
     def write_spec(self, path: str = DEFAULT_SPEC_FILE) -> Path:
         """Writes a PyInstaller spec file with the default settings, to edit."""
@@ -294,6 +336,17 @@ class DesktopCLIController(CLIController[Any]):
         print(f"Packaged application in {folder}")
 
     @command(
+        "env",
+        help=f"Write the packaged program's settings file to edit (default: {DEFAULT_ENV_FILE})",
+    )
+    async def env(self, path: str = DEFAULT_ENV_FILE) -> None:
+        env_file = self._desktop.write_env(path)
+        print(
+            f"Wrote {env_file}. Set the program's settings in it (no secrets); "
+            "desktop:package bundles it into the program."
+        )
+
+    @command(
         "spec",
         help=f"Write a PyInstaller spec file to edit (default: {DEFAULT_SPEC_FILE})",
     )
@@ -320,25 +373,35 @@ def _desktop_configs(app: Any) -> DesktopConfig:
     return DesktopConfig.model_validate({})
 
 
-def show_window(app: Any, url: str, *, dev_tools: bool) -> None:
+def show_window(
+    app: Any,
+    url: str,
+    *,
+    dev_tools: bool,
+    app_name: Optional[str] = None,
+    configs: Optional[DesktopConfig] = None,
+) -> None:
     """
-    Shows ``url`` in a pywebview window set up by the application's DESKTOP
-    settings; returns when the window is closed.
+    Shows ``url`` in a pywebview window set up by the DESKTOP settings
+    (``configs``, by default the application's); returns when the window is
+    closed. ``app_name`` (by default the application's) titles the window
+    and names the data folder.
     """
-    configs = _desktop_configs(app)
+    configs = configs or _desktop_configs(app)
+    name = app_name or app.app_name
     open_window(
-        configs.TITLE or app.app_name,
+        configs.TITLE or name,
         url,
         configs,
-        user_data_dir(app.app_name),
+        user_data_dir(name),
         dev_tools=dev_tools,
-        icon=icon_path(app),
+        icon=icon_path(app, configs),
     )
 
 
-def icon_path(app: Any) -> Optional[Path]:
+def icon_path(app: Any, configs: Optional[DesktopConfig] = None) -> Optional[Path]:
     """DESKTOP.ICON as a path (relative ones from the application's root folder)."""
-    icon = _desktop_configs(app).ICON
+    icon = (configs or _desktop_configs(app)).ICON
     if not icon:
         return None
     path = Path(icon)
@@ -453,8 +516,11 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
     Runs the application in this process and shows it in a window until the
     window is closed: the entry point of a packaged desktop application.
 
-    Before the application is created, the settings file of this
-    installation is loaded when it exists (see settings_file()).
+    Before the application is created, its settings are loaded under the
+    environment variables already set: the installation's settings.env (see
+    settings_file()), then the bundled desktop.env (see envfile.py). A
+    configuration that declares SECRET_KEY gets a key of its own at the
+    first start, kept in settings.env.
 
     The server (uvicorn) runs on a background thread, on 127.0.0.1 and the
     port of the last start when it is free (see installation_port()); the
@@ -464,14 +530,16 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
     PATERA_LOG_FILES__PATH names another file.
     """
     import uvicorn
-    from dotenv import load_dotenv
 
     _ensure_streams()
-    app_name = app_class._app_configs["configs"]().APP_NAME  # type: ignore[attr-defined]
+    config_class = app_class._app_configs["configs"]  # type: ignore[attr-defined]
+    env_file = bundled_env_file()
+    app_name = program_app_name(config_class, env_file)
     installation_settings = settings_file(app_name)
-    if installation_settings.is_file():
-        # Real environment variables win, as they do over .env.
-        load_dotenv(installation_settings, override=False)
+    load_program_env(
+        config_class, env_file, user_data_dir(app_name), installation_settings
+    )
+    ensure_secret_key(config_class, installation_settings)
     os.environ.setdefault("PATERA_DEBUG", "0")
     if getattr(sys, "frozen", False):
         os.environ.setdefault(

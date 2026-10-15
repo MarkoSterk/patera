@@ -1376,9 +1376,10 @@ color, text selection, zoom, the web inspector, and whether cookies and local st
 (install `patera-desktop[pyinstaller]`), by default into `dist/desktop/<APP_NAME>/`. The program runs
 the server in a background thread on a free port, in production mode, through `run_in_window(App)`, and
 keeps its log files in `user_data_dir(APP_NAME)` (for example `%APPDATA%\<name>`), the place for its
-other data too. A program does not read `.env`: settings come from the configuration class and from
-the installation's `settings.env` in that folder (`settings_file(APP_NAME)`), which `run_in_window`
-loads like `.env`. The application must live in a package, which is copied next to the executable.
+other data too. A program does not read `.env`: its settings come from `desktop.env`, which
+`uv run patera cli desktop:env` writes from the configuration class (with `${PATERA_DATA_DIR}` for
+paths in the data folder) and `desktop:package` bundles, and from the installation's `settings.env`
+in the data folder (`settings_file(APP_NAME)`). The application must live in a package, which is copied next to the executable.
 For hidden imports, data files, an icon or a single-file program, `uv run patera cli desktop:spec`
 writes a PyInstaller spec file, `desktop.spec`, to edit; `desktop:package` builds with it. See the [patera-desktop README](packages/patera-desktop/README.md) for details, and
 [`examples/desktop_notes`](examples/desktop_notes) for a complete notes program.

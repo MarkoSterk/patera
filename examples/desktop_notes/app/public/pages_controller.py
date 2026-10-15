@@ -1,9 +1,8 @@
 from patera import MediaType, Request, Response
 from patera.controller import Controller, get, path, produces
-from patera.desktop import settings_file
+from patera.desktop import settings_file, user_data_dir
 
 from app import App
-from app.configs import DATA_FOLDER
 
 
 @path("/")
@@ -15,7 +14,7 @@ class PagesController(Controller[App]):
         return await req.res.html(
             "index.html",
             context={
-                "data_folder": str(DATA_FOLDER),
+                "data_folder": str(user_data_dir(self.app.app_name)),
                 "settings_file": str(settings_file(self.app.app_name)),
             },
         )

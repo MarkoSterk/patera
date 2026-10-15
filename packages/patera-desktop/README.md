@@ -137,6 +137,38 @@ if __name__ == "__main__":
     run_in_window(App)
 ```
 
+### The program's settings
+
+A packaged program reads no `.env`: that file holds development values and often secrets. Its
+settings come from `desktop.env`, a file in the project that is bundled into the program. Write it
+from the configuration class and edit it:
+
+```sh
+uv run patera cli desktop:env      # writes desktop.env
+```
+
+The file lists every setting the configuration class declares (not the built-in ones), with its
+default in a commented line; remove the `#` to change one. A required setting, declared without a
+value (`MAIN_DB: SqlDatabaseConfig`), is an empty line, and `desktop:package` refuses to build until
+it has a value. Values are never copied from `.env`. `${PATERA_DATA_DIR}` is the user's data folder:
+
+```sh
+PATERA_MAIN_DB__DATABASE_URI=sqlite+aiosqlite:///${PATERA_DATA_DIR}/app.db
+PATERA_DESKTOP__WIDTH=1200
+```
+
+At every start the program loads, each over the next: environment variables, the installation's
+`settings.env` in the data folder, `desktop.env`, and the configuration class's defaults.
+`desktop:run` loads `desktop.env` too, under the development `.env`, so the window looks as it will
+in the program. `APP_NAME` names the data folder, so it comes from the class, `desktop.env` or the
+environment, not from `settings.env`.
+
+Anyone with a copy of the program can read `desktop.env`, so it holds no passwords, keys or tokens;
+`desktop:package` warns about values whose names look like secrets. When the configuration
+declares `SECRET_KEY`, the program makes a key of its own at its first start and keeps it in the
+installation's `settings.env`, unless a variable sets one: a key shipped with the program would be
+the same for every user.
+
 Things to keep in mind:
 
 - The application must be in a package (`app/__init__.py`). The package folder is copied next
@@ -147,26 +179,15 @@ Things to keep in mind:
   `PACKAGE_EXCLUDES` in the spec file for more (a name matches anywhere in the package, a pattern
   with `/` the path from the package folder, such as `"static/uploads"`), or remove `"*.db"` to
   ship a database with the program. Keep secrets and large data out of the package.
-- A program has no `.env` file. Give every setting a working default in the configuration
-  class, and keep `.env` for development overrides; secrets do not belong in a program at all,
-  since anyone who has it can read them. What differs per user or installation goes into the
-  installation's settings file, `settings_file(APP_NAME)` (`settings.env` in the data folder
-  below). `run_in_window` loads it before the application starts, like `.env` during
-  development: the same `PATERA_...` names, and real environment variables win. The application
-  may write it, for example from a settings page; changes apply at the next start.
+- What differs per user or installation goes into the installation's settings file,
+  `settings_file(APP_NAME)` (`settings.env` in the data folder below). The application may write
+  it, for example from a settings page; changes apply at the next start.
 - The program's own folder may not be writable (Program Files) and is replaced by every update.
   Keep data in `user_data_dir(APP_NAME)` (`%APPDATA%\<name>` on Windows,
   `~/Library/Application Support/<name>` on macOS, `~/.local/share/<name>` on Linux; on iOS and
-  Android, a folder in the app's private storage), for example a SQLite database:
-
-  ```python
-  from patera.desktop import user_data_dir
-
-  DATA = user_data_dir("Notes")
-  MAIN_DB: SqlDatabaseConfig = SqlDatabaseConfig(DATABASE_URI=f"sqlite+aiosqlite:///{DATA / 'notes.db'}")
-  ```
-
-  The packaged program writes its log files there by default.
+  Android, a folder in the app's private storage), for example a SQLite database, with
+  `${PATERA_DATA_DIR}` in `desktop.env` or `user_data_dir(APP_NAME)` in code. The packaged program
+  writes its log files there by default.
 
 See the [Desktop applications section of the Patera documentation](https://github.com/MarkoSterk/Patera#desktop-applications),
 and the [notes example](https://github.com/MarkoSterk/Patera/tree/main/examples/desktop_notes), a

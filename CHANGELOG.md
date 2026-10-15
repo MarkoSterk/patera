@@ -278,23 +278,31 @@ command `desktop:run [dev|prod]`: it starts the application in a separate proces
 or `patera prod` would (on `127.0.0.1` and the `PORT` setting), shows `DESKTOP.INDEX_PAGE` (default
 `/`) in a pywebview window, and stops the application when the window is closed. The launcher, the
 frontend bridge, frontend tools and the `PATERA_DESKTOP_*` settings are gone, and so is the core
-command `patera desktop`. `python -m patera.cli` now runs the `patera` command.
-`desktop:package [folder]` packages the application as a program with PyInstaller (extra
+command `patera desktop`. `python -m patera.cli` now runs the `patera` command. `desktop:package
+[folder]` packages the application as a program with PyInstaller (extra
 `patera-desktop[pyinstaller]`), by default into `dist/desktop/<APP_NAME>/`: the program runs the
 server in a background thread with `run_in_window(App)`, on a free port, and writes its log files to
-`user_data_dir(APP_NAME)`. Before the application starts, `run_in_window` loads the
-installation's settings file, `settings_file(APP_NAME)` (`settings.env` in that folder), like
-`.env` during development. The package ships a PyInstaller hook so the `patera.*` extensions are
-found also in editable (workspace) installs. Window settings in `DESKTOP`: `TITLE`, `WIDTH`/`HEIGHT` (1024 × 720), `MIN_WIDTH`/`MIN_HEIGHT`,
-`REMEMBER_GEOMETRY` (size, position and maximized state restored at the next start, on by
-default), `MAXIMIZED`, `FULLSCREEN`, `RESIZABLE`, `ON_TOP`, `CONFIRM_CLOSE`, `BACKGROUND_COLOR`,
-`TEXT_SELECT` (on), `ZOOMABLE`, `PERSIST_STORAGE` (cookies and local storage kept in the user's
-data folder, on by default; pywebview forgets them at every close otherwise), `ICON` (also the
-spec file's default icon), `DEV_TOOLS` and `GUI`. A packaged program reuses the port of its last
-start, so the page's origin and local storage stay the same. `user_data_dir` also knows iOS (Application Support in
-the app's sandbox) and Android (the app's internal storage, `$HOME`). `desktop:spec [path]` writes a PyInstaller spec file
+`user_data_dir(APP_NAME)`. Before the application starts, `run_in_window` loads the installation's
+settings file, `settings_file(APP_NAME)` (`settings.env` in that folder), like `.env` during
+development. The package ships a PyInstaller hook so the `patera.*` extensions are found also in
+editable (workspace) installs. Window settings in `DESKTOP`: `TITLE`, `WIDTH`/`HEIGHT` (1024 × 720),
+`MIN_WIDTH`/`MIN_HEIGHT`, `REMEMBER_GEOMETRY` (size, position and maximized state restored at the
+next start, on by default), `MAXIMIZED`, `FULLSCREEN`, `RESIZABLE`, `ON_TOP`, `CONFIRM_CLOSE`,
+`BACKGROUND_COLOR`, `TEXT_SELECT` (on), `ZOOMABLE`, `PERSIST_STORAGE` (cookies and local storage
+kept in the user's data folder, on by default; pywebview forgets them at every close otherwise),
+`ICON` (also the spec file's default icon), `DEV_TOOLS` and `GUI`. `desktop:env` writes
+`desktop.env`, the packaged program's settings: every setting the configuration declares, defaults
+commented out, required ones empty. `desktop:package` bundles it, refuses to build while a required
+setting is empty, and warns about values that look like secrets. The program loads environment
+variables, then the installation's `settings.env`, then `desktop.env`; `${PATERA_DATA_DIR}` is the
+user's data folder. `desktop:run` loads `desktop.env` under the development `.env`. A configuration
+that declares `SECRET_KEY` gets a key per installation, made at the first start and kept in
+`settings.env`. A packaged program reuses the port of its last start, so the page's origin and local
+storage stay the same. `user_data_dir` also knows iOS (Application Support in the app's sandbox) and
+Android (the app's internal storage, `$HOME`). `desktop:spec [path]` writes a PyInstaller spec file
 (default `desktop.spec`) with the defaults as settings to edit (hidden imports, data files, icon,
 console, one file, own entry script). The application package is copied without what running and
 developing it leave there (`__pycache__`, log files, SQLite databases, `.env`, tool caches;
 `PACKAGE_EXCLUDES` in the spec file). `desktop:package [folder] [spec]` builds with the spec file
-when it exists, otherwise with a generated one in `build/desktop/`. patera-desktop now depends on uvicorn.
+when it exists, otherwise with a generated one in `build/desktop/`. patera-desktop now depends on
+uvicorn.

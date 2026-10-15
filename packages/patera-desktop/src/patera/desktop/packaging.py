@@ -248,6 +248,9 @@ ONE_FILE = False
 # Your own entry script instead of the generated one, which only calls
 # run_in_window(APP_CLASS); for example to prepare something first.
 ENTRY_SCRIPT = None
+# The program's settings file (see "patera cli desktop:env"). It is bundled
+# with the program when it exists, which loads it at every start.
+ENV_FILE = {env_file}
 
 
 def _path(path):
@@ -274,6 +277,8 @@ datas = package_files(_path(PACKAGE_PARENT), PACKAGE, PACKAGE_EXCLUDES)
 for package in COLLECT_DATA:
     datas += collect_data_files(package)
 datas += [(_path(source), target) for source, target in DATAS]
+if ENV_FILE and os.path.isfile(_path(ENV_FILE)):
+    datas.append((_path(ENV_FILE), "."))
 icon = _path(ICON) if ICON else None
 
 a = Analysis(
@@ -319,8 +324,14 @@ def _spec_icon(app: Any, spec_file: Path) -> Optional[str]:
     return None if icon is None else _relative(icon, spec_file.resolve().parent)
 
 
-def spec_text(app: Any, spec_file: Path) -> str:
-    """A spec file for ``app``, with paths relative to the folder of ``spec_file``."""
+def spec_text(app: Any, spec_file: Path, root: Optional[Path] = None) -> str:
+    """
+    A spec file for ``app``, with paths relative to the folder of
+    ``spec_file``; ``root`` is the project folder (the current one by default).
+    """
+    from .envfile import DEFAULT_ENV_FILE
+
+    env_file = (root or Path.cwd()).resolve() / DEFAULT_ENV_FILE
     app_class = _application_class(app)
     package_name, package_folder = application_package(app)
     values = {
@@ -333,12 +344,15 @@ def spec_text(app: Any, spec_file: Path) -> str:
         "excludes": list(EXCLUDED_MODULES),
         "package_excludes": package_excludes(app, package_folder),
         "icon": _spec_icon(app, spec_file),
+        "env_file": _relative(env_file, spec_file.resolve().parent),
     }
     literals = {key: _literal(value) for key, value in values.items()}
     return _SPEC_TEMPLATE.format(spec_name=spec_file.name, **literals)
 
 
-def write_spec(app: Any, spec_file: Path, *, overwrite: bool = False) -> Path:
+def write_spec(
+    app: Any, spec_file: Path, *, overwrite: bool = False, root: Optional[Path] = None
+) -> Path:
     """Writes a spec file for ``app`` and returns its path."""
     if spec_file.exists() and not overwrite:
         raise FileExistsError(
@@ -346,7 +360,7 @@ def write_spec(app: Any, spec_file: Path, *, overwrite: bool = False) -> Path:
             "make a new one."
         )
     spec_file.parent.mkdir(parents=True, exist_ok=True)
-    spec_file.write_text(spec_text(app, spec_file), encoding="utf-8")
+    spec_file.write_text(spec_text(app, spec_file, root), encoding="utf-8")
     return spec_file
 
 
@@ -363,6 +377,33 @@ def pyinstaller_command(spec_file: Path, output: Path, build: Path) -> list[str]
         "--workpath",
         str(build / "work"),
     ]
+
+
+def check_env_file(app: Any, root: Path) -> None:
+    """
+    Stops packaging when a required setting has no value for the program,
+    and warns about values in desktop.env that look like secrets.
+    """
+    from .envfile import DEFAULT_ENV_FILE, missing_required, secret_like
+
+    env_file = root / DEFAULT_ENV_FILE
+    missing = missing_required(app, env_file)
+    if missing:
+        where = (
+            f"Set them in {DEFAULT_ENV_FILE}"
+            if env_file.is_file()
+            else f"Write {DEFAULT_ENV_FILE} with 'patera cli desktop:env' and set them there"
+        )
+        raise RuntimeError(
+            "The program would not start: these required settings have no value: "
+            f"{', '.join(missing)}. {where}."
+        )
+    for name in secret_like(env_file):
+        print(
+            f"Warning: {DEFAULT_ENV_FILE} sets {name}, which looks like a secret. "
+            "Anyone with a copy of the program can read it.",
+            file=sys.stderr,
+        )
 
 
 def pyinstaller_installed() -> bool:
@@ -389,7 +430,8 @@ def package(
     if not spec.is_file():
         if spec_file != Path(DEFAULT_SPEC_FILE):
             raise FileNotFoundError(f"There is no spec file {spec}.")
-        spec = write_spec(app, build / DEFAULT_SPEC_FILE, overwrite=True)
+        spec = write_spec(app, build / DEFAULT_SPEC_FILE, overwrite=True, root=root)
+    check_env_file(app, root)
 
     result = subprocess.run(
         pyinstaller_command(spec, output, build), cwd=root, check=False

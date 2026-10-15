@@ -78,6 +78,9 @@ ONE_FILE = False
 # Your own entry script instead of the generated one, which only calls
 # run_in_window(APP_CLASS); for example to prepare something first.
 ENTRY_SCRIPT = None
+# The program's settings file (see "patera cli desktop:env"). It is bundled
+# with the program when it exists, which loads it at every start.
+ENV_FILE = "desktop.env"
 
 
 def _path(path):
@@ -104,6 +107,8 @@ datas = package_files(_path(PACKAGE_PARENT), PACKAGE, PACKAGE_EXCLUDES)
 for package in COLLECT_DATA:
     datas += collect_data_files(package)
 datas += [(_path(source), target) for source, target in DATAS]
+if ENV_FILE and os.path.isfile(_path(ENV_FILE)):
+    datas.append((_path(ENV_FILE), "."))
 icon = _path(ICON) if ICON else None
 
 a = Analysis(
