@@ -34,7 +34,6 @@ classifiers = [
 ]
 dependencies = [
     "aiofiles>=25.1.0",
-    "granian>=2.7.2",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
     "pydantic>=2.12.5",
@@ -45,6 +44,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+prod = ["granian>=2.7.2"]
 dev = ["uvicorn>=0.42.0", "watchfiles>=1.1.1", "websockets>=16.0"]
 testing = ["anyio", "pytest>=8", "pytest-cov", "pytest-asyncio>=0.24", "asgi-lifespan>=2.1.0", "httpx>=0.28.1"]
 database = ["patera-database>=0.11"]
@@ -148,6 +148,7 @@ dev = [
     "mypy>=2.4.0",
     "pre-commit>=4.5.1",
     "ruff>=0.15.5",
+    "granian>=2.7.2",
     "uvicorn>=0.42.0",
     "watchfiles>=1.1.1",
     "anyio",
@@ -161,4 +162,5 @@ dev = [
     "numpy>=2.4.4",
     "pgvector>=0.4.2",
     "asyncpg>=0.30",
+    "patera-desktop[pyinstaller]",
 ]

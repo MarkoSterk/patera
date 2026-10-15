@@ -61,6 +61,7 @@ Optional features are installed with extras:
 
 | Extra | Installs | Purpose |
 | --- | --- | --- |
+| `prod` | granian | production server (`patera prod`) |
 | `dev` | uvicorn, watchfiles, websockets | development server with auto-reload (`patera dev`) |
 | `testing` | pytest, pytest-asyncio, httpx, ... | testing tools (`patera test`) |
 | `database` | `patera-database` | async SQLAlchemy integration |
@@ -74,11 +75,15 @@ Optional features are installed with extras:
 | `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental; `patera-aiinterface[augmentation]` adds the embedding libraries) |
 | `admin` | `patera-admin` | admin dashboard |
 | `desktop` | `patera-desktop` | show the app in a desktop window (pywebview) and package it as a program |
-| `all` | all of the above except `aiinterface` and `desktop` | |
+| `all` | the extension packages above except `aiinterface` and `desktop` | |
 
 ```sh
 uv add "patera[database,auth,caching]"
 ```
+
+The production server is an extra too, `prod`, because a deployment needs it but a desktop
+program does not (it embeds Uvicorn). Without it, the core's dependencies are pure Python
+apart from pydantic-core.
 
 ## Quick start
 
@@ -172,7 +177,7 @@ package is not called `app`.
 | Command | Description |
 | --- | --- |
 | `patera dev [--app app:App] [--env-file .env]` | development server (uvicorn) with auto-reload. Loads `.env`, `.env.dev` or `.env.local` if no file is given. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `localhost:3000`). |
-| `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the core package), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
+| `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the `prod` extra: `uv add "patera[prod]"`), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
 | `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
 | `patera test [--env-file FILE] [pytest args...]` | runs pytest after loading the test environment file (`.env.test` when the project has one). Pytest options may come in any order (`patera test -k login -q`); everything after `--` goes to pytest unchanged. |
 
@@ -197,6 +202,22 @@ PATERA_MAIN_DB__DATABASE_URI=postgresql+asyncpg://user:pass@db/app
 Extension and middleware settings are regular fields of your config class, named after the class in
 UPPER_SNAKE_CASE (`MainDb` → `MAIN_DB`, `PublicCache` → `PUBLIC_CACHE`). See
 [Services and dependency injection](#services-and-dependency-injection).
+
+The values can live in `.env` (or the environment) instead of the class. Declare a settings model
+without a value, and it is built from the variables that are set, with the model's defaults for the
+rest:
+
+```python
+class Config(BaseConfig):
+    BASE_PATH: str = os.path.dirname(__file__)
+    MAIN_DB: SqlDatabaseConfig    # PATERA_MAIN_DB__DATABASE_URI must be set
+    DESKTOP: DesktopConfig        # every field has a default; PATERA_DESKTOP__WIDTH=1200 changes one
+```
+
+A required field that no variable sets stops the application at startup with its name
+(`MAIN_DB.DATABASE_URI: Field required`). A model declared with a value in the class
+(`MAIN_DB: SqlDatabaseConfig = SqlDatabaseConfig(...)`) keeps that value as its default, and
+variables change single fields of it.
 
 Read configuration values with `app.configs.NAME`, `app.get_conf("NAME", default)` (supports dotted
 paths into nested models and dictionaries: `app.get_conf("MAIN_DB.DATABASE_URI")`) or the
@@ -1344,8 +1365,12 @@ class App(Patera):
 
 `uv run patera cli desktop:run` (or `desktop:run prod`) starts the application in a separate
 process, as `patera dev` (or `patera prod`) would, listening on `127.0.0.1` and the `PORT` setting.
-Once it answers, a window titled with `APP_NAME` opens `INDEX_PAGE`: a path relative to `URL_PREFIX`
+Once it answers, a window titled with `APP_NAME` (or `DESKTOP.TITLE`) opens `INDEX_PAGE`: a path relative to `URL_PREFIX`
 (default `/`) or an absolute URL. Closing the window stops the application.
+
+`DESKTOP` also sets up the window: its size (remembered between starts), title, icon, background
+color, text selection, zoom, the web inspector, and whether cookies and local storage persist
+(they do by default, in the user's data folder).
 
 `uv run patera cli desktop:package [folder]` packages the application as a program with PyInstaller
 (install `patera-desktop[pyinstaller]`), by default into `dist/desktop/<APP_NAME>/`. The program runs
@@ -1355,7 +1380,8 @@ other data too. A program does not read `.env`: settings come from the configura
 the installation's `settings.env` in that folder (`settings_file(APP_NAME)`), which `run_in_window`
 loads like `.env`. The application must live in a package, which is copied next to the executable.
 For hidden imports, data files, an icon or a single-file program, `uv run patera cli desktop:spec`
-writes a PyInstaller spec file, `desktop.spec`, to edit; `desktop:package` builds with it. See the [patera-desktop README](packages/patera-desktop/README.md) for details.
+writes a PyInstaller spec file, `desktop.spec`, to edit; `desktop:package` builds with it. See the [patera-desktop README](packages/patera-desktop/README.md) for details, and
+[`examples/desktop_notes`](examples/desktop_notes) for a complete notes program.
 
 ## Developing Patera
 

@@ -4,8 +4,8 @@ Base configuration class
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
-from pydantic import Field, field_validator
+from typing import Any, Optional, Sequence
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .logging.logger_config_base import DefaultLoggerConfig
@@ -20,8 +20,6 @@ class BaseConfig(BaseSettings):
         env_file_encoding="utf-8",
         env_prefix="PATERA_",
         env_nested_delimiter="__",
-        # PATERA_MAIN_DB__DATABASE_URI=... changes one field of a nested
-        # default (MAIN_DB = SqlDatabaseConfig(...)) and keeps the others.
         nested_model_default_partial_update=True,
     )
     APP_PACKAGE: str = Field(
@@ -197,6 +195,34 @@ class BaseConfig(BaseSettings):
     LOGGER_FOLDERS: Optional[Sequence[str]] = Field(
         None, description="List of additional folders to load loggers from"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _declared_settings_models(cls, data: Any) -> Any:
+        """
+        A settings model declared without a value is built from the
+        environment, with the model's own defaults for whatever the
+        environment does not set:
+
+            MAIN_DB: SqlDatabaseConfig      # PATERA_MAIN_DB__DATABASE_URI=...
+            DESKTOP: DesktopConfig          # PATERA_DESKTOP__WIDTH=1200
+
+        With no variable for it at all, it is built from the defaults alone.
+        A model with a required field still reports that field by name
+        (MAIN_DB.DATABASE_URI: Field required), so nothing required is
+        silently left out.
+        """
+        if not isinstance(data, dict):
+            return data
+        missing: dict[str, Any] = {
+            name: {}
+            for name, field in cls.model_fields.items()
+            if field.is_required()
+            and isinstance(field.annotation, type)
+            and issubclass(field.annotation, BaseModel)
+            and name not in data
+        }
+        return {**data, **missing} if missing else data
 
     @field_validator(
         "CONTROLLER_FOLDERS",

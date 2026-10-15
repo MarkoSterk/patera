@@ -34,7 +34,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 #: Build files (generated spec file, entry script, PyInstaller's work folder).
 BUILD_FOLDER = Path("build") / "desktop"
@@ -239,7 +239,7 @@ BINARIES = []
 # Modules left out: development tools that dependencies import optionally.
 EXCLUDES = {excludes}
 # The program's icon (.ico on Windows, .icns on macOS), or None.
-ICON = None
+ICON = {icon}
 # True shows a console window with the program's output, handy when debugging.
 CONSOLE = False
 # True makes one executable file instead of a folder. It is unpacked again at
@@ -302,11 +302,21 @@ if sys.platform == "darwin" and not CONSOLE:
 def _literal(value: Any) -> str:
     """A string or a list of strings as Python source (JSON strings are
     Python strings too); long lists get one item per line."""
+    if value is None:
+        return "None"
     one_line = json.dumps(value, ensure_ascii=False)
     if not isinstance(value, list) or len(one_line) <= 60:
         return one_line
     items = "".join(f"    {json.dumps(item, ensure_ascii=False)},\n" for item in value)
     return f"[\n{items}]"
+
+
+def _spec_icon(app: Any, spec_file: Path) -> Optional[str]:
+    """DESKTOP.ICON relative to the spec file's folder, or None."""
+    from .desktop import icon_path
+
+    icon = icon_path(app)
+    return None if icon is None else _relative(icon, spec_file.resolve().parent)
 
 
 def spec_text(app: Any, spec_file: Path) -> str:
@@ -322,6 +332,7 @@ def spec_text(app: Any, spec_file: Path) -> str:
         "collect_data": patera_data_packages(app),
         "excludes": list(EXCLUDED_MODULES),
         "package_excludes": package_excludes(app, package_folder),
+        "icon": _spec_icon(app, spec_file),
     }
     literals = {key: _literal(value) for key, value in values.items()}
     return _SPEC_TEMPLATE.format(spec_name=spec_file.name, **literals)

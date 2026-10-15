@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app.configs.APP_NAME }}</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="{{ url_for('static', filename='notes.css') }}">
+</head>
+<body data-api="{{ url_for('NotesApi.list_notes') }}">
+    <aside class="sidebar">
+        <div class="sidebar-top">
+            <input id="search" type="search" placeholder="Search notes" aria-label="Search notes">
+            <button id="new-note" type="button" title="New note (Ctrl+N)">New</button>
+        </div>
+        <ul id="note-list" aria-label="Notes"></ul>
+        <p id="empty-list" class="hint" hidden>No notes yet.</p>
+        <details class="about">
+            <summary>{{ app.configs.APP_NAME }} {{ app.configs.VERSION }}</summary>
+            <p>Your notes are stored in<br><code>{{ data_folder }}</code></p>
+            <p>Settings for this computer can go in<br><code>{{ settings_file }}</code></p>
+        </details>
+    </aside>
+
+    <main class="editor">
+        <div id="placeholder" class="placeholder">
+            <p>Select a note, or create one with <kbd>Ctrl</kbd>+<kbd>N</kbd>.</p>
+        </div>
+        <form id="note-form" hidden autocomplete="off">
+            <div class="editor-top">
+                <input id="title" type="text" maxlength="200" placeholder="Title" aria-label="Title">
+                <span id="status" class="status" aria-live="polite"></span>
+                <button id="delete" type="button" class="danger">Delete</button>
+            </div>
+            <textarea id="body" placeholder="Write something…" aria-label="Note"></textarea>
+        </form>
+    </main>
+
+    <script src="{{ url_for('static', filename='notes.js') }}"></script>
+</body>
+</html>

@@ -116,3 +116,49 @@ def test_env_variable_changes_one_field_of_a_nested_default(monkeypatch):
     assert configs.SERVICE == _Service(
         URL="https://api.example.com", MODEL="small", API_KEY="secret", TIMEOUT=5
     )
+
+
+class _Window(BaseModel):
+    WIDTH: int = 1024
+    TITLE: str | None = None
+
+
+def test_a_declared_settings_model_is_built_from_the_environment(monkeypatch):
+    from pydantic import ValidationError
+
+    from patera import BaseConfig
+
+    class Config(BaseConfig):
+        BASE_PATH: str = "."
+        SERVICE: _Service  # declared, no value in the class
+        WINDOW: _Window
+
+    for name in (
+        "PATERA_SERVICE__URL",
+        "PATERA_SERVICE__MODEL",
+        "PATERA_WINDOW__WIDTH",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    # Nothing in the environment: the models' defaults, and the required
+    # fields are reported by name.
+    with pytest.raises(ValidationError) as caught:
+        Config()
+    assert {error["loc"] for error in caught.value.errors()} == {
+        ("SERVICE", "URL"),
+        ("SERVICE", "MODEL"),
+    }
+
+    # What the environment sets, plus the defaults for the rest.
+    monkeypatch.setenv("PATERA_SERVICE__URL", "https://api.example.com")
+    monkeypatch.setenv("PATERA_SERVICE__MODEL", "small")
+    configs = Config()
+    assert configs.SERVICE == _Service(URL="https://api.example.com", MODEL="small")
+    assert configs.WINDOW == _Window()  # no variable at all: every default
+
+    monkeypatch.setenv("PATERA_WINDOW__WIDTH", "1300")
+    assert Config().WINDOW == _Window(WIDTH=1300)
+    # A value given in code still wins over the defaults.
+    assert Config(WINDOW={"TITLE": "Notes"}).WINDOW == _Window(
+        WIDTH=1300, TITLE="Notes"
+    )

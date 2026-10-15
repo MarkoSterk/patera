@@ -398,9 +398,17 @@ def _start_prod(
     """
     Starts application in production mode.
     """
-    from granian import Granian
-    from granian.constants import Interfaces, Loops
-    from granian.log import LogLevels
+    try:
+        from granian import Granian
+        from granian.constants import Interfaces, Loops
+        from granian.log import LogLevels
+    except ModuleNotFoundError as exc:
+        if not (exc.name or "").startswith("granian"):
+            raise
+        raise RuntimeError(
+            "the production server, Granian, is not installed. "
+            'Install it with: uv add "patera[prod]" (or pip install "patera[prod]").'
+        ) from None
     from ..patera import Patera
 
     # Production only loads an explicitly named environment file; the

@@ -29,15 +29,16 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Optional, Self, TypeVar
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from patera.base_extension import BaseExtension
 from patera.cli import CLIController, cli_controller, command
 
 from .packaging import DEFAULT_SPEC_FILE
+from .window import open_window
 
 if TYPE_CHECKING:
     from patera import Patera
@@ -54,6 +55,8 @@ SHUTDOWN_TIMEOUT = 10.0
 DEFAULT_PACKAGE_FOLDER = "dist/desktop"
 #: File in the user's data folder with the settings of one installation.
 SETTINGS_FILE_NAME = "settings.env"
+#: File in the user's data folder with the port the program listened on.
+PORT_FILE_NAME = "port"
 
 
 class DesktopConfig(BaseModel):
@@ -66,6 +69,85 @@ class DesktopConfig(BaseModel):
             "URL_PREFIX ('/', '/dashboard'), or an absolute URL."
         ),
     )
+    TITLE: Optional[str] = Field(
+        None, description="Window title. Not set: the application's APP_NAME."
+    )
+    WIDTH: int = Field(1024, ge=100, description="Window width (logical pixels).")
+    HEIGHT: int = Field(720, ge=100, description="Window height (logical pixels).")
+    MIN_WIDTH: int = Field(
+        480, ge=100, description="The narrowest the user can make the window."
+    )
+    MIN_HEIGHT: int = Field(
+        360, ge=100, description="The lowest the user can make the window."
+    )
+    REMEMBER_GEOMETRY: bool = Field(
+        True,
+        description=(
+            "Reopen the window with the size, position and maximized state it "
+            "had when it was closed (kept in the user's data folder). WIDTH, "
+            "HEIGHT and MAXIMIZED then apply only to the first start."
+        ),
+    )
+    MAXIMIZED: bool = Field(False, description="Open the window maximized.")
+    FULLSCREEN: bool = Field(False, description="Open the window in full screen.")
+    RESIZABLE: bool = Field(True, description="The user can resize the window.")
+    ON_TOP: bool = Field(False, description="Keep the window above other windows.")
+    CONFIRM_CLOSE: bool = Field(
+        False, description="Ask the user to confirm before the window closes."
+    )
+    BACKGROUND_COLOR: str = Field(
+        "#FFFFFF",
+        pattern=r"^#[0-9A-Fa-f]{6}$",
+        description=(
+            "Color shown before the page has loaded; set it to the page's "
+            "background to avoid a flash, for example in a dark design."
+        ),
+    )
+    TEXT_SELECT: bool = Field(
+        True, description="The user can select (and copy) the page's text."
+    )
+    ZOOMABLE: bool = Field(
+        False, description="The user can zoom the page (Ctrl and +/-)."
+    )
+    PERSIST_STORAGE: bool = Field(
+        True,
+        description=(
+            "Keep cookies and local storage between starts, in the user's data "
+            "folder. Off: they are forgotten when the window closes, so for "
+            "example every start signs the user out."
+        ),
+    )
+    ICON: Optional[str] = Field(
+        None,
+        description=(
+            "Icon file, relative to the application's root folder (.ico on "
+            "Windows, .icns on macOS, .png on Linux). Linux uses it for the "
+            "window; on Windows and macOS the window shows the executable's "
+            "icon, which desktop:spec takes from this setting."
+        ),
+    )
+    DEV_TOOLS: Optional[bool] = Field(
+        None,
+        description=(
+            "The web inspector, from the page's context menu. Not set: on for "
+            "desktop:run in dev mode and when DEBUG is on, off otherwise."
+        ),
+    )
+    GUI: Optional[str] = Field(
+        None,
+        description=(
+            "pywebview's GUI toolkit, for example 'qt' or 'gtk' on Linux. Not "
+            "set: pywebview chooses."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _size_within_minimum(self) -> Self:
+        if self.WIDTH < self.MIN_WIDTH or self.HEIGHT < self.MIN_HEIGHT:
+            raise ValueError(
+                "WIDTH and HEIGHT must be at least MIN_WIDTH and MIN_HEIGHT."
+            )
+        return self
 
 
 class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
@@ -124,9 +206,9 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
             f"{STARTUP_TIMEOUT:g} seconds."
         )
 
-    def show_window(self, url: str) -> None:
+    def show_window(self, url: str, dev_tools: bool = False) -> None:
         """Shows ``url`` in a window; returns when the window is closed."""
-        show_window(self.app.app_name, url)
+        show_window(self.app, url, dev_tools=dev_tools)
 
     def stop_server(self, server: subprocess.Popen[bytes]) -> None:
         """Stops the application as Ctrl+C would, and kills it if it hangs."""
@@ -159,9 +241,14 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
         server = self.start_server(mode, port)
         try:
             self.wait_until_ready(server, port)
-            self.show_window(self.index_url(port))
+            self.show_window(self.index_url(port), dev_tools=self.dev_tools(mode))
         finally:
             self.stop_server(server)
+
+    def dev_tools(self, mode: str) -> bool:
+        """Whether ``desktop:run`` in ``mode`` enables the web inspector."""
+        setting = self.configs.DEV_TOOLS
+        return mode == "dev" if setting is None else setting
 
     def package(
         self, output: str = DEFAULT_PACKAGE_FOLDER, spec: str = DEFAULT_SPEC_FILE
@@ -233,12 +320,29 @@ def _desktop_configs(app: Any) -> DesktopConfig:
     return DesktopConfig.model_validate({})
 
 
-def show_window(title: str, url: str) -> None:
-    """Shows ``url`` in a pywebview window; returns when it is closed."""
-    import webview
+def show_window(app: Any, url: str, *, dev_tools: bool) -> None:
+    """
+    Shows ``url`` in a pywebview window set up by the application's DESKTOP
+    settings; returns when the window is closed.
+    """
+    configs = _desktop_configs(app)
+    open_window(
+        configs.TITLE or app.app_name,
+        url,
+        configs,
+        user_data_dir(app.app_name),
+        dev_tools=dev_tools,
+        icon=icon_path(app),
+    )
 
-    webview.create_window(title, url)
-    webview.start()
+
+def icon_path(app: Any) -> Optional[Path]:
+    """DESKTOP.ICON as a path (relative ones from the application's root folder)."""
+    icon = _desktop_configs(app).ICON
+    if not icon:
+        return None
+    path = Path(icon)
+    return path if path.is_absolute() else Path(app.root_path) / path
 
 
 def free_port() -> int:
@@ -246,6 +350,45 @@ def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind((HOST, 0))
         return int(sock.getsockname()[1])
+
+
+def port_is_free(port: int) -> bool:
+    """Whether the server can listen on ``port`` now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        if sys.platform != "win32":
+            # As uvicorn does: a port whose last connections are still in
+            # TIME_WAIT, as after the previous start, can be used again. (On
+            # Windows the option would allow taking a port in use.)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind((HOST, port))
+        except OSError:
+            return False
+        return True
+
+
+def installation_port(app_name: str) -> int:
+    """
+    The port a packaged application listens on: the one it used last time,
+    when it is still free, otherwise a free one, kept for the next start.
+
+    The page's origin, http://127.0.0.1:<port>, then stays the same, and with
+    it the page's local storage, which browsers keep per origin (port
+    included). Cookies do not depend on the port.
+    """
+    path = user_data_dir(app_name) / PORT_FILE_NAME
+    try:
+        port = int(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        port = 0
+    if 1024 <= port <= 65535 and port_is_free(port):
+        return port
+    port = free_port()
+    try:
+        path.write_text(str(port), encoding="utf-8")
+    except OSError:
+        pass
+    return port
 
 
 _UNSAFE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
@@ -257,7 +400,9 @@ def user_data_dir(app_name: str) -> Path:
     SQLite database, ...), created if needed:
 
     - Windows: %APPDATA%\\<app name>
-    - macOS: ~/Library/Application Support/<app name>
+    - macOS and iOS: ~/Library/Application Support/<app name> (on iOS, in the
+      app's sandbox)
+    - Android: $HOME/<app name>, the app's internal storage
     - Linux: $XDG_DATA_HOME/<app name>, by default ~/.local/share/<app name>
 
     A packaged application's own folder may not be writable (Program Files)
@@ -265,8 +410,12 @@ def user_data_dir(app_name: str) -> Path:
     """
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
-    elif sys.platform == "darwin":
+    elif sys.platform in ("darwin", "ios"):
         base = Path.home() / "Library" / "Application Support"
+    elif sys.platform == "android":
+        # Embedded Python (Chaquopy, which Briefcase uses) sets HOME to the
+        # app's private internal storage; files there stay until uninstall.
+        base = Path.home()
     else:
         base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
     name = _UNSAFE_NAME.sub("_", app_name).strip(" .") or "Patera app"
@@ -307,8 +456,9 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
     Before the application is created, the settings file of this
     installation is loaded when it exists (see settings_file()).
 
-    The server (uvicorn) runs on a background thread, on 127.0.0.1 and a
-    free port; the window needs the main thread. The application runs in
+    The server (uvicorn) runs on a background thread, on 127.0.0.1 and the
+    port of the last start when it is free (see installation_port()); the
+    window needs the main thread. The application runs in
     production mode unless PATERA_DEBUG says otherwise. In a packaged
     (frozen) application, the log files go to user_data_dir() unless
     PATERA_LOG_FILES__PATH names another file.
@@ -329,7 +479,7 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
             str(user_data_dir(app_name) / "logs" / "patera.jsonl"),
         )
 
-    port = free_port()
+    port = installation_port(app_name)
     # The settings then report the address the application really uses.
     os.environ["PATERA_HOST"] = HOST
     os.environ["PATERA_PORT"] = str(port)
@@ -358,7 +508,9 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
                     f"The application did not start within {STARTUP_TIMEOUT:g} seconds."
                 )
             time.sleep(0.05)
-        show_window(application.app_name, index_url(application, port))
+        setting = _desktop_configs(application).DEV_TOOLS
+        dev_tools = bool(application.configs.DEBUG) if setting is None else setting
+        show_window(application, index_url(application, port), dev_tools=dev_tools)
     finally:
         server.should_exit = True
         thread.join(timeout=SHUTDOWN_TIMEOUT)

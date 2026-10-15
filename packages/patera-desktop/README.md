@@ -39,7 +39,9 @@ The command starts the application in a separate process, as `patera dev` or `pa
 would, on `127.0.0.1` and the application's `PORT` setting. When it answers, a window opens the
 index page; closing the window stops the application.
 
-The only setting is the index page, a path relative to `URL_PREFIX` or an absolute URL:
+### Settings
+
+The window is set up by the `DESKTOP` settings:
 
 ```python
 from patera.desktop import DesktopConfig
@@ -47,8 +49,35 @@ from patera.desktop import DesktopConfig
 
 class Config(BaseConfig):
     ...
-    DESKTOP: DesktopConfig = DesktopConfig(INDEX_PAGE="/dashboard")  # default "/"
+    DESKTOP: DesktopConfig = DesktopConfig(
+        INDEX_PAGE="/dashboard",
+        WIDTH=1200,
+        HEIGHT=800,
+        BACKGROUND_COLOR="#17191C",
+    )
 ```
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `INDEX_PAGE` | `"/"` | The page the window opens: a path relative to `URL_PREFIX`, or an absolute URL. |
+| `TITLE` | `APP_NAME` | The window's title. |
+| `WIDTH`, `HEIGHT` | 1024 × 720 | The window's size at the first start. |
+| `MIN_WIDTH`, `MIN_HEIGHT` | 480 × 360 | The smallest the user can make it. |
+| `REMEMBER_GEOMETRY` | `True` | Reopen the window with the size, position and maximized state it had when it was closed. A window whose screen is gone opens centered. |
+| `MAXIMIZED`, `FULLSCREEN` | `False` | Open maximized, or in full screen (which is not remembered). |
+| `RESIZABLE`, `ON_TOP` | `True`, `False` | |
+| `CONFIRM_CLOSE` | `False` | Ask before the window closes. |
+| `BACKGROUND_COLOR` | `"#FFFFFF"` | Shown before the page has loaded; match the page to avoid a flash. |
+| `TEXT_SELECT` | `True` | The user can select and copy the page's text. |
+| `ZOOMABLE` | `False` | The user can zoom with Ctrl and +/-. |
+| `PERSIST_STORAGE` | `True` | Keep cookies and local storage between starts (so a signed-in user stays signed in). Off: they are forgotten when the window closes. |
+| `ICON` | `None` | Icon file relative to the application's folder (`.ico` on Windows, `.icns` on macOS, `.png` on Linux). Linux shows it on the window; Windows and macOS show the executable's icon, which `desktop:spec` takes from this setting. |
+| `DEV_TOOLS` | `None` | The web inspector, from the page's context menu ("Inspect"). Not set: on for `desktop:run` in dev mode and when `DEBUG` is on. |
+| `GUI` | `None` | pywebview's toolkit, for example `"qt"` or `"gtk"` on Linux. |
+
+The window's last size and position (`window.json`) and the web view's storage (`webview/`) are
+kept in the user's data folder (see below), not in pywebview's own folder, which every pywebview
+program shares.
 
 ## Packaging a program
 
@@ -61,8 +90,10 @@ The command runs PyInstaller. The result is a folder, `dist/desktop/<APP_NAME>/`
 executable and everything it needs; ship the whole folder (an installer such as Inno Setup can
 wrap it). PyInstaller builds for the system it runs on, so build the Windows program on Windows.
 
-The packaged program runs the server inside its own process, on `127.0.0.1` and a free port, in
-production mode, and closes it with the window.
+The packaged program runs the server inside its own process, on `127.0.0.1`, in production mode,
+and closes it with the window. It listens on the port of its last start when that is free, and
+otherwise on a free one, which it keeps for the next start: browsers keep local storage per origin,
+port included, so the page's storage stays with it.
 
 ### The spec file
 
@@ -125,8 +156,8 @@ Things to keep in mind:
   may write it, for example from a settings page; changes apply at the next start.
 - The program's own folder may not be writable (Program Files) and is replaced by every update.
   Keep data in `user_data_dir(APP_NAME)` (`%APPDATA%\<name>` on Windows,
-  `~/Library/Application Support/<name>` on macOS, `~/.local/share/<name>` on Linux), for example
-  a SQLite database:
+  `~/Library/Application Support/<name>` on macOS, `~/.local/share/<name>` on Linux; on iOS and
+  Android, a folder in the app's private storage), for example a SQLite database:
 
   ```python
   from patera.desktop import user_data_dir
@@ -137,7 +168,9 @@ Things to keep in mind:
 
   The packaged program writes its log files there by default.
 
-See the [Desktop applications section of the Patera documentation](https://github.com/MarkoSterk/Patera#desktop-applications).
+See the [Desktop applications section of the Patera documentation](https://github.com/MarkoSterk/Patera#desktop-applications),
+and the [notes example](https://github.com/MarkoSterk/Patera/tree/main/examples/desktop_notes), a
+complete program with a database, a page and a spec file.
 
 ## License
 

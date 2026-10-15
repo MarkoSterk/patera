@@ -181,6 +181,17 @@ def test_main_parses_cli_arguments(monkeypatch):
     assert captured["command_args"] == ["a", "b"]
 
 
+def test_prod_explains_how_to_install_granian(tmp_path, monkeypatch):
+    import sys
+
+    from patera.cli.start_project import _start_prod
+
+    # None in sys.modules makes "import granian" fail as if it were missing.
+    monkeypatch.setitem(sys.modules, "granian", None)
+    with pytest.raises(RuntimeError, match=r"patera\[prod\]"):
+        _start_prod(str(tmp_path), app="app:App")
+
+
 def test_prod_loads_only_an_explicit_env_file(tmp_path, monkeypatch):
     import os
 

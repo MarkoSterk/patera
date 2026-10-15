@@ -92,10 +92,10 @@ class _Steps:
     def wait_until_ready(self, server, port):
         self._step("ready", port)
 
-    def show_window(self, url):
+    def show_window(self, url, dev_tools=False):
         # GUI toolkits only work on the main thread.
         assert threading.current_thread() is threading.main_thread()
-        self._step("window", url)
+        self._step("window", (url, dev_tools))
 
     def stop_server(self, server):
         self._step("stop", server)
@@ -108,7 +108,7 @@ def test_run_starts_the_server_shows_the_window_and_stops_the_server(make_app):
     assert steps.calls == [
         ("start", ("prod", 4321)),
         ("ready", 4321),
-        ("window", "http://127.0.0.1:4321/"),
+        ("window", ("http://127.0.0.1:4321/", False)),
         ("stop", "server"),
     ]
 
@@ -221,10 +221,11 @@ def test_run_in_window_serves_the_app_until_the_window_closes(
     app_class = _app_class(make_app, window_env, tmp_path)
     seen: dict[str, Any] = {}
 
-    def window(title: str, url: str) -> None:
+    def window(app, url: str, *, dev_tools: bool) -> None:
         assert threading.current_thread() is threading.main_thread()
         with urllib.request.urlopen(url, timeout=5) as page:
-            seen.update(title=title, url=url, body=page.read())
+            seen.update(title=app.app_name, url=url, body=page.read())
+        seen["dev_tools"] = dev_tools
 
     window_env.setattr(desktop_module, "show_window", window)
     window_env.setattr(sys, "stdout", None)  # a windowed executable has none
@@ -233,6 +234,7 @@ def test_run_in_window_serves_the_app_until_the_window_closes(
     sys.stdout.close()
 
     assert seen["body"] == b"desktop home"
+    assert seen["dev_tools"] is False  # production mode: DEBUG is off
     port = int(urllib.parse.urlparse(seen["url"]).port or 0)
     assert seen["url"] == f"http://127.0.0.1:{port}/"
     assert os.environ["PATERA_DEBUG"] == "0"
@@ -256,7 +258,7 @@ class FailingApp(App):
     files["server.py"] += failing
     name, _ = make_app.package(files)
     app_class = importlib.import_module(f"{name}.server").FailingApp
-    window_env.setattr(desktop_module, "show_window", lambda title, url: None)
+    window_env.setattr(desktop_module, "show_window", lambda app, url, dev_tools: None)
     with pytest.raises(RuntimeError, match="stopped while starting"):
         desktop_module.run_in_window(app_class)
 
@@ -269,6 +271,13 @@ def test_user_data_dir_per_platform(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
     folder = desktop_module.user_data_dir("Notes")
     assert folder == tmp_path / "share" / "Notes" and folder.is_dir()
+    monkeypatch.setattr(desktop_module.Path, "home", lambda: tmp_path / "home")
+    support = tmp_path / "home" / "Library" / "Application Support"
+    for platform in ("darwin", "ios"):
+        monkeypatch.setattr(sys, "platform", platform)
+        assert desktop_module.user_data_dir("Notes") == support / "Notes"
+    monkeypatch.setattr(sys, "platform", "android")
+    assert desktop_module.user_data_dir("Notes") == tmp_path / "home" / "Notes"
 
 
 # ---- desktop:package --------------------------------------------------------------
@@ -543,7 +552,7 @@ def test_run_in_window_loads_the_installation_settings(make_app, window_env, tmp
     )
     seen: dict[str, Any] = {}
 
-    def window(title: str, url: str) -> None:
+    def window(app, url: str, *, dev_tools: bool) -> None:
         seen.update(
             debug=os.environ["PATERA_DEBUG"],
             greeting=os.environ.get("PATERA_GREETING"),
@@ -565,6 +574,6 @@ def test_run_in_window_works_without_a_settings_file(make_app, window_env, tmp_p
     app_class = _app_class(make_app, window_env, tmp_path)
     window_env.setenv("XDG_DATA_HOME", str(tmp_path / "empty"))
     window_env.setattr(sys, "platform", "linux")
-    window_env.setattr(desktop_module, "show_window", lambda title, url: None)
+    window_env.setattr(desktop_module, "show_window", lambda app, url, dev_tools: None)
     desktop_module.run_in_window(app_class)
     assert os.environ["PATERA_DEBUG"] == "0"

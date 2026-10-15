@@ -564,37 +564,37 @@ wheels = [
 
 [package.optional-dependencies]
 cublas = [
-    { name = "nvidia-cublas" },
+    { name = "nvidia-cublas", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cudart = [
-    { name = "nvidia-cuda-runtime" },
+    { name = "nvidia-cuda-runtime", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufft = [
-    { name = "nvidia-cufft" },
+    { name = "nvidia-cufft", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufile = [
-    { name = "nvidia-cufile" },
+    { name = "nvidia-cufile", marker = "sys_platform == 'linux'" },
 ]
 cupti = [
-    { name = "nvidia-cuda-cupti" },
+    { name = "nvidia-cuda-cupti", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 curand = [
-    { name = "nvidia-curand" },
+    { name = "nvidia-curand", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusolver = [
-    { name = "nvidia-cusolver" },
+    { name = "nvidia-cusolver", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusparse = [
-    { name = "nvidia-cusparse" },
+    { name = "nvidia-cusparse", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvjitlink = [
-    { name = "nvidia-nvjitlink" },
+    { name = "nvidia-nvjitlink", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvrtc = [
-    { name = "nvidia-cuda-nvrtc" },
+    { name = "nvidia-cuda-nvrtc", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvtx = [
-    { name = "nvidia-nvtx" },
+    { name = "nvidia-nvtx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 
 [[package]]
@@ -1360,7 +1360,6 @@ version = "0.121.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
-    { name = "granian" },
     { name = "jinja2" },
     { name = "loguru" },
     { name = "pydantic" },
@@ -1419,6 +1418,9 @@ email = [
 migrate = [
     { name = "patera-migrate" },
 ]
+prod = [
+    { name = "granian" },
+]
 taskmanager = [
     { name = "patera-taskmanager" },
 ]
@@ -1437,9 +1439,11 @@ dev = [
     { name = "asgi-lifespan" },
     { name = "asyncpg" },
     { name = "fakeredis" },
+    { name = "granian" },
     { name = "httpx" },
     { name = "mypy" },
     { name = "numpy" },
+    { name = "patera-desktop", extra = ["pyinstaller"] },
     { name = "pgvector" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -1455,7 +1459,7 @@ requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "anyio", marker = "extra == 'testing'" },
     { name = "asgi-lifespan", marker = "extra == 'testing'", specifier = ">=2.1.0" },
-    { name = "granian", specifier = ">=2.7.2" },
+    { name = "granian", marker = "extra == 'prod'", specifier = ">=2.7.2" },
     { name = "httpx", marker = "extra == 'testing'", specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },
@@ -1491,7 +1495,7 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'dev'", specifier = ">=16.0" },
     { name = "werkzeug", specifier = ">=3.1.6" },
 ]
-provides-extras = ["dev", "testing", "database", "migrate", "auth", "caching", "caching-redis", "caching-sqlite", "taskmanager", "email", "apiinterface", "admin", "aiinterface", "desktop", "all"]
+provides-extras = ["prod", "dev", "testing", "database", "migrate", "auth", "caching", "caching-redis", "caching-sqlite", "taskmanager", "email", "apiinterface", "admin", "aiinterface", "desktop", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1499,9 +1503,11 @@ dev = [
     { name = "asgi-lifespan", specifier = ">=2.1.0" },
     { name = "asyncpg", specifier = ">=0.30" },
     { name = "fakeredis", specifier = ">=2.20" },
+    { name = "granian", specifier = ">=2.7.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "numpy", specifier = ">=2.4.4" },
+    { name = "patera-desktop", extras = ["pyinstaller"], editable = "packages/patera-desktop" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=8" },

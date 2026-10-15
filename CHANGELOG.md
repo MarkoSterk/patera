@@ -26,6 +26,14 @@ together.
   `<name>` placeholders and become query parameters or the body.
 - **patera-database:** `@query` methods annotated `-> None` return `None`; `-> int` on a statement
   without result rows returns the number of affected rows.
+- **Core:** a settings model declared in the config class without a value (`MAIN_DB:
+  SqlDatabaseConfig`) is built from the environment (and `.env`), with the model's defaults for
+  the fields no variable sets; with no variable at all, from the defaults alone. A required field
+  that nothing sets is reported by name (`MAIN_DB.DATABASE_URI`), instead of the whole model
+  being "required".
+- **Core:** Granian is no longer installed with the core package. `patera prod` needs the new
+  `prod` extra: `uv add "patera[prod]"` (or `pip install "patera[prod]"`); without it, the command
+  says so. The core's own dependencies are now pure Python apart from pydantic-core.
 - **Core:** blank query and form values (`?q=`) are kept as `""` instead of being dropped.
 - **Core:** the OpenAPI document's server is relative (`URL_PREFIX`, or `/`) instead of
   `PROTOCOL://HOST:PORT`, so Swagger's "Try it out" calls the origin that served the page.
@@ -277,7 +285,14 @@ server in a background thread with `run_in_window(App)`, on a free port, and wri
 `user_data_dir(APP_NAME)`. Before the application starts, `run_in_window` loads the
 installation's settings file, `settings_file(APP_NAME)` (`settings.env` in that folder), like
 `.env` during development. The package ships a PyInstaller hook so the `patera.*` extensions are
-found also in editable (workspace) installs. `desktop:spec [path]` writes a PyInstaller spec file
+found also in editable (workspace) installs. Window settings in `DESKTOP`: `TITLE`, `WIDTH`/`HEIGHT` (1024 × 720), `MIN_WIDTH`/`MIN_HEIGHT`,
+`REMEMBER_GEOMETRY` (size, position and maximized state restored at the next start, on by
+default), `MAXIMIZED`, `FULLSCREEN`, `RESIZABLE`, `ON_TOP`, `CONFIRM_CLOSE`, `BACKGROUND_COLOR`,
+`TEXT_SELECT` (on), `ZOOMABLE`, `PERSIST_STORAGE` (cookies and local storage kept in the user's
+data folder, on by default; pywebview forgets them at every close otherwise), `ICON` (also the
+spec file's default icon), `DEV_TOOLS` and `GUI`. A packaged program reuses the port of its last
+start, so the page's origin and local storage stay the same. `user_data_dir` also knows iOS (Application Support in
+the app's sandbox) and Android (the app's internal storage, `$HOME`). `desktop:spec [path]` writes a PyInstaller spec file
 (default `desktop.spec`) with the defaults as settings to edit (hidden imports, data files, icon,
 console, one file, own entry script). The application package is copied without what running and
 developing it leave there (`__pycache__`, log files, SQLite databases, `.env`, tool caches;
