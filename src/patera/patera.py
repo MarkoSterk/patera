@@ -587,6 +587,15 @@ class Patera(Injectable, Generic[ConfT]):
 
         res: Response = await req.route_handler.__self__(req.route_handler, req)  # type: ignore
 
+        # Convert the body through its Response[Model] type now, inside the
+        # middleware chain: the database middleware commits or rolls back and
+        # closes the request's sessions on the way out, which expires ORM
+        # objects that the body still refers to.
+        if isinstance(res, Response):
+            self.response_renderer.materialize_body(
+                res, req.response.expected_body_type()
+            )
+
         return res
 
     async def _send_error(

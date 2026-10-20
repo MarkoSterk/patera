@@ -83,7 +83,9 @@ def form_values(
     - An empty value of a non-text field is None for a nullable column and
       left out otherwise (the column default applies on create).
     - On create, a required field without a value is an error.
-    - Custom form fields keep the value their element sends.
+    - Custom form fields keep the value their element sends, unless the
+      element sets ``converts_value`` (DateInput), which converts it like a
+      generated input.
 
     Raises AdminFormError listing every field that does not fit.
     """
@@ -92,7 +94,10 @@ def form_values(
     for field in fields:
         name = field["name"]
         python_type = _python_type(model, field)
-        if field.get("custom_field") is not None:
+        custom_field = field.get("custom_field")
+        if custom_field is not None and not getattr(
+            custom_field, "converts_value", False
+        ):
             if name in data:
                 values[name] = data[name]
             continue

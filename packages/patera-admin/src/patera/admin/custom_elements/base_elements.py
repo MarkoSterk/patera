@@ -12,6 +12,8 @@ AttributeValue = str | int | float | bool | None
 
 class BaseHtmlElement:
     tag_name: str = ""
+    # Void elements such as <input> have no content and no closing tag.
+    void_element: bool = False
 
     def __init__(
         self,
@@ -38,6 +40,12 @@ class BaseHtmlElement:
     def render(self, field: dict[str, Any] | None = None) -> Markup:
         attrs = self.build_attributes(field)
         attrs_html = self.render_attributes(attrs)
+
+        if self.void_element:
+            if attrs_html:
+                return Markup(f"<{self.tag_name} {attrs_html}>")
+            return Markup(f"<{self.tag_name}>")
+
         content = self.render_content()
 
         if attrs_html:
@@ -110,6 +118,10 @@ class BaseHtmlElement:
 
 
 class BaseHtmlInput(BaseHtmlElement):
+    # True: Admin converts the submitted text to the column's type, as for
+    # generated inputs. False: the model receives the value as it was sent.
+    converts_value: bool = False
+
     def __init__(
         self,
         *,
@@ -154,7 +166,8 @@ class BaseHtmlInput(BaseHtmlElement):
         field_required = field.get("required") if field else self.required
 
         attrs["name"] = self.name or field_name
-        attrs["id"] = self.id or f"create-field-{field_name}"
+        form = (field or {}).get("form", "create")
+        attrs["id"] = self.id or f"{form}-field-{field_name}"
 
         if field_name:
             attrs["data-field-name"] = field_name

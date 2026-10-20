@@ -1,5 +1,12 @@
 from .base_elements import BaseHtmlElement, BaseHtmlInput
 
-from .inputs import TagsInput, SummernoteEditor
+from .inputs import DateInput, FileInput, SummernoteEditor, TagsInput
 
-__all__ = ["BaseHtmlElement", "BaseHtmlInput", "TagsInput", "SummernoteEditor"]
+__all__ = [
+    "BaseHtmlElement",
+    "BaseHtmlInput",
+    "DateInput",
+    "FileInput",
+    "SummernoteEditor",
+    "TagsInput",
+]

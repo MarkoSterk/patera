@@ -5,7 +5,7 @@ from typing import Any, Optional, Type, TYPE_CHECKING
 from .http_statuses import HttpStatus
 from .media_types import MediaType
 from .response import Response
-from .serializers import SerializerRegistry
+from .serializers import SerializerRegistry, materialize
 
 if TYPE_CHECKING:
     from .patera import Patera  # noqa: F401
@@ -43,6 +43,45 @@ class ResponseRenderer:
             return await self.serializers.serialize(response, response_type)
         except Exception as e:
             self._app.logger.error(f"Error occurred while serializing response: {e}")
+            raise ResponseRendererException("Failed to render response body") from e
+
+    def materialize_body(
+        self,
+        response: Response[Any],
+        response_type: Optional[Type[Any]] = None,
+    ) -> None:
+        """
+        Converts the body of a successful JSON or NDJSON response through the
+        declared response type, in place (see serializers.materialize).
+
+        Called right after the route handler returns, inside the middleware
+        chain, so ORM objects are read while their sessions are still open.
+        A body that does not fit its type raises ResponseRendererException
+        there, so a @transactional request is rolled back instead of
+        committed. Streamed and file responses are left untouched.
+        """
+        if (
+            response_type is None
+            or response.body is None
+            or response.is_streaming
+            or response.zero_copy is not None
+            or not 200 <= int(response.status_code) < 300
+        ):
+            return
+        if response.media_type == MediaType.APPLICATION_X_NDJSON.value:
+            # Rows are converted one by one; only a list of them is known here.
+            if not isinstance(response.body, (list, tuple)):
+                return
+        elif response.media_type not in (
+            None,  # an object body without a media type is sent as JSON
+            MediaType.APPLICATION_JSON.value,
+            MediaType.APPLICATION_PROBLEM_JSON.value,
+        ):
+            return
+        try:
+            response.body = materialize(response.body, response_type)
+        except Exception as e:
+            self._app.logger.error(f"Response body does not fit its declared type: {e}")
             raise ResponseRendererException("Failed to render response body") from e
 
     def apply_default_content_type(self, response: Response[Any]) -> None:

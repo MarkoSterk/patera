@@ -908,7 +908,9 @@ class App(Patera[Config]):
 ```
 
 `SqlDatabaseConfig` options: `DATABASE_URI`, `DATABASE_SESSION_NAME` (default `"session"`),
-`SHOW_SQL`, `NICE_NAME`, `EXPIRE_ON_COMMIT`, `AUTOFLUSH`. The engine connects on startup and is
+`SHOW_SQL`, `NICE_NAME`, `EXPIRE_ON_COMMIT`, `AUTOFLUSH`, and `SQLITE_FOREIGN_KEYS` (SQLite only:
+enforce `FOREIGN KEY` constraints, which SQLite leaves off by default; for example
+`PATERA_MAIN_DB__SQLITE_FOREIGN_KEYS=true`). The engine connects on startup and is
 disposed on shutdown. Register only the manager, not the individual databases. With several
 databases, give each one a unique `__db_name__` **and** a unique `DATABASE_SESSION_NAME`.
 

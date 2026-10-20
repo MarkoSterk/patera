@@ -1,4 +1,4 @@
-from typing import Sequence, Any, Mapping
+from typing import Any, Mapping, Sequence
 from markupsafe import Markup
 
 from .base_elements import BaseHtmlInput, AttributeValue
@@ -106,3 +106,136 @@ class SummernoteEditor(BaseHtmlInput):
             return str(value)
 
         return str(value)
+
+
+class FileInput(BaseHtmlInput):
+    """
+    A file upload, ``<input type="file">``. The model's admin hooks receive
+    the chosen file as a ``patera.UploadedFile`` and decide what to store.
+    When no file is chosen the field is left out of the submitted form, so
+    an update keeps the record's current value.
+
+    ``accept`` limits the file chooser (MIME types or extensions) and
+    ``max_size`` (bytes) is checked in the browser before the form is sent;
+    the model must still validate what it receives.
+    """
+
+    tag_name = "input"
+    void_element = True
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        accept: Sequence[str] | str | None = None,
+        max_size: int | None = None,
+        id: str | None = None,
+        label: str | None = None,
+        required: bool | None = None,
+        disabled: bool = False,
+        classes: Sequence[str] | None = None,
+        attributes: Mapping[str, AttributeValue] | None = None,
+        data_attributes: Mapping[str, AttributeValue] | None = None,
+        aria_attributes: Mapping[str, AttributeValue] | None = None,
+        styles: Mapping[str, str] | None = None,
+    ) -> None:
+        super().__init__(
+            name=name,
+            id=id,
+            label=label,
+            required=required,
+            disabled=disabled,
+            classes=classes if classes is not None else ["form-control"],
+            attributes=attributes,
+            data_attributes=data_attributes,
+            aria_attributes=aria_attributes,
+            styles=styles,
+        )
+        self.accept = (
+            accept if isinstance(accept, str) or accept is None else ",".join(accept)
+        )
+        self.max_size = max_size
+
+    def build_attributes(
+        self,
+        field: dict[str, Any] | None = None,
+    ) -> dict[str, AttributeValue]:
+        attrs = super().build_attributes(field)
+        attrs["type"] = "file"
+        if self.accept:
+            attrs["accept"] = self.accept
+        if self.max_size is not None:
+            attrs["data-max-size"] = self.max_size
+        return attrs
+
+
+class DateInput(BaseHtmlInput):
+    """
+    A date picker, ``<input type="date">``, or a date and time picker,
+    ``<input type="datetime-local">``, with ``include_time=True``.
+
+    The submitted text is converted to the column's type like a generated
+    input, so it suits ``Date``, ``DateTime`` and string columns. With
+    ``utc=True`` (date and time only) the browser shows a stored ISO 8601
+    timestamp in the viewer's local time and submits it back in UTC, for
+    example ``2026-10-20T08:00:00.000Z``.
+    """
+
+    tag_name = "input"
+    void_element = True
+    converts_value = True
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        include_time: bool = False,
+        utc: bool = False,
+        min: str | None = None,
+        max: str | None = None,
+        id: str | None = None,
+        label: str | None = None,
+        required: bool | None = None,
+        disabled: bool = False,
+        readonly: bool = False,
+        classes: Sequence[str] | None = None,
+        attributes: Mapping[str, AttributeValue] | None = None,
+        data_attributes: Mapping[str, AttributeValue] | None = None,
+        aria_attributes: Mapping[str, AttributeValue] | None = None,
+        styles: Mapping[str, str] | None = None,
+    ) -> None:
+        if utc and not include_time:
+            raise ValueError(
+                "utc=True needs include_time=True: a date has no time zone."
+            )
+        super().__init__(
+            name=name,
+            id=id,
+            label=label,
+            required=required,
+            disabled=disabled,
+            readonly=readonly,
+            classes=classes if classes is not None else ["form-control"],
+            attributes=attributes,
+            data_attributes=data_attributes,
+            aria_attributes=aria_attributes,
+            styles=styles,
+        )
+        self.include_time = include_time
+        self.utc = utc
+        self.min = min
+        self.max = max
+
+    def build_attributes(
+        self,
+        field: dict[str, Any] | None = None,
+    ) -> dict[str, AttributeValue]:
+        attrs = super().build_attributes(field)
+        attrs["type"] = "datetime-local" if self.include_time else "date"
+        if self.utc:
+            attrs["data-utc"] = "true"
+        if self.min is not None:
+            attrs["min"] = self.min
+        if self.max is not None:
+            attrs["max"] = self.max
+        return attrs

@@ -140,6 +140,32 @@ def _adapter(response_type: Any) -> TypeAdapter[Any]:
     return TypeAdapter(response_type)
 
 
+def materialize(value: Any, response_type: Any = None) -> Any:
+    """
+    Converts a response body through its declared type when that type
+    involves a Pydantic model (``PostOut``, ``list[PostOut]``, ...): ORM
+    objects and other objects with matching attributes become model
+    instances. Any other value is returned unchanged.
+
+    Patera calls this as soon as the route handler returns, while the
+    request's database sessions are still open. Reading the attributes later,
+    after a session was committed, rolled back or closed, would find expired
+    or detached objects.
+    """
+    if (
+        response_type is None
+        or value is None
+        or isinstance(value, (bytes, bytearray, str))
+        or not _mentions_model(response_type)
+    ):
+        return value
+    try:
+        adapter = _adapter(response_type)
+    except TypeError:  # an unhashable annotation: build the adapter each time
+        adapter = TypeAdapter(response_type)
+    return adapter.validate_python(value, from_attributes=True)
+
+
 def json_bytes(value: Any, response_type: Any = None) -> bytes:
     """
     The JSON encoding of a response body, as UTF-8.

@@ -35,13 +35,13 @@
               <div class="col-12">
 
                 {% if field.custom_field %}
-                  <label for="create-field-{{ field.name }}" class="form-label">
+                  <label for="update-field-{{ field.name }}" class="form-label">
                     {{ field.label }}
                     {% if field.required %}
                       <span class="text-danger">*</span>
                     {% endif %}
                   </label>
-                  {{ render_custom_form_field(field)|safe }}
+                  {{ render_custom_form_field(field, "update")|safe }}
 
                 {% elif field.input_type == "checkbox" %}
                   <div class="form-check">

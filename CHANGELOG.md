@@ -3,6 +3,49 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
+## Unreleased
+
+### Added
+
+- **patera-database:** `SqlDatabaseConfig.SQLITE_FOREIGN_KEYS` (default `False`) runs
+  `PRAGMA foreign_keys=ON` on every new SQLite connection, so `FOREIGN KEY` constraints such as
+  `ON DELETE CASCADE` are enforced; SQLite leaves them off by default. Set it in the settings
+  model or from the environment, for example `PATERA_MAIN_DB__SQLITE_FOREIGN_KEYS=true`. Other
+  databases ignore it. Applications no longer need to override `SqlDatabase.connect()` for this.
+- **patera-admin:** `FileInput` and `DateInput` form elements in `patera.admin.custom_elements`,
+  for `Meta.custom_form_fields`. `FileInput` renders `<input type="file">` (with `accept` and a
+  browser-side `max_size`); the model's admin hooks receive the chosen file as an `UploadedFile`,
+  and when no file is chosen the field is not sent, so an update keeps the current value.
+  `DateInput` renders a date or, with `include_time=True`, a date-and-time picker; its value is
+  converted to the column's type like a generated input, and `utc=True` shows a stored UTC
+  timestamp in the viewer's local time and submits it in UTC. Custom elements opt in to that
+  conversion with `converts_value = True`.
+
+### Fixed
+
+- **Core:** a `Response[Model]` body made of ORM objects is converted through its declared type
+  as soon as the route handler returns, while the request's database sessions are still open.
+  Before, it was converted when the response was sent, after `patera-database` had rolled back
+  (requests without `@transactional`) or committed with `EXPIRE_ON_COMMIT=True` and closed the
+  session, so reading the expired objects failed with `DetachedInstanceError` (`500`). A body that
+  does not fit its type now fails inside the middleware chain, so a `@transactional` request is
+  rolled back instead of committed; the answer is still `500`. Streamed bodies are not converted
+  early, and relationships must be loaded eagerly. `patera.serializers.materialize()` and
+  `ResponseRenderer.materialize_body()` perform the conversion.
+- **patera-admin:** record dialogs no longer overflow the window: the form inside each dialog is
+  now the flex column, so the header and footer stay visible and the body scrolls.
+- **patera-admin:** a custom form element gets its own id in the create and update dialogs
+  (`create-field-<name>`, `update-field-<name>`); both used `create-field-<name>`, and the update
+  dialog's label pointed at the create form. Elements without content, such as `<input>`, are
+  rendered without a closing tag.
+- **patera-admin:** a model's `admin_delete()` hook can refuse a deletion by raising
+  `AdminFormError`: Admin answers `422` with the first error's message, which the records table
+  shows (it was a `500`).
+- **patera-admin:** an unknown database or model in a records-table URL shows the Admin error page
+  with `404` (rendering the page failed because the template context was missing).
+- **patera-admin:** the sign-in and "unauthorized" pages load Bootstrap and its icons from the
+  copies shipped with the package instead of jsDelivr, so Admin works without internet access.
+
 ## patera 0.121.0 and extensions 0.11.0 (2026-10-12)
 
 Every package in this release requires `patera>=0.121`. Upgrade the core and the extensions

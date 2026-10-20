@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import pytest
+from pydantic import BaseModel
 from sqlalchemy import Integer, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -393,3 +394,106 @@ async def test_session_scope_inside_a_request(make_app, tmp_path, client_for):
     finally:
         await db.disconnect()
     assert titles == ["from scope"]  # committed by the scope, not the request
+
+
+# ----- Response[Model] bodies made of ORM objects ------------------------------
+
+
+class NoteOut(BaseModel):
+    id: int
+    title: str
+
+
+@path("/typed")
+class TypedNoteController(Controller):
+    notes: Inject[NoteRepository]
+
+    @get("/")
+    async def index(self, req: Request) -> Response[list[NoteOut]]:
+        # Not transactional: the request's session is rolled back and closed
+        # before the response is sent, which expires these objects.
+        return req.res.json(await self.notes.list_all())
+
+    @post("/")
+    @transactional
+    async def create(self, req: Request) -> Response[NoteOut]:
+        return req.res.json(await self.notes.create_and_flush(title="typed"))
+
+    @post("/mismatch")
+    @transactional
+    async def mismatch(self, req: Request) -> Response[NoteOut]:
+        await self.notes.create_and_flush(title="never committed")
+        return req.res.json({"id": "not a number", "title": "x"})
+
+
+@pytest.mark.parametrize("expire_on_commit", [False, True])
+async def test_orm_objects_in_typed_responses_are_read_before_sessions_close(
+    make_app, tmp_path, client_for, expire_on_commit
+):
+    app = make_app(
+        controllers=[TypedNoteController],
+        extensions=[Databases],
+        DEBUG=False,
+        MAIN_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'typed.db'}",
+            EXPIRE_ON_COMMIT=expire_on_commit,
+        ),
+    )
+    async with client_for(app) as client:
+        await _create_schema(app)
+        res = await client.post("/typed/")
+        assert res.status_code == 200, res.text
+        assert res.json() == {"id": 1, "title": "typed"}
+
+        res = await client.get("/typed/")
+        assert res.status_code == 200, res.text
+        assert res.json() == [{"id": 1, "title": "typed"}]
+
+        # A body that does not fit its type fails before the commit.
+        res = await client.post("/typed/mismatch")
+        assert res.status_code == 500
+        res = await client.get("/typed/")
+        assert [note["title"] for note in res.json()] == ["typed"]
+
+
+# ----- SQLite foreign keys ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("enforced", [False, True])
+async def test_sqlite_foreign_keys_setting(make_app, tmp_path, enforced):
+    app = make_app(
+        extensions=[Databases],
+        MAIN_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'fk.db'}",
+            SQLITE_FOREIGN_KEYS=enforced,
+        ),
+    )
+    db = app.get_extension(Databases).get_database("main")
+    await db.connect()
+    try:
+        async with db.engine.begin() as conn:
+            assert (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar() == int(
+                enforced
+            )
+            await conn.exec_driver_sql("CREATE TABLE parents (id INTEGER PRIMARY KEY)")
+            await conn.exec_driver_sql(
+                "CREATE TABLE children (id INTEGER PRIMARY KEY, parent_id INTEGER "
+                "REFERENCES parents(id) ON DELETE CASCADE)"
+            )
+            await conn.exec_driver_sql("INSERT INTO parents (id) VALUES (1)")
+            await conn.exec_driver_sql("INSERT INTO children (parent_id) VALUES (1)")
+            await conn.exec_driver_sql("DELETE FROM parents WHERE id = 1")
+            left = (
+                await conn.exec_driver_sql("SELECT COUNT(*) FROM children")
+            ).scalar()
+        assert left == (0 if enforced else 1)
+
+        # A new engine after a reconnect gets the hook again.
+        await db.disconnect()
+        await db.connect()
+        async with db.engine.connect() as conn:
+            assert (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar() == int(
+                enforced
+            )
+    finally:
+        await db.disconnect()

@@ -2250,13 +2250,13 @@ name = "quick-exams"
 version = "0.1.0"
 source = { virtual = "examples/quick_exams" }
 dependencies = [
-    { name = "patera", extra = ["dev"] },
+    { name = "patera", extra = ["admin", "auth", "database", "dev", "migrate"] },
     { name = "qrcode" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "patera", extras = ["dev"], editable = "." },
+    { name = "patera", extras = ["dev", "admin", "auth", "database", "migrate"], editable = "." },
     { name = "qrcode", specifier = ">=8.2" },
 ]
 

@@ -42,7 +42,7 @@
                       <span class="text-danger">*</span>
                     {% endif %}
                   </label>
-                  {{ render_custom_form_field(field)|safe }}
+                  {{ render_custom_form_field(field, "create")|safe }}
 
                 {% elif field.input_type == "checkbox" %}
                   <div class="form-check">

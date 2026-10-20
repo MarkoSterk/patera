@@ -179,3 +179,53 @@ async def test_declared_type_only_shapes_success_bodies(app):
 
 class _Message(_BaseModel):
     message: str
+
+
+# ----- materialize ---------------------------------------------------------------
+
+
+class _OrmRow:
+    def __init__(self, id: int, name: str) -> None:
+        self.id = id
+        self.name = name
+
+
+class _OrmRowOut(_BaseModel):
+    id: int
+    name: str
+
+
+def test_materialize_converts_objects_through_model_types():
+    from patera.serializers import materialize
+
+    rows = materialize([_OrmRow(1, "a")], list[_OrmRowOut])
+    assert rows == [_OrmRowOut(id=1, name="a")]
+    assert materialize(_OrmRow(2, "b"), _OrmRowOut) == _OrmRowOut(id=2, name="b")
+    # Without a model in the type, or for raw bodies, nothing changes.
+    plain = {"id": 1}
+    assert materialize(plain, dict) is plain
+    assert materialize(b"raw", _OrmRowOut) == b"raw"
+    assert materialize(plain, None) is plain
+
+
+async def test_materialize_body_skips_errors_streams_and_other_media(app):
+    from patera.response_renderer import ResponseRendererException
+    from tests.helpers import make_request
+
+    renderer = app.response_renderer
+
+    res = make_request(app).res.json([_OrmRow(1, "a")])
+    renderer.materialize_body(res, list[_OrmRowOut])
+    assert res.body == [_OrmRowOut(id=1, name="a")]
+
+    error = make_request(app).res.json({"message": "nope"}).status(HttpStatus.NOT_FOUND)
+    renderer.materialize_body(error, _OrmRowOut)
+    assert error.body == {"message": "nope"}
+
+    text = make_request(app).res.text("hello")
+    renderer.materialize_body(text, _OrmRowOut)
+    assert text.body == "hello"
+
+    bad = make_request(app).res.json({"id": "x", "name": "a"})
+    with pytest.raises(ResponseRendererException):
+        renderer.materialize_body(bad, _OrmRowOut)

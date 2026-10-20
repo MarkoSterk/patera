@@ -4,8 +4,9 @@
 <style>
   .admin-dialog {
     width: min(900px, calc(100vw - 2rem));
-    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
     padding: 0;
+    overflow: hidden;
     border: 0;
     border-radius: var(--bs-border-radius-lg);
     box-shadow: var(--bs-box-shadow-lg);
@@ -17,10 +18,22 @@
   }
 
   .admin-dialog .card {
-    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+  }
+
+  /* The dialogs wrap header, body and footer in a form: it must be the flex
+     column, or the body grows instead of scrolling. */
+  .admin-dialog .card > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: inherit;
   }
 
   .admin-dialog .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
   }
 </style>
@@ -400,6 +413,55 @@
     });
   }
 
+  function toLocalDateTimeValue(value) {
+    if (!value) {
+      return "";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return normalizeDateTimeLocalValue(value);
+    }
+
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+
+  function setFileHint(field, hasValue) {
+    field.dataset.hasValue = hasValue ? "true" : "";
+
+    let hint = field.parentElement?.querySelector(
+      `.file-kept-hint[data-for="${CSS.escape(field.id)}"]`
+    );
+
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.className = "form-text file-kept-hint";
+      hint.dataset.for = field.id;
+      hint.textContent = "{{ translate('file_kept_hint') }}";
+      field.insertAdjacentElement("afterend", hint);
+    }
+
+    hint.hidden = !hasValue;
+  }
+
+  function prepareFormData(form, formData) {
+    form.querySelectorAll('input[type="file"][name]').forEach((field) => {
+      if (!field.files || field.files.length === 0) {
+        formData.delete(field.name);
+      }
+    });
+
+    form.querySelectorAll('input[data-utc="true"][name]').forEach((field) => {
+      if (field.value) {
+        formData.set(field.name, new Date(field.value).toISOString());
+      }
+    });
+
+    return formData;
+  }
+
   function normalizeDateTimeLocalValue(value) {
     if (!value || typeof value !== "string") {
       return value || "";
@@ -447,6 +509,14 @@
 
     if (field.type === "checkbox") {
       return field.checked ? "true" : "";
+    }
+
+    if (field.type === "file") {
+      if (field.files && field.files.length > 0) {
+        return field.files[0].name;
+      }
+
+      return field.dataset.hasValue === "true" ? "kept" : "";
     }
 
     if (tagName === "tags-input") {
@@ -506,6 +576,13 @@
 
       if (field.type === "hidden") {
         continue;
+      }
+
+      if (field.type === "file" && field.dataset.maxSize && field.files?.length) {
+        if (field.files[0].size > Number(field.dataset.maxSize)) {
+          focusField(field);
+          return `${getFieldLabel(form, field)}: {{ translate('file_too_large') }}`;
+        }
       }
 
       if (!field.hasAttribute("required")) {
@@ -656,6 +733,17 @@
         return;
       }
 
+      if (field.type === "file") {
+        field.value = "";
+        setFileHint(field, value !== null && value !== undefined && value !== "");
+        return;
+      }
+
+      if (field.type === "datetime-local" && field.dataset.utc === "true") {
+        field.value = toLocalDateTimeValue(value);
+        return;
+      }
+
       if (field.type === "datetime-local") {
         field.value = normalizeDateTimeLocalValue(value);
         return;
@@ -698,7 +786,7 @@
     }
 
     try {
-      const formData = new FormData(form);
+      const formData = prepareFormData(form, new FormData(form));
 
       const response = await fetch(form.action, {
         method: methodOverride || form.method || "POST",

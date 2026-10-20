@@ -1,13 +1,19 @@
 [project]
 name = "quick-exams"
 version = "0.1.0"
-description = "Add your description here"
+description = "Patera example: instructor workspace, Patera Admin and public student exams with JWT authentication"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "patera[dev]",
+    "patera[dev,admin,auth,database,migrate]",
     "qrcode>=8.2",
 ]
 
 [tool.uv.sources]
 patera = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

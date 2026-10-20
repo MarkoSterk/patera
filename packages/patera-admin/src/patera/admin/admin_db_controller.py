@@ -158,39 +158,27 @@ class _AdminDbController(Controller[Patera]):
                 },
             )
         except (AdminUnknownModelException, AdminUnknownDatabaseException):
-            return (
-                await req.res.html(
-                    "_admin/error.html",
-                    {
-                        "error_message": "Unknown database or model",
-                        "error_title": "Invalid action",
-                    },
-                )
-            ).status(HttpStatus.BAD_REQUEST)
+            return await self.error_page(
+                req,
+                HttpStatus.NOT_FOUND,
+                "Invalid action",
+                "Unknown database or model",
+            )
         except ValidationError:
-            return (
-                await req.res.html(
-                    "_admin/error.html",
-                    {
-                        "error_message": (
-                            "Invalid query parameters. Please provide "
-                            "page[int] and per_page[int]"
-                        ),
-                        "error_title": "Invalid record query",
-                    },
-                )
-            ).status(HttpStatus.BAD_REQUEST)
+            return await self.error_page(
+                req,
+                HttpStatus.BAD_REQUEST,
+                "Invalid record query",
+                "Invalid query parameters. Please provide page[int] and per_page[int]",
+            )
         except Exception as e:
             self.app.logger.exception(e)
-            return (
-                await req.res.html(
-                    "_admin/error.html",
-                    {
-                        "error_message": "Failed to load table records.",
-                        "error_title": "Internal server error",
-                    },
-                )
-            ).status(HttpStatus.INTERNAL_SERVER_ERROR)
+            return await self.error_page(
+                req,
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal server error",
+                "Failed to load table records.",
+            )
 
     @get("/<string:db_name>/model/<string:model_name>/pk/<path:pk_values_str>")
     @role_required(
@@ -383,6 +371,16 @@ class _AdminDbController(Controller[Patera]):
                     model_name=model_name,
                 )
             )
+        except AdminFormError as e:
+            # The model's admin_delete() hook refused: show its reason.
+            reason = e.errors[0].get("msg") if e.errors else None
+            return req.res.json(
+                {
+                    "message": reason or "The record cannot be deleted.",
+                    "status": "error",
+                    "details": e.errors,
+                }
+            ).status(HttpStatus.UNPROCESSABLE_ENTITY)
         except AdminRecordNotFound:
             return req.res.json(
                 {
@@ -518,6 +516,27 @@ class _AdminDbController(Controller[Patera]):
         if key is None:
             return None
         return await model.query(session).filter_by(**key).first()
+
+    async def error_page(
+        self, req: Request, status: HttpStatus, title: str, message: str
+    ) -> Response:
+        """
+        The Admin error page. It extends the Admin layout, so it needs the
+        interface's template context (language, menus, URLs).
+        """
+        return (
+            await req.res.html(
+                "_admin/error.html",
+                {
+                    **self.admin_interface.context_variables,
+                    "error_title": title,
+                    "error_message": message,
+                    "error_status": None,
+                    "status_code": status,
+                    "error_details": None,
+                },
+            )
+        ).status(status)
 
     def path_pairs_to_dict(self, value: str) -> dict[str, str]:
         """
@@ -1064,9 +1083,12 @@ class _AdminDbController(Controller[Patera]):
             for choice in python_type
         ]
 
-    def render_custom_form_field(self, field: dict[str, Any]) -> str:
+    def render_custom_form_field(
+        self, field: dict[str, Any], form: str = "create"
+    ) -> str:
         """
-        Renders a custom form field, if the field defines one.
+        Renders a custom form field, if the field defines one. ``form`` names
+        the dialog ("create" or "update") and gives the element its own id.
 
         This method supports a few common render APIs:
         - field.render(field_metadata)
@@ -1077,6 +1099,8 @@ class _AdminDbController(Controller[Patera]):
 
         if custom_field is None:
             return ""
+
+        field = {**field, "form": form}
 
         if hasattr(custom_field, "render"):
             return str(custom_field.render(field))

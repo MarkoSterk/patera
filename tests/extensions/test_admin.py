@@ -6,9 +6,11 @@ from typing import Optional
 
 import pytest
 
-from patera import Request
+from patera import Request, UploadedFile
 from patera.admin import AdminInterface
 from patera.admin.admin_interface import AdminConfig, Permissions
+from patera.admin.custom_elements import DateInput, FileInput
+from patera.admin.form_values import AdminFormError
 from patera.auth import Authentication
 from patera.middleware import middleware
 from patera.taskmanager import TaskManager
@@ -746,4 +748,226 @@ async def test_admin_forms_without_a_schema(make_app, client_for, tmp_path, back
     finally:
         async with db.engine.begin() as conn:
             await conn.run_sync(MemberBase.metadata.drop_all, tables=[Member.__table__])
+        await db.disconnect()
+
+
+class GuardedBase(DeclarativeBaseModel):
+    __abstract__ = True
+    __db_name__ = "guarded"
+
+
+class GuardedItem(GuardedBase):
+    __tablename__ = "admin_guarded_items"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    locked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    async def admin_delete(self) -> None:
+        if self.locked:
+            raise AdminFormError(
+                [
+                    {
+                        "loc": ["record"],
+                        "msg": "Locked items are kept",
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+
+class GuardedDb(SqlDatabase):
+    __db_name__ = "guarded"
+
+
+class GuardedDatabases(SqlDatabaseManager):
+    databases = [GuardedDb]
+
+
+class GuardedAdmin(AdminInterface):
+    MANAGED_MODELS = [GuardedItem]
+
+
+async def test_refused_deletes_and_unknown_models(make_app, client_for, tmp_path):
+    app = make_app(
+        extensions=[GuardedDatabases, Jobs, GuardedAdmin],
+        middleware=[HeaderAuth],
+        GUARDED_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'guarded.db'}"
+        ),
+        GUARDED_ADMIN=ADMIN_CONFIG,
+    )
+    db = app.get_extension(GuardedDatabases).get_database("guarded")
+    await db.connect()
+    async with db.engine.begin() as conn:
+        await conn.run_sync(
+            GuardedBase.metadata.create_all, tables=[GuardedItem.__table__]
+        )
+    async with db.session_scope() as session:
+        session.add_all(
+            [
+                GuardedItem(id=1, name="kept", locked=True),
+                GuardedItem(id=2, name="free"),
+            ]
+        )
+    base = "/admin/en/databases/guarded/model/"
+    try:
+        async with client_for(app) as client:
+            # A hook that refuses deletion is a client error with its reason.
+            res = await client.delete(base + "GuardedItem/pk/id/1", headers=ADMIN)
+            assert res.status_code == 422
+            assert res.json()["message"] == "Locked items are kept"
+            res = await client.delete(
+                base + "GuardedItem/pk/id/2", headers=ADMIN, follow_redirects=False
+            )
+            assert res.status_code == 303
+
+            # An unknown model is answered with the Admin error page.
+            res = await client.get(base + "Missing", headers=ADMIN)
+            assert res.status_code == 404
+            assert "text/html" in res.headers["content-type"]
+            assert "Unknown database or model" in res.text
+        async with db.session_scope() as session:
+            names = (await session.execute(select(GuardedItem.name))).scalars().all()
+        assert names == ["kept"]
+    finally:
+        await db.disconnect()
+
+
+BUNDLE = "/admin/en/_static/js/vendors/bootstrap/bootstrap.bundle.min.js"
+
+
+async def test_pages_outside_the_layout_use_bundled_assets(app, client_for):
+    async with client_for(app) as client:
+        pages = [
+            await client.get("/admin/en/"),
+            await client.get("/admin/en/unauthorized", headers={"x-user": "bob"}),
+        ]
+        for page in pages:
+            assert page.status_code == 200
+            assert "cdn.jsdelivr.net" not in page.text
+            assert BUNDLE in page.text
+        asset = await client.get(BUNDLE)
+        assert asset.status_code == 200
+
+
+class UploadBase(DeclarativeBaseModel):
+    __abstract__ = True
+    __db_name__ = "uploads"
+
+
+class Upload(UploadBase):
+    __tablename__ = "admin_uploads"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    attachment: Mapped[str] = mapped_column(String(200), default="")
+    due: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+
+    class Meta(ModelMeta):
+        custom_form_fields = [
+            FileInput(name="attachment", accept="text/plain", max_size=100),
+            DateInput(name="due"),
+        ]
+
+    async def admin_create(self, new_data):
+        await self.admin_update(new_data)
+
+    async def admin_update(self, new_data):
+        upload = new_data.pop("attachment", None)
+        if isinstance(upload, UploadedFile):
+            self.attachment = upload.read().decode()
+        for key, value in new_data.items():
+            setattr(self, key, value)
+
+
+class UploadsDb(SqlDatabase):
+    __db_name__ = "uploads"
+
+
+class UploadDatabases(SqlDatabaseManager):
+    databases = [UploadsDb]
+
+
+class UploadsAdmin(AdminInterface):
+    MANAGED_MODELS = [Upload]
+
+
+def test_file_and_date_inputs_render_as_inputs():
+    file_input = FileInput(
+        name="attachment", accept=["image/png", "image/jpeg"], max_size=10
+    )
+    html = str(file_input.render({"name": "attachment", "form": "update"}))
+    assert html.startswith("<input ") and not html.endswith("</input>")
+    assert 'type="file"' in html and 'id="update-field-attachment"' in html
+    assert 'accept="image/png,image/jpeg"' in html and 'data-max-size="10"' in html
+    assert 'class="form-control"' in html
+
+    date_html = str(DateInput(name="due").render({"name": "due"}))
+    assert 'type="date"' in date_html and 'id="create-field-due"' in date_html
+    moment = str(
+        DateInput(name="at", include_time=True, utc=True).render({"name": "at"})
+    )
+    assert 'type="datetime-local"' in moment and 'data-utc="true"' in moment
+    with pytest.raises(ValueError):
+        DateInput(name="day", utc=True)
+
+
+async def test_file_and_date_inputs_through_admin_forms(make_app, client_for, tmp_path):
+    app = make_app(
+        extensions=[UploadDatabases, Jobs, UploadsAdmin],
+        middleware=[HeaderAuth],
+        UPLOADS_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'uploads.db'}"
+        ),
+        UPLOADS_ADMIN=ADMIN_CONFIG,
+    )
+    db = app.get_extension(UploadDatabases).get_database("uploads")
+    await db.connect()
+    async with db.engine.begin() as conn:
+        await conn.run_sync(UploadBase.metadata.create_all, tables=[Upload.__table__])
+    base = "/admin/en/databases/uploads/model/Upload"
+    try:
+        async with client_for(app) as client:
+            page = await client.get(base, headers=ADMIN)
+            assert page.status_code == 200
+            # Each dialog has its own element, and labels point at it.
+            assert 'id="create-field-attachment"' in page.text
+            assert 'id="update-field-attachment"' in page.text
+            assert 'for="update-field-attachment"' in page.text
+            assert "</input>" not in page.text
+
+            res = await client.post(
+                base + "/create",
+                headers=ADMIN,
+                files={
+                    "name": (None, "report"),
+                    "attachment": ("notes.txt", b"hello", "text/plain"),
+                    "due": (None, "2026-10-20"),
+                },
+                follow_redirects=False,
+            )
+            assert res.status_code == 303, res.text
+
+            # No file chosen: the field is not sent and the value is kept.
+            res = await client.put(
+                base + "/pk/id/1",
+                headers=ADMIN,
+                files={"name": (None, "renamed"), "due": (None, "2026-11-01")},
+                follow_redirects=False,
+            )
+            assert res.status_code == 303, res.text
+            res = await client.post(
+                base + "/create",
+                headers=ADMIN,
+                files={"name": (None, "bad"), "due": (None, "not a date")},
+            )
+            assert res.status_code == 422
+            assert res.json()["details"][0]["loc"] == ["due"]
+        async with db.session_scope() as session:
+            upload = (await session.execute(select(Upload))).scalar_one()
+        assert (upload.name, upload.attachment, upload.due) == (
+            "renamed",
+            "hello",
+            datetime.date(2026, 11, 1),
+        )
+    finally:
         await db.disconnect()

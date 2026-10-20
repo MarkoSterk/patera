@@ -436,6 +436,18 @@ TRANSLATIONS_MAP: dict[str, dict[str, str]] = {
         "sl": "Nekaj je šlo narobe.",
         "es": "Algo salió mal.",
     },
+    "file_kept_hint": {
+        "en": "A file is stored. Choose a new file to replace it.",
+        "de": "Eine Datei ist gespeichert. Wählen Sie eine neue Datei, um sie zu ersetzen.",
+        "sl": "Datoteka je shranjena. Izberite novo datoteko, da jo zamenjate.",
+        "es": "Hay un archivo guardado. Elija uno nuevo para reemplazarlo.",
+    },
+    "file_too_large": {
+        "en": "the file is larger than allowed.",
+        "de": "die Datei ist größer als erlaubt.",
+        "sl": "datoteka je večja od dovoljene.",
+        "es": "el archivo es más grande de lo permitido.",
+    },
     "something_went_wrong_no_period": {
         "en": "Something went wrong",
         "de": "Etwas ist schiefgelaufen",

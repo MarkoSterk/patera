@@ -88,7 +88,11 @@ class DeclarativeBaseModel(DeclarativeBase):
             setattr(self, key, value)
 
     async def admin_delete(self) -> None:
-        pass
+        """
+        Called by Patera Admin before the record is deleted. Raise
+        ``patera.admin.form_values.AdminFormError`` to refuse; Admin answers
+        422 and shows the first error's message.
+        """
 
     async def admin_update(
         self,

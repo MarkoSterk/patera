@@ -1,2 +1,2 @@
-patera[dev,admin,auth,database]>=0.121.1
+patera[dev,admin,auth,database,migrate]>=0.121.1
 qrcode>=8.2,<9

@@ -19,7 +19,7 @@ from typing import (
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import wraps
-from sqlalchemy import MetaData, Table, select, func
+from sqlalchemy import MetaData, Table, event, select, func
 from sqlalchemy.inspection import inspect
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import (
@@ -88,6 +88,24 @@ class SqlDatabaseConfig(BaseModel):
     AUTOFLUSH: bool = Field(
         False, description="Wether session should autoflush or not. Defaults to False."
     )
+    SQLITE_FOREIGN_KEYS: bool = Field(
+        False,
+        description=(
+            "SQLite only: run PRAGMA foreign_keys=ON on every new connection, so "
+            "FOREIGN KEY constraints (ON DELETE CASCADE, RESTRICT, ...) are "
+            "enforced. SQLite leaves them off by default. Ignored for other "
+            "databases, which always enforce them."
+        ),
+    )
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:
+    """Connection hook: SQLite enforces foreign keys per connection, when asked."""
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
 _DIALECT_EXTRAS: Dict[str, Callable] = {
@@ -146,6 +164,13 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
                 pool_pre_ping=True,
                 pool_recycle=1800,
             )
+            if (
+                self.configs.SQLITE_FOREIGN_KEYS
+                and self._engine.dialect.name == "sqlite"
+            ):
+                event.listen(
+                    self._engine.sync_engine, "connect", _enable_sqlite_foreign_keys
+                )
         self.app.logger.info(f"Connecting to database {self.__class__.__name__}")
         self._session_factory = async_sessionmaker(
             bind=self._engine,
