@@ -1,0 +1,13 @@
+[project]
+name = "quick-exams"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "patera[dev]",
+    "qrcode>=8.2",
+]
+
+[tool.uv.sources]
+patera = { workspace = true }
