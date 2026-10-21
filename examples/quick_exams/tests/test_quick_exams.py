@@ -15,9 +15,10 @@ def window(hours_from: float = -1, hours_until: float = 1) -> dict:
     }
 
 
-def question_body(category_id: str, **changes) -> dict:
+def question_body(category: dict, **changes) -> dict:
     return {
-        "category_id": category_id,
+        "subject_id": category["subject_id"],
+        "category_id": category["id"],
         "question_text": "2 + 2?",
         "answers": ["3", "4", "5", "6"],
         "correct_answer": 1,
@@ -46,11 +47,19 @@ class Api:
         return response.json() if response.content else None
 
 
+async def subject(api, name="Mathematics") -> dict:
+    return await api("POST", "/api/subjects/", 201, json={"name": name})
+
+
 async def bank(api) -> tuple[dict, dict]:
-    category = await api("POST", "/api/categories/", 201, json={"name": "Arithmetic"})
-    question = await api(
-        "POST", "/api/questions/", 201, json=question_body(category["id"])
+    maths = await subject(api)
+    category = await api(
+        "POST",
+        "/api/categories/",
+        201,
+        json={"subject_id": maths["id"], "name": "Arithmetic"},
     )
+    question = await api("POST", "/api/questions/", 201, json=question_body(category))
     return category, question
 
 
@@ -229,6 +238,7 @@ async def test_exam_workflow_and_privacy(exams_app):
             "/api/exams/",
             201,
             json={
+                "subject_id": question["subject_id"],
                 "title": "Quiz",
                 **window(),
                 "random": {"category_ids": [category["id"]], "count": 1},
@@ -244,7 +254,7 @@ async def test_exam_workflow_and_privacy(exams_app):
         assert await other("GET", "/api/exams/") == []
         await other("DELETE", f"/api/exams/{exam['id']}", 404)
         await other("GET", f"/api/exams/{exam['id']}/qr", 404)
-        await other("POST", "/api/questions/", 400, json=question_body(category["id"]))
+        await other("POST", "/api/questions/", 400, json=question_body(category))
 
         response = await client.post(
             "/api/attempts/",
@@ -302,13 +312,14 @@ async def test_validation_window_and_snapshot(exams_app, db):
                 "POST",
                 "/api/questions/",
                 422,
-                json=question_body(category["id"], **invalid),
+                json=question_body(category, **invalid),
             )
         await teacher(
             "POST",
             "/api/exams/",
             400,
             json={
+                "subject_id": question["subject_id"],
                 "title": "Too many",
                 **window(),
                 "random": {"category_ids": [category["id"]], "count": 2},
@@ -319,17 +330,28 @@ async def test_validation_window_and_snapshot(exams_app, db):
             "/api/exams/",
             422,
             json={
+                "subject_id": question["subject_id"],
                 "title": "Backwards",
                 **window(1, -1),
                 "question_ids": [question["id"]],
             },
         )
-        await teacher("POST", "/api/exams/", 422, json={"title": "Empty", **window()})
+        await teacher(
+            "POST",
+            "/api/exams/",
+            422,
+            json={"subject_id": question["subject_id"], "title": "Empty", **window()},
+        )
         exam = await teacher(
             "POST",
             "/api/exams/",
             201,
-            json={"title": "Test", **window(), "question_ids": [question["id"]]},
+            json={
+                "subject_id": question["subject_id"],
+                "title": "Test",
+                **window(),
+                "question_ids": [question["id"]],
+            },
         )
 
         attempt = (
@@ -340,9 +362,7 @@ async def test_validation_window_and_snapshot(exams_app, db):
         await teacher(
             "PUT",
             f"/api/questions/{question['id']}",
-            json=question_body(
-                category["id"], question_text="Changed", correct_answer=0
-            ),
+            json=question_body(category, question_text="Changed", correct_answer=0),
         )
         result = await client.post(
             f"/api/attempts/{attempt['id']}/submit",
@@ -357,6 +377,7 @@ async def test_validation_window_and_snapshot(exams_app, db):
             "/api/exams/",
             201,
             json={
+                "subject_id": question["subject_id"],
                 "title": "Closed",
                 **window(-2, -1),
                 "question_ids": [question["id"]],
@@ -388,8 +409,12 @@ async def test_validation_window_and_snapshot(exams_app, db):
 async def test_weighted_grades_and_admin_safeguards(exams_app):
     async with PateraTestClient(exams_app) as client:
         teacher = Api(client, await login(client))
+        weighted = await subject(teacher, "Weighting")
         category = await teacher(
-            "POST", "/api/categories/", 201, json={"name": "Weighted"}
+            "POST",
+            "/api/categories/",
+            201,
+            json={"subject_id": weighted["id"], "name": "Weighted"},
         )
         questions = [
             await teacher(
@@ -397,7 +422,7 @@ async def test_weighted_grades_and_admin_safeguards(exams_app):
                 "/api/questions/",
                 201,
                 json=question_body(
-                    category["id"],
+                    category,
                     question_text=str(points),
                     correct_answer=0,
                     points=points,
@@ -410,6 +435,7 @@ async def test_weighted_grades_and_admin_safeguards(exams_app):
             "/api/exams/",
             201,
             json={
+                "subject_id": category["subject_id"],
                 "title": "Weighted",
                 **window(),
                 "question_ids": [q["id"] for q in questions],
@@ -510,6 +536,7 @@ async def test_admin_crud_obeys_domain_rules(exams_app, db):
         base = "/admin/en/databases/exams/model/"
         for model in (
             "User",
+            "Subject",
             "Category",
             "Question",
             "Exam",
@@ -527,14 +554,42 @@ async def test_admin_crud_obeys_domain_rules(exams_app, db):
             "SELECT id FROM users WHERE email='other@example.com'"
         ).fetchone()["id"]
         response = await form(
-            "POST", base + "Category/create", {"owner_id": owner, "name": " Planets "}
+            "POST",
+            base + "Subject/create",
+            {"owner_id": owner, "name": " Astronomy ", "description": "Sky"},
+        )
+        assert response.status_code == 303, response.text
+        subject = db.execute("SELECT id, name, description FROM subjects").fetchone()
+        assert (subject["name"], subject["description"]) == ("Astronomy", "Sky")
+        assert (
+            await form(
+                "POST",
+                base + "Subject/create",
+                {"owner_id": owner, "name": "Astronomy"},
+            )
+        ).status_code == 422
+        assert (
+            await form(
+                "POST",
+                base + "Category/create",
+                {"owner_id": other, "subject_id": subject["id"], "name": "Stars"},
+            )
+        ).status_code == 422
+        response = await form(
+            "POST",
+            base + "Category/create",
+            {"owner_id": owner, "subject_id": subject["id"], "name": " Planets "},
         )
         assert response.status_code == 303, response.text
         category = db.execute("SELECT id, name FROM categories").fetchone()
         assert category["name"] == "Planets"
+        response = await client.delete(base + "Subject/pk/id/" + subject["id"])
+        assert response.status_code == 422
+        assert "categories and exams first" in response.json()["message"]
 
         question = {
             "owner_id": owner,
+            "subject_id": subject["id"],
             "category_id": category["id"],
             "question_text": "Red planet?",
             "answer_1": "Mars",
@@ -565,6 +620,7 @@ async def test_admin_crud_obeys_domain_rules(exams_app, db):
 
         exam = {
             "owner_id": owner,
+            "subject_id": subject["id"],
             "title": "Planets",
             "pass_percentage": "50",
             **window(),
@@ -580,6 +636,26 @@ async def test_admin_crud_obeys_domain_rules(exams_app, db):
             {"exam_id": exam_id, "question_id": question_id, "position": "0"},
         )
         assert response.status_code == 303, response.text
+        stored = db.execute("SELECT subject_id FROM exam_questions").fetchone()
+        assert stored["subject_id"] == subject["id"]
+
+        await form("POST", base + "Subject/create", {"owner_id": owner, "name": "Sea"})
+        sea = db.execute("SELECT id FROM subjects WHERE name='Sea'").fetchone()["id"]
+        response = await form(
+            "PUT", base + "Exam/pk/id/" + exam_id, {**exam, "subject_id": sea}
+        )
+        assert response.status_code == 422
+        await form(
+            "POST", base + "Exam/create", {**exam, "subject_id": sea, "title": "Sea"}
+        )
+        sea_exam = db.execute("SELECT id FROM exams WHERE title='Sea'").fetchone()
+        response = await form(
+            "POST",
+            base + "ExamQuestion/create",
+            {"exam_id": sea_exam["id"], "question_id": question_id, "position": "0"},
+        )
+        assert response.status_code == 422
+        assert "exam's subject" in response.json()["details"][0]["msg"]
 
         attempt = (
             await client.post(
@@ -714,7 +790,12 @@ async def test_deleting_an_exam_cascades_to_its_question_selection(exams_app, db
             "POST",
             "/api/exams/",
             201,
-            json={"title": "Quiz", **window(), "question_ids": [question["id"]]},
+            json={
+                "subject_id": question["subject_id"],
+                "title": "Quiz",
+                **window(),
+                "question_ids": [question["id"]],
+            },
         )
         await teacher("DELETE", f"/api/exams/{exam['id']}", 204)
     assert db.execute("SELECT COUNT(*) FROM exam_questions").fetchone()[0] == 0
@@ -748,16 +829,29 @@ async def test_admin_question_image_upload_and_exam_dates(exams_app, db):
         page = await client.get(base + "Question")
         assert 'type="file"' in page.text and 'id="update-field-image"' in page.text
         assert 'name="remove_image"' in page.text
+        assert page.text.count("<latex-input data-field-name=") == 10
+        assert (
+            '<textarea name="question_text" id="create-field-question_text"'
+            in page.text
+        )
+        assert '<input name="answer_1" id="update-field-answer_1"' in page.text
 
         owner = db.execute(
             "SELECT id FROM users WHERE email='teacher@example.com'"
         ).fetchone()[0]
-        await form("POST", base + "Category/create", {"owner_id": owner, "name": "Art"})
+        await form("POST", base + "Subject/create", {"owner_id": owner, "name": "Art"})
+        subject = db.execute("SELECT id FROM subjects").fetchone()[0]
+        await form(
+            "POST",
+            base + "Category/create",
+            {"owner_id": owner, "subject_id": subject, "name": "Colour"},
+        )
         category = db.execute("SELECT id FROM categories").fetchone()[0]
         question = {
             "owner_id": owner,
+            "subject_id": subject,
             "category_id": category,
-            "question_text": "Which colour?",
+            "question_text": "Which colour is $\\mathrm{rgb}(255, 0, 0)$?",
             "answer_1": "Red",
             "answer_2": "Green",
             "answer_3": "Blue",
@@ -795,6 +889,7 @@ async def test_admin_question_image_upload_and_exam_dates(exams_app, db):
         assert 'type="datetime-local"' in page.text and 'data-utc="true"' in page.text
         exam = {
             "owner_id": owner,
+            "subject_id": subject,
             "title": "Colours",
             "pass_percentage": "50",
             "available_from": "2026-10-20T08:00:00.000Z",
@@ -803,3 +898,148 @@ async def test_admin_question_image_upload_and_exam_dates(exams_app, db):
         assert (await form("POST", base + "Exam/create", exam)).status_code == 303
         row = db.execute("SELECT available_from, available_until FROM exams").fetchone()
         assert tuple(row) == ("2026-10-20T08:00:00+00:00", "2026-10-20T10:30:00+00:00")
+
+
+async def test_math_rendering_assets_are_served(exams_app):
+    async with PateraTestClient(exams_app) as client:
+        page = (await client.get("/")).text
+        for asset in (
+            "/static/vendor/temml/temml.min.js",
+            "/static/vendor/temml/Temml-Local.css",
+            "/static/math_text.js",
+            "/static/math_text.css",
+        ):
+            assert asset in page
+            assert (await client.get(asset)).status_code == 200
+        assert (await client.get("/static/vendor/temml/Temml.woff2")).status_code == 200
+
+
+async def test_subjects_hold_categories_questions_and_exams(exams_app, db):
+    async with PateraTestClient(exams_app) as client:
+        teacher = Api(client, await login(client))
+        other = Api(client, await login(client, "other@example.com"))
+        client.client.cookies.clear()
+
+        maths = await teacher(
+            "POST",
+            "/api/subjects/",
+            201,
+            json={"name": " Mathematics ", "description": "Year 1"},
+        )
+        assert maths == {**maths, "name": "Mathematics", "description": "Year 1"}
+        physics = await subject(teacher, "Physics")
+        await teacher("POST", "/api/subjects/", 409, json={"name": "Physics"})
+        await teacher("POST", "/api/subjects/", 422, json={"name": " "})
+        assert [s["name"] for s in await teacher("GET", "/api/subjects/")] == [
+            "Mathematics",
+            "Physics",
+        ]
+        assert await other("GET", "/api/subjects/") == []
+        await subject(other, "Physics")
+
+        # A category needs one of the instructor's own subjects.
+        await teacher("POST", "/api/categories/", 422, json={"name": "Algebra"})
+        await other(
+            "POST",
+            "/api/categories/",
+            400,
+            json={"subject_id": maths["id"], "name": "Algebra"},
+        )
+        algebra = await teacher(
+            "POST",
+            "/api/categories/",
+            201,
+            json={"subject_id": maths["id"], "name": "Algebra"},
+        )
+        mechanics = await teacher(
+            "POST",
+            "/api/categories/",
+            201,
+            json={"subject_id": physics["id"], "name": "Mechanics"},
+        )
+
+        # A question's category must belong to the question's subject.
+        response = await client.post(
+            "/api/questions/",
+            headers=teacher.headers,
+            json={**question_body(algebra), "subject_id": physics["id"]},
+        )
+        assert response.status_code == 400
+        assert "category of the selected subject" in response.json()["message"]
+        question = await teacher(
+            "POST", "/api/questions/", 201, json=question_body(algebra)
+        )
+        assert (question["subject_id"], question["category_id"]) == (
+            maths["id"],
+            algebra["id"],
+        )
+        moved = await teacher(
+            "POST", "/api/questions/", 201, json=question_body(mechanics)
+        )
+
+        # An exam selects questions and random categories of its own subject.
+        exam = {"subject_id": physics["id"], "title": "Forces", **window()}
+        await teacher(
+            "POST", "/api/exams/", 400, json={**exam, "question_ids": [question["id"]]}
+        )
+        await teacher(
+            "POST",
+            "/api/exams/",
+            400,
+            json={**exam, "random": {"category_ids": [algebra["id"]], "count": 1}},
+        )
+        created = await teacher(
+            "POST",
+            "/api/exams/",
+            201,
+            json={**exam, "random": {"category_ids": [mechanics["id"]], "count": 1}},
+        )
+        assert created["subject_id"] == physics["id"]
+        assert created["question_ids"] == [moved["id"]]
+
+        # Moving an exam to another subject replaces its selection.
+        updated = await teacher(
+            "PUT",
+            f"/api/exams/{created['id']}",
+            json={**exam, "subject_id": maths["id"], "question_ids": [question["id"]]},
+        )
+        assert updated["subject_id"] == maths["id"]
+        assert updated["question_ids"] == [question["id"]]
+        rows = db.execute("SELECT subject_id FROM exam_questions").fetchall()
+        assert [row["subject_id"] for row in rows] == [maths["id"]]
+
+        # Content used elsewhere cannot move subjects or disappear.
+        await teacher(
+            "PUT",
+            f"/api/questions/{question['id']}",
+            409,
+            json={**question_body(mechanics)},
+        )
+        await teacher(
+            "PUT",
+            f"/api/categories/{algebra['id']}",
+            409,
+            json={"subject_id": physics["id"], "name": "Algebra"},
+        )
+        await teacher("DELETE", f"/api/subjects/{maths['id']}", 409)
+        await other("DELETE", f"/api/subjects/{physics['id']}", 404)
+
+        # Without its exam, the question moves; an empty subject is deleted.
+        await teacher("DELETE", f"/api/exams/{created['id']}", 204)
+        relocated = await teacher(
+            "PUT", f"/api/questions/{question['id']}", json=question_body(mechanics)
+        )
+        assert relocated["subject_id"] == physics["id"]
+        await teacher(
+            "PUT",
+            f"/api/categories/{algebra['id']}",
+            json={"subject_id": physics["id"], "name": "Algebra"},
+        )
+        renamed = await teacher(
+            "PUT",
+            f"/api/subjects/{maths['id']}",
+            json={"name": "Maths", "description": ""},
+        )
+        assert renamed["name"] == "Maths"
+        await teacher("DELETE", f"/api/subjects/{maths['id']}", 204)
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []

@@ -1,0 +1,16 @@
+.latex-input-preview {
+  min-height: 2.5em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.latex-input-preview math[display="block"] {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.latex-error {
+  color: #b22222;
+  text-decoration: underline wavy;
+}

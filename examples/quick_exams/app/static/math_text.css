@@ -1,0 +1,30 @@
+.math-text,
+.math-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.math-text math[display="block"],
+.math-preview math[display="block"] {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.math-preview {
+  min-height: 2.5em;
+  margin: -0.25rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed currentColor;
+  border-radius: 0.5rem;
+  opacity: 0.85;
+}
+
+.math-preview:empty {
+  display: none;
+}
+
+.math-error {
+  color: #b22222;
+  text-decoration: underline wavy;
+}

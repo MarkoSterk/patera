@@ -3,6 +3,7 @@ from .base import Base
 from .category import Category
 from .exam import Exam, ExamQuestion
 from .question import Question
+from .subject import Subject
 from .user import ADMIN, INSTRUCTOR, User
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "Exam",
     "ExamQuestion",
     "Question",
+    "Subject",
     "User",
 ]

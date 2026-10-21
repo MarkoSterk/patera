@@ -84,6 +84,7 @@ Name = Annotated[str, _text(100)]
 Title = Annotated[str, _text(200)]
 Answer = Annotated[str, _text(2000)]
 QuestionText = Annotated[str, _text(5000)]
+Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
 class Input(BaseModel):

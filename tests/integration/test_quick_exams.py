@@ -108,9 +108,10 @@ def window(hours_from: float = -1, hours_until: float = 1) -> dict:
     }
 
 
-def question_body(category_id: str, **changes) -> dict:
+def question_body(category: dict, **changes) -> dict:
     return {
-        "category_id": category_id,
+        "subject_id": category["subject_id"],
+        "category_id": category["id"],
         "question_text": "2 + 2?",
         "answers": ["3", "4", "5", "6"],
         "correct_answer": 1,
@@ -205,13 +206,16 @@ async def test_transactional_writes_and_listings(exams_app, db):
         other = await login(client, "other@example.com")
         client.client.cookies.clear()
 
+        subject = await call(
+            client, teacher, "POST", "/api/subjects/", 201, json={"name": "Maths"}
+        )
         category = await call(
             client,
             teacher,
             "POST",
             "/api/categories/",
             201,
-            json={"name": "Arithmetic"},
+            json={"subject_id": subject["id"], "name": "Arithmetic"},
         )
         question = await call(
             client,
@@ -219,10 +223,11 @@ async def test_transactional_writes_and_listings(exams_app, db):
             "POST",
             "/api/questions/",
             201,
-            json=question_body(category["id"]),
+            json=question_body(category),
         )
 
         # Records loaded in a request that ends with the defensive rollback.
+        assert await call(client, teacher, "GET", "/api/subjects/") == [subject]
         assert await call(client, teacher, "GET", "/api/categories/") == [category]
         assert await call(client, teacher, "GET", "/api/questions/") == [question]
 
@@ -234,6 +239,7 @@ async def test_transactional_writes_and_listings(exams_app, db):
             "/api/exams/",
             400,
             json={
+                "subject_id": subject["id"],
                 "title": "Too many",
                 **window(),
                 "random": {"category_ids": [category["id"]], "count": 5},
@@ -246,7 +252,7 @@ async def test_transactional_writes_and_listings(exams_app, db):
             "POST",
             "/api/questions/",
             422,
-            json=question_body(category["id"], correct_answer=4),
+            json=question_body(category, correct_answer=4),
         )
 
         exam = await call(
@@ -255,7 +261,12 @@ async def test_transactional_writes_and_listings(exams_app, db):
             "POST",
             "/api/exams/",
             201,
-            json={"title": "Quiz", **window(), "question_ids": [question["id"]]},
+            json={
+                "subject_id": subject["id"],
+                "title": "Quiz",
+                **window(),
+                "question_ids": [question["id"]],
+            },
         )
         assert await call(client, teacher, "GET", "/api/exams/") == [exam]
         assert (
@@ -267,6 +278,7 @@ async def test_transactional_writes_and_listings(exams_app, db):
         assert await call(client, other, "GET", "/api/exams/") == []
         await call(client, other, "DELETE", f"/api/exams/{exam['id']}", 404)
         await call(client, teacher, "DELETE", f"/api/categories/{category['id']}", 409)
+        await call(client, teacher, "DELETE", f"/api/subjects/{subject['id']}", 409)
 
         # Cross-site writes and other content types are refused.
         res = await client.post(
@@ -287,8 +299,16 @@ async def test_student_attempts_keep_an_independent_archive(exams_app, db):
     async with PateraTestClient(exams_app) as client:
         teacher = await login(client)
         client.client.cookies.clear()
+        subject = await call(
+            client, teacher, "POST", "/api/subjects/", 201, json={"name": "Maths"}
+        )
         category = await call(
-            client, teacher, "POST", "/api/categories/", 201, json={"name": "Math"}
+            client,
+            teacher,
+            "POST",
+            "/api/categories/",
+            201,
+            json={"subject_id": subject["id"], "name": "Math"},
         )
         question = await call(
             client,
@@ -296,7 +316,7 @@ async def test_student_attempts_keep_an_independent_archive(exams_app, db):
             "POST",
             "/api/questions/",
             201,
-            json=question_body(category["id"]),
+            json=question_body(category),
         )
         exam = await call(
             client,
@@ -305,6 +325,7 @@ async def test_student_attempts_keep_an_independent_archive(exams_app, db):
             "/api/exams/",
             201,
             json={
+                "subject_id": subject["id"],
                 "title": "Quiz",
                 **window(),
                 "random": {"category_ids": [category["id"]], "count": 1},
@@ -327,9 +348,7 @@ async def test_student_attempts_keep_an_independent_archive(exams_app, db):
             teacher,
             "PUT",
             f"/api/questions/{question['id']}",
-            json=question_body(
-                category["id"], question_text="Changed", correct_answer=0
-            ),
+            json=question_body(category, question_text="Changed", correct_answer=0),
         )
         submit = f"/api/attempts/{attempt['id']}/submit"
         result = (
@@ -375,6 +394,7 @@ async def test_admin_uses_the_application_authentication(exams_app, db):
         base = "/admin/en/databases/exams/model/"
         for model in (
             "User",
+            "Subject",
             "Category",
             "Question",
             "Exam",
@@ -392,9 +412,15 @@ async def test_admin_uses_the_application_authentication(exams_app, db):
         ).fetchone()[0]
         assert (
             await form(
+                "POST", base + "Subject/create", {"owner_id": owner, "name": "Sky"}
+            )
+        ).status_code == 303
+        subject = db.execute("SELECT id FROM subjects").fetchone()[0]
+        assert (
+            await form(
                 "POST",
                 base + "Category/create",
-                {"owner_id": owner, "name": " Planets "},
+                {"owner_id": owner, "subject_id": subject, "name": " Planets "},
             )
         ).status_code == 303
         category = db.execute("SELECT id, name FROM categories").fetchone()
@@ -403,6 +429,7 @@ async def test_admin_uses_the_application_authentication(exams_app, db):
         # Model hooks apply the application's rules to Admin forms.
         question = {
             "owner_id": other,
+            "subject_id": subject,
             "category_id": category["id"],
             "question_text": "Red planet?",
             "answer_1": "Mars",
@@ -455,7 +482,7 @@ def test_cli_session_and_migrations(exams_app, create_user, db):
     tables = {
         r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
-    assert {"users", "questions", "attempts", "pyway_migrations"} <= tables
+    assert {"users", "subjects", "questions", "attempts", "pyway_migrations"} <= tables
     assert "sessions" not in tables  # removed by V1_1
 
     create_user("admin@example.com", "admin")

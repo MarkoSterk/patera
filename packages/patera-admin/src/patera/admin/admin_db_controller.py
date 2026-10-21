@@ -36,6 +36,7 @@ from patera.auth import role_required
 
 from .admin_interface import AdminInterface, Permissions
 from .form_values import AdminFormError, form_values, primary_key_values
+from .pagination import page_items
 from .exceptions import (
     AdminUnknownModelException,
     AdminUnknownDatabaseException,
@@ -146,9 +147,13 @@ class _AdminDbController(Controller[Patera]):
                     "create_fields": create_fields,
                     "update_fields": update_fields,
                     "view_fields": view_fields,
-                    "pagination_pages": self.get_pagination_pages(
-                        records.page,
-                        records.pages,
+                    "pagination_pages": page_items(records.page, records.pages),
+                    "records_page_url": lambda number: self.admin_interface.url_for(
+                        "_AdminDbController.get_list",
+                        db_name=db_name,
+                        model_name=model_name,
+                        page=number,
+                        per_page=records.per_page,
                     ),
                     "get_record_value": self.get_record_value,
                     "get_record_primary_key_value": self.get_record_primary_key_value,
@@ -563,26 +568,6 @@ class _AdminDbController(Controller[Patera]):
             raise AdminRecordNotFound("", "")
 
         return {parts[i]: parts[i + 1] for i in range(0, len(parts), 2)}
-
-    def get_pagination_pages(
-        self,
-        current_page: int,
-        total_pages: int,
-        window: int = 2,
-    ) -> list[int]:
-        """
-        Returns a small page window around the current page.
-
-        Example:
-            current_page=5, total_pages=10 -> [3, 4, 5, 6, 7]
-        """
-        if total_pages <= 0:
-            return []
-
-        start = max(current_page - window, 1)
-        end = min(current_page + window, total_pages)
-
-        return list(range(start, end + 1))
 
     def get_db(self, db_name: str) -> SqlDatabase:
         """

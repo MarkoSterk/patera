@@ -31,16 +31,24 @@ class ExamQuestions(Repository[ExamQuestion]):
             selected[row.exam_id].append(row.question_id)
         return selected
 
-    async def replace(self, exam_id: str, question_ids: list[str]) -> None:
+    async def clear(self, exam_id: str) -> None:
         await self.session.execute(
             delete(ExamQuestion).where(ExamQuestion.exam_id == exam_id)
         )
         await self.flush()
+
+    async def add_selection(
+        self, exam_id: str, subject_id: str, question_ids: list[str]
+    ) -> None:
         self.add_all(
             [
                 ExamQuestion(
-                    exam_id=exam_id, question_id=question_id, position=position
+                    exam_id=exam_id,
+                    subject_id=subject_id,
+                    question_id=question_id,
+                    position=position,
                 )
                 for position, question_id in enumerate(question_ids)
             ]
         )
+        await self.flush()

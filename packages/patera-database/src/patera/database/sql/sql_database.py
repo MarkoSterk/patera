@@ -97,15 +97,43 @@ class SqlDatabaseConfig(BaseModel):
             "databases, which always enforce them."
         ),
     )
+    SQLITE_BUSY_TIMEOUT: Optional[float] = Field(
+        None,
+        ge=0,
+        description=(
+            "SQLite only: seconds a connection waits for another connection's "
+            "lock before failing with 'database is locked' (PRAGMA "
+            "busy_timeout on every new connection). None keeps the driver's "
+            "default of 5 seconds or a ?timeout= in DATABASE_URI; a value "
+            "here takes precedence over both. Ignored for other databases."
+        ),
+    )
 
 
-def _enable_sqlite_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:
-    """Connection hook: SQLite enforces foreign keys per connection, when asked."""
-    cursor = dbapi_connection.cursor()
-    try:
-        cursor.execute("PRAGMA foreign_keys=ON")
-    finally:
-        cursor.close()
+def _sqlite_connection_hook(
+    foreign_keys: bool, busy_timeout: Optional[float]
+) -> Optional[Callable[[Any, Any], None]]:
+    """
+    A hook that applies the SQLite settings to every new connection, or
+    None when none are set. SQLite keeps both settings per connection.
+    """
+    pragmas: list[str] = []
+    if foreign_keys:
+        pragmas.append("PRAGMA foreign_keys=ON")
+    if busy_timeout is not None:
+        pragmas.append(f"PRAGMA busy_timeout={round(busy_timeout * 1000)}")
+    if not pragmas:
+        return None
+
+    def configure(dbapi_connection: Any, _connection_record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            for pragma in pragmas:
+                cursor.execute(pragma)
+        finally:
+            cursor.close()
+
+    return configure
 
 
 _DIALECT_EXTRAS: Dict[str, Callable] = {
@@ -164,13 +192,12 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
                 pool_pre_ping=True,
                 pool_recycle=1800,
             )
-            if (
-                self.configs.SQLITE_FOREIGN_KEYS
-                and self._engine.dialect.name == "sqlite"
-            ):
-                event.listen(
-                    self._engine.sync_engine, "connect", _enable_sqlite_foreign_keys
+            if self._engine.dialect.name == "sqlite":
+                hook = _sqlite_connection_hook(
+                    self.configs.SQLITE_FOREIGN_KEYS, self.configs.SQLITE_BUSY_TIMEOUT
                 )
+                if hook is not None:
+                    event.listen(self._engine.sync_engine, "connect", hook)
         self.app.logger.info(f"Connecting to database {self.__class__.__name__}")
         self._session_factory = async_sessionmaker(
             bind=self._engine,

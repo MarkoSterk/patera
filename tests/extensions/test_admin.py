@@ -9,7 +9,7 @@ import pytest
 from patera import Request, UploadedFile
 from patera.admin import AdminInterface
 from patera.admin.admin_interface import AdminConfig, Permissions
-from patera.admin.custom_elements import DateInput, FileInput
+from patera.admin.custom_elements import DateInput, FileInput, LatexInput
 from patera.admin.form_values import AdminFormError
 from patera.auth import Authentication
 from patera.middleware import middleware
@@ -911,6 +911,45 @@ def test_file_and_date_inputs_render_as_inputs():
         DateInput(name="day", utc=True)
 
 
+def test_latex_input_renders_a_form_control_and_preview():
+    element = LatexInput(name="body", maxlength=50)
+    html = str(
+        element.render(
+            {"name": "body", "label": "Body", "required": True, "form": "update"}
+        )
+    )
+    assert html.startswith('<latex-input data-field-name="body">')
+    # The inner control carries the form attributes; the wrapper does not.
+    assert (
+        '<textarea name="body" id="update-field-body" required aria-label="Body"'
+        ' class="form-control" maxlength="50" rows="4">\n</textarea>'
+    ) in html
+    assert "data-preview" in html and 'aria-live="polite"' in html
+    assert element.converts_value
+
+    single = str(
+        LatexInput(name="line", multiline=False, value='a<"b').render({"name": "line"})
+    )
+    assert '<input name="line" id="create-field-line"' in single
+    assert 'type="text" value="a&lt;&quot;b"' in single and "<textarea" not in single
+    assert str(LatexInput(name="t", value="<b>").render(None)).count("&lt;b&gt;") == 1
+
+
+async def test_latex_input_assets_are_served_by_admin(make_app, client_for):
+    app = make_app(extensions=[Admin], middleware=[HeaderAuth], ADMIN=ADMIN_CONFIG)
+    async with client_for(app) as client:
+        for path in (
+            "js/inputs/latexInput.js",
+            "js/inputs/latex.js",
+            "js/inputs/latexInput.css",
+            "js/vendors/temml/temml.min.js",
+            "js/vendors/temml/Temml-Local.css",
+            "js/vendors/temml/Temml.woff2",
+        ):
+            res = await client.get("/admin/en/_static/" + path)
+            assert res.status_code == 200, path
+
+
 async def test_file_and_date_inputs_through_admin_forms(make_app, client_for, tmp_path):
     app = make_app(
         extensions=[UploadDatabases, Jobs, UploadsAdmin],
@@ -971,3 +1010,154 @@ async def test_file_and_date_inputs_through_admin_forms(make_app, client_for, tm
         )
     finally:
         await db.disconnect()
+
+
+# ----- Request statistics ----------------------------------------------------------
+
+from patera import RequestRecord  # noqa: E402
+from patera.admin.request_stats import RequestStats, percentile  # noqa: E402
+
+
+def _record(at, status=200, route="/items/<id>", method="GET", ms=10.0):
+    return RequestRecord(
+        method=method,
+        path="/x",
+        route=route,
+        status_code=status,
+        started_at=at,
+        duration=ms / 1000,
+    )
+
+
+def test_request_stats_counts_classes_routes_and_errors():
+    now = 1_800_000_000.0
+    stats = RequestStats(started_at=now - 7200)
+    for second in range(30):
+        stats.observe(_record(now - 60 + second, ms=20))
+    stats.observe(_record(now - 30, status=404, route=None, ms=1))
+    stats.observe(_record(now - 20, status=500, route="/boom", method="POST", ms=900))
+    stats.observe(_record(now - 10, status=302))
+    stats.observe(_record(now - 5, status=None))  # the client left: not counted
+    stats.observe(_record(now - 4000))  # older than one hour
+
+    summary = stats.summary("1h", now=now)
+    totals = summary["totals"]
+    assert (totals["requests"], totals["2xx"], totals["3xx"]) == (33, 30, 1)
+    assert (totals["4xx"], totals["5xx"]) == (1, 1)
+    assert totals["p95_ms"] is not None and 10 < totals["p95_ms"] <= 1000
+    assert summary["uptime"] == 7200 and summary["step"] == 60
+    assert len(summary["series"]) == 60
+    assert sum(point["requests"] for point in summary["series"]) == 33
+
+    assert summary["routes"][0] == {
+        "method": "GET",
+        "route": "/items/<id>",
+        "requests": 31,
+        "4xx": 0,
+        "5xx": 0,
+        "average_ms": pytest.approx((30 * 20 + 10) / 31),
+    }
+    assert [e["status"] for e in summary["errors"]] == [404, 500]
+    assert summary["errors"][0]["routes"] == [{"route": "(no route)", "requests": 1}]
+
+    # The 24-hour view still sees the older request.
+    assert stats.summary("24h", now=now)["totals"]["requests"] == 34
+
+
+def test_request_stats_drop_buckets_older_than_a_day():
+    stats = RequestStats(started_at=0)
+    stats.observe(_record(1000.0))
+    stats.observe(_record(1000.0 + 2 * 86400))
+    assert len(stats._buckets) == 1 and len(stats._route_buckets) == 1
+
+
+def test_percentile_interpolates_within_a_bin():
+    histogram = [0] * 14
+    histogram[3] = 10  # ten requests between 5 and 10 ms
+    assert percentile(histogram, 0.5) == pytest.approx(7.5)
+    assert percentile([0] * 14, 0.95) is None
+
+
+async def test_dashboard_request_statistics(app, client_for):
+    admin = {"x-user": "admin"}
+    async with client_for(app) as client:
+        await client.get("/nowhere")
+        page = await client.get("/admin/en/dashboard", headers=admin)
+        assert page.status_code == 200
+        assert 'id="request-stats"' in page.text
+        assert "js/dashboard/request_stats.js" in page.text
+        assert "Busiest endpoints" in page.text
+
+        res = await client.get("/admin/en/dashboard/stats?period=15m", headers=admin)
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert data["period"] == "15m" and len(data["series"]) == 90
+        assert data["totals"]["4xx"] >= 1
+        assert {
+            "status": 404,
+            "requests": 1,
+            "routes": [{"route": "(no route)", "requests": 1}],
+        } in data["errors"]
+        # The dashboard's own polling is not counted.
+        routes = {entry["route"] for entry in data["routes"]}
+        assert not any(route.endswith("/dashboard/stats") for route in routes)
+        assert any(route.endswith("/dashboard") for route in routes)
+
+        res = await client.get("/admin/en/dashboard/stats?period=2d", headers=admin)
+        assert res.status_code == 400
+        res = await client.get("/admin/en/dashboard/stats", follow_redirects=False)
+        assert res.status_code in (302, 303)
+        js = await client.get("/admin/en/_static/js/dashboard/request_stats.js")
+        assert js.status_code == 200
+
+
+async def test_request_statistics_can_be_disabled(make_app, client_for):
+    config = AdminConfig(
+        URL_FOR_FOR_LOGIN="OpenAPIController.docs",
+        URL_FOR_FOR_LOGOUT="OpenAPIController.docs",
+        REQUEST_STATISTICS=False,
+    )
+    app = make_app(extensions=[Jobs, Admin], middleware=[HeaderAuth], ADMIN=config)
+    assert app._request_observers == []
+    async with client_for(app) as client:
+        page = await client.get("/admin/en/dashboard", headers={"x-user": "admin"})
+        assert 'id="request-stats"' not in page.text
+        res = await client.get("/admin/en/dashboard/stats", headers={"x-user": "admin"})
+        assert res.status_code == 404
+
+
+# ----- Pagination -------------------------------------------------------------------
+
+from patera.admin.pagination import page_items  # noqa: E402
+
+
+def test_page_items_show_edges_and_a_window_with_ellipses():
+    assert page_items(10, 59) == [1, None, 8, 9, 10, 11, 12, None, 59]
+    assert page_items(1, 59) == [1, 2, 3, None, 59]
+    assert page_items(59, 59) == [1, None, 57, 58, 59]
+    # A gap of one page shows that page rather than an ellipsis.
+    assert page_items(5, 10) == [1, 2, 3, 4, 5, 6, 7, None, 10]
+    assert page_items(3, 7) == list(range(1, 8))
+    assert page_items(1, 1) == [1]
+    assert page_items(1, 0) == []
+    assert page_items(99, 5) == [1, 2, 3, 4, 5]
+
+
+async def test_dashboard_log_pagination_stays_compact(app, client_for):
+    for number in range(600):
+        app.logger.warning(f"pagination record {number}")
+    async with client_for(app) as client:
+        res = await client.get(
+            "/admin/en/dashboard?count=10&page=20&severity=WARNING",
+            headers={"x-user": "admin"},
+        )
+    assert res.status_code == 200
+    html = res.text
+    nav = html[html.index('aria-label="Log table pagination"') :]
+    nav = nav[: nav.index("</nav>")]
+    assert (
+        nav.count('class="page-link"') == 2 + 7 + 2
+    )  # prev, 7 pages, 2 ellipses, next
+    assert nav.count("…") == 2 and 'aria-current="page"' in nav
+    assert "page=1&" in nav and "page=60&" in nav and "page=30&" not in nav
+    assert "flex-wrap" in nav

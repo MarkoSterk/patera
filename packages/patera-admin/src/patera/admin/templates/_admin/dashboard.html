@@ -1,8 +1,246 @@
 {% extends '_admin/layout/base.html' %}
+{% from '_admin/layout/pagination.html' import pagination with context %}
+
+{% block css %}
+<style>
+  .request-stats {
+    --stats-2xx: #0ca30c;
+    --stats-3xx: #8a8984;
+    --stats-4xx: #fab219;
+    --stats-5xx: #d03b3b;
+    --stats-average: #2a78d6;
+    --stats-p95: #eb6834;
+    --stats-surface: var(--bs-body-bg, #fff);
+    --stats-ink-muted: var(--bs-secondary-color, #6c757d);
+    --stats-grid: var(--bs-border-color-translucent, rgba(0, 0, 0, 0.1));
+  }
+  .request-stats .stats-label { font-size: .8rem; color: var(--stats-ink-muted); }
+  .request-stats .stats-value { font-size: 1.6rem; font-weight: 600; line-height: 1.2; margin-top: .25rem; font-variant-numeric: tabular-nums; }
+  .request-stats .stats-note { font-size: .8rem; color: var(--stats-ink-muted); min-height: 1.2em; }
+  .request-stats .stats-icon-2xx { color: var(--stats-2xx); }
+  .request-stats .stats-icon-4xx { color: #b47b00; }
+  .request-stats .stats-icon-5xx { color: var(--stats-5xx); }
+  .request-stats .stats-legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .8rem; color: var(--stats-ink-muted); }
+  .request-stats .stats-swatch { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .35rem; vertical-align: -1px; }
+  .request-stats .stats-bg-2xx { background: var(--stats-2xx); }
+  .request-stats .stats-bg-3xx { background: var(--stats-3xx); }
+  .request-stats .stats-bg-4xx { background: var(--stats-4xx); }
+  .request-stats .stats-bg-5xx { background: var(--stats-5xx); }
+  .request-stats .stats-bg-average { background: var(--stats-average); }
+  .request-stats .stats-bg-p95 { background: var(--stats-p95); }
+  .request-stats .stats-chart { position: relative; height: 230px; }
+  .request-stats .stats-chart svg { display: block; overflow: visible; }
+  .request-stats .stats-empty { margin: .5rem 0 0; }
+  .request-stats .stats-grid { stroke: var(--stats-grid); stroke-width: 1; }
+  .request-stats .stats-axis { stroke: var(--stats-ink-muted); stroke-opacity: .5; stroke-width: 1; }
+  .request-stats .stats-tick { fill: var(--stats-ink-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .request-stats .stats-separator { fill: none; stroke: var(--stats-surface); stroke-width: 1.5; stroke-linejoin: round; }
+  .request-stats .stats-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .request-stats .stats-before-start { fill: var(--stats-ink-muted); fill-opacity: .07; }
+  .request-stats .stats-crosshair { stroke: var(--stats-ink-muted); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+  .request-stats .stats-tooltip {
+    position: absolute; pointer-events: none; z-index: 2; min-width: 9rem;
+    background: var(--stats-surface); border: 1px solid var(--stats-grid); border-radius: .375rem;
+    box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .12); padding: .4rem .55rem; font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .request-stats .stats-tooltip-title { color: var(--stats-ink-muted); margin-bottom: .15rem; }
+  .request-stats .btn-group .btn.active { color: #fff; }
+</style>
+{% endblock %}
 
 {% block content %}
 <main class="app-main py-4">
   <div class="container-fluid px-3 px-md-4">
+
+    {% if request_stats_enabled %}
+    <section id="request-stats" class="request-stats mb-5" aria-labelledby="request-stats-title">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-2 mb-3">
+        <div>
+          <h2 class="h3 mb-1" id="request-stats-title">{{ translate('request_statistics') }}</h2>
+          <p class="text-muted mb-0">
+            {{ translate('request_statistics_scope') }}
+            <span class="text-nowrap" data-stat="updated"></span>
+          </p>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="{{ translate('time_period') }}">
+          {% for period, label in request_stats_periods %}
+            <button type="button" class="btn btn-outline-secondary" data-period="{{ period }}" aria-pressed="false">
+              {{ label }}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="alert alert-warning" role="alert" data-stats-error hidden>
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        {{ translate('statistics_unavailable') }}
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>{{ translate('uptime') }}</div>
+              <div class="stats-value" data-stat="uptime">–</div>
+              <div class="stats-note" data-stat="started"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>{{ translate('requests') }}</div>
+              <div class="stats-value" data-stat="requests">–</div>
+              <div class="stats-note" data-stat="average_rps"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-check-circle-fill me-1 stats-icon-2xx" aria-hidden="true"></i>{{ translate('successful_2xx') }}</div>
+              <div class="stats-value" data-stat="2xx">–</div>
+              <div class="stats-note" data-stat="2xx_share"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-exclamation-triangle-fill me-1 stats-icon-4xx" aria-hidden="true"></i>{{ translate('client_errors_4xx') }}</div>
+              <div class="stats-value" data-stat="4xx">–</div>
+              <div class="stats-note" data-stat="4xx_share"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-x-octagon-fill me-1 stats-icon-5xx" aria-hidden="true"></i>{{ translate('server_errors_5xx') }}</div>
+              <div class="stats-value" data-stat="5xx">–</div>
+              <div class="stats-note" data-stat="5xx_share"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xxl-2">
+          <div class="card content-card shadow-sm h-100 stats-tile">
+            <div class="card-body">
+              <div class="stats-label"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>{{ translate('response_time') }}</div>
+              <div class="stats-value" data-stat="average_ms">–</div>
+              <div class="stats-note" data-stat="p95_ms"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-xl-7">
+          <div class="card content-card shadow-sm h-100">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <h2 class="h6 mb-0">{{ translate('requests_per_second') }}</h2>
+              <ul class="stats-legend list-unstyled mb-0">
+                <li><span class="stats-swatch stats-bg-2xx"></span>{{ translate('successful_2xx') }}</li>
+                <li><span class="stats-swatch stats-bg-3xx"></span>{{ translate('redirects_3xx') }}</li>
+                <li><span class="stats-swatch stats-bg-4xx"></span>{{ translate('client_errors_4xx') }}</li>
+                <li><span class="stats-swatch stats-bg-5xx"></span>{{ translate('server_errors_5xx') }}</li>
+              </ul>
+            </div>
+            <div class="card-body">
+              <div class="stats-chart" data-chart="requests"></div>
+              <p class="stats-empty text-muted small" data-empty="charts" hidden>{{ translate('no_requests_in_period') }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-5">
+          <div class="card content-card shadow-sm h-100">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <h2 class="h6 mb-0">{{ translate('response_time_ms') }}</h2>
+              <ul class="stats-legend list-unstyled mb-0">
+                <li><span class="stats-swatch stats-bg-average"></span>{{ translate('average') }}</li>
+                <li><span class="stats-swatch stats-bg-p95"></span>{{ translate('percentile_95') }}</li>
+              </ul>
+            </div>
+            <div class="card-body">
+              <div class="stats-chart" data-chart="latency"></div>
+              <p class="stats-empty text-muted small" data-empty="charts" hidden>{{ translate('no_requests_in_period') }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-12">
+          <details class="stats-data">
+            <summary class="small text-muted">{{ translate('show_data') }}</summary>
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th scope="col">{{ translate('time') }}</th>
+                    <th scope="col" class="text-end">2xx/s</th>
+                    <th scope="col" class="text-end">3xx/s</th>
+                    <th scope="col" class="text-end">4xx/s</th>
+                    <th scope="col" class="text-end">5xx/s</th>
+                    <th scope="col" class="text-end">{{ translate('average') }}</th>
+                    <th scope="col" class="text-end">{{ translate('percentile_95') }}</th>
+                  </tr>
+                </thead>
+                <tbody data-table="series"></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-xl-7">
+          <div class="card content-card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h2 class="h6 mb-0">{{ translate('busiest_endpoints') }}</h2>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">{{ translate('method') }}</th>
+                      <th scope="col">{{ translate('route') }}</th>
+                      <th scope="col" class="text-end">{{ translate('requests') }}</th>
+                      <th scope="col" class="text-end">4xx</th>
+                      <th scope="col" class="text-end">5xx</th>
+                      <th scope="col" class="text-end">{{ translate('average_time') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody data-table="routes"></tbody>
+                </table>
+              </div>
+              <p class="text-muted small m-3" data-empty="routes" hidden>{{ translate('no_requests_in_period') }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-5">
+          <div class="card content-card shadow-sm h-100">
+            <div class="card-header bg-white">
+              <h2 class="h6 mb-0">{{ translate('errors_by_status') }}</h2>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">{{ translate('status') }}</th>
+                      <th scope="col" class="text-end">{{ translate('requests') }}</th>
+                      <th scope="col">{{ translate('most_affected_routes') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody data-table="errors"></tbody>
+                </table>
+              </div>
+              <p class="text-muted small m-3" data-empty="errors" hidden>{{ translate('no_errors_in_period') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
 
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
       <div>
@@ -304,40 +542,7 @@
           </form>
         </div>
 
-        <nav aria-label="{{ translate('log_table_pagination') }}">
-          <ul class="pagination pagination-sm mb-0">
-
-            <li class="page-item {% if logs_page <= 1 %}disabled{% endif %}">
-              <a
-                class="page-link"
-                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=logs_page - 1, count=logs_count, order_by=logs_order_by) }}"
-              >
-                {{ translate('previous') }}
-              </a>
-            </li>
-
-            {% for page_number in range(1, logs_total_pages + 1) %}
-              <li class="page-item {% if page_number == logs_page %}active{% endif %}">
-                <a
-                  class="page-link"
-                  href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=page_number, count=logs_count, order_by=logs_order_by) }}"
-                >
-                  {{ page_number }}
-                </a>
-              </li>
-            {% endfor %}
-
-            <li class="page-item {% if logs_page >= logs_total_pages %}disabled{% endif %}">
-              <a
-                class="page-link"
-                href="{{ admin_interface.url_for('_AdminController.dashboard', query=logs_query, severity=logs_severity, page=logs_page + 1, count=logs_count, order_by=logs_order_by) }}"
-              >
-                {{ translate('next') }}
-              </a>
-            </li>
-
-          </ul>
-        </nav>
+        {{ pagination(logs_page_items, logs_page, logs_total_pages, logs_page_url, translate('log_table_pagination')) }}
       </div>
     </div>
 
@@ -383,6 +588,16 @@
 {% endblock %}
 
 {% block js %}
+{% if request_stats_enabled %}
+<script type="application/json" id="request-stats-config">
+  {{ {
+    "url": admin_interface.url_for('_AdminController.request_statistics'),
+    "lang": lang,
+    "labels": request_stats_labels,
+  } | tojson }}
+</script>
+<script type="module" src="{{ admin_interface.url_for('_AdminController.static', filename='js/dashboard/request_stats.js') }}"></script>
+{% endif %}
 <style>
   .log-dialog {
     width: min(900px, calc(100vw - 2rem));

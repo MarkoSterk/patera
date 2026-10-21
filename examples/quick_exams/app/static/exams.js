@@ -4,7 +4,8 @@ const accountActions = document.querySelector('#account-actions');
 const TAGLINE = 'A little preparation. A clear result.';
 
 let user = null;
-let data = {categories: [], questions: [], exams: []};
+let data = {subjects: [], categories: [], questions: [], exams: []};
+let subjectFilter = '';
 let section = new URLSearchParams(location.search).get('view') === 'admin' ? 'admin' : 'exams';
 let imageData = '';
 
@@ -12,6 +13,8 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;'
 const title = text => text[0].toUpperCase() + text.slice(1);
 const pct = value => `${value.toFixed(1)}%`;
 const when = value => esc(new Date(value).toLocaleString());
+const math = value => `<span class="math-text">${esc(value)}</span>`;
+const MATH_HINT = '<p><small>Write math in LaTeX between $…$, or $$…$$ for a centred line. Type \\$ for a dollar sign.</small></p>';
 
 function notice(message) {
   const box = document.querySelector('#notice');
@@ -50,6 +53,13 @@ const field = (label, name, value = '', type = 'text', extra = '') =>
   `<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
 const options = (items, selected) =>
   items.map(item => `<option value="${item.id}" ${item.id === selected ? 'selected' : ''}>${esc(item.name)}</option>`).join('');
+const choose = (prompt, items, selected) =>
+  `<option value="" ${selected ? '' : 'selected'} disabled>${prompt}</option>${options(items, selected)}`;
+const subjectName = id => data.subjects.find(s => s.id === id)?.name;
+const categoryName = id => data.categories.find(c => c.id === id)?.name;
+const inSubject = (items, subjectId) => items.filter(item => item.subject_id === subjectId);
+const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const points = value => plural(value, 'point');
 
 function localDate(value) {
   const date = value ? new Date(value) : new Date();
@@ -85,9 +95,10 @@ const isAdmin = () => user.roles.includes('ADMIN');
 async function refresh() {
   user = await api('GET', '/api/auth/me');
   if (isInstructor()) {
-    const [categories, questions, exams] = await Promise.all(
-      ['categories', 'questions', 'exams'].map(name => api('GET', `/api/${name}/`)));
-    data = {categories, questions, exams};
+    const [subjects, categories, questions, exams] = await Promise.all(
+      ['subjects', 'categories', 'questions', 'exams'].map(name => api('GET', `/api/${name}/`)));
+    data = {subjects, categories, questions, exams};
+    if (!subjects.some(s => s.id === subjectFilter)) subjectFilter = '';
   }
   render();
 }
@@ -97,7 +108,7 @@ function render() {
   accountActions.innerHTML = `${isAdmin() ? '<a class="header-admin" href="/admin/en/dashboard">Admin</a>' : ''}<button id="logout" class="header-logout">Sign out</button>`;
   document.querySelector('#logout').onclick = () => run(logout);
 
-  const tabs = isInstructor() ? ['exams', 'questions', 'categories', 'reports'] : [];
+  const tabs = isInstructor() ? ['exams', 'questions', 'categories', 'subjects', 'reports'] : [];
   root.innerHTML = `<h1>Your exam workspace</h1><p>Build a question bank. Share an exam. See how everyone did.</p>
     <nav>${tabs.map(tab => `<button class="${tab === section ? '' : 'secondary'}" data-tab="${tab}">${title(tab)}</button>`).join('')}
     ${isAdmin() ? `<button data-tab="admin" class="${section === 'admin' ? '' : 'secondary'}">Users &amp; reports</button>` : ''}</nav>
@@ -114,21 +125,35 @@ function render() {
 }
 
 const KINDS = {
-  exams: {kind: 'exam', path: '/api/exams/', label: exam => exam.title},
-  questions: {kind: 'question', path: '/api/questions/', label: question => question.question_text},
-  categories: {kind: 'category', path: '/api/categories/', label: category => category.name},
+  exams: {kind: 'exam', path: '/api/exams/', label: exam => esc(exam.title)},
+  questions: {kind: 'question', path: '/api/questions/', label: question => math(question.question_text)},
+  categories: {kind: 'category', path: '/api/categories/', label: category => esc(category.name)},
+  subjects: {kind: 'subject', path: '/api/subjects/', label: subject => esc(subject.name)},
 };
 
 function recordDetails(record) {
   if (section === 'exams') {
-    return `<p>${record.question_ids.length} questions · Pass: ${record.pass_percentage}%</p>
+    return `<p>${esc(subjectName(record.subject_id))} · ${plural(record.question_ids.length, 'question')} · Pass: ${record.pass_percentage}%</p>
       <p>${when(record.available_from)} – ${when(record.available_until)}</p>`;
   }
   if (section === 'questions') {
-    const category = data.categories.find(c => c.id === record.category_id);
-    return `<p>${record.points} points · ${esc(category?.name)}</p>`;
+    return `<p>${esc(subjectName(record.subject_id))} · ${esc(categoryName(record.category_id))} · ${points(record.points)}</p>`;
+  }
+  if (section === 'categories') {
+    return `<p>${esc(subjectName(record.subject_id))} · ${plural(inSubject(data.questions, record.subject_id).filter(q => q.category_id === record.id).length, 'question')}</p>`;
+  }
+  if (section === 'subjects') {
+    const counts = [['categories', 'category'], ['questions', 'question'], ['exams', 'exam']]
+      .map(([key, noun]) => plural(inSubject(data[key], record.id).length, noun)).join(' · ');
+    return `${record.description ? `<p>${esc(record.description)}</p>` : ''}<p>${counts}</p>`;
   }
   return '';
+}
+
+function subjectFilterControl() {
+  if (section === 'subjects' || !data.subjects.length) return '';
+  return `<label class="subject-filter">Subject<select id="subject-filter">
+    <option value="">All subjects</option>${options(data.subjects, subjectFilter)}</select></label>`;
 }
 
 function shareExam(exam) {
@@ -140,16 +165,19 @@ function shareExam(exam) {
 
 function listView() {
   const {kind, path, label} = KINDS[section];
-  const records = data[section];
+  const records = section !== 'subjects' && subjectFilter ? inSubject(data[section], subjectFilter) : data[section];
   document.querySelector('#content').innerHTML = `<div class="row between"><h2>${title(section)}</h2><button id="new">+ New ${kind}</button></div>
+    ${subjectFilterControl()}
     <div id="editor"></div>
     ${records.length ? records.map(record => `<article class="card"><div class="row between">
-      <div><h2>${esc(label(record))}</h2>${recordDetails(record)}</div>
+      <div><h2>${label(record)}</h2>${recordDetails(record)}</div>
       <div class="row"><button data-edit="${record.id}" class="secondary">Edit</button><button data-delete="${record.id}" class="danger">Delete</button></div>
       </div>${section === 'exams' ? shareExam(record) : ''}</article>`).join('')
       : '<div class="card" id="empty-state"><h2>A fresh start</h2><p>Create your first item to get started.</p></div>'}`;
 
-  document.querySelector('#new').onclick = () => editor(kind, {});
+  document.querySelector('#new').onclick = () => editor(kind, section !== 'subjects' && subjectFilter ? {subject_id: subjectFilter} : {});
+  const filter = document.querySelector('#subject-filter');
+  if (filter) filter.onchange = () => { subjectFilter = filter.value; listView(); };
   root.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editor(kind, records.find(r => r.id === button.dataset.edit)));
   root.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => {
     if (confirm('Delete this item? Archived submissions will remain.')) {
@@ -158,36 +186,64 @@ function listView() {
   });
 }
 
-function categoryFields(record) {
-  return field('Category name', 'name', record.name, 'text', 'required maxlength="100"');
+function subjectFields(record) {
+  return `${field('Subject name', 'name', record.name, 'text', 'required maxlength="100"')}
+    <label>Description <small>(optional)</small><textarea name="description" maxlength="2000">${esc(record.description)}</textarea></label>`;
 }
 
+const subjectSelect = record =>
+  `<label>Subject<select name="subject_id" required>${choose('Choose a subject', data.subjects, record.subject_id)}</select></label>`;
+
+function categoryFields(record) {
+  return `${subjectSelect(record)}
+    <fieldset class="plain" data-needs-subject ${record.subject_id ? '' : 'disabled'}>
+    ${field('Category name', 'name', record.name, 'text', 'required maxlength="100"')}</fieldset>`;
+}
+
+const categoryOptions = (subjectId, selected) =>
+  choose(subjectId ? 'Choose a category' : 'Choose a subject first', inSubject(data.categories, subjectId), selected);
+
 function questionFields(record) {
-  return `<label>Question<textarea name="question_text" required maxlength="5000">${esc(record.question_text)}</textarea></label>
-    <label>Category<select name="category_id" required>${options(data.categories, record.category_id)}</select></label>
+  const placed = Boolean(record.subject_id && record.category_id);
+  return `${subjectSelect(record)}
+    <label>Category<select name="category_id" required ${record.subject_id ? '' : 'disabled'}>${categoryOptions(record.subject_id, record.category_id)}</select></label>
+    <p id="no-categories" ${record.subject_id && !inSubject(data.categories, record.subject_id).length ? '' : 'hidden'}><small>This subject has no categories yet. Create one under Categories first.</small></p>
+    <fieldset class="plain" data-needs-category ${placed ? '' : 'disabled'}>
+    <label>Question<textarea name="question_text" required maxlength="5000">${esc(record.question_text)}</textarea></label>
+    <div class="math-preview" data-preview="question_text" aria-live="polite"></div>${MATH_HINT}
     ${field('Maximum points', 'points', record.points ?? 1, 'number', 'required min="0.01" max="100000" step="any"')}
     <fieldset><legend>Four answers · select the correct answer</legend>
     ${[0, 1, 2, 3].map(i => `<div class="row"><label><input type="radio" name="correct_answer" value="${i}" ${record.correct_answer === i ? 'checked' : ''} required>Correct ${i + 1}</label></div>
-      ${field('Answer ' + (i + 1), 'answer' + i, record.answers?.[i] || '', 'text', 'required maxlength="2000"')}`).join('')}</fieldset>
+      ${field('Answer ' + (i + 1), 'answer' + i, record.answers?.[i] || '', 'text', 'required maxlength="2000"')}
+      <div class="math-preview" data-preview="answer${i}" aria-live="polite"></div>`).join('')}</fieldset>
     <label>Optional image <small>(PNG, JPEG, GIF, WebP; up to 2 MB)</small><input id="image" type="file" accept="image/png,image/jpeg,image/gif,image/webp"></label>
     <img id="preview" class="question-image" ${imageData ? `src="${esc(imageData)}"` : 'hidden'} alt="Question image preview">
-    <button type="button" id="clear-image" class="secondary">Remove image</button>`;
+    <button type="button" id="clear-image" class="secondary">Remove image</button></fieldset>`;
+}
+
+function examSelection(subjectId, record) {
+  const categories = inSubject(data.categories, subjectId);
+  const questions = inSubject(data.questions, subjectId);
+  if (!questions.length) return '<p><small>This subject has no questions yet.</small></p>';
+  return `<label><input name="random" type="checkbox">Generate a random selection from categories (replaces manual selection)</label>
+    ${field('Number of random questions', 'count', 10, 'number', 'min="1" step="1"')}
+    <p>Categories for random generation</p>
+    ${categories.map(c => `<label><input type="checkbox" name="category_ids" value="${c.id}">${esc(c.name)}</label>`).join('')}
+    <p>Or select questions manually</p>
+    ${questions.map(q => `<label><input type="checkbox" name="question_ids" value="${q.id}" ${record.question_ids?.includes(q.id) ? 'checked' : ''}>${math(q.question_text)} <small>(${esc(categoryName(q.category_id))} · ${points(q.points)})</small></label>`).join('')}`;
 }
 
 function examFields(record) {
   const until = record.available_until || new Date(Date.now() + 86400000).toISOString();
-  return `${field('Exam title', 'title', record.title, 'text', 'required maxlength="200"')}
+  return `${subjectSelect(record)}
+    <fieldset class="plain" data-needs-subject ${record.subject_id ? '' : 'disabled'}>
+    ${field('Exam title', 'title', record.title, 'text', 'required maxlength="200"')}
     <div class="grid">${field('Available from (your local time)', 'available_from', localDate(record.available_from), 'datetime-local', 'required')}
     ${field('Available until (your local time)', 'available_until', localDate(until), 'datetime-local', 'required')}
     ${field('Points needed to pass (%)', 'pass_percentage', record.pass_percentage ?? 50, 'number', 'required min="0" max="100" step="any"')}</div>
-    <fieldset><legend>Question selection</legend>
-    <label><input name="random" type="checkbox">Generate a random selection from categories (replaces manual selection)</label>
-    ${field('Number of random questions', 'count', 10, 'number', 'min="1" step="1"')}
-    <p>Categories for random generation</p>
-    ${data.categories.map(c => `<label><input type="checkbox" name="category_ids" value="${c.id}">${esc(c.name)}</label>`).join('')}
-    <p>Or select questions manually</p>
-    ${data.questions.map(q => `<label><input type="checkbox" name="question_ids" value="${q.id}" ${record.question_ids?.includes(q.id) ? 'checked' : ''}>${esc(q.question_text)} <small>(${q.points} points)</small></label>`).join('')}
-    </fieldset>`;
+    <fieldset><legend>Question selection · from the exam's subject</legend>
+    <div id="selection">${record.subject_id ? examSelection(record.subject_id, record) : ''}</div>
+    </fieldset></fieldset>`;
 }
 
 function readImage(event) {
@@ -208,9 +264,11 @@ function readImage(event) {
 }
 
 function formBody(kind, form) {
-  if (kind === 'category') return {name: form.get('name')};
+  if (kind === 'subject') return {name: form.get('name'), description: form.get('description')};
+  if (kind === 'category') return {subject_id: form.get('subject_id'), name: form.get('name')};
   if (kind === 'question') {
     return {
+      subject_id: form.get('subject_id'),
       category_id: form.get('category_id'),
       question_text: form.get('question_text'),
       answers: [0, 1, 2, 3].map(i => form.get('answer' + i)),
@@ -220,6 +278,7 @@ function formBody(kind, form) {
     };
   }
   return {
+    subject_id: form.get('subject_id'),
     title: form.get('title'),
     available_from: new Date(form.get('available_from')).toISOString(),
     available_until: new Date(form.get('available_until')).toISOString(),
@@ -229,15 +288,49 @@ function formBody(kind, form) {
   };
 }
 
+function needSubjectFirst(editorBox) {
+  editorBox.innerHTML = `<div class="card"><h2>Create a subject first</h2>
+    <p>Categories, questions and exams belong to a subject.</p>
+    <div class="row"><button type="button" id="to-subjects">Go to subjects</button><button type="button" id="cancel" class="secondary">Cancel</button></div></div>`;
+  document.querySelector('#to-subjects').onclick = () => { section = 'subjects'; render(); editor('subject', {}); };
+  document.querySelector('#cancel').onclick = render;
+}
+
+function wireSubjectChoice(kind, record, form) {
+  const subject = form.querySelector('[name="subject_id"]');
+  const category = form.querySelector('[name="category_id"]');
+  const update = () => {
+    const chosen = subject.value;
+    form.querySelectorAll('[data-needs-subject]').forEach(part => part.disabled = !chosen);
+    if (kind === 'question') {
+      category.disabled = !chosen;
+      form.querySelector('#no-categories').hidden = !chosen || inSubject(data.categories, chosen).length > 0;
+      form.querySelector('[data-needs-category]').disabled = !(chosen && category.value);
+    }
+  };
+  subject.onchange = () => {
+    if (kind === 'question') category.innerHTML = categoryOptions(subject.value, '');
+    if (kind === 'exam') form.querySelector('#selection').innerHTML = examSelection(subject.value, {});
+    update();
+  };
+  if (category) category.onchange = update;
+  update();
+}
+
 function editor(kind, record) {
   const emptyState = document.querySelector('#empty-state');
   if (emptyState) emptyState.hidden = true;
-  imageData = record.image || '';
-  const fields = {category: categoryFields, question: questionFields, exam: examFields}[kind](record);
   const editorBox = document.querySelector('#editor');
+  if (kind !== 'subject' && !data.subjects.length) {
+    needSubjectFirst(editorBox);
+    return;
+  }
+  imageData = record.image || '';
+  const fields = {subject: subjectFields, category: categoryFields, question: questionFields, exam: examFields}[kind](record);
   editorBox.innerHTML = `<form class="card" id="edit"><h2>${record.id ? 'Edit' : 'Create'} ${kind}</h2>${fields}
     <div class="row"><button>Save ${kind}</button><button type="button" id="cancel" class="secondary">Cancel</button></div></form>`;
   document.querySelector('#cancel').onclick = render;
+  if (kind !== 'subject') wireSubjectChoice(kind, record, document.querySelector('#edit'));
   if (kind === 'question') {
     document.querySelector('#clear-image').onclick = () => {
       imageData = '';
@@ -245,6 +338,12 @@ function editor(kind, record) {
       document.querySelector('#image').value = '';
     };
     document.querySelector('#image').onchange = readImage;
+    editorBox.querySelectorAll('[data-preview]').forEach(preview => {
+      const input = editorBox.querySelector(`[name="${preview.dataset.preview}"]`);
+      const update = () => QuickExamsMath.render(input.value, preview);
+      input.addEventListener('input', update);
+      update();
+    });
   }
   document.querySelector('#edit').onsubmit = event => {
     event.preventDefault();
@@ -262,9 +361,9 @@ function attemptDetails(attempt) {
   const {result} = attempt;
   return `<details><summary>${esc(attempt.student_email)} · ${pct(result.percentage)} · ${result.passed ? 'Pass' : 'Fail'} · ${when(attempt.submitted_at)}</summary>
     <p>${result.points} / ${result.maximum} points · Pass threshold: ${attempt.pass_percentage}%</p>
-    ${attempt.questions.map(q => `<fieldset><legend>${esc(q.question_text)} (${q.points} points)</legend>
+    ${attempt.questions.map(q => `<fieldset><legend>${points(q.points)}</legend><p>${math(q.question_text)}</p>
       ${q.image ? `<img class="question-image" src="${esc(q.image)}" alt="Question image">` : ''}
-      ${q.answers.map((answer, i) => `<p>${i === q.selected_answer ? 'Selected · ' : ''}${i === q.correct_answer ? 'Correct · ' : ''}${esc(answer)}</p>`).join('')}
+      ${q.answers.map((answer, i) => `<p>${i === q.selected_answer ? 'Selected · ' : ''}${i === q.correct_answer ? 'Correct · ' : ''}${math(answer)}</p>`).join('')}
       </fieldset>`).join('')}</details>`;
 }
 
@@ -335,9 +434,9 @@ function studentStart(examId) {
 
 function studentQuestions(attempt) {
   root.innerHTML = `<h1>${esc(attempt.exam_title)}</h1><p>Closes ${when(attempt.available_until)}. Select one answer for every question.</p>
-    <form id="answers">${attempt.questions.map((q, i) => `<fieldset class="card"><legend>${i + 1}. ${esc(q.question_text)} · ${q.points} points</legend>
+    <form id="answers">${attempt.questions.map((q, i) => `<fieldset class="card"><legend>Question ${i + 1} · ${points(q.points)}</legend><p>${math(q.question_text)}</p>
       ${q.image ? `<img class="question-image" src="${esc(q.image)}" alt="Question image">` : ''}
-      ${q.answers.map((answer, n) => `<label class="answer"><input type="radio" name="${q.id}" value="${n}" required>${esc(answer)}</label>`).join('')}
+      ${q.answers.map((answer, n) => `<label class="answer"><input type="radio" name="${q.id}" value="${n}" required>${math(answer)}</label>`).join('')}
       </fieldset>`).join('')}<button id="submit">Submit exam</button></form>`;
   document.querySelector('#answers').onsubmit = event => {
     event.preventDefault();
@@ -356,6 +455,8 @@ function studentQuestions(attempt) {
     });
   };
 }
+
+QuickExamsMath.observe(root);
 
 const examId = location.pathname.match(/^\/exam\/([^/]+)$/)?.[1];
 if (examId) {

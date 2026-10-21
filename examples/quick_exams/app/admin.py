@@ -7,6 +7,7 @@ from .models import (
     Exam,
     ExamQuestion,
     Question,
+    Subject,
     User,
 )
 
@@ -20,6 +21,7 @@ class Admin(AdminInterface):
 
     MANAGED_MODELS = [
         User,
+        Subject,
         Category,
         Question,
         Exam,

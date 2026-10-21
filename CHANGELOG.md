@@ -12,6 +12,11 @@ contain breaking changes; they are listed first in each release.
   `ON DELETE CASCADE` are enforced; SQLite leaves them off by default. Set it in the settings
   model or from the environment, for example `PATERA_MAIN_DB__SQLITE_FOREIGN_KEYS=true`. Other
   databases ignore it. Applications no longer need to override `SqlDatabase.connect()` for this.
+- **patera-database:** `SqlDatabaseConfig.SQLITE_BUSY_TIMEOUT` (seconds, default `None`) runs
+  `PRAGMA busy_timeout` on every new SQLite connection: how long a connection waits for another
+  connection's lock before failing with "database is locked". `None` keeps the driver's default
+  of 5 seconds, or a `?timeout=` in `DATABASE_URI`; a value takes precedence over both. Other
+  databases ignore it, for example `PATERA_MAIN_DB__SQLITE_BUSY_TIMEOUT=10`.
 - **patera-admin:** `FileInput` and `DateInput` form elements in `patera.admin.custom_elements`,
   for `Meta.custom_form_fields`. `FileInput` renders `<input type="file">` (with `accept` and a
   browser-side `max_size`); the model's admin hooks receive the chosen file as an `UploadedFile`,
@@ -20,9 +25,37 @@ contain breaking changes; they are listed first in each release.
   converted to the column's type like a generated input, and `utc=True` shows a stored UTC
   timestamp in the viewer's local time and submits it in UTC. Custom elements opt in to that
   conversion with `converts_value = True`.
+- **patera-admin:** `LatexInput` form element: a textarea, or a text input with
+  `multiline=False`, for text with LaTeX math, with a preview underneath that updates while the
+  user types. Math goes between `$...$` or `$$...$$`, and `\$` is a literal dollar sign. The
+  preview is rendered as MathML by [Temml](https://temml.org) 0.14.0 (MIT), which Admin serves
+  from its own static assets (`js/vendors/temml/`) and loads only on pages with this input. The
+  inner control is an ordinary form field, so it is submitted and validated with the form.
+
+- **Core:** request observers. `app.add_request_observer(callback)` calls `callback(record)` after
+  every HTTP request, including router answers (404, 405), static resources and failed requests,
+  with a `patera.RequestRecord`: method, path, the matched URL rule (`/api/exams/<exam_id>`, or
+  `None` when no route matched), the status sent (500 for a failure before the response started),
+  the start time and the duration. An observer that raises is logged and skipped; applications
+  without observers take the previous code path. `Router.path_of(endpoint)` returns an endpoint's
+  URL rule.
+- **patera-admin:** request statistics on the dashboard, above the logs: uptime and start time,
+  requests and average requests/s, 2xx/4xx/5xx counts with their share, average and approximate
+  95th-percentile response time, a stacked requests-per-second chart by status class, a response
+  time chart, the busiest endpoints and the most frequent 4xx/5xx statuses with their routes, for
+  the last 15 minutes, hour, 6 hours or 24 hours, refreshed every 10 seconds. Admin collects them
+  in memory through a request observer (24 hours, 10-second buckets), so each worker shows its own
+  requests since it started; the dashboard's own polling is not counted.
+  `AdminConfig.REQUEST_STATISTICS=False` turns the collection and the section off. The data is
+  served as JSON at `<ADMIN_BASE_URL>/<lang>/dashboard/stats?period=1h`.
 
 ### Fixed
 
+- **patera-admin:** the log table's page links no longer run off the right edge when there are many
+  pages. Like the records table, they show the first and last page and two pages on each side of
+  the current one, with ellipses between; on small screens only the neighbouring pages and arrow
+  buttons are shown, and the links wrap if space runs out. Both tables share one template macro
+  (`_admin/layout/pagination.html`) and `patera.admin.pagination.page_items()`.
 - **Core:** a `Response[Model]` body made of ORM objects is converted through its declared type
   as soon as the route handler returns, while the request's database sessions are still open.
   Before, it was converted when the response was sent, after `patera-database` had rolled back

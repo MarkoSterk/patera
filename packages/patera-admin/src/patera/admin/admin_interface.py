@@ -10,10 +10,11 @@ import os
 from typing import Generic, Iterator, Optional, Type, TypeVar, Any
 from pydantic import BaseModel, Field, field_validator
 
-from patera import Patera, BaseExtension, MediaType
+from patera import Patera, BaseExtension, MediaType, RequestRecord
 from patera.controller import path
 from patera.injectable import Injectable
 
+from .request_stats import RequestStats
 from .translations import TRANSLATIONS_MAP
 
 
@@ -83,6 +84,13 @@ class AdminConfig(BaseModel):
     SHOW_FORGOT_PASSWORD: bool = Field(
         False, description="Show forgot password option at login"
     )
+    REQUEST_STATISTICS: bool = Field(
+        True,
+        description=(
+            "Count the application's requests in memory and show request "
+            "statistics on the dashboard. Each worker counts its own requests."
+        ),
+    )
 
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
@@ -118,6 +126,8 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         # every AdminInterface instance and every app in the process).
         self._models_map: dict[str, Type] = {}
         self._translation_maps: dict[str, dict[str, str]] = {}
+        self._request_stats: Optional[RequestStats] = None
+        self._stats_route: Optional[str] = None
 
         self._admin_root_path: str = os.path.dirname(__file__)
         templates_path = os.path.join(self._admin_root_path, "templates")
@@ -127,6 +137,32 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
         self._register_admin_controller()
         self._register_admin_file_explorer()
         self._register_extension_panels()
+        if self.configs.REQUEST_STATISTICS:
+            self._request_stats = RequestStats()
+            self._app.add_request_observer(self._observe_request)
+            self._app.add_on_startup_method(self._request_stats.mark_started)
+
+    @property
+    def request_stats(self) -> Optional[RequestStats]:
+        """This process's request statistics, or None when they are disabled."""
+        return self._request_stats
+
+    def _observe_request(self, record: RequestRecord) -> None:
+        if self._request_stats is None:
+            return
+        if self._stats_route is None:
+            from .admin_controller import _AdminController
+
+            controller = self._app.get_controller(_AdminController)
+            self._stats_route = (
+                self._app.router.path_of(
+                    controller.request_statistics  # type: ignore[union-attr]
+                )
+                or ""
+            )
+        # The dashboard polls its statistics; those requests are not counted.
+        if record.route != self._stats_route:
+            self._request_stats.observe(record)
 
     def _register_extension_panels(self) -> None:
         """

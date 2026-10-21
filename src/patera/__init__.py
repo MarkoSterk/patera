@@ -17,6 +17,7 @@ from .exceptions import abort, html_abort  # noqa: E402
 from .configuration_base import BaseConfig  # noqa: E402
 
 from .request import Request, UploadedFile  # noqa: E402
+from .request_record import RequestRecord  # noqa: E402
 from .response import Response  # noqa: E402
 
 from .utilities import run_sync_or_async, run_in_background, development, ignore  # noqa: E402
@@ -36,6 +37,7 @@ __all__ = [
     "run_sync_or_async",
     "run_in_background",
     "UploadedFile",
+    "RequestRecord",
     "MediaType",
     "HttpMethod",
     "HttpStatus",

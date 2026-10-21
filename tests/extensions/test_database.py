@@ -497,3 +497,59 @@ async def test_sqlite_foreign_keys_setting(make_app, tmp_path, enforced):
             )
     finally:
         await db.disconnect()
+
+
+# ----- SQLite busy timeout ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("query", "setting", "expected"),
+    [
+        ("", None, 5000),  # the driver's default
+        ("?timeout=10", None, 10000),  # the URI alone
+        ("", 12.5, 12500),
+        ("?timeout=10", 0.25, 250),  # the setting wins over the URI
+        ("", 0, 0),
+    ],
+)
+async def test_sqlite_busy_timeout_setting(
+    make_app, tmp_path, query, setting, expected
+):
+    app = make_app(
+        extensions=[Databases],
+        MAIN_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'busy.db'}{query}",
+            SQLITE_BUSY_TIMEOUT=setting,
+        ),
+    )
+    db = app.get_extension(Databases).get_database("main")
+    await db.connect()
+    try:
+        async with db.engine.connect() as conn:
+            timeout = (await conn.exec_driver_sql("PRAGMA busy_timeout")).scalar()
+            foreign_keys = (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar()
+        assert (timeout, foreign_keys) == (expected, 0)
+    finally:
+        await db.disconnect()
+
+
+async def test_sqlite_settings_together_and_validation(make_app, tmp_path):
+    app = make_app(
+        extensions=[Databases],
+        MAIN_DB=SqlDatabaseConfig(
+            DATABASE_URI=f"sqlite+aiosqlite:///{tmp_path / 'both.db'}",
+            SQLITE_FOREIGN_KEYS=True,
+            SQLITE_BUSY_TIMEOUT=2,
+        ),
+    )
+    db = app.get_extension(Databases).get_database("main")
+    await db.connect()
+    try:
+        async with db.engine.connect() as conn:
+            assert (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar() == 1
+            assert (await conn.exec_driver_sql("PRAGMA busy_timeout")).scalar() == 2000
+    finally:
+        await db.disconnect()
+
+    with pytest.raises(ValueError):
+        SqlDatabaseConfig(DATABASE_URI="sqlite+aiosqlite://", SQLITE_BUSY_TIMEOUT=-1)

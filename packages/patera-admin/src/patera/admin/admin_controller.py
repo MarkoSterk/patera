@@ -20,6 +20,8 @@ from .exceptions import (
     AdminLoginRequiredException,
     AdminAuthorizationRequiredException,
 )
+from .pagination import page_items
+from .request_stats import PERIODS
 from .schemas.dashboard_schemas import (
     LOG_LEVELS,
     LogsQuerySchema,
@@ -27,6 +29,23 @@ from .schemas.dashboard_schemas import (
     log_sort_key,
 )
 from .admin_interface import NOTIFICATIONS_SEEN_COOKIE
+
+
+# Translations the dashboard's statistics script needs.
+REQUEST_STATS_LABELS = (
+    "share_of_requests",
+    "running_since",
+    "average_per_second",
+    "p95_under",
+    "requests_per_second",
+    "response_time_ms",
+    "average",
+    "percentile_95",
+    "requests",
+    "no_matching_route",
+    "updated_at",
+    "before_start",
+)
 
 
 class _AdminController(Controller[Patera]):
@@ -118,13 +137,57 @@ class _AdminController(Controller[Patera]):
                 "logs_page": page,
                 "logs_count": count,
                 "logs_total_pages": total_pages,
+                "logs_page_items": page_items(page, total_pages),
+                "logs_page_url": lambda number: self.admin_interface.url_for(
+                    "_AdminController.dashboard",
+                    query=query_schema.query or "",
+                    severity=query_schema.severity,
+                    page=number,
+                    count=count,
+                    order_by=query_schema.order_by,
+                ),
                 "logs_order_by": query_schema.order_by,
                 "logs_query": query_schema.query or "",
                 "logs_severity": query_schema.severity,
                 "log_levels": list(LOG_LEVELS),
                 "log_files_enabled": self.app.log_files.enabled,
+                "request_stats_enabled": self.admin_interface.request_stats is not None,
+                "request_stats_periods": [
+                    (period, self.admin_interface.translate(f"period_{period}"))
+                    for period in PERIODS
+                ],
+                "request_stats_labels": {
+                    key: self.admin_interface.translate(key)
+                    for key in REQUEST_STATS_LABELS
+                },
             },
         )
+
+    @get("/dashboard/stats")
+    @role_required(
+        Permissions.ADMIN_CAN_ENTER,
+        raise_authentication_exception=AdminLoginRequiredException,
+        raise_authorization_exception=AdminAuthorizationRequiredException,
+    )
+    async def request_statistics(self, req: Request) -> Response:
+        """
+        This worker's request statistics for ``?period=`` (15m, 1h, 6h or
+        24h), read by the dashboard's charts.
+        """
+        stats = self.admin_interface.request_stats
+        if stats is None:
+            return req.res.json(
+                {"status": "error", "message": "Request statistics are disabled."}
+            ).status(404)
+        period = str(req.query_parameters.get("period") or "1h")
+        if period not in PERIODS:
+            return req.res.json(
+                {
+                    "status": "error",
+                    "message": f"Unknown period; use one of {', '.join(PERIODS)}.",
+                }
+            ).status(400)
+        return req.res.json(stats.summary(period))
 
     @get("/notifications")
     @role_required(

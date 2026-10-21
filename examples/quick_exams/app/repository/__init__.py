@@ -2,6 +2,7 @@ from .attempts import AttemptQuestions, Attempts
 from .categories import Categories
 from .exams import ExamQuestions, Exams
 from .questions import Questions
+from .subjects import Subjects
 from .users import Users
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "ExamQuestions",
     "Exams",
     "Questions",
+    "Subjects",
     "Users",
 ]

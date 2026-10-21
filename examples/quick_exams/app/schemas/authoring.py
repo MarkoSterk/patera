@@ -14,6 +14,7 @@ from pydantic import (
 from .common import (
     Answer,
     AnswerIndex,
+    Description,
     Input,
     Name,
     Percentage,
@@ -24,16 +25,30 @@ from .common import (
 )
 
 
+class SubjectIn(Input):
+    name: Name
+    description: Description = ""
+
+
+class SubjectOut(BaseModel):
+    id: str
+    name: str
+    description: str
+
+
 class CategoryIn(Input):
+    subject_id: str
     name: Name
 
 
 class CategoryOut(BaseModel):
     id: str
+    subject_id: str
     name: str
 
 
 class QuestionIn(Input):
+    subject_id: str
     category_id: str
     question_text: QuestionText
     answers: Annotated[list[Answer], Field(min_length=4, max_length=4)]
@@ -44,6 +59,7 @@ class QuestionIn(Input):
 
 class QuestionOut(BaseModel):
     id: str
+    subject_id: str
     category_id: str
     question_text: str
     answers: list[str]
@@ -53,13 +69,17 @@ class QuestionOut(BaseModel):
 
 
 class RandomSelection(Input):
-    """Sample ``count`` distinct questions from the categories once, at save time."""
+    """
+    Sample ``count`` distinct questions from the categories, which belong to
+    the exam's subject, once, at save time.
+    """
 
     category_ids: Annotated[list[str], Field(min_length=1)]
     count: Annotated[StrictInt, Field(ge=1)] = 10
 
 
 class ExamSettingsIn(Input):
+    subject_id: str
     title: Title
     available_from: AwareDatetime
     available_until: AwareDatetime
@@ -88,6 +108,7 @@ class ExamIn(ExamSettingsIn):
 
 class ExamOut(BaseModel):
     id: str
+    subject_id: str
     title: str
     available_from: str
     available_until: str

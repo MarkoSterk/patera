@@ -20,6 +20,8 @@ class Router:
         self.endpoints: dict[str, Callable] = {}
         # (path, method) -> (function, endpoint_name), to detect duplicates
         self._rules: dict[tuple[str, str], tuple[Callable, str]] = {}
+        # function -> the URL rule it was first registered under
+        self._paths: dict[Callable, str] = {}
 
     def add_route(
         self, path: str, endpoint: Callable, methods: list[str], endpoint_name: str
@@ -46,8 +48,16 @@ class Router:
             self._rules.setdefault((path, method), (endpoint, endpoint_name))
         # Store the endpoint function:
         self.endpoints[endpoint_name] = endpoint
+        self._paths.setdefault(endpoint, path)
         # Add a single Rule that handles the specified methods
         self.url_map.add(Rule(path, endpoint=endpoint_name, methods=methods))
+
+    def path_of(self, endpoint: Callable) -> str | None:
+        """The URL rule of a registered endpoint, e.g. ``/items/<item_id>``."""
+        try:
+            return self._paths.get(endpoint)
+        except TypeError:  # an unhashable callable was never registered
+            return None
 
     def match(
         self, path: str, method: str

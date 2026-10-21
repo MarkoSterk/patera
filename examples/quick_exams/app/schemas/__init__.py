@@ -15,6 +15,8 @@ from .authoring import (
     QuestionIn,
     QuestionOut,
     RandomSelection,
+    SubjectIn,
+    SubjectOut,
 )
 from .common import (
     IMAGE_TYPES,
@@ -61,6 +63,8 @@ __all__ = [
     "ResultOut",
     "Role",
     "StartAttemptIn",
+    "SubjectIn",
+    "SubjectOut",
     "SubmitIn",
     "TokenOut",
     "UserIn",

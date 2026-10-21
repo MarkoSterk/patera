@@ -1,0 +1,54 @@
+{#
+  Page links for a paginated table: previous, the first and last page, a
+  window around the current page, and ellipses for the pages in between.
+  ``items`` comes from patera.admin.pagination.page_items; ``page_url`` is a
+  function returning a page's URL. Import "with context" for translate().
+  On small screens only the neighbours of the current page are shown.
+#}
+{% macro pagination(items, current, pages, page_url, label) %}
+<nav aria-label="{{ label }}">
+  <ul class="pagination pagination-sm flex-wrap mb-0">
+    <li class="page-item {% if current <= 1 %}disabled{% endif %}">
+      <a
+        class="page-link"
+        href="{{ page_url(current - 1) }}"
+        {% if current <= 1 %}aria-disabled="true" tabindex="-1"{% endif %}
+        aria-label="{{ translate('previous') }}"
+      >
+        <span class="d-none d-sm-inline">{{ translate('previous') }}</span>
+        <i class="bi bi-chevron-left d-sm-none" aria-hidden="true"></i>
+      </a>
+    </li>
+
+    {% for item in items %}
+      {% if item is none %}
+        <li class="page-item disabled" aria-hidden="true">
+          <span class="page-link">…</span>
+        </li>
+      {% else %}
+        <li class="page-item{% if item == current %} active{% endif %}{% if (item - current)|abs > 1 and item != 1 and item != pages %} d-none d-sm-block{% endif %}">
+          <a
+            class="page-link"
+            href="{{ page_url(item) }}"
+            {% if item == current %}aria-current="page"{% endif %}
+          >
+            {{ item }}
+          </a>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    <li class="page-item {% if current >= pages %}disabled{% endif %}">
+      <a
+        class="page-link"
+        href="{{ page_url(current + 1) }}"
+        {% if current >= pages %}aria-disabled="true" tabindex="-1"{% endif %}
+        aria-label="{{ translate('next') }}"
+      >
+        <span class="d-none d-sm-inline">{{ translate('next') }}</span>
+        <i class="bi bi-chevron-right d-sm-none" aria-hidden="true"></i>
+      </a>
+    </li>
+  </ul>
+</nav>
+{% endmacro %}

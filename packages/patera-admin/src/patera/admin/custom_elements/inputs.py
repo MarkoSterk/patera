@@ -1,4 +1,6 @@
+from html import escape
 from typing import Any, Mapping, Sequence
+
 from markupsafe import Markup
 
 from .base_elements import BaseHtmlInput, AttributeValue
@@ -239,3 +241,107 @@ class DateInput(BaseHtmlInput):
         if self.max is not None:
             attrs["max"] = self.max
         return attrs
+
+
+class LatexInput(BaseHtmlInput):
+    """
+    A textarea, or a text input with ``multiline=False``, for text with LaTeX
+    math, with a preview underneath that updates while the user types.
+
+    Math goes between ``$...$`` (inline) or ``$$...$$`` (on a line of its
+    own), and ``\\$`` is a literal dollar sign. The preview is rendered as
+    MathML by Temml, which Admin serves from its own static assets and loads
+    only on pages with this input. The submitted value is the text as typed,
+    converted to the column's type like a generated input.
+    """
+
+    tag_name = "latex-input"
+    converts_value = True
+
+    CONTROL_ATTRIBUTES = (
+        "name",
+        "id",
+        "value",
+        "required",
+        "disabled",
+        "readonly",
+        "placeholder",
+        "aria-label",
+    )
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        multiline: bool = True,
+        rows: int = 4,
+        maxlength: int | None = None,
+        preview_label: str = "Preview",
+        id: str | None = None,
+        label: str | None = None,
+        value: str | None = None,
+        required: bool | None = None,
+        disabled: bool = False,
+        readonly: bool = False,
+        placeholder: str | None = None,
+        classes: Sequence[str] | None = None,
+        attributes: Mapping[str, AttributeValue] | None = None,
+        data_attributes: Mapping[str, AttributeValue] | None = None,
+        aria_attributes: Mapping[str, AttributeValue] | None = None,
+        styles: Mapping[str, str] | None = None,
+    ) -> None:
+        super().__init__(
+            name=name,
+            id=id,
+            label=label,
+            value=value,
+            required=required,
+            disabled=disabled,
+            readonly=readonly,
+            placeholder=placeholder,
+            classes=classes,
+            attributes=attributes,
+            data_attributes=data_attributes,
+            aria_attributes=aria_attributes,
+            styles=styles,
+        )
+        self.multiline = multiline
+        self.rows = rows
+        self.maxlength = maxlength
+        self.preview_label = preview_label
+
+    def render(self, field: dict[str, Any] | None = None) -> Markup:
+        attrs = self.build_attributes(field)
+        control = {
+            key: attrs.pop(key) for key in self.CONTROL_ATTRIBUTES if key in attrs
+        }
+        control["class"] = "form-control"
+        if self.maxlength is not None:
+            control["maxlength"] = self.maxlength
+        value = control.pop("value", None)
+
+        if self.multiline:
+            control["rows"] = self.rows
+            text = escape(str(value or ""), quote=False)
+            control_html = (
+                f"<textarea {self.render_attributes(control)}>\n{text}</textarea>"
+            )
+        else:
+            control["type"] = "text"
+            control["value"] = value
+            control_html = f"<input {self.render_attributes(control)}>"
+
+        preview = self.render_attributes(
+            {
+                "class": "latex-input-preview form-control bg-body-tertiary mt-1",
+                "data-preview": True,
+                "aria-live": "polite",
+                "aria-label": self.preview_label,
+                "hidden": True,
+            }
+        )
+        return Markup(
+            f"<{self.tag_name} {self.render_attributes(attrs)}>"
+            f"{control_html}<div {preview}></div>"
+            f"</{self.tag_name}>"
+        )

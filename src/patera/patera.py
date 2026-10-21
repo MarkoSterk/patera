@@ -9,6 +9,7 @@ import json
 import os
 import re
 import inspect
+import time
 from collections.abc import AsyncIterator, Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
@@ -82,6 +83,7 @@ from .injectable import Injectable
 from .serializers import SerializerRegistry
 from .response_renderer import ResponseRenderer, ResponseRendererException
 from .base_extension import BaseExtension
+from .request_record import RequestObserver, RequestRecord
 
 logger.remove()
 
@@ -285,6 +287,7 @@ class Patera(Injectable, Generic[ConfT]):
         # register middleware during app initialization.
         self._middleware_classes: dict[int, Type[MiddlewareBase]] = {}
         self._cors_middleware: Optional[CORSMiddleware] = None
+        self._request_observers: list[RequestObserver] = []
 
         self._controllers: dict[str, "Controller"] = {}
         self._cli_controllers: dict[str, "CLIController"] = {}
@@ -965,9 +968,60 @@ class Patera(Injectable, Generic[ConfT]):
         self._logger_sink_ids.clear()
         self.log_files.detach()
 
+    def add_request_observer(self, observer: RequestObserver) -> None:
+        """
+        Calls ``observer(record)`` with a ``RequestRecord`` after every HTTP
+        request, including those answered by the router (404, 405), static
+        resources and failed requests. Observers run in the request's task
+        once its response has been sent, so they must be quick and must not
+        block; an observer that raises is logged and skipped.
+        """
+        self._request_observers.append(observer)
+
     async def _handle_http_request(self, scope, receive, send):
         """
-        Handles HTTP requests.
+        Handles HTTP requests, and reports each one to the request observers.
+        """
+        if not self._request_observers:
+            return await self._dispatch_http_request(scope, receive, send)
+
+        started_at = time.time()
+        start = time.perf_counter()
+        status: list[int] = []
+
+        async def observed_send(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                status.append(message["status"])
+            await send(message)
+
+        failed = False
+        try:
+            return await self._dispatch_http_request(scope, receive, observed_send)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            self._notify_request_observers(
+                RequestRecord(
+                    method=scope["method"].upper(),
+                    path=scope["path"],
+                    route=scope.get("patera.route"),
+                    status_code=status[0] if status else (500 if failed else None),
+                    started_at=started_at,
+                    duration=time.perf_counter() - start,
+                )
+            )
+
+    def _notify_request_observers(self, record: RequestRecord) -> None:
+        for observer in self._request_observers:
+            try:
+                observer(record)
+            except Exception as exc:  # an observer must not break requests
+                self.logger.error(f"Request observer {observer!r} failed: {exc}")
+
+    async def _dispatch_http_request(self, scope, receive, send):
+        """
+        Routes an HTTP request and sends its response.
         """
         method: str = scope["method"].upper()
         url_path: str = scope["path"]
@@ -1021,6 +1075,9 @@ class Patera(Injectable, Generic[ConfT]):
                 exc.new_url,
                 exc.code,  # type: ignore
             )
+
+        if self._request_observers:
+            scope["patera.route"] = self.router.path_of(cast(Callable, route_handler))
 
         req = self.request_class(
             scope,

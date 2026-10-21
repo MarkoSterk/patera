@@ -1,4 +1,5 @@
 {% extends '_admin/layout/base.html' %}
+{% from '_admin/layout/pagination.html' import pagination with context %}
 
 {% block css %}
 <style>
@@ -219,74 +220,7 @@
           </span>
         </div>
 
-        <nav aria-label="{{ translate('records_table_pagination') }}">
-          <ul class="pagination pagination-sm mb-0">
-
-            <li class="page-item {% if not records.has_prev %}disabled{% endif %}">
-              <a
-                class="page-link"
-                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page - 1, per_page=records.per_page) }}"
-              >
-                {{ translate('previous') }}
-              </a>
-            </li>
-
-            {% if records.page > 3 %}
-              <li class="page-item">
-                <a
-                  class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=1, per_page=records.per_page) }}"
-                >
-                  1
-                </a>
-              </li>
-
-              {% if records.page > 4 %}
-                <li class="page-item disabled">
-                  <span class="page-link">…</span>
-                </li>
-              {% endif %}
-            {% endif %}
-
-            {% for page_number in pagination_pages %}
-              <li class="page-item {% if page_number == records.page %}active{% endif %}">
-                <a
-                  class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=page_number, per_page=records.per_page) }}"
-                >
-                  {{ page_number }}
-                </a>
-              </li>
-            {% endfor %}
-
-            {% if records.page < records.pages - 2 %}
-              {% if records.page < records.pages - 3 %}
-                <li class="page-item disabled">
-                  <span class="page-link">…</span>
-                </li>
-              {% endif %}
-
-              <li class="page-item">
-                <a
-                  class="page-link"
-                  href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.pages, per_page=records.per_page) }}"
-                >
-                  {{ records.pages }}
-                </a>
-              </li>
-            {% endif %}
-
-            <li class="page-item {% if not records.has_next %}disabled{% endif %}">
-              <a
-                class="page-link"
-                href="{{ admin_interface.url_for('_AdminDbController.get_list', db_name=db_name, model_name=model_name, page=records.page + 1, per_page=records.per_page) }}"
-              >
-                {{ translate('next') }}
-              </a>
-            </li>
-
-          </ul>
-        </nav>
+        {{ pagination(pagination_pages, records.page, records.pages, records_page_url, translate('records_table_pagination')) }}
       </div>
     </div>
 
