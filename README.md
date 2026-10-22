@@ -179,6 +179,7 @@ package is not called `app`.
 | `patera dev [--app app:App] [--env-file .env]` | development server (uvicorn) with auto-reload. Loads `.env`, `.env.dev` or `.env.local` if no file is given. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `localhost:3000`). |
 | `patera prod [--app app:App] [--env-file .env.prod]` | production server ([Granian](https://github.com/emmett-framework/granian), installed with the `prod` extra: `uv add "patera[prod]"`), `DEBUG` is forced off. Only an environment file given with `--env-file` is loaded. Host/port from `PATERA_HOST`/`PATERA_PORT` (default `0.0.0.0:80`), event loop from `PATERA_LOOP`. |
 | `patera cli Controller:command [args...]` | runs a [CLI command](#command-line-interface). |
+| `patera cli agents [codex\|claude\|all]` | generates project instructions and Patera skills without loading an application. Defaults to Codex; supports `--dry-run` and `--force`. |
 | `patera test [--env-file FILE] [pytest args...]` | runs pytest after loading the test environment file (`.env.test` when the project has one). Pytest options may come in any order (`patera test -k login -q`); everything after `--` goes to pytest unchanged. |
 
 The application class is an ASGI application factory, so any ASGI server works, e.g.
@@ -787,6 +788,35 @@ class Config(BaseConfig):
 
 
 ## Command line interface
+
+### Generate coding-agent guidance
+
+Run from the project directory, including before an application exists:
+
+```sh
+patera cli agents             # AGENTS.md and .agents/skills/patera/
+patera cli agents claude      # CLAUDE.md and .claude/skills/patera/
+patera cli agents all         # both layouts; CLAUDE.md imports AGENTS.md
+patera cli agents all --dry-run
+```
+
+The bundled skill covers application construction, configuration, injection,
+controllers, requests/responses, middleware, errors, CLI controllers, WebSockets,
+templates, logging, testing, deployment, custom extensions, and all official
+extension packages. Its `SKILL.md` routes to focused reference files derived from
+the tutorial and architecture books; generation works offline from an installed
+package and does not require the books or optional extensions.
+
+Existing instruction files retain their content outside a marked Patera section.
+Repeated runs skip identical files. A conflicting skill file stops generation
+before any writes; use `--force` to replace those bundled files deliberately.
+Unrelated files are preserved. `--dry-run` never writes, even with `--force`.
+Malformed section markers and linked destinations require manual repair and are
+not bypassed by `--force`. Run the command in the intended project root: it writes
+to the current directory, without searching for an app or loading environment
+files. Application-only `--app`, `--env-file`, and `--list` options do not apply.
+
+### Application commands
 
 Maintenance commands are methods of CLI controllers:
 

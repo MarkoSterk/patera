@@ -93,7 +93,10 @@ def main():
         help="Path to environment variable file",
     )
 
-    start_cli_parser = subparsers.add_parser("cli")
+    start_cli_parser = subparsers.add_parser(
+        "cli",
+        epilog="Built-in: patera cli agents [codex|claude|all] [--dry-run] [--force]",
+    )
     start_cli_parser.add_argument(
         "--app",
         type=str,
@@ -145,6 +148,13 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.command == "cli" and args.command_name == "agents":
+        from .agents import run_agents
+
+        if args.app is not None or args.env_file is not None or args.list:
+            parser.error("agents does not accept --app, --env-file, or --list")
+        return run_agents(Path.cwd(), args.command_args)
 
     method = methods.get(args.command)
     if method is None:
