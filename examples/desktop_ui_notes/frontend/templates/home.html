@@ -1,8 +1,13 @@
-<h1>Python Notes</h1>
-<label>Filter notes <input name="filter" value="{{ component.search }}" @input="filter_notes"></label>
-<section data-bind="query.filter"><div data-bind="app.notes">
-<ul>{% for note in component.visible_notes %}
-<li><a href="{{ app.url_for('NoteDetail', note_id=note.id) }}">{{ note.title }}</a></li>
-{% else %}<li>No notes found.</li>{% endfor %}</ul>
-</div></section>
-<h2>Create a note</h2><note-form></note-form>
+<div class="page-heading"><div><p class="eyebrow">A LITTLE SPACE TO THINK</p><h1>Python Notes</h1><p class="muted">Pick up an idea, make a plan, or start something new.</p></div><a class="button primary" href="{{ app.url_for('NewNote') }}">Write a note ↗</a></div>
+<div class="stats-grid">
+  <section class="stat panel" data-bind="app.notes"><span class="muted">Your collection</span><strong>{{ data.notes|length }}</strong><span>notes on this device</span></section>
+  <section class="stat panel" data-bind="app.favorites"><span class="muted">Worth keeping close</span><strong>{{ data.favorites|length }}</strong><span>favorites this session</span></section>
+  <section class="stat panel" data-bind="app.notes"><span class="muted">Ideas captured</span><strong>{{ component.word_count }}</strong><span>words in your collection</span></section>
+</div>
+<div class="section-heading"><h2>Latest notes</h2><a href="{{ app.url_for('Library') }}">Open library →</a></div>
+<section data-bind="app.notes"><div class="note-grid">
+{% for note in data.notes[:6] %}{% include 'templates/card.html' %}{% else %}
+<div class="empty-state panel"><span class="empty-icon">✎</span><h2>A fresh page awaits</h2><p>Write your first note, or add a few examples to explore the workspace.</p><a class="button" href="{{ app.url_for('NewNote') }}">Create your first note</a></div>
+{% endfor %}</div></section>
+<section class="welcome-panel"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>Explore a fuller notebook</h2><p>Add six example notes to try the reading pane, favorites, and editor. Your existing notes stay in place.</p></div><div data-bind="loading_samples"><button @click="add_samples" {% if component.loading_samples %}disabled{% endif %}>{{ 'Adding notes…' if component.loading_samples else 'Add example notes' }}</button></div></section>
+<section class="panel draft-panel" data-bind="app.drafts"><h2>Unfinished thoughts</h2>{% for key, draft in data.drafts.items() %}<a class="draft-link" href="{{ app.url_for('NewNote') if key == 'new' else app.url_for('EditNote', note_id=key|int) }}"><span>{{ draft.title or 'Untitled draft' }}</span><span>Resume draft →</span></a>{% else %}<p class="muted">No drafts waiting. Drafts survive navigation until you close or reload this window.</p>{% endfor %}</section>

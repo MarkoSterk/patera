@@ -5,7 +5,7 @@ import sqlite3
 from pydantic import BaseModel, Field
 
 from patera import MediaType, Request, abort
-from patera.controller import Controller, consumes, get, path, post, put
+from patera.controller import Controller, consumes, delete, get, path, post, put
 from patera.desktop import user_data_dir
 
 
@@ -16,6 +16,20 @@ class NoteInput(BaseModel):
 
 @path("/api/notes")
 class NotesAPI(Controller):
+    @delete("/<int:note_id>")
+    async def remove(self, req: Request, note_id: int):
+        connection = self.connect()
+        try:
+            with connection:
+                cursor = connection.execute(
+                    "DELETE FROM notes WHERE id = ?", (note_id,)
+                )
+                if not cursor.rowcount:
+                    abort("Note not found", 404)
+            return req.res.json({"deleted": note_id})
+        finally:
+            connection.close()
+
     def connect(self):
         connection = sqlite3.connect(user_data_dir(self.app.app_name) / "notes.sqlite")
         connection.row_factory = sqlite3.Row

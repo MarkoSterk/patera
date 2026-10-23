@@ -1,0 +1,9 @@
+<div class="note-workspace">
+  <aside class="note-browser panel" aria-label="Note browser"><div class="note-browser-heading"><h2>Your notes</h2><a href="{{ app.url_for('Library') }}">All notes</a></div>
+    <label class="compact-label">Find a note<input type="search" name="browser-filter" placeholder="Filter titles…" value="{{ component.search }}" @input="filter_notes"></label>
+    <div class="note-browser-scroll"><div data-bind="search"><div data-bind="app.notes"><div data-bind="params.note_id">
+      {% for note in component.visible_notes %}<a class="note-browser-item" href="{{ app.url_for('NoteDetail', note_id=note.id) }}" {% if note.id == component.context.params.note_id %}aria-current="page"{% endif %}><strong>{{ note.title }}</strong><span>{{ note.body[:65] or 'Empty note' }}</span></a>{% else %}<p class="muted">No matching notes.</p>{% endfor %}
+    </div></div></div></div>
+  </aside>
+  <section class="note-reader panel"><div id="note-content"></div></section>
+</div>

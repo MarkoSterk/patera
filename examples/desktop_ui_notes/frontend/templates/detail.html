@@ -1,4 +1,3 @@
-<h1>{{ note.title }}</h1>
-<p style="white-space: pre-wrap">{{ note.body }}</p>
-<a href="{{ app.url_for('NotesHome') }}">All notes</a>
-<a href="{{ app.url_for('EditNote', note_id=note.id) }}">Edit note</a>
+<div class="reader-toolbar"><span class="card-kicker">NOTE / {{ '%03d'|format(note.id) }}</span><div class="actions"><span data-bind="app.favorites"><button class="quiet" @click="favorite" aria-pressed="{{ 'true' if note.id in data.favorites else 'false' }}">{{ '★ Favorited' if note.id in data.favorites else '☆ Favorite' }}</button></span><a class="button primary" href="{{ app.url_for('EditNote', note_id=note.id) }}">Edit note</a></div></div>
+<article class="note-article"><h1>{{ note.title }}</h1><p class="muted">{{ note.body.split()|length }} words · Stored on this device</p><div class="note-body">{{ note.body or 'This note has no content yet. Open the editor to add your thoughts.' }}</div></article>
+<div class="reader-footer" data-bind="confirm_delete">{% if component.confirm_delete %}<div class="delete-confirm" role="alert"><p>Delete this note permanently? This cannot be undone.</p><div class="actions"><button class="danger" @click="delete_note">Delete permanently</button><button @click="ask_delete">Keep note</button></div></div>{% else %}<button class="quiet danger-text" @click="ask_delete">Delete note</button>{% endif %}</div>

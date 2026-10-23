@@ -1,0 +1,5 @@
+<a class="note-card panel" href="{{ app.url_for('NoteDetail', note_id=note.id) }}">
+  <span class="card-kicker">NOTE / {{ '%03d'|format(note.id) }}</span><h3>{{ note.title }}</h3>
+  <p>{{ note.body[:160] or 'An empty page, full of possibilities.' }}{% if note.body|length > 160 %}…{% endif %}</p>
+  <span class="card-footer">{{ note.body.split()|length }} words <span aria-hidden="true">↗</span></span>
+</a>

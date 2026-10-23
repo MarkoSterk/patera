@@ -1,0 +1,7 @@
+<form @submit="save" class="note-editor">
+  <label>Title<input name="title" class="title-input" placeholder="Give your idea a name" required maxlength="200" value="{{ component.values.title }}" @input="changed"></label>
+  <label>Note<textarea name="body" rows="14" maxlength="100000" placeholder="Start writing…" @input="changed">{{ component.values.body }}</textarea></label>
+  <div class="editor-meta"><span data-bind="word_count">{{ component.word_count }} words</span><span>Drafts stay in this window until reload.</span></div>
+  <div class="editor-actions"><button class="primary" type="submit">{{ 'Save changes' if component.note_id else 'Save note' }}</button><button type="button" @click="discard">Discard draft</button></div>
+  <p class="form-status" data-bind="message" role="status">{{ component.message }}</p>
+</form>
