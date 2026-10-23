@@ -1,0 +1,20 @@
+[project]
+name = "patera-desktop-ui"
+version = "0.1.0"
+description = "Python browser UI for Patera desktop applications"
+readme = "README.md"
+license = "MIT AND MPL-2.0"
+license-files = ["LICENSE", "src/patera/desktop/ui/types/LICENSE-MPL-2.0"]
+requires-python = ">=3.13"
+dependencies = ["patera-desktop>=0.11.2", "jinja2>=3.1.6,<4", "markupsafe>=3.0,<4"]
+
+[tool.uv.sources]
+patera-desktop = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "patera.desktop.ui"
+source-include = ["tools/**", "docs/**"]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.13.0"]
+build-backend = "uv_build"

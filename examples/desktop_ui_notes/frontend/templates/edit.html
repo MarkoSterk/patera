@@ -1,0 +1,4 @@
+<h1>Edit note</h1><form @submit="save">
+<label>Title <input name="title" required maxlength="200" value="{{ note.title }}"></label>
+<label>Note <textarea name="body">{{ note.body }}</textarea></label>
+<button>Save changes</button></form>

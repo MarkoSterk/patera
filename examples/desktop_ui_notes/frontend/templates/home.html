@@ -1,0 +1,8 @@
+<h1>Python Notes</h1>
+<label>Filter notes <input name="filter" value="{{ component.search }}" @input="filter_notes"></label>
+<section data-bind="query.filter"><div data-bind="app.notes">
+<ul>{% for note in component.visible_notes %}
+<li><a href="{{ app.url_for('NoteDetail', note_id=note.id) }}">{{ note.title }}</a></li>
+{% else %}<li>No notes found.</li>{% endfor %}</ul>
+</div></section>
+<h2>Create a note</h2><note-form></note-form>

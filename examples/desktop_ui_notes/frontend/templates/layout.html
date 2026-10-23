@@ -1,0 +1,11 @@
+<style>
+body { font: 16px system-ui; margin: 0; color: #1d2939; background: #f8fafc; }
+header { display: flex; align-items: center; gap: 2rem; padding: 1rem 2rem; background: #fff; border-bottom: 1px solid #d0d5dd; }
+main { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+label { display: block; margin: 1rem 0; } input, textarea { display: block; width: 100%; box-sizing: border-box; padding: .6rem; }
+button { padding: .5rem 1rem; cursor: pointer; } a { color: #175cd3; } li { margin: .6rem 0; }
+</style>
+<header><strong>Python desktop notes</strong>
+<button @click="increment">Layout counter</button>
+<span data-bind="visits" id="layout-count">{{ component.visits }}</span>
+</header><main id="page"></main>

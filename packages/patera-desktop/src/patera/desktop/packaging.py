@@ -27,9 +27,12 @@ program on Windows. Needs ``pip install "patera-desktop[pyinstaller]"``.
 from __future__ import annotations
 
 import fnmatch
+import ast
+import importlib
 import importlib.util
 import json
 import os
+import pprint
 import re
 import subprocess
 import sys
@@ -191,6 +194,68 @@ def _relative(target: Path, start: Path) -> str:
         return target.as_posix()
 
 
+def desktop_contributions(app: Any, spec_file: Path) -> list[dict]:
+    """Optional desktop-only asset builders contributed by extensions."""
+    return [
+        extension.desktop_packaging(spec_file)
+        for extension in app.extensions.values()
+        if callable(getattr(extension, "desktop_packaging", None))
+    ]
+
+
+def prepare_desktop_assets(
+    contributions: list[dict], base_dir: str
+) -> list[tuple[str, str]]:
+    """Prepare extension assets when a generated or custom spec is executed.
+
+    Builder references are application-authored Python import paths, just like
+    the spec itself. No application instance is constructed by this helper.
+    """
+    datas = []
+    for contribution in contributions:
+        module, attribute = contribution["builder"].split(":")
+        builder = getattr(importlib.import_module(module), attribute)
+        datas.extend(builder(base_dir=base_dir, **contribution["options"]))
+    return datas
+
+
+def validate_desktop_assets(app: Any, spec_file: Path) -> None:
+    """Catch stale specs, including ones with an empty contribution list.
+
+    Only the literal DESKTOP_ASSETS setting is inspected; spec code is never
+    executed here. Custom specs keep this setting and the preparation call.
+    """
+    expected = desktop_contributions(app, spec_file)
+    if not expected:
+        return
+    tree = ast.parse(spec_file.read_text(encoding="utf-8"))
+    declared: list[dict] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "DESKTOP_ASSETS"
+            for target in node.targets
+        ):
+            try:
+                value = ast.literal_eval(node.value)
+                if isinstance(value, list):
+                    declared = value
+            except (ValueError, TypeError):
+                pass
+    builders = {item.get("builder") for item in declared if isinstance(item, dict)}
+    prepared = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "prepare_desktop_assets"
+        for node in ast.walk(tree)
+    )
+    if not prepared or any(item["builder"] not in builders for item in expected):
+        raise RuntimeError(
+            "This desktop spec is missing extension asset builds. Generate a new spec "
+            "with 'desktop:spec' or copy DESKTOP_ASSETS and the prepare_desktop_assets "
+            "call from a freshly generated spec before packaging."
+        )
+
+
 _SPEC_TEMPLATE = '''\
 # -*- mode: python ; coding: utf-8 -*-
 """
@@ -206,7 +271,7 @@ import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-from patera.desktop.packaging import HOOKS_FOLDER, package_files
+from patera.desktop.packaging import HOOKS_FOLDER, package_files, prepare_desktop_assets
 
 # The program's name: the name of its executable and folder.
 NAME = {name}
@@ -234,6 +299,8 @@ COLLECT_SUBMODULES = [PACKAGE, "uvicorn"]
 COLLECT_DATA = {collect_data}
 # More files and folders for the program: (source, folder in the program).
 DATAS = []
+# Optional extension builds. Executed by standalone PyInstaller builds too.
+DESKTOP_ASSETS = {desktop_assets}
 # More binaries, such as DLLs: (source, folder in the program).
 BINARIES = []
 # Modules left out: development tools that dependencies import optionally.
@@ -277,6 +344,7 @@ datas = package_files(_path(PACKAGE_PARENT), PACKAGE, PACKAGE_EXCLUDES)
 for package in COLLECT_DATA:
     datas += collect_data_files(package)
 datas += [(_path(source), target) for source, target in DATAS]
+datas += prepare_desktop_assets(DESKTOP_ASSETS, SPECPATH)
 if ENV_FILE and os.path.isfile(_path(ENV_FILE)):
     datas.append((_path(ENV_FILE), "."))
 icon = _path(ICON) if ICON else None
@@ -347,6 +415,7 @@ def spec_text(app: Any, spec_file: Path, root: Optional[Path] = None) -> str:
         "env_file": _relative(env_file, spec_file.resolve().parent),
     }
     literals = {key: _literal(value) for key, value in values.items()}
+    literals["desktop_assets"] = pprint.pformat(desktop_contributions(app, spec_file))
     return _SPEC_TEMPLATE.format(spec_name=spec_file.name, **literals)
 
 
@@ -432,6 +501,8 @@ def package(
             raise FileNotFoundError(f"There is no spec file {spec}.")
         spec = write_spec(app, build / DEFAULT_SPEC_FILE, overwrite=True, root=root)
     check_env_file(app, root)
+
+    validate_desktop_assets(app, spec)
 
     result = subprocess.run(
         pyinstaller_command(spec, output, build), cwd=root, check=False

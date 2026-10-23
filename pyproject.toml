@@ -82,6 +82,7 @@ members = [
     "packages/patera-email",
     "packages/patera-taskmanager",
     "packages/patera-desktop",
+    "packages/patera-desktop-ui",
     "examples/quick_exams",
 ]
 
@@ -96,6 +97,7 @@ patera-email = { workspace = true }
 patera-caching = { workspace = true }
 patera-migrate = { workspace = true }
 patera-desktop = { workspace = true }
+patera-desktop-ui = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.13.0"]
@@ -164,4 +166,5 @@ dev = [
     "pgvector>=0.4.2",
     "asyncpg>=0.30",
     "patera-desktop[pyinstaller]",
+    "patera-desktop-ui",
 ]

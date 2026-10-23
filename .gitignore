@@ -25,3 +25,4 @@ htmlcov/
 
 # Patera JSON Lines log files
 logs/
+legacy/

@@ -1,0 +1,4 @@
+<h1>{{ note.title }}</h1>
+<p style="white-space: pre-wrap">{{ note.body }}</p>
+<a href="{{ app.url_for('NotesHome') }}">All notes</a>
+<a href="{{ app.url_for('EditNote', note_id=note.id) }}">Edit note</a>

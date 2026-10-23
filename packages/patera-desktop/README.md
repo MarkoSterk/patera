@@ -15,6 +15,12 @@ uv add "patera-desktop[pyinstaller]"
 
 Requires Python 3.13 or newer and `patera>=0.121`.
 
+For Python-authored browser pages and components, install the optional
+`patera-desktop-ui` package and register `DesktopUI` alongside `Desktop`.
+It provides controller/page routing, offline PyScript bundles, and desktop
+packaging integration. See [the UI extension](../patera-desktop-ui/README.md).
+Applications using ordinary HTML/JavaScript do not need it.
+
 ## Running in a window
 
 Register the extension:

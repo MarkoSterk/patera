@@ -1,5 +1,6 @@
-from patera import Patera, app
 from patera.desktop import Desktop
+
+from patera import Patera, app
 
 from .configs import Config
 from .database import Databases

@@ -16,6 +16,7 @@ members = [
     "patera-caching",
     "patera-database",
     "patera-desktop",
+    "patera-desktop-ui",
     "patera-email",
     "patera-migrate",
     "patera-taskmanager",
@@ -1445,6 +1446,7 @@ dev = [
     { name = "mypy" },
     { name = "numpy" },
     { name = "patera-desktop", extra = ["pyinstaller"] },
+    { name = "patera-desktop-ui" },
     { name = "pgvector" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -1509,6 +1511,7 @@ dev = [
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "patera-desktop", extras = ["pyinstaller"], editable = "packages/patera-desktop" },
+    { name = "patera-desktop-ui", editable = "packages/patera-desktop-ui" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=8" },
@@ -1649,7 +1652,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.11.1"
+version = "0.11.2"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -1670,6 +1673,23 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.42.0" },
 ]
 provides-extras = ["pyinstaller"]
+
+[[package]]
+name = "patera-desktop-ui"
+version = "0.1.0"
+source = { editable = "packages/patera-desktop-ui" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "markupsafe" },
+    { name = "patera-desktop" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jinja2", specifier = ">=3.1.6,<4" },
+    { name = "markupsafe", specifier = ">=3.0,<4" },
+    { name = "patera-desktop", editable = "packages/patera-desktop" },
+]
 
 [[package]]
 name = "patera-email"
