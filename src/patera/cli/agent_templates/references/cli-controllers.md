@@ -28,7 +28,7 @@ can use `cli_session` from `patera.database.sql`; HTTP clients need `aclose()` i
 a CLI session.
 
 Use `patera cli --app app:App --env-file .env.tools greetings:repeat Ada` to
-select an app or environment. The built-in `patera cli agents [codex|claude|all]`
+select an app or environment. The built-in `patera agents [codex|claude|all]`
 instead generates instructions in the current directory without loading an app
 or environment. `--dry-run` previews; `--force` replaces conflicting skill files.
 

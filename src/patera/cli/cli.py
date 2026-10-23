@@ -4,13 +4,15 @@ Patera cli
 
 import argparse
 import sys
-from typing import Any, Callable
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
+from .agents import configure_agents_parser, run_agents
 from .start_project import (
+    start_cli,
     start_dev,
     start_prod,
-    start_cli,
     start_testing,
 )
 
@@ -19,6 +21,7 @@ methods: dict[str, Callable] = {
     "prod": start_prod,
     "cli": start_cli,
     "test": start_testing,
+    "agents": run_agents,
 }
 
 
@@ -60,6 +63,9 @@ def main():
 
     parser = argparse.ArgumentParser(prog="patera")
     subparsers = parser.add_subparsers(dest="command")
+    configure_agents_parser(
+        subparsers.add_parser("agents", help="Generate Patera instructions and skills")
+    )
 
     start_dev_parser = subparsers.add_parser("dev")
     start_dev_parser.add_argument(
@@ -93,10 +99,7 @@ def main():
         help="Path to environment variable file",
     )
 
-    start_cli_parser = subparsers.add_parser(
-        "cli",
-        epilog="Built-in: patera cli agents [codex|claude|all] [--dry-run] [--force]",
-    )
+    start_cli_parser = subparsers.add_parser("cli")
     start_cli_parser.add_argument(
         "--app",
         type=str,
@@ -148,13 +151,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    if args.command == "cli" and args.command_name == "agents":
-        from .agents import run_agents
-
-        if args.app is not None or args.env_file is not None or args.list:
-            parser.error("agents does not accept --app, --env-file, or --list")
-        return run_agents(Path.cwd(), args.command_args)
 
     method = methods.get(args.command)
     if method is None:

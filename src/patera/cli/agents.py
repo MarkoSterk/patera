@@ -1,10 +1,9 @@
 """Install the bundled Patera agent guidance without loading an application."""
 
 import argparse
+import sys
 from importlib.resources import files
 from pathlib import Path
-import sys
-
 
 PROFILES = {
     "codex": ("AGENTS.md", ".agents/skills/patera"),
@@ -136,10 +135,9 @@ def generate_agents(
     return 0
 
 
-def run_agents(root: Path, argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(
-        prog="patera cli agents",
-        description="Generate Patera instructions and skills in the current directory.",
+def configure_agents_parser(parser: argparse.ArgumentParser) -> None:
+    parser.description = (
+        "Generate Patera instructions and skills in the current directory."
     )
     parser.add_argument("agent", nargs="?", default="codex", choices=[*PROFILES, "all"])
     parser.add_argument(
@@ -150,9 +148,18 @@ def run_agents(root: Path, argv: list[str]) -> int:
         action="store_true",
         help="Replace conflicting Patera skill files; preserve other instructions",
     )
-    args = parser.parse_args(argv)
+
+
+def run_agents(
+    root: Path,
+    command: str,
+    agent: str = "codex",
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+) -> int:
     try:
-        return generate_agents(root, args.agent, dry_run=args.dry_run, force=args.force)
+        return generate_agents(root, agent, dry_run=dry_run, force=force)
     except (OSError, ValueError) as exc:
-        print(f"patera cli agents: {exc}", file=sys.stderr)
+        print(f"patera agents: {exc}", file=sys.stderr)
         return 1

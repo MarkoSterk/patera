@@ -1,8 +1,8 @@
 """Observable installation behavior and executable examples for agent guidance."""
 
-from importlib.resources import files
 import re
 import sys
+from importlib.resources import files
 
 import pytest
 
@@ -12,7 +12,7 @@ from patera.cli.cli import main
 
 def invoke(monkeypatch, root, *args):
     monkeypatch.chdir(root)
-    monkeypatch.setattr(sys, "argv", ["patera", "cli", "agents", *args])
+    monkeypatch.setattr(sys, "argv", ["patera", "agents", *args])
     return main()
 
 
@@ -152,12 +152,35 @@ def test_help_does_not_load_app_or_write(tmp_path, monkeypatch, capsys):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_top_level_help_lists_agents(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["patera", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+    assert "agents" in capsys.readouterr().out
+
+
+def test_cli_agents_is_no_longer_a_scaffolding_alias(tmp_path, monkeypatch):
+    from patera.cli import cli
+
+    captured = {}
+    monkeypatch.setitem(
+        cli.methods, "cli", lambda cwd, **kwargs: captured.update(kwargs)
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["patera", "cli", "agents", "claude"])
+    main()
+    assert captured["command_name"] == "agents"
+    assert captured["command_args"] == ["claude"]
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize(
     "option", [["--app", "missing:App"], ["--env-file", "missing"], ["--list"]]
 )
 def test_app_only_options_are_rejected(tmp_path, monkeypatch, option):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["patera", "cli", *option, "agents"])
+    monkeypatch.setattr(sys, "argv", ["patera", "agents", *option])
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 2
@@ -170,9 +193,9 @@ def example(topic):
         .joinpath("agent_templates", "references", topic + ".md")
         .read_text(encoding="utf-8")
     )
-    code = re.search(r"```python\n(.*?)```", text, re.S).group(1)
+    code = re.search(r"```python\n(.*?)```", text, re.DOTALL).group(1)
     namespace = {"__name__": "agent_example"}
-    exec(compile(code, topic + ".md", "exec"), namespace)
+    exec(compile(code, topic + ".md", "exec"), namespace)  # noqa: S102 - trusted bundled examples
     return namespace
 
 
