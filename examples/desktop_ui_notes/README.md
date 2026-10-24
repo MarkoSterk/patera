@@ -9,9 +9,15 @@ and lock its actual paths/versions with `patera cli ui:lock-runtime`. See the
 Then run:
 
 ```sh
-patera cli ui:build
-patera cli desktop:run
+patera cli ui:run
 ```
+
+`ui:run` builds the UI, watches for frontend changes, and opens the desktop
+window. Closing the window or pressing Ctrl+C stops the watcher and backend.
+An in-progress build finishes before the watcher exits. Failed rebuilds retain
+the last working UI; an initial build failure prevents launch.
+Use `patera cli ui:run prod` to build and launch without watching.
+`ui:build`, `ui:watch`, and `desktop:run` remain available separately.
 
 Or use `patera dev` and open `http://127.0.0.1:3000/app/` (use the configured
 server port). Notes persist in `user_data_dir("Patera Python Notes")/notes.sqlite`.

@@ -14,6 +14,7 @@ from .view import View, TemplateEngine
 from .cache import TemplateCache
 from .lifecycle import Lifecycle, run_hooks, Scope
 from .metadata import AuthenticationError, AuthorizationError, Page
+from .updates import Diagnostics
 
 if TYPE_CHECKING:
     from .browser import APIClient, Browser
@@ -52,6 +53,7 @@ class PageContext:
                 awaitable.close()
             raise RuntimeError("Page scope is closed")
         task = asyncio.create_task(awaitable)
+        self.app.diagnostics.track_task(task)
         self._tasks.add(task)
         task.add_done_callback(self._completed)
         return task
@@ -108,7 +110,11 @@ class Application:
         templates_cache_duration=300,
         templates_cache_cleanup_interval=60,
         server_components_url=None,
+        batch_updates: bool = False,
+        diagnostics: bool = False,
     ) -> None:
+        self.batch_updates = batch_updates
+        self.diagnostics = Diagnostics(diagnostics)
         if import_name is not None:
             from .components import Component
             from .controller import Controller
@@ -286,6 +292,7 @@ class Application:
                     )
 
         task = asyncio.create_task(report())
+        self.diagnostics.track_task(task)
         self._error_tasks.add(task)
         task.add_done_callback(self._error_tasks.discard)
 
@@ -303,7 +310,7 @@ class Application:
         generation = self._generation
         if self._navigation_scope:
             self._navigation_scope.cancel()
-        scope = self._navigation_scope = Scope()
+        scope = self._navigation_scope = Scope(diagnostics=self.diagnostics)
         if self._pending:
             self._pending.cancel()
         context = PageContext(self, url)
@@ -449,6 +456,33 @@ class Application:
         self.api = None
         self.context = None
 
+    async def flush(self) -> None:
+        """Commit queued binding updates, independently of browser frame delivery.
+
+        This is a DOM commit barrier, not a wait for network requests, component
+        initialization, event tasks, or a browser paint.
+        """
+        if self.adapter:
+            self.adapter.updates.drain()
+
+    def diagnostics_snapshot(self):
+        result = self.diagnostics.snapshot()
+        result["resources"] = (
+            self.adapter.resources()
+            if self.adapter
+            else dict(
+                components=0,
+                tasks=sum(not task.done() for task in self.diagnostics.tasks),
+                listeners=0,
+                proxies=0,
+                subscriptions=len(self.data._subscribers)
+                + sum(len(items) for items in self._listeners.values()),
+                fragments=0,
+                queued_components=0,
+            )
+        )
+        return result
+
     async def _clean_cache(self):
         while self.adapter:
             delay = self.templates_cache_cleanup_interval
@@ -538,7 +572,7 @@ class Application:
         self._error_rendering = True
         if self._navigation_scope and self._pending is not asyncio.current_task():
             self._navigation_scope.cancel()
-        scope = self._navigation_scope = Scope()
+        scope = self._navigation_scope = Scope(diagnostics=self.diagnostics)
         self._generation += 1
         generation = self._generation
         if self._pending and self._pending is not asyncio.current_task():

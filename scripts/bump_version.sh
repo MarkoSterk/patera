@@ -1,22 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-part="${1:-patch}"
-
-if [[ "$part" != "major" && "$part" != "minor" && "$part" != "patch" ]]; then
-  echo "Usage: ./scripts/bump_version.sh [major|minor|patch]"
-  exit 1
-fi
-
-echo "Bumping patera ($part)..."
-uv version --package patera --bump "$part"
-
-for dir in packages/*; do
-  if [[ -f "$dir/pyproject.toml" ]]; then
-    pkg="$(basename "$dir")"
-    echo "Bumping $pkg ($part)..."
-    uv version --package "$pkg" --bump "$part"
-  fi
-done
-
-echo "Done."
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec uv run --no-project "$script_dir/release.py" bump "$@"

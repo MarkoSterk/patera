@@ -192,6 +192,12 @@ other non-Python assets are served below the build's `public/` URL.
 
 Builds are content-addressed and switch `current.json` atomically. Re-run
 `ui:build` after edits, or run `patera cli ui:watch` in another terminal.
+For a single-command desktop workflow, use `patera cli ui:run`: it builds first,
+watches in a background thread, and runs the desktop window on the main thread.
+Closing the window or Ctrl+C stops the watcher; any active build finishes before
+exit. The desktop extension handles backend shutdown. Initial build failures
+prevent launch; subsequent failures retain the working build. `ui:run prod`
+builds and launches without watching. Both modes require the Desktop extension.
 Development windows (`DEBUG=True`) poll the build version and reload after a
 successful build. Failed builds preserve the working version. Previous builds
 remain available to already-open windows. Frozen applications never poll or
@@ -280,6 +286,139 @@ Import `PageContext` to annotate page handlers as
 `patera.desktop.ui.types` under `TYPE_CHECKING`, with postponed annotations.
 These stubs describe the original browser event proxy; they do not wrap or
 convert events. Narrow or cast event targets to access element-specific fields.
+
+## Reactive update scheduling and diagnostics
+
+Existing applications keep synchronous binding updates. Opt into frame batching
+when constructing the frontend application:
+
+```python
+app = Application(__name__, batch_updates=True, diagnostics=True)
+
+# Inside an async component handler:
+self.count += 1                 # Python reads see the new value immediately
+self.count += 1
+await self.flush()               # or await app.flush()
+```
+
+With batching, repeated invalidations of a binding are combined. A selected
+parent fragment also covers its selected descendants. Normal commits run on the
+next animation frame; explicit `flush()` commits without waiting for a frame,
+including when the window is hidden. Updates caused during rendering are handled
+in subsequent batches, with a 100-batch limit to surface update loops. Disposing a
+component removes its queued work. Full `rerender()` remains an explicit async
+operation; batching applies to reactive binding/text/value updates.
+
+`flush()` is a DOM commit barrier for queued bindings, not a paint, network,
+initialization, or event-task barrier. After inserting components through a
+binding, use `await self.wait_children()` if their initialization must
+finish before continuing. `insert_html()` and `hydrate()` already wait for
+non-deferred children. Initial rendering resolves `init_complete` after those
+children and `BEFORE_INIT_RESOLVE`; `AFTER_INIT` and `mounted()` run afterward.
+Explicit `rerender()` waits for children before `AFTER_RERENDER`. Fragment updates
+do not invoke full-render lifecycle hooks. A newer render or disposal prevents
+obsolete asynchronous results from committing.
+
+Fragment commits retain listeners outside the replaced subtree, hydrate only
+inserted nodes, and skip identical output. Binding identifiers remain stable
+when an unchanged parent recreates its nested bindings. Form submission and
+explicit event modifiers still cancel events during synchronous DOM dispatch.
+Ordinary list bindings still replace their rendered range. Use the opt-in list
+blocks below for keyed reconciliation or virtualization.
+
+Diagnostics are disabled by default. With `diagnostics=True`, inspect
+`app.diagnostics_snapshot()` for aggregate counts and timings in milliseconds:
+template evaluation, DOM replacement, hydration, listener addition/removal,
+initialization, and cleanup. Initialization/cleanup timings include awaited work;
+nested measurements overlap and must not be summed as a total. The snapshot also
+counts registered components, component/browser tasks, listeners/proxies,
+subscriptions, fragments, and queued components. These are framework resource
+counts, not total Python/WebAssembly memory or arbitrary user-created tasks.
+`app.diagnostics.reset()` resets measurements without changing live resources.
+Snapshots contain copied numeric data, not retained component/event references.
+
+See `tests/browser/framework_updates.cjs` for isolated framework workloads and
+`tests/browser/BENCHMARKS.md` for running the browser checks and comparisons.
+
+## Keyed lists
+
+Use a Jinja `keyed` block where a `data-bind` loop would otherwise replace every
+row. The block name is the invalidation name, just like a normal binding:
+
+```html
+<ul>
+  {% keyed "items" %}
+    {% for item in component.items %}
+      <li data-ui-key="{{ item.id }}">
+        <input value="{{ item.title }}">
+        <button @click="remove" :item="{{ item.id }}">Remove</button>
+      </li>
+    {% endfor %}
+  {% endkeyed %}
+</ul>
+```
+
+For example, an `items = react_factory(list)` field invalidates this block on
+assignment. Every direct row needs a stable, unique, non-empty `data-ui-key`.
+Keys describe item identity, so avoid array positions when items can move.
+Missing/duplicate keys and malformed row HTML fail before DOM reconciliation.
+Use explicitly balanced HTML; for table rows put the block inside a `<tbody>`.
+
+Matching keys and element types retain their row nodes. The framework patches
+changed text and declared attributes, creates new rows, removes obsolete rows,
+and moves existing rows without remounting their Patera child components. Input
+edits remain intact when their declared value did not change; an explicitly
+changed value updates the field. Focus and selection survive moves of retained
+elements. Event handlers are rebound only where their declarations changed.
+
+A mounted child component owns its interior. Its host and local Python state
+survive a move; changed `:argument`/`data-ui-arg-*` values update `args` and schedule
+its normal `rerender()` lifecycle. After `await self.flush()`, use
+`await self.wait_children()` to await new child initialization and pending list
+argument updates. Removed children are disposed. Changing a row's key or element
+type deliberately replaces it. Deferred children receive new arguments without
+being initialized automatically. These guarantees cover framework-controlled moves
+within the list, not arbitrary DOM moves across component/application owners.
+
+Nested ordinary `bind`/`data-bind` regions inside rows are supported. Place a
+nested keyed or virtual list in a child Component so it has its own renderer and
+lifetime. Keyed rendering still evaluates the entire loop; it reduces DOM and
+lifecycle churn, rather than the amount of row-template evaluation.
+
+## Fixed-height virtual lists
+
+For a large sequence, a `virtual` block evaluates and mounts only a visible
+window plus overscan. Its body receives `item` and zero-based `index`:
+
+```html
+{% virtual "items", component.items, key="id", row_height=40, height=400, overscan=3 %}
+  <span>{{ item.title }}</span>
+  <button @click="open" :item="{{ item.id }}">Open</button>
+{% endvirtual %}
+```
+
+`key` is a mapping key, object attribute name, or callable such as
+`key=component.item_key`. Key values must be non-empty strings or integers and
+must be unique across the sequence (integer `1` and string `"1"` collide).
+`row_height` and viewport `height` are positive pixel sizes; `overscan` is a
+non-negative integer. Defaults are 40, 400, and 3 respectively. The framework
+provides a scroll viewport, spacer elements, fixed-height row wrappers, and
+list/listitem roles with position and total-size attributes. Keep row content
+within the configured height; variable-height rows and automatic measurement
+are not supported. Use a normal block container, not a table or select element.
+
+Scroll updates are frame-coalesced in either application update mode, and a
+scroll that stays within the same rendered window does not reevaluate templates.
+The viewport and overlapping keyed rows retain identity. Filtering clamps the
+scroll offset when the sequence shrinks; empty sequences remove all rows.
+Off-screen rows are disposed, so keep persistent edits/selection in application
+state rather than solely in a row component. Keyboard focus on a row removed
+from the window is not pinned or restored automatically.
+
+The items expression and keys are reevaluated on invalidation; key validation
+still scans the sequence. Only row-template evaluation, DOM size, and mounted
+row components are bounded by the viewport. These APIs add no frontend runtime
+dependencies and keep Jinja2 as the template engine.
 
 ## Browser type library
 

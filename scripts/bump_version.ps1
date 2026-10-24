@@ -1,21 +1,12 @@
 param(
     [ValidateSet("major", "minor", "patch")]
-    [string]$Part = "patch"
+    [string]$Part = "patch",
+    [switch]$UpdateDependencyFloors,
+    [switch]$DryRun
 )
-
 $ErrorActionPreference = "Stop"
-
-$packages = @("patera")
-
-Get-ChildItem "packages" -Directory | ForEach-Object {
-    if (Test-Path "$($_.FullName)\pyproject.toml") {
-        $packages += $_.Name
-    }
-}
-
-foreach ($pkg in $packages) {
-    Write-Host "Bumping $pkg ($Part)..."
-    uv version --package $pkg --bump $Part
-}
-
-Write-Host "Done."
+$releaseArgs = @("bump", $Part)
+if ($UpdateDependencyFloors) { $releaseArgs += "--update-dependency-floors" }
+if ($DryRun) { $releaseArgs += "--dry-run" }
+& uv run --no-project (Join-Path $PSScriptRoot "release.py") @releaseArgs
+if ($LASTEXITCODE -ne 0) { throw "Release command failed (exit code $LASTEXITCODE)" }

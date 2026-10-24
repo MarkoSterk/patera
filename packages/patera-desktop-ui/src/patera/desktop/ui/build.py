@@ -27,6 +27,8 @@ PORTABLE_MODULES = (
     "cache.py",
     "metadata.py",
     "properties.py",
+    "updates.py",
+    "lists.py",
 )
 SOURCE_SUFFIXES = {
     ".py",

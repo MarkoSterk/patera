@@ -1,6 +1,6 @@
 ---
 name: patera
-description: Build, test, and maintain Python applications and extensions using the Patera framework. Use for Patera configuration, controllers, middleware, exception handlers, CLI commands, services, and integrations.
+description: Build, test, and maintain Python applications and extensions using the Patera framework. Use for Patera configuration, controllers, middleware, exception handlers, CLI commands, services, desktop windows, Python browser UIs, and integrations.
 ---
 
 # Patera
@@ -8,7 +8,7 @@ description: Build, test, and maintain Python applications and extensions using 
 Use the project's installed Patera version and existing application conventions.
 These references describe the APIs bundled with this Patera release; check the
 installed source when upgrading. They are distilled from the Patera tutorial and
-architecture books, with the experimental AI package checked against its source.
+architecture books, with experimental package guidance checked against its source.
 
 Read only the references relevant to the task:
 
@@ -38,6 +38,7 @@ Read only the references relevant to the task:
 | Declarative HTTP clients | [API interfaces](references/apiinterface.md) |
 | Experimental AI services | [AI interfaces](references/aiinterface.md) |
 | Experimental desktop applications | [desktop](references/desktop.md) |
+| Python/PyScript SPA pages, components, reactive lists, UI builds | [desktop UI](references/desktop-ui.md) |
 
 ## Working conventions
 

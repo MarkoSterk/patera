@@ -114,14 +114,20 @@ class Component:
         self.args: dict[str, Any] = {}
         self.parent = None
         self.context = app.context
-        self.scope = Scope(lambda error: app.report_error(error, self.context))
+        self.scope = Scope(
+            lambda error: app.report_error(error, self.context),
+            diagnostics=app.diagnostics,
+        )
         self.initialization_state = "pending"
         self.initialization_error = None
         self._init_complete = None
         self._initializing = None
         self._render_scope = None
         self._disposed = False
+        self._dispose_complete = asyncio.Event()
+        self._disposing_task = None
         self._renderer = None
+        self._render_revision = 0
 
     @property
     def init_complete(self):
@@ -149,10 +155,16 @@ class Component:
 
     async def init_element(self):
         if self._initializing is None:
-            self._initializing = asyncio.create_task(self._initialize())
+            self._initializing = self.app.diagnostics.track_task(
+                asyncio.create_task(self._initialize())
+            )
         return await self.scope.wait(self._initializing, shared=True)
 
     async def _initialize(self):
+        with self.app.diagnostics.measure("initialization"):
+            await self._initialize_element()
+
+    async def _initialize_element(self):
         try:
             for dependency in dict.fromkeys(
                 d
@@ -242,9 +254,11 @@ class Component:
 
     async def _render(self, *, initial=False):
         self.scope.check()
+        self._render_revision += 1
+        revision = self._render_revision
         if self._render_scope:
             self._render_scope.cancel()
-        scope = self._render_scope = Scope()
+        scope = self._render_scope = Scope(diagnostics=self.app.diagnostics)
         try:
             if not initial:
                 await self.scope.wait(
@@ -267,21 +281,28 @@ class Component:
             scope.check()
             self.scope.check()
             if isinstance(source, Template):
-                markup, renderer = self.app.template_engine.render(
-                    source,
-                    component=self,
-                    app=self.app,
-                    data=self.app.data,
-                    query=self.app.query_parameters,
-                    params=self.context.params if self.context else {},
-                    args=self.args,
-                    ctx=self.context,
-                )
+                with self.app.diagnostics.measure("template"):
+                    markup, renderer = self.app.template_engine.render(
+                        source,
+                        component=self,
+                        app=self.app,
+                        data=self.app.data,
+                        query=self.app.query_parameters,
+                        params=self.context.params if self.context else {},
+                        args=self.args,
+                        ctx=self.context,
+                    )
             else:
                 markup, renderer = source, None
-            await self.scope.wait(
-                scope.wait(self.app.adapter.render_component(self, markup, renderer))
-            )
+
+            async def commit():
+                scope.check()
+                self.scope.check()
+                if revision != self._render_revision:
+                    raise asyncio.CancelledError()
+                await self.app.adapter.render_component(self, markup, renderer)
+
+            await self.scope.wait(scope.wait(commit()))
             if not initial:
                 await self.scope.wait(scope.wait(self.app.adapter.wait_children(self)))
                 await self.scope.wait(
@@ -294,6 +315,16 @@ class Component:
 
     async def rerender(self):
         await self._render()
+
+    async def flush(self):
+        """Commit the application's queued binding updates; does not await paint."""
+        self.scope.check()
+        await self.app.flush()
+
+    async def wait_children(self):
+        """Wait for non-deferred child initialization and pending list arg updates."""
+        self.scope.check()
+        await self.scope.wait(self.app.adapter.wait_children(self))
 
     def invalidate(self, binding):
         if not self.scope.closed and self.app.adapter:
@@ -335,8 +366,23 @@ class Component:
 
     async def dispose(self):
         if self._disposed:
+            if asyncio.current_task() is not self._disposing_task:
+                await self._dispose_complete.wait()
             return
         self._disposed = True
+        self._disposing_task = asyncio.current_task()
+        try:
+            await self._dispose()
+        finally:
+            self._renderer = None
+            self._disposing_task = None
+            self._dispose_complete.set()
+
+    async def _dispose(self):
+        self._render_revision += 1
+        updates = getattr(self.app.adapter, "updates", None)
+        if updates:
+            updates.discard(self)
         self.scope.cancel()
         if self._render_scope:
             self._render_scope.cancel()
@@ -344,9 +390,12 @@ class Component:
             self._initializing.cancel()
         if not self.init_complete.done():
             self.init_complete.cancel()
-        await self.scope.close()
-        await run_hooks(self, Lifecycle.AFTER_DISCONNECT)
-        await invoke(self.unmounted)
+        with self.app.diagnostics.measure("cleanup"):
+            try:
+                await self.scope.close()
+                await run_hooks(self, Lifecycle.AFTER_DISCONNECT)
+            finally:
+                await invoke(self.unmounted)
 
     def markup(self):
         return None

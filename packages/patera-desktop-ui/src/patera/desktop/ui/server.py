@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import sys
+import threading
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -344,31 +345,64 @@ class DesktopUICLI(CLIController):
 
     @command("watch", help="Rebuild changed UI sources; development windows reload")
     async def watch(self):
+        stop = threading.Event()
+        worker = threading.Thread(
+            target=self._watch, args=(stop,), name="patera-ui-watch"
+        )
+        worker.start()
+        try:
+            while worker.is_alive():
+                await asyncio.sleep(0.5)
+        finally:
+            stop.set()
+            worker.join()
+
+    @command("run", help="Build UI and open desktop; watch in dev mode (dev or prod)")
+    async def run(self, mode: str = "dev") -> None:
+        from patera.desktop import Desktop
+
+        if mode not in {"dev", "prod"}:
+            raise ValueError("Mode must be 'dev' or 'prod'.")
+        desktop = self.app.get_extension(Desktop)
+        # Snapshot before building so edits made during the build are not missed.
+        previous = self._snapshot() if mode == "dev" else None
+        await self.build()
+        stop = threading.Event()
+        worker = None
+        try:
+            if mode == "dev":
+                worker = threading.Thread(
+                    target=self._watch, args=(stop, previous), name="patera-ui-watch"
+                )
+                worker.start()
+            # GUI toolkits require the main thread; Desktop owns server cleanup.
+            desktop.run(mode)
+        finally:
+            stop.set()
+            if worker is not None:
+                worker.join()
+
+    def _snapshot(self):
         source, runtime, _ = self.extension.paths()
         roots = (source, runtime, Path(__file__).parent)
+        return tuple(
+            (str(file), file.stat().st_mtime_ns, file.stat().st_size)
+            for root in roots
+            for file in sorted(root.rglob("*"))
+            if file.is_file() and "__pycache__" not in file.parts
+        )
 
-        def snapshot():
-            return tuple(
-                (str(file), file.stat().st_mtime_ns, file.stat().st_size)
-                for root in roots
-                for file in sorted(root.rglob("*"))
-                if file.is_file() and "__pycache__" not in file.parts
-            )
-
-        previous = None
-        while True:
-            current = snapshot()
-            if current != previous:
-                previous = current
-                try:
-                    manifest = await asyncio.to_thread(self.extension.build)
+    def _watch(self, stop, previous=None):
+        while not stop.is_set():
+            try:
+                current = self._snapshot()
+                if current != previous:
+                    previous = current
+                    manifest = self.extension.build()
                     print(f"Built UI {manifest['id']}", flush=True)
-                except Exception as error:
-                    print(
-                        f"UI build failed (previous build retained): {error}",
-                        flush=True,
-                    )
-            await asyncio.sleep(0.5)
+            except Exception as error:
+                print(f"UI build failed (previous build retained): {error}", flush=True)
+            stop.wait(0.5)
 
     @command("lock-runtime", help="Hash a complete local PyScript/Pyodide runtime")
     async def lock_runtime(

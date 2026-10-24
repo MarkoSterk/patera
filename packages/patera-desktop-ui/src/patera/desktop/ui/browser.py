@@ -113,6 +113,7 @@ class Browser:
         self.components = {}
         self.component_types = {}
         self.tasks = set()
+        self.disposals = set()
         self.proxies = []
         self.next_id = 0
         self.closed = False
@@ -123,9 +124,56 @@ class Browser:
         self.rendered_context = None
         self.reload_url = config.get("reload_url")
         self.build_id = config.get("build_id")
+        from .updates import UpdateQueue
+
+        self.updates = UpdateQueue(self.commit_updates, self.schedule_updates)
+        self._frame_callback = None
+        self._frame_proxy = create_proxy(self._on_frame)
+        self.proxies.append(self._frame_proxy)
+
+    def schedule_updates(self, callback):
+        self._frame_callback = callback
+        identifier = window.requestAnimationFrame(self._frame_proxy)
+
+        def cancel():
+            window.cancelAnimationFrame(identifier)
+            self._frame_callback = None
+
+        return cancel
+
+    def _on_frame(self, timestamp):
+        callback = self._frame_callback
+        if callback:
+            try:
+                callback()
+            except Exception as error:
+                self.app.report_error(error)
+
+    def resources(self):
+        instances = [record["instance"] for record in self.components.values()]
+        tasks = set(self.tasks) | set(self.app.diagnostics.tasks)
+        for instance in instances:
+            tasks.update(instance.scope.tasks)
+        listeners = len(self.listeners) + sum(
+            len(r["listeners"]) for r in self.components.values()
+        )
+        return dict(
+            components=len(instances),
+            tasks=sum(not task.done() for task in tasks),
+            listeners=listeners,
+            proxies=listeners + len(self.proxies),
+            subscriptions=sum(len(item.state._subscribers) for item in instances)
+            + len(self.app.data._subscribers)
+            + sum(len(items) for items in self.app._listeners.values()),
+            fragments=sum(
+                len(item._renderer.fragments) for item in instances if item._renderer
+            ),
+            queued_components=len(self.updates.pending),
+        )
 
     def spawn(self, awaitable):
         task = asyncio.create_task(awaitable)
+        self.app.diagnostics.track_task(task)
         self.tasks.add(task)
 
         def completed(done):
@@ -137,18 +185,35 @@ class Browser:
         return task
 
     def listen(self, element, name, callback, collection=None):
-        proxy = create_proxy(callback)
-        element.addEventListener(name, proxy)
-        (self.listeners if collection is None else collection).append(
-            (element, name, proxy)
-        )
+        with self.app.diagnostics.measure("listeners_add"):
+            proxy = create_proxy(callback)
+            try:
+                element.addEventListener(name, proxy)
+            except BaseException:
+                proxy.destroy()
+                raise
+            (self.listeners if collection is None else collection).append(
+                (element, name, proxy)
+            )
+        self.app.diagnostics.count("listeners_added")
 
-    @staticmethod
-    def unlisten(collection):
-        for element, name, proxy in collection:
-            element.removeEventListener(name, proxy)
-            proxy.destroy()
-        collection.clear()
+    def unlisten(self, collection):
+        with self.app.diagnostics.measure("listeners_remove"):
+            for element, name, proxy in collection:
+                element.removeEventListener(name, proxy)
+                proxy.destroy()
+            self.app.diagnostics.count("listeners_removed", len(collection))
+            collection.clear()
+
+    def prune_listeners(self, instance):
+        record = self.record(instance)
+        if record is None:
+            return
+        retained, removed = [], []
+        for entry in record["listeners"]:
+            (retained if instance.element.contains(entry[0]) else removed).append(entry)
+        self.unlisten(removed)
+        record["listeners"] = retained
 
     def relative(self, pathname):
         if pathname == self.mount:
@@ -495,20 +560,63 @@ class Browser:
             raise asyncio.CancelledError()
         if markup is not None:
             self.unlisten(record["listeners"])
-            instance.element.innerHTML = str(markup)
+            with self.app.diagnostics.measure("dom"):
+                instance.element.innerHTML = str(markup)
         instance._renderer = renderer
         self.hydrate(instance)
         for name, value in instance.state._values.items():
-            self.state_changed(instance, name, value)
+            self.update_state(instance, name, value)
 
-    def hydrate(self, instance):
+    def hydrate(self, instance, roots=None, *, direct=()):
+        with self.app.diagnostics.measure("hydrate"):
+            self._hydrate(instance, roots, direct=direct)
+
+    def _hydrate(self, instance, roots=None, *, direct=()):
         record = self.record(instance)
         if record is None or instance.scope.closed:
             return
-        self.unlisten(record["listeners"])
-        for node in instance.element.querySelectorAll("*"):
+        if roots is None:
+            self.unlisten(record["listeners"])
+            nodes = list(instance.element.querySelectorAll("*"))
+        else:
+            nodes = []
+            for root in roots:
+                if int(root.nodeType) == 1:
+                    nodes.extend([root, *root.querySelectorAll("*")])
+        for node in direct:
+            if node not in nodes:
+                nodes.append(node)
+        self.app.diagnostics.count("hydration_nodes", len(nodes))
+        remember = instance._renderer and any(
+            mode != "replace" for mode in instance._renderer.modes.values()
+        )
+        for node in nodes:
             if not self.owned(instance, node):
                 continue
+            if remember:
+                window.pateraUI.remember(node)
+            if node.hasAttribute("data-ui-virtual"):
+                node.scrollTop = float(node.getAttribute("data-ui-scroll-top") or 0)
+
+                def scrolled(event, node=node):
+                    renderer = instance._renderer
+                    identifier = str(node.getAttribute("data-ui-virtual"))
+                    if renderer and identifier in renderer.fragments:
+                        top = float(node.scrollTop)
+                        renderer.virtual_offsets[identifier] = top
+                        settings = renderer.virtual_windows.get(identifier)
+                        if settings:
+                            from .lists import window_bounds
+
+                            count, row_height, height, overscan, start, end = settings
+                            bounds = window_bounds(
+                                count, top, row_height, height, overscan
+                            )
+                            if bounds[:2] == (start, end):
+                                return
+                        self.updates.add(instance, renderer.fragments[identifier][0])
+
+                self.listen(node, "scroll", scrolled, record["listeners"])
             for attribute in list(node.attributes):
                 name, method_name = str(attribute.name), str(attribute.value)
                 prefix = next(
@@ -556,8 +664,12 @@ class Browser:
                 self.listen(node, event_name, callback, record["listeners"])
 
     def state_changed(self, instance, name, value):
+        self.invalidate(instance, name)
+
+    def update_state(self, instance, name, value):
         if instance.scope.closed:
             return
+        removed_elements = False
         for node in [
             instance.element,
             *instance.element.querySelectorAll("[data-ui-text], [data-ui-value]"),
@@ -565,22 +677,98 @@ class Browser:
             if not self.owned(instance, node):
                 continue
             if str(node.getAttribute("data-ui-text")) == name:
-                node.textContent = str(value)
+                if str(node.textContent) != str(value):
+                    removed_elements |= bool(node.childElementCount)
+                    node.textContent = str(value)
             if str(node.getAttribute("data-ui-value")) == name and str(
                 node.value
             ) != str(value):
                 node.value = str(value)
-        self.invalidate(instance, name)
+        if removed_elements:
+            self.prune_listeners(instance)
 
     def invalidate(self, instance, binding):
-        if instance.scope.closed or instance._renderer is None:
+        if instance.scope.closed or self.closed:
+            return
+        self.app.diagnostics.count("invalidations")
+        if self.app.batch_updates:
+            self.updates.add(instance, binding)
+        else:
+            self.commit_updates(instance, {binding})
+
+    def commit_updates(self, instance, bindings):
+        if instance.scope.closed or self.record(instance) is None:
             return
         try:
-            for identifier, markup in instance._renderer.refresh(binding):
-                window.pateraUI.replaceBinding(instance.element, identifier, markup)
-            self.hydrate(instance)
+            self.app.diagnostics.count("commits")
+            inserted = []
+            changed = []
+            components = []
+            if instance._renderer is not None:
+                with self.app.diagnostics.measure("template"):
+                    changes = instance._renderer.refresh_many(
+                        bindings, skip_unchanged=True
+                    )
+                with self.app.diagnostics.measure("dom"):
+                    for identifier, markup in changes:
+                        mode = instance._renderer.modes.get(identifier, "replace")
+                        nodes = window.pateraUI.replaceBinding(
+                            instance.element, identifier, markup, mode
+                        )
+                        if not is_none(nodes):
+                            if mode == "replace":
+                                inserted.extend(nodes)
+                            else:
+                                inserted.extend(nodes.inserted)
+                                changed.extend(nodes.changed)
+                                components.extend(nodes.components)
+                        self.app.diagnostics.count(
+                            "fragment_replacements"
+                            if mode == "replace"
+                            else "list_reconciliations"
+                        )
+                if changes:
+                    self.prune_listeners(instance)
+                    record = self.record(instance)
+                    if record:
+                        removed = [
+                            entry
+                            for entry in record["listeners"]
+                            if entry[0] in changed
+                        ]
+                        record["listeners"] = [
+                            entry
+                            for entry in record["listeners"]
+                            if entry[0] not in changed
+                        ]
+                        self.unlisten(removed)
+                    self.hydrate(instance, inserted, direct=changed)
+                    for node in components:
+                        child = self.components.get(
+                            str(node.getAttribute("data-ui-instance"))
+                        )
+                        if child:
+                            args = self.arguments(node)
+                            target = child["instance"]
+                            target.context = instance.context
+                            if target.args != args:
+                                target.args = args
+                                if (
+                                    not node.hasAttribute("defer")
+                                    or target._initializing is not None
+                                ):
+                                    child["update_task"] = target.spawn(
+                                        self.update_child(target)
+                                    )
+            for name in bindings:
+                if name in instance.state._values:
+                    self.update_state(instance, name, instance.state[name])
         except Exception as error:
             self.app.report_error(error, instance.context)
+
+    async def update_child(self, instance):
+        await instance.scope.wait(instance.init_complete, shared=True)
+        await instance.rerender()
 
     def data_changed(self, name, value):
         for record in list(self.components.values()):
@@ -680,8 +868,9 @@ class Browser:
             raise ValueError(
                 "Insert inside the owned target with afterbegin or beforeend"
             )
-        target.insertAdjacentHTML(position, str(markup))
-        self.hydrate(instance)
+        with self.app.diagnostics.measure("dom"):
+            inserted = window.pateraUI.insertHTML(target, position, str(markup))
+        self.hydrate(instance, inserted)
         await self.wait_children(instance)
 
     async def wait_children(self, instance):
@@ -693,6 +882,9 @@ class Browser:
             record = self.components.get(str(node.getAttribute("data-ui-instance")))
             if record and not node.hasAttribute("defer"):
                 futures.append(record["instance"].init_complete)
+                update = record.get("update_task")
+                if update is not None:
+                    futures.append(update)
         if futures:
             await asyncio.gather(*(asyncio.shield(future) for future in futures))
 
@@ -702,13 +894,17 @@ class Browser:
         record = self.components.pop(key, None)
         if record is not None:
             instance = record["instance"]
+            self.updates.discard(instance)
             instance.scope.cancel()
             self.unlisten(record["listeners"])
             if record["unsubscribe"]:
                 record["unsubscribe"]()
-            self.spawn(instance.dispose())
+            task = self.spawn(instance.dispose())
+            self.disposals.add(task)
+            task.add_done_callback(self.disposals.discard)
 
     async def dispose(self, record):
+        self.updates.discard(record["instance"])
         self.unlisten(record["listeners"])
         if record["unsubscribe"]:
             record["unsubscribe"]()
@@ -725,13 +921,21 @@ class Browser:
                 self.error(error)
 
     async def close(self):
+        if self.closed:
+            return
         self.closed = True
+        self.updates.close()
         window.history.scrollRestoration = self.scroll_restoration
         self.unlisten(self.listeners)
         await self.clear_components()
+        current = asyncio.current_task()
+        pending = [task for task in self.disposals if task is not current]
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
         window.pateraUI.detach(self.root)
         for task in tuple(self.tasks):
-            task.cancel()
+            if task is not current:
+                task.cancel()
         for proxy in self.proxies:
             proxy.destroy()
         self.proxies.clear()

@@ -9,6 +9,7 @@ from jinja2 import DictLoader, Environment, StrictUndefined, nodes
 from jinja2.ext import Extension
 from jinja2.runtime import Macro
 from markupsafe import Markup
+from .lists import ListExtension, validate_keys
 
 TrustedHTML = Markup
 
@@ -137,32 +138,81 @@ class Rendered:
         self.engine, self.context = engine, context
         self.fragments, self.parents, self.stack = {}, {}, []
         self.counter = 0
+        self.outputs = {}
+        self.reuse = []
+        self.modes = {}
+        self.virtual_offsets = {}
+        self.virtual_windows = {}
 
-    def capture(self, binding, caller):
-        self.counter += 1
-        identifier = str(self.counter)
+    def capture(self, binding, caller, *, mode="replace"):
+        if mode in {"keyed", "virtual"} and any(
+            self.modes.get(parent) in {"keyed", "virtual"} for parent in self.stack
+        ):
+            raise ValueError("Put nested list blocks in a child Component")
+        if self.reuse:
+            identifier = self.reuse.pop(0)
+        else:
+            self.counter += 1
+            identifier = str(self.counter)
         self.fragments[identifier] = (binding, caller)
+        self.modes[identifier] = mode
         self.parents[identifier] = self.stack[-1] if self.stack else None
         self.stack.append(identifier)
         try:
             value = caller()
+            if mode == "keyed":
+                validate_keys(value)
         finally:
             self.stack.pop()
+        self.outputs[identifier] = str(value)
         return Markup(f"<!--ui-bind:{identifier}-->{value}<!--/ui-bind:{identifier}-->")
 
     def refresh(self, binding):
-        previous = (dict(self.fragments), dict(self.parents), self.counter)
-        try:
-            return self._refresh(binding)
-        except Exception:
-            self.fragments, self.parents, self.counter = previous
-            raise
+        return self.refresh_many({binding})
 
-    def _refresh(self, binding):
-        selected = {key for key, (name, _) in self.fragments.items() if name == binding}
+    def refresh_many(self, bindings, *, skip_unchanged=False):
+        previous = (
+            dict(self.fragments),
+            dict(self.parents),
+            self.counter,
+            dict(self.outputs),
+            dict(self.modes),
+            dict(self.virtual_offsets),
+            dict(self.virtual_windows),
+        )
+        try:
+            return self._refresh(bindings, skip_unchanged=skip_unchanged)
+        except Exception:
+            (
+                self.fragments,
+                self.parents,
+                self.counter,
+                self.outputs,
+                self.modes,
+                self.virtual_offsets,
+                self.virtual_windows,
+            ) = previous
+            raise
+        finally:
+            self.reuse = []
+            self.virtual_offsets = {
+                key: value
+                for key, value in self.virtual_offsets.items()
+                if self.modes.get(key) == "virtual" and key in self.fragments
+            }
+            self.virtual_windows = {
+                key: value
+                for key, value in self.virtual_windows.items()
+                if key in self.virtual_offsets
+            }
+
+    def _refresh(self, bindings, *, skip_unchanged=False):
+        selected = {
+            key for key, (name, _) in self.fragments.items() if name in bindings
+        }
         result = []
         for key in list(self.fragments):
-            if key not in selected:
+            if key not in selected or key not in self.fragments:
                 continue
             ancestor, ancestors = self.parents.get(key), []
             while ancestor:
@@ -182,9 +232,32 @@ class Rendered:
             for child in obsolete:
                 self.fragments.pop(child, None)
                 self.parents.pop(child, None)
+                self.outputs.pop(child, None)
+                self.modes.pop(child, None)
+            self.reuse = obsolete
             self.stack.append(key)
             try:
-                result.append((key, str(caller())))
+                value = str(caller())
+                if self.modes[key] == "keyed":
+                    validate_keys(value)
+                if not skip_unchanged or self.outputs.get(key) != value:
+                    result.append((key, value))
+                    # Keep ancestor output in step with independently updated
+                    # descendants, so a later no-op parent refresh stays a no-op.
+                    for ancestor in ancestors:
+                        cached = self.outputs.get(ancestor)
+                        if cached is not None:
+                            start = f"<!--ui-bind:{key}-->"
+                            end = f"<!--/ui-bind:{key}-->"
+                            prefix, opening, tail = cached.partition(start)
+                            _, closing, suffix = tail.partition(end)
+                            if opening and closing:
+                                self.outputs[ancestor] = (
+                                    prefix + start + value + end + suffix
+                                )
+                            else:
+                                self.outputs.pop(ancestor, None)
+                self.outputs[key] = value
             finally:
                 self.stack.pop()
         return result
@@ -207,7 +280,7 @@ class TemplateEngine:
             loader=DictLoader(templates if templates is not None else {}),
             autoescape=True,
             undefined=StrictUndefined,
-            extensions=[BindingExtension],
+            extensions=[BindingExtension, ListExtension],
         )
         self.environment.filters.update(filters or {})
         self.environment.globals.update(globals or {})

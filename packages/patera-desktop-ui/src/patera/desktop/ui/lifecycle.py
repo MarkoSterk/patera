@@ -59,12 +59,13 @@ class ElementDisconnectedError(asyncio.CancelledError):
 
 
 class Scope:
-    def __init__(self, on_error=None):
+    def __init__(self, on_error=None, *, diagnostics=None):
         self.closed = False
         self.tasks = set()
         self.cleanups = []
         self.on_error = on_error
         self._closed = asyncio.Event()
+        self.diagnostics = diagnostics
 
     def check(self):
         if self.closed:
@@ -76,6 +77,8 @@ class Scope:
                 awaitable.close()
             self.check()
         task = asyncio.create_task(awaitable)
+        if self.diagnostics:
+            self.diagnostics.track_task(task)
         self.tasks.add(task)
 
         def completed(done):
@@ -93,6 +96,8 @@ class Scope:
                 awaitable.close()
             self.check()
         task = asyncio.ensure_future(awaitable)
+        if self.diagnostics:
+            self.diagnostics.track_task(task)
         closed = asyncio.create_task(self._closed.wait())
         # Always retrieve late failures, including cancellation-resistant work.
         task.add_done_callback(lambda t: None if t.cancelled() else t.exception())
