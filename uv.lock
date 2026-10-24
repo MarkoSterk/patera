@@ -1358,7 +1358,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.121.1"
+version = "0.122.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1524,7 +1524,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "markupsafe" },
@@ -1541,7 +1541,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -1569,7 +1569,7 @@ provides-extras = ["augmentation"]
 
 [[package]]
 name = "patera-apiinterface"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-apiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -1584,7 +1584,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-auth"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -1603,7 +1603,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -1635,7 +1635,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1652,7 +1652,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.11.2"
+version = "0.12.0"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -1676,7 +1676,7 @@ provides-extras = ["pyinstaller"]
 
 [[package]]
 name = "patera-desktop-ui"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/patera-desktop-ui" }
 dependencies = [
     { name = "jinja2" },
@@ -1693,7 +1693,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -1708,7 +1708,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-migrate"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -1725,7 +1725,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.11.1"
+version = "0.12.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
