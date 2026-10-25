@@ -164,8 +164,15 @@ def safe_dist(root):
     return path
 
 
-def build(root, packages):
+def build(root, packages, dry_run=False):
     target = safe_dist(root)
+    if dry_run:
+        for package in packages:
+            print(f"Would build {package.name} {package.version} (wheel and sdist)")
+        print(
+            f"Would verify metadata and hashes, then replace release artifacts in {target}"
+        )
+        return
     # Stage within the repository so promotion uses same-filesystem renames.
     with tempfile.TemporaryDirectory(prefix=".release-", dir=root) as temporary:
         stage = Path(temporary) / "new"
@@ -347,7 +354,8 @@ def bump(root, packages, part, update_floors=False, dry_run=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("build")
+    build_parser = commands.add_parser("build")
+    build_parser.add_argument("--dry-run", action="store_true")
     publish_parser = commands.add_parser("publish")
     publish_parser.add_argument("--dry-run", action="store_true")
     bump_parser = commands.add_parser("bump")
@@ -361,7 +369,7 @@ def main():
     try:
         packages = discover(root)
         if args.command == "build":
-            build(root, packages)
+            build(root, packages, args.dry_run)
         elif args.command == "publish":
             publish(root, packages, args.dry_run)
         else:

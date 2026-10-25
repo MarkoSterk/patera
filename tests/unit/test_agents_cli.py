@@ -248,3 +248,29 @@ async def test_documented_middleware_and_error_handler_work(make_app, client_for
         response = await client.get("/example/missing")
         assert response.status_code == 404
         assert response.json()["title"] == "Note not found"
+
+
+async def test_documented_joltui_example_runs(make_app, client_for):
+    ns = example("joltui")
+    app = make_app(extensions=[ns["JoltuiInterface"]])
+    async with client_for(app) as client:
+        response = await client.post(
+            "/joltui/components",
+            json={
+                "tagName": "user-page",
+                "groupName": "user-group",
+                "routeParameters": {"user_id": "42"},
+            },
+        )
+        assert response.status_code == 200
+        assert response.text == "<h1>User 42</h1>"
+        assert response.headers["content-type"].startswith("text/html")
+        response = await client.post(
+            "/joltui/components",
+            json={
+                "tagName": "user-page",
+                "groupName": "user-group",
+                "routeParameters": {"user_id": "invalid"},
+            },
+        )
+        assert response.status_code == 422

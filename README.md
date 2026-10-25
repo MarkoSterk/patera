@@ -72,6 +72,7 @@ Optional features are installed with extras:
 | `taskmanager` | `patera-taskmanager` | scheduled and background tasks (APScheduler) |
 | `email` | `patera-email` | SMTP e-mail client |
 | `apiinterface` | `patera-apiinterface` | declarative clients for external HTTP APIs |
+| `joltui` | [`patera-joltui`](packages/patera-joltui/README.md) | JolUI server components with typed group registration |
 | `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental; `patera-aiinterface[augmentation]` adds the embedding libraries) |
 | `admin` | `patera-admin` | admin dashboard |
 | `desktop` | `patera-desktop` | show the app in a desktop window (pywebview) and package it as a program |

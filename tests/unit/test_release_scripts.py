@@ -3,6 +3,7 @@
 import importlib.util
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -213,3 +214,63 @@ def test_bump_dry_run_leaves_every_file_unchanged(repo, monkeypatch):
     )
     release.bump(repo, release.discover(repo), "patch", dry_run=True)
     assert before == {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+
+
+def test_build_dry_run_leaves_every_file_unchanged(repo, monkeypatch, capsys):
+    before = {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+    monkeypatch.setattr(
+        release, "run", lambda *a, **kw: pytest.fail("No command expected")
+    )
+    release.build(repo, release.discover(repo), dry_run=True)
+    assert before == {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+    assert "Would build patera " in capsys.readouterr().out
+
+
+def test_repository_discovery_includes_joltui_after_core():
+    root = Path(__file__).resolve().parents[2]
+    packages = release.discover(root)
+    names = [p.name for p in packages]
+    assert names.index("patera") < names.index("patera-joltui")
+    assert "quick-exams" not in names
+
+
+def test_new_extension_independent_bump_build_and_publish(repo, monkeypatch):
+    folder = repo / "packages/patera-joltui"
+    folder.mkdir()
+    metadata = folder / "pyproject.toml"
+    metadata.write_text(
+        '[project]\nname="patera-joltui"\nversion="0.1.0"\ndependencies=["patera>=1.0"]\n'
+    )
+    packages = release.discover(repo)
+    calls = []
+
+    def run(root, *args, **kwargs):
+        calls.append(args)
+        if args[:2] == ("uv", "version"):
+            package = next(p for p in packages if p.name == args[3])
+            source = package.path.read_text()
+            source = re.sub(r'version\s*=\s*"[^"]+"', f'version="{args[4]}"', source)
+            package.path.write_text(source)
+        elif args[:2] == ("uv", "build"):
+            package = next(p for p in release.discover(root) if p.name == args[3])
+            artifacts(Path(args[-1]), package)
+
+    monkeypatch.setattr(release, "run", run)
+    release.bump(repo, packages, "patch", update_floors=True)
+    assert tomllib.loads(metadata.read_text())["project"]["version"] == "0.1.1"
+    assert tomllib.loads(metadata.read_text())["project"]["dependencies"] == [
+        "patera>=1.0.1"
+    ]
+    assert calls.count(("uv", "lock")) == 1
+    packages = release.discover(repo)
+    release.build(repo, packages)
+    manifest = json.loads((repo / "dist/release.json").read_text())
+    assert "patera_joltui-0.1.1-py3-none-any.whl" in manifest
+    assert "patera_joltui-0.1.1.tar.gz" in manifest
+    monkeypatch.setattr(
+        release,
+        "credentials",
+        lambda root: pytest.fail("Dry run must not read credentials"),
+    )
+    release.publish(repo, packages, dry_run=True)
+    assert not any(args[:2] == ("uv", "publish") for args in calls)

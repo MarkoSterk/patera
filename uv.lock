@@ -18,6 +18,7 @@ members = [
     "patera-desktop",
     "patera-desktop-ui",
     "patera-email",
+    "patera-joltui",
     "patera-migrate",
     "patera-taskmanager",
     "quick-exams",
@@ -1358,7 +1359,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.122.0"
+version = "0.123.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1385,6 +1386,7 @@ all = [
     { name = "patera-caching" },
     { name = "patera-database" },
     { name = "patera-email" },
+    { name = "patera-joltui" },
     { name = "patera-migrate" },
     { name = "patera-taskmanager" },
 ]
@@ -1416,6 +1418,9 @@ dev = [
 ]
 email = [
     { name = "patera-email" },
+]
+joltui = [
+    { name = "patera-joltui" },
 ]
 migrate = [
     { name = "patera-migrate" },
@@ -1482,6 +1487,8 @@ requires-dist = [
     { name = "patera-desktop", marker = "extra == 'desktop'", editable = "packages/patera-desktop" },
     { name = "patera-email", marker = "extra == 'all'", editable = "packages/patera-email" },
     { name = "patera-email", marker = "extra == 'email'", editable = "packages/patera-email" },
+    { name = "patera-joltui", marker = "extra == 'all'", editable = "packages/patera-joltui" },
+    { name = "patera-joltui", marker = "extra == 'joltui'", editable = "packages/patera-joltui" },
     { name = "patera-migrate", marker = "extra == 'all'", editable = "packages/patera-migrate" },
     { name = "patera-migrate", marker = "extra == 'migrate'", editable = "packages/patera-migrate" },
     { name = "patera-taskmanager", marker = "extra == 'all'", editable = "packages/patera-taskmanager" },
@@ -1498,7 +1505,7 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'dev'", specifier = ">=16.0" },
     { name = "werkzeug", specifier = ">=3.1.6" },
 ]
-provides-extras = ["prod", "dev", "testing", "database", "migrate", "auth", "caching", "caching-redis", "caching-sqlite", "taskmanager", "email", "apiinterface", "admin", "aiinterface", "desktop", "all"]
+provides-extras = ["prod", "dev", "testing", "database", "migrate", "auth", "caching", "caching-redis", "caching-sqlite", "taskmanager", "email", "apiinterface", "joltui", "admin", "aiinterface", "desktop", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1524,7 +1531,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "markupsafe" },
@@ -1541,7 +1548,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -1569,7 +1576,7 @@ provides-extras = ["augmentation"]
 
 [[package]]
 name = "patera-apiinterface"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-apiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -1584,7 +1591,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-auth"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -1603,7 +1610,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -1635,7 +1642,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1652,7 +1659,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -1676,7 +1683,7 @@ provides-extras = ["pyinstaller"]
 
 [[package]]
 name = "patera-desktop-ui"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/patera-desktop-ui" }
 dependencies = [
     { name = "jinja2" },
@@ -1693,7 +1700,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -1707,8 +1714,19 @@ requires-dist = [
 ]
 
 [[package]]
+name = "patera-joltui"
+version = "0.2.0"
+source = { editable = "packages/patera-joltui" }
+dependencies = [
+    { name = "patera" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "patera", editable = "." }]
+
+[[package]]
 name = "patera-migrate"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -1725,7 +1743,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },

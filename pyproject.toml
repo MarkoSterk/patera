@@ -1,6 +1,6 @@
 [project]
 name = "patera"
-version = "0.122.0"
+version = "0.123.0"
 description = "Modular async-first Python web framework with controllers, dependency injection and typed configuration"
 readme = "README.md"
 license = "MIT"
@@ -56,10 +56,12 @@ caching-sqlite = ["patera-caching[sqlite]>=0.11"]
 taskmanager = ["patera-taskmanager>=0.11"]
 email = ["patera-email>=0.11"]
 apiinterface = ["patera-apiinterface>=0.11"]
+joltui = ["patera-joltui>=0.1"]
 admin = ["patera-admin>=0.11"]
 aiinterface = ["patera-aiinterface>=0.11"]
 desktop = ["patera-desktop>=0.11"]
 all = [
+    "patera-joltui>=0.1",
     "patera-database>=0.11",
     "patera-migrate>=0.11",
     "patera-email>=0.11",
@@ -72,6 +74,7 @@ all = [
 
 [tool.uv.workspace]
 members = [
+    "packages/patera-joltui",
     "packages/patera-admin",
     "packages/patera-aiinterface",
     "packages/patera-apiinterface",
@@ -87,6 +90,7 @@ members = [
 ]
 
 [tool.uv.sources]
+patera-joltui = { workspace = true }
 patera-admin = { workspace = true }
 patera-aiinterface = { workspace = true }
 patera-apiinterface = { workspace = true }

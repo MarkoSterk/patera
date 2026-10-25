@@ -36,6 +36,7 @@ Read only the references relevant to the task:
 | Scheduled and background work | [task manager](references/taskmanager.md) |
 | Response caching | [caching](references/caching.md) |
 | Declarative HTTP clients | [API interfaces](references/apiinterface.md) |
+| JolUI server components, groups, typed request bodies | [patera-joltui](references/joltui.md) |
 | Experimental AI services | [AI interfaces](references/aiinterface.md) |
 | Experimental desktop applications | [desktop](references/desktop.md) |
 | Python/PyScript SPA pages, components, reactive lists, UI builds | [desktop UI](references/desktop-ui.md) |

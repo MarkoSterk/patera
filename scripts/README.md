@@ -6,7 +6,9 @@ it provisions Python >=3.13 and the declared `packaging` dependency if needed.
 Metadata checks use `uvx twine`.
 
 Core and every `packages/*/pyproject.toml` workspace package are discovered from
-metadata, including desktop UI. Example workspace members are not released.
+metadata, including desktop UI and `patera-joltui`. New packages must be workspace
+members and satisfy internal dependency constraints; no wrapper package lists
+need updating. Example workspace members are not released.
 Required internal dependencies determine build/upload order; optional extras are
 checked for compatibility but do not create ordering cycles.
 
@@ -41,6 +43,10 @@ compatibility and is not required for every patch release.
 
 Windows: `.\scripts\build_all.ps1`
 Linux/macOS: `./scripts/build_all.sh`
+
+Preview the package/version order without building or writing artifacts with
+`.\scripts\build_all.ps1 -DryRun` or `./scripts/build_all.sh --dry-run`.
+Unlike publish dry-run, this checks source metadata only, not built artifacts.
 
 Builds wheel/sdist pairs with `uv build --no-sources` in staging, verifies their
 names, versions and embedded metadata, and runs `twine check --strict`. Only
