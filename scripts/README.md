@@ -96,6 +96,12 @@ Remote publication cannot be transactional: earlier packages may already be
 published when an upload fails. Retain verified artifacts for retries; do not
 rebuild different contents under an already published version.
 
+## Documentation
+
+`docs.sh`/`docs.ps1` preview and build the documentation site; `publish_docs.sh`/`publish_docs.ps1`
+publish the version of the checked-out release tag to GitHub Pages. Instructions and the
+per-release checklist are in [DOCS_PUBLISHING.md](DOCS_PUBLISHING.md).
+
 ## Release checklist
 
 1. Bump versions, review compatibility and the lockfile.
@@ -104,6 +110,8 @@ rebuild different contents under an already published version.
 4. Build distributions and inspect contents when resources change.
 5. Run publish dry-run, then publish when ready.
 6. Tag the release (`git tag v<core-version>`) and push the tag.
+7. Publish the documentation from the tag: `./scripts/publish_docs.sh`
+   (see [DOCS_PUBLISHING.md](DOCS_PUBLISHING.md) for its checklist).
 
 Local release tests: `python -m pytest tests/unit/test_release_scripts.py`.
 
