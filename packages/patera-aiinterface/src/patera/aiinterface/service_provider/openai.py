@@ -4,6 +4,7 @@ OpenAI chat service provider
 
 from __future__ import annotations
 import json
+import httpx
 from typing import TYPE_CHECKING, Dict, Any, Optional
 from collections.abc import AsyncIterator
 
@@ -139,7 +140,8 @@ class OpenAIServiceProvider(BaseServiceProvider):
                         continue
                     data = line[len("data:") :].strip()
                     if data == "[DONE]":
-                        break
+                        return
                     chunk = from_openai_chunk(json.loads(data))
                     if chunk is not None:
                         yield chunk
+                raise httpx.RemoteProtocolError("OpenAI stream ended before [DONE].")

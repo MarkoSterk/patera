@@ -55,6 +55,8 @@ class Config(BaseConfig):
 
 See the [AI interface (experimental) section of the Patera documentation](https://github.com/MarkoSterk/Patera#ai-interface-experimental) for the full guide.
 
+Local integration results and reproduction steps are in [VALIDATION.md](VALIDATION.md).
+
 ## License
 
 MIT. See [LICENSE](https://github.com/MarkoSterk/Patera/blob/main/LICENSE).

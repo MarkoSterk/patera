@@ -4,6 +4,7 @@ Ollama chat service provider
 
 from __future__ import annotations
 import json
+import httpx
 from typing import TYPE_CHECKING, Dict, Any
 from collections.abc import AsyncIterator
 
@@ -93,4 +94,10 @@ class OllamaServiceProvider(BaseServiceProvider):
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line.strip():
-                        yield from_ollama(json.loads(line))
+                        data = json.loads(line)
+                        if data.get("error"):
+                            raise httpx.RemoteProtocolError(str(data["error"]))
+                        yield from_ollama(data)
+                        if data.get("done"):
+                            return
+                raise httpx.RemoteProtocolError("Ollama stream ended before done.")

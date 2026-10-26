@@ -402,7 +402,7 @@ async def test_only_one_first_summary_is_saved(chat):
     assert len(rows) == 1
 
 
-async def test_two_worker_processes_do_not_collide(chat, make_app):
+async def test_two_application_engines_do_not_collide(chat, make_app):
     """
     Two applications with engines of their own stand in for two worker
     processes. Only the database lock keeps their writes apart.
@@ -432,6 +432,73 @@ async def test_two_worker_processes_do_not_collide(chat, make_app):
     stored = await chat.history_provider.load_since("s", None, None)
     assert [item.position for item in stored] == list(range(16))
     assert sorted(firsts) == [False, True]
+
+
+def _history_worker(uri, root, barrier, number):
+    """Spawn target: each worker owns its application, loop, and DB engine."""
+    from pathlib import Path
+    from tests.helpers import AppFactory
+
+    async def run():
+        factory = AppFactory(Path(root))
+        app = factory(
+            extensions=[SumDatabases],
+            SUM_DB=SqlDatabaseConfig(DATABASE_URI=uri),
+            CHAT=CONFIG,
+        )
+        service = Chat(app)
+        database = app.get_extension(SumDatabases).get_database("summaries")
+        await database.connect()
+        try:
+            await asyncio.to_thread(barrier.wait, 20)
+            for index in range(4):
+                await service.history_provider.append(
+                    "processes", _pair(number * 4 + index)
+                )
+            await service.history_provider.save_summary(
+                "processes", HistorySummary(f"worker {number}", 1), None
+            )
+        finally:
+            await database.disconnect()
+            factory.cleanup()
+
+    asyncio.run(run())
+
+
+async def test_spawned_processes_do_not_collide(chat, tmp_path):
+    import multiprocessing
+
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(2)
+    database = chat.app.get_extension(SumDatabases).get_database("summaries")
+    workers = []
+    try:
+        for number in range(2):
+            root = tmp_path / f"worker-{number}"
+            root.mkdir()
+            worker = context.Process(
+                target=_history_worker,
+                args=(database.db_uri, str(root), barrier, number),
+            )
+            worker.start()
+            workers.append(worker)
+        for worker in workers:
+            await asyncio.to_thread(worker.join, 40)
+            assert worker.exitcode == 0
+    finally:
+        for worker in workers:
+            if worker.is_alive():
+                worker.terminate()
+                await asyncio.to_thread(worker.join, 5)
+            worker.close()
+    rows = await chat.history_provider.load_since("processes", None, None)
+    assert [row.position for row in rows] == list(range(16))
+    assert {row.message.content for row in rows} == {
+        f"{role}{number}" for role in ("q", "a") for number in range(8)
+    }
+    for question, answer in zip(rows[::2], rows[1::2]):
+        assert question.message.content[1:] == answer.message.content[1:]
+    assert await chat.history_provider.load_summary("processes") is not None
 
 
 async def _transactional_request(app, work) -> None:

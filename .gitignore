@@ -30,3 +30,4 @@ legacy/
 # Zensical documentation build
 site/
 .cache/
+thesis/

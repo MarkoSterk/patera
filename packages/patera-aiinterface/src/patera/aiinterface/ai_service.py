@@ -447,11 +447,17 @@ class AiService(
     ) -> AsyncIterator[ChatResponse]:
         call = await self._prepare(func, arguments)
         parts: list[str] = []
-        async for chunk in self.service_provider.stream(call.messages, self.configs):
-            chunk.session_id = call.session_id
-            if chunk.message.content:
-                parts.append(chunk.message.content)
-            yield chunk
+        stream = self.service_provider.stream(call.messages, self.configs)
+        try:
+            async for chunk in stream:
+                chunk.session_id = call.session_id
+                if chunk.message.content:
+                    parts.append(chunk.message.content)
+                yield chunk
+        finally:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
         await self._remember(call, "".join(parts))
 
     # ---- turning decorated methods into calls --------------------------------
