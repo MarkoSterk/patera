@@ -342,6 +342,27 @@ def test_a_new_event_loop_gets_a_new_client(make_app):
     asyncio.run(api.ping())
     asyncio.run(api.ping())  # e.g. two CLI commands
     assert len(created) == 2
+    assert all(client.is_closed for client in created)
+
+
+def test_explicit_client_cannot_be_abandoned_in_another_loop(make_app):
+    import asyncio
+
+    api = GithubApi(make_app())
+
+    async def acquire():
+        return api.client
+
+    with asyncio.Runner() as owner:
+        first = owner.run(acquire())
+        with asyncio.Runner() as other:
+            with pytest.raises(RuntimeError, match="owning event loop"):
+                other.run(acquire())
+            with pytest.raises(RuntimeError, match="owning event loop"):
+                other.run(api.aclose())
+        assert api._client is first
+        owner.run(api.aclose())
+        assert first.is_closed
 
 
 async def test_error_statuses_raise(app, requests_seen):

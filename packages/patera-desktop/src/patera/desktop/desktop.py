@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any, Generic, Optional, Self, TypeVar
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
+import psutil
 
 from patera.base_extension import BaseExtension
 from patera.cli import CLIController, cli_controller, command
@@ -230,23 +231,39 @@ class Desktop(BaseExtension[AppT, DesktopConfig], Generic[AppT]):
         """Stops the application as Ctrl+C would, and kills it if it hangs."""
         if server.poll() is not None:
             return
+        try:
+            # Capture process identities before signaling: the reloader parent
+            # can exit before its worker, after which tree lookup is too late.
+            children = psutil.Process(server.pid).children(recursive=True)
+        except psutil.NoSuchProcess:
+            children = []
+        deadline = time.monotonic() + SHUTDOWN_TIMEOUT
         if sys.platform == "win32":
             server.send_signal(signal.CTRL_BREAK_EVENT)
         else:
             os.killpg(server.pid, signal.SIGINT)
         try:
             server.wait(timeout=SHUTDOWN_TIMEOUT)
-            return
         except subprocess.TimeoutExpired:
-            pass
-        if sys.platform == "win32":
-            subprocess.run(
-                ["taskkill", "/T", "/F", "/PID", str(server.pid)],
-                capture_output=True,
-                check=False,
-            )
-        else:
-            os.killpg(server.pid, signal.SIGKILL)
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(server.pid)],
+                    capture_output=True,
+                    check=False,
+                )
+            else:
+                os.killpg(server.pid, signal.SIGKILL)
+        _, alive = psutil.wait_procs(
+            children, timeout=max(0, deadline - time.monotonic())
+        )
+        for child in alive:
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
+        _, alive = psutil.wait_procs(alive, timeout=SHUTDOWN_TIMEOUT)
+        if alive:
+            raise RuntimeError("Application child processes did not stop")
         server.wait()
 
     def run(self, mode: str = "dev") -> None:

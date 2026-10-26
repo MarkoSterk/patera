@@ -289,10 +289,24 @@ def publish(root, packages, dry_run=False):
         )
 
 
-def bump(root, packages, part, update_floors=False, dry_run=False):
+def bump(root, packages, part, update_floors=False, dry_run=False, version=None):
     versions = {}
+    target = Version(version) if version is not None else None
+    if target is not None and (
+        target.epoch or target.local or len(target.release) != 3
+    ):
+        raise ValueError(
+            "An explicit version must be major.minor.patch with an optional prerelease suffix"
+        )
     for package in packages:
         old = Version(package.version)
+        if target is not None:
+            if target <= old:
+                raise ValueError(
+                    f"{package.name}: target version must be newer than {old}"
+                )
+            versions[package.name] = str(target)
+            continue
         if not re.fullmatch(r"\d+\.\d+\.\d+", package.version):
             raise ValueError(
                 f"Only stable major.minor.patch versions are supported: {package.name}"
@@ -364,6 +378,10 @@ def main():
     )
     bump_parser.add_argument("--update-dependency-floors", action="store_true")
     bump_parser.add_argument("--dry-run", action="store_true")
+    bump_parser.add_argument(
+        "--version",
+        help="Explicit version for all release packages, including release candidates",
+    )
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     try:
@@ -373,7 +391,14 @@ def main():
         elif args.command == "publish":
             publish(root, packages, args.dry_run)
         else:
-            bump(root, packages, args.part, args.update_dependency_floors, args.dry_run)
+            bump(
+                root,
+                packages,
+                args.part,
+                args.update_dependency_floors,
+                args.dry_run,
+                args.version,
+            )
     except (
         OSError,
         ValueError,

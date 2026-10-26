@@ -1,3 +1,3 @@
-from .migrate import Migrate
+from .migrate import Migrate, MigrateConfig
 
-__all__ = ["Migrate"]
+__all__ = ["Migrate", "MigrateConfig"]

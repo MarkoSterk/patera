@@ -31,6 +31,12 @@ URL aliases, template paths and lifecycle callbacks through the application's
 public methods. Register middleware before the chain is built. Do not import the
 concrete application into a reusable extension.
 
+Registration is provisional until `init` succeeds. Failed construction rolls
+back framework registries, routes, template paths and lifecycle hooks, including
+nested dependency registrations. Injection rejects instances still initializing.
+This cannot undo arbitrary external side effects: acquire resources in startup,
+or clean them up in the extension if its initialization fails.
+
 Acquire resources in startup and close them in shutdown; CLI users must explicitly
 manage resources. Preserve instance independence across test applications. Keep
 request state in context. Validate settings rather than silently ignoring invalid

@@ -23,7 +23,9 @@ from pyway.validate import Validate as PywayValidate
 from pyway.checksum import Checksum as PywayChecksum
 
 
-class _PateraPywayConfigs(BaseModel):
+class MigrateConfig(BaseModel):
+    """Public configuration for the migration CLI and file naming."""
+
     model_config = ConfigDict(extra="allow")
 
     MIGRATE_CLI_NAME: str = Field(
@@ -44,6 +46,9 @@ class _PateraPywayConfigs(BaseModel):
     MIGRATE_TABLE: str = Field("pyway_migrations", description="")
     MIGRATE_CONFIG_FILE: str = Field(".pyway.conf", description="")
 
+
+# Compatibility for applications that imported the former private name.
+_PateraPywayConfigs = MigrateConfig
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 

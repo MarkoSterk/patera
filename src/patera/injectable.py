@@ -134,16 +134,23 @@ class Injectable:
     """
 
     __autowires__: dict[str, AutowireDef] = {}
+    __local_autowires__: dict[str, AutowireDef] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
 
         inherited_autowires: dict[str, AutowireDef] = {}
 
+        # Walk declarations in MRO order, including ordinary overrides. Merging
+        # already-flattened maps can resurrect an injection suppressed by a base.
         for base in reversed(cls.__mro__[1:]):
-            inherited_autowires.update(getattr(base, "__autowires__", {}))
+            for name in set(vars(base)) | set(_own_annotations(base)):
+                inherited_autowires.pop(name, None)
+            inherited_autowires.update(base.__dict__.get("__local_autowires__", {}))
 
         raw_annotations = _own_annotations(cls)
+        for name in set(vars(cls)) | set(raw_annotations):
+            inherited_autowires.pop(name, None)
 
         local_autowires: dict[str, AutowireDef] = {}
 
@@ -185,6 +192,7 @@ class Injectable:
                 target_type=target_type,
             )
 
+        cls.__local_autowires__ = local_autowires
         cls.__autowires__ = {**inherited_autowires, **local_autowires}
 
     def _resolve_autowires(self) -> None:
@@ -206,6 +214,10 @@ class Injectable:
         app = self.app  # type: ignore[attr-defined]
         name: str = pascal_to_upper_snake(target_type.__name__)
         value = app._extensions.get(name, None)
+        if value is not None and getattr(value, "_extension_initializing", False):
+            raise CircularDependencyError(
+                f"Circular dependency: {target_type.__name__} is still initializing"
+            )
         if value is None:
             # Types whose construction is in progress, outermost first. A type
             # that is requested again while it is being constructed is a cycle.

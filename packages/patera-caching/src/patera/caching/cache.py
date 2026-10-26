@@ -5,6 +5,7 @@ Caching extension and the @cache route handler decorator.
 from __future__ import annotations
 
 import base64
+from hashlib import sha256
 from collections.abc import Mapping
 from functools import wraps
 from typing import (
@@ -175,14 +176,18 @@ def _default_cache_key(handler: Callable, req: Request) -> str:
     preserved) so the key is stable across processes and restarts.
     """
     query = urlencode(sorted(req.query_parameters.items()), doseq=True)
-    return f"{handler.__name__}:{req.method}:{req.path}:{query}"
+    return (
+        f"{handler.__module__}.{handler.__qualname__}:{req.method}:{req.path}:{query}"
+    )
 
 
 def cache(
     cache_name: str,
     duration: Optional[int] = None,
-    key: Optional[str] = None,
+    key: str | Callable | None = None,
     per_user: bool = True,
+    *,
+    methods: tuple[str, ...] = ("GET", "HEAD"),
 ) -> Callable:
     """
     Decorator for caching route handler results using the Caching extension.
@@ -190,7 +195,10 @@ def cache(
     cache_name: registered name of the Caching extension (its UPPER_SNAKE_CASE
         class name, e.g. "PUBLIC_CACHE" for class PublicCache).
     duration: cache duration in seconds (defaults to the extension's DURATION)
-    key: fixed cache key. Defaults to handler name + method + path + query.
+    key: fixed cache key or sync/async callable receiving the Request.
+        Defaults to qualified handler name + method + path + query.
+    methods: methods to cache. POST and other methods require explicit opt-in;
+        their body digest is appended even when a custom key is supplied.
     per_user: when True (the default), a signed-in user gets an entry of their
         own, so a response that depends on who asks is never served to
         someone else. Anonymous requests share one entry. Set it to False
@@ -199,16 +207,32 @@ def cache(
     Only successful (< 400), non-streaming responses without cookies are cached.
     """
 
+    allowed_methods = {method.upper() for method in methods}
+
     def decorator(handler: Callable) -> Callable:
         @wraps(handler)
         async def wrapper(self, *args, **kwargs) -> "Response":
+            req: Request = args[0]
+            if req.method.upper() not in allowed_methods:
+                return await run_sync_or_async(handler, self, *args, **kwargs)
             cache_extension: Caching = self.app._extensions.get(cache_name, None)  # type: ignore
             if cache_extension is None:
                 raise RuntimeError(
                     f"Caching extension {cache_name!r} not found in the app."
                 )
-            req: Request = args[0]
-            cache_key = key if key is not None else _default_cache_key(handler, req)
+            cache_key = (
+                await run_sync_or_async(key, req)
+                if callable(key)
+                else key
+                if key is not None
+                else _default_cache_key(handler, req)
+            )
+            if not isinstance(cache_key, str):
+                raise TypeError("A cache key must be a string")
+            if req.method.upper() not in {"GET", "HEAD"}:
+                cache_key += (
+                    f":{req.method}:body:{sha256(await req.body()).hexdigest()}"
+                )
             if per_user:
                 user_key = cache_extension.user_cache_key(req)
                 if user_key is not None:

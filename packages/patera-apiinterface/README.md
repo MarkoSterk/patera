@@ -14,6 +14,12 @@ Requires Python 3.13 or newer and `patera>=0.121`.
 
 ## Usage
 
+Within an application lifespan, an interface reuses one HTTP client and closes
+it at shutdown. Standalone and CLI endpoint calls use temporary clients closed
+before the call returns, including failures. If you acquire `interface.client`
+explicitly, call `await interface.aclose()` in that same event loop before it
+closes. Access from another loop raises instead of discarding an unclosed client.
+
 `patera-apiinterface` turns annotated methods into HTTP calls (with [HTTPX](https://www.python-httpx.org)):
 
 ```python

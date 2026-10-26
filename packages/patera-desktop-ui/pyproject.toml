@@ -6,7 +6,24 @@ readme = "README.md"
 license = "MIT AND MPL-2.0"
 license-files = ["LICENSE", "src/patera/desktop/ui/types/LICENSE-MPL-2.0"]
 requires-python = ">=3.13"
+authors = [{ name = "Marko Šterk", email = "marko_sterk@hotmail.com" }]
+keywords = ["patera", "desktop", "pyodide"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
 dependencies = ["patera-desktop>=0.11.2", "jinja2>=3.1.6,<4", "markupsafe>=3.0,<4"]
+
+[project.urls]
+Homepage = "https://github.com/MarkoSterk/Patera"
+Documentation = "https://github.com/MarkoSterk/Patera/tree/main/packages/patera-desktop-ui"
+Repository = "https://github.com/MarkoSterk/Patera"
+Issues = "https://github.com/MarkoSterk/Patera/issues"
 
 [tool.uv.sources]
 patera-desktop = { workspace = true }

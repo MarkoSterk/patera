@@ -552,7 +552,9 @@ def test_the_pyinstaller_hook_names_every_patera_folder():
 def test_run_in_window_loads_the_installation_settings(make_app, window_env, tmp_path):
     app_class = _app_class(make_app, window_env, tmp_path)
     window_env.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
-    window_env.setattr(sys, "platform", "linux")
+    data_folder = tmp_path / "share" / "Patera app"
+    data_folder.mkdir(parents=True)
+    window_env.setattr(desktop_module, "user_data_dir", lambda name: data_folder)
     for name in ("PATERA_GREETING", "PATERA_THEME"):
         window_env.setenv(name, "")
         window_env.delenv(name)
@@ -586,7 +588,9 @@ def test_run_in_window_loads_the_installation_settings(make_app, window_env, tmp
 def test_run_in_window_works_without_a_settings_file(make_app, window_env, tmp_path):
     app_class = _app_class(make_app, window_env, tmp_path)
     window_env.setenv("XDG_DATA_HOME", str(tmp_path / "empty"))
-    window_env.setattr(sys, "platform", "linux")
+    data_folder = tmp_path / "empty" / "Patera app"
+    data_folder.mkdir(parents=True)
+    window_env.setattr(desktop_module, "user_data_dir", lambda name: data_folder)
     window_env.setattr(desktop_module, "show_window", lambda app, url, dev_tools: None)
     desktop_module.run_in_window(app_class)
     assert os.environ["PATERA_DEBUG"] == "0"

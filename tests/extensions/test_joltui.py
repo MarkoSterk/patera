@@ -137,7 +137,7 @@ def test_duplicate_groups(make_app):
     class Duplicate(Interface):
         second: ComponentGroup[DefaultGroup]
 
-    with pytest.raises(ValueError, match="Duplicate JolUI group"):
+    with pytest.raises(ValueError, match="Duplicate JoltUI group"):
         make_app(extensions=[Duplicate])
 
 
@@ -157,7 +157,7 @@ def test_duplicate_components(make_app):
         (PateraJoltui,),
         {"__annotations__": {"group": ComponentGroup[DuplicateGroup]}},
     )
-    with pytest.raises(ValueError, match="Duplicate JolUI component"):
+    with pytest.raises(ValueError, match="Duplicate JoltUI component"):
         make_app(extensions=[cls])
 
 
@@ -472,3 +472,69 @@ def test_invalid_body_annotation_fails_at_registration(make_app):
     )
     with pytest.raises(TypeError, match="Pydantic model"):
         make_app(extensions=[cls])
+
+
+@pytest.mark.parametrize("component_outermost", [True, False])
+async def test_consumes_error_preserves_415(make_app, client_for, component_outermost):
+    from patera.controller import consumes
+
+    async def page(self, req):
+        return req.res.html_body("<p>ok</p>")
+
+    decorators = [component("media-page"), consumes(MediaType.APPLICATION_JSON)]
+    if component_outermost:
+        decorators.reverse()
+    for decorator in decorators:
+        page = decorator(page)
+    cls = group("default")(type("MediaGroup", (JoltuiGroupHandler,), {"page": page}))
+    interface = type(
+        "MediaInterface",
+        (PateraJoltui,),
+        {"__annotations__": {"media": ComponentGroup[cls]}},
+    )
+    async with client_for(make_app(extensions=[interface])) as client:
+        response = await client.post(
+            "/joltui/components",
+            content='{"tagName":"media-page"}',
+            headers={"content-type": "text/plain"},
+        )
+        assert response.status_code == 415
+        assert response.json()["message"] == "Unsupported media type"
+        response = await client.post(
+            "/joltui/components", json={"tagName": "media-page"}
+        )
+        assert response.status_code == 200
+        assert response.text == "<p>ok</p>"
+
+
+@pytest.mark.parametrize("status", [200, 503])
+async def test_lifecycle_error_preserved_but_success_requires_html(
+    make_app, client_for, status
+):
+    from patera.controller import after_request
+
+    @group("default")
+    class HookGroup(JoltuiGroupHandler):
+        @component("hook-page")
+        async def page(self, req):
+            return req.res.html_body("<p>ok</p>")
+
+        @after_request
+        def replace(self, response):
+            response.json({"error": "unavailable"}).status(status)
+
+    interface = type(
+        "HookInterface",
+        (PateraJoltui,),
+        {"__annotations__": {"hook": ComponentGroup[HookGroup]}},
+    )
+    async with client_for(make_app(extensions=[interface])) as client:
+        if status == 200:
+            with pytest.raises(TypeError, match="text/html"):
+                await client.post("/joltui/components", json={"tagName": "hook-page"})
+        else:
+            response = await client.post(
+                "/joltui/components", json={"tagName": "hook-page"}
+            )
+            assert response.status_code == 503
+            assert response.json() == {"error": "unavailable"}

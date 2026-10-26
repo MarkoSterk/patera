@@ -1,7 +1,7 @@
 # patera-joltui
 
 Install `patera-joltui` or `patera[joltui]`; import from `patera.joltui`.
-This integrates the TypeScript JolUI frontend's server-rendered components.
+This integrates the TypeScript JoltUI frontend's server-rendered components.
 It is distinct from `patera.desktop.ui`'s Python/PyScript components.
 
 ```python
@@ -67,6 +67,11 @@ The dispatch middleware resolves the bound component before CORS, database,
 auth, and application middleware; `req.route_handler` and
 `current_request.controller` identify that component and group. `@consumes`
 remains supported for the original envelope. `@produces` operates on a Response.
+Successful responses require HTML; responses with status 400 or higher retain
+their normal media type, including decorator-generated 415 errors. Response
+caching requires `@cache(..., methods=("POST",))` opt-in for this read-only RPC
+transport; default keys include the full body digest. Add a callable key for
+header-dependent variants.
 Inherited methods work; an undecorated override removes component exposure.
 `@ignore` and `@development` affect group/component registration.
 

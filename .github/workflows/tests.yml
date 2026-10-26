@@ -1,0 +1,24 @@
+name: Tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked --all-packages --group dev --extra all --extra dev --extra testing
+      - run: uv run --no-sync pytest -q
+      - run: uv run --no-sync ruff check src packages
+      - run: uv run --no-sync mypy src/patera packages --follow-imports=silent
+      - run: uv run --no-sync python scripts/check_browser.py
+      - run: uv run --no-sync python scripts/release.py build
+      - run: uv run --no-sync python scripts/smoke_wheels.py

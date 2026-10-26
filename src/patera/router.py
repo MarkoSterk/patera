@@ -52,6 +52,19 @@ class Router:
         # Add a single Rule that handles the specified methods
         self.url_map.add(Rule(path, endpoint=endpoint_name, methods=methods))
 
+    def copy(self) -> "Router":
+        """Copy registrations without copying bound controllers or the app."""
+        router = Router(self.url_map.strict_slashes)
+        router.url_map = Map(
+            [rule.empty() for rule in self.url_map.iter_rules()],
+            strict_slashes=self.url_map.strict_slashes,
+            converters=self.url_map.converters,
+        )
+        router.endpoints = self.endpoints.copy()
+        router._rules = self._rules.copy()
+        router._paths = self._paths.copy()
+        return router
+
     def path_of(self, endpoint: Callable) -> str | None:
         """The URL rule of a registered endpoint, e.g. ``/items/<item_id>``."""
         try:

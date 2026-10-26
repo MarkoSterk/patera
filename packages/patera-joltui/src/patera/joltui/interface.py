@@ -1,4 +1,4 @@
-"""Dispatch JolUI's fetchHTML protocol through ordinary Patera requests."""
+"""Dispatch JoltUI's fetchHTML protocol through ordinary Patera requests."""
 
 from __future__ import annotations
 
@@ -95,10 +95,14 @@ class JoltuiGroupHandler(Controller):
 
 def _require_html_response(result: Any) -> None:
     if not isinstance(result, Response):
-        raise TypeError("JolUI component handlers must return an HTML Response")
+        raise TypeError("JoltUI component handlers must return an HTML Response")
+    # Normal endpoint decorators and lifecycle hooks may return structured
+    # client/server errors. Preserve those responses and their status codes.
+    if int(result.status_code) >= 400:
+        return
     content_type = result.content_type or result.media_type or ""
     if content_type.split(";", 1)[0].strip().lower() != MediaType.TEXT_HTML.value:
-        raise TypeError("JolUI component responses must use text/html")
+        raise TypeError("JoltUI component responses must use text/html")
 
 
 def _body_parameter(method: Callable) -> tuple[str, type[BaseModel]] | None:
@@ -184,7 +188,7 @@ def joltui_request(req: Request) -> JoltuiRequest:
     """Return metadata during a component dispatch, without replacing Request."""
     value = req.scope.get("patera.joltui")
     if not isinstance(value, JoltuiRequest):
-        raise RuntimeError("This request is not a JolUI component request")
+        raise RuntimeError("This request is not a JoltUI component request")
     return value
 
 
@@ -220,7 +224,7 @@ class PateraJoltui(BaseExtension[Any, JoltuiConfig]):
             if group_name is None:
                 raise TypeError(f"{target.__name__} needs a @group decorator")
             if group_name in groups:
-                raise ValueError(f"Duplicate JolUI group: {group_name}")
+                raise ValueError(f"Duplicate JoltUI group: {group_name}")
             groups.add(group_name)
             if self._excluded(target):
                 continue
@@ -237,7 +241,7 @@ class PateraJoltui(BaseExtension[Any, JoltuiConfig]):
                     continue
                 key = (group_name, tag)
                 if key in self._handlers:
-                    raise ValueError(f"Duplicate JolUI component: {group_name}/{tag}")
+                    raise ValueError(f"Duplicate JoltUI component: {group_name}/{tag}")
                 self._handlers[key] = getattr(handler, method_name)
                 _body_parameter(self._handlers[key])
 
@@ -269,12 +273,12 @@ class PateraJoltui(BaseExtension[Any, JoltuiConfig]):
         try:
             payload = JoltuiRequest.model_validate(await req.json())
         except ValidationError as exc:
-            raise InvalidRequestBody("Invalid JolUI component request") from exc
+            raise InvalidRequestBody("Invalid JoltUI component request") from exc
         if payload.tag_name is None:
             raise InvalidRequestBody("tagName is required for component dispatch")
         handler = self._handlers.get((payload.group_name, payload.tag_name))
         if handler is None:
-            raise BaseHttpException("Unknown JolUI component", status_code=404)
+            raise BaseHttpException("Unknown JoltUI component", status_code=404)
         req.scope["patera.joltui"] = payload
         req._route_handler = handler
         get_request_context().controller = handler.__self__

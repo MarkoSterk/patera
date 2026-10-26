@@ -14,6 +14,20 @@ Requires Python 3.13 or newer and `patera>=0.121`.
 
 ## Usage
 
+Only GET and HEAD are cached by default. Opt into POST explicitly with
+`@cache("PUBLIC_CACHE", methods=("POST",))` for read-only RPC operations; cache
+hits skip the handler. Opted-in methods include a SHA-256 body digest in the key.
+Default keys contain the handler's module and qualified name, method, path and
+query. Existing entries with the former short-name keys expire naturally; update
+manual invalidation patterns to include the qualified name.
+
+`key` accepts a string or a sync/async callable taking `Request`. For example,
+`key=lambda req: f"page:{req.path}:{req.headers.get('accept-language', '')}"`
+separates language variants. A custom key replaces the default URL/handler key,
+so include every relevant variation. Body digests and default user partitioning
+still apply. User partitioning alone does not account for headers or other
+request-dependent data.
+
 `patera-caching` caches responses of endpoints:
 
 ```python

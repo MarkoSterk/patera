@@ -14,6 +14,14 @@ Requires Python 3.13 or newer and `patera>=0.121`.
 
 ## Usage
 
+For persistent job stores, set `TaskManagerConfig(JOB_NAMESPACE="my-app-jobs")`
+on your manager's configuration. Keep the namespace stable across restarts and
+unique for separate applications/stores using the same manager class. An empty
+namespace preserves existing stored job identifiers, but only one such manager
+may be active per process. A duplicate fails at startup instead of redirecting
+jobs to another app. Registrations are removed at shutdown. Separate applications
+also need separate job-store instances; do not share a store object between them.
+
 `patera-taskmanager` schedules jobs with [APScheduler](https://apscheduler.readthedocs.io/en/3.x/):
 
 ```python

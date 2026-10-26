@@ -15,6 +15,8 @@ from typing import (
 )
 import inspect
 from functools import wraps
+import asyncio
+from weakref import WeakValueDictionary
 
 from apscheduler.events import EVENT_JOB_SUBMITTED, EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.job import Job
@@ -44,13 +46,17 @@ class TaskManagerConfig(BaseModel):
         default=True,
         description="Whether the scheduler should run as a daemon. Default True",
     )
+    JOB_NAMESPACE: str = Field(
+        default="",
+        description="Stable namespace for persisted jobs; unique per application/store.",
+    )
 
 
 AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 
 # The running task managers by class ("module:QualName"), so a job stored in
 # a persistent job store can find its task manager again when it runs.
-_TASK_MANAGERS: dict[str, "TaskManager[Any]"] = {}
+_TASK_MANAGERS: WeakValueDictionary[str, "TaskManager[Any]"] = WeakValueDictionary()
 
 
 def _manager_key(cls: type) -> str:
@@ -134,7 +140,9 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         )
 
         self._job_stores: dict[str, BaseJobStore] = job_stores
-        _TASK_MANAGERS[_manager_key(type(self))] = self
+        self._persistent_key = _manager_key(type(self))
+        if self.configs.JOB_NAMESPACE:
+            self._persistent_key += ":" + self.configs.JOB_NAMESPACE
 
         self._scheduler = self.scheduler_cls(
             jobstores=job_stores,
@@ -181,15 +189,36 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         """
         Startup hook for starting the scheduler.
         """
-        self.scheduler.start()
-        self._start_initial_jobs()
+        persistent = any(
+            not isinstance(store, MemoryJobStore) for store in self._job_stores.values()
+        )
+        if persistent:
+            existing = _TASK_MANAGERS.get(self._persistent_key)
+            if existing is not None and existing is not self:
+                raise RuntimeError(
+                    "A persistent task manager already uses this JOB_NAMESPACE; "
+                    "configure distinct stable namespaces for separate applications."
+                )
+            _TASK_MANAGERS[self._persistent_key] = self
+        try:
+            self.scheduler.start()
+            self._start_initial_jobs()
+        except BaseException:
+            await self._stop_scheduler()
+            raise
 
     async def _stop_scheduler(self) -> None:
         """
         Shutdown hook for stopping the scheduler.
         """
-        if self.scheduler.running:
-            self.scheduler.shutdown()
+        try:
+            if self.scheduler.running:
+                self.scheduler.shutdown()
+                # AsyncIOScheduler schedules shutdown on its loop.
+                await asyncio.sleep(0)
+        finally:
+            if _TASK_MANAGERS.get(self._persistent_key) is self:
+                del _TASK_MANAGERS[self._persistent_key]
 
     def _get_defined_jobs(self) -> None:
         """
@@ -273,7 +302,7 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
         # add_job(func, trigger, args, kwargs, ...): the job's own arguments
         # may be given positionally after the trigger.
         job_args = positional.pop(1) if len(positional) > 1 else kwargs.pop("args", ())
-        kwargs["args"] = [_manager_key(type(self)), method, *(job_args or ())]
+        kwargs["args"] = [self._persistent_key, method, *(job_args or ())]
         return tuple(positional), kwargs
 
     def job_callable(self, job: Job) -> Callable:

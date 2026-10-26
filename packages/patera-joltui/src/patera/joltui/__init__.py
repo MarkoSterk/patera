@@ -1,4 +1,4 @@
-"""JolUI server components for Patera."""
+"""JoltUI server components for Patera."""
 
 from .interface import (
     ComponentGroup,

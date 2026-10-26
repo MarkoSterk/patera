@@ -3,6 +3,8 @@ from __future__ import annotations
 import datetime
 
 import pytest
+
+
 from pydantic import BaseModel
 
 from patera import MediaType, Request, Response
@@ -95,9 +97,13 @@ async def test_manual_api_and_invalidation(app, client_for):
 
         await client.get("/cached/json")
         await client.get("/cached/json?x=1")
-        assert await caching.delete("json_view:*", wildcard=True) == 2
+        assert (
+            await caching.delete("*.CachedController.json_view:*", wildcard=True) == 2
+        )
         await client.get("/cached/json")
-        assert await caching.delete(r"^json_view:GET", regex=True) == 1
+        assert (
+            await caching.delete(r"\.CachedController\.json_view:GET", regex=True) == 1
+        )
         await caching.clear()
 
 
@@ -479,3 +485,56 @@ async def test_unreadable_entries_are_misses(tmp_path):
         assert await backend.get("k") is None
     finally:
         await backend.disconnect()
+
+
+async def test_post_cache_requires_opt_in_and_varies_by_body(make_app, client_for):
+    from patera.controller import post
+
+    calls = []
+
+    @path("/post-cache")
+    class Posts(Controller):
+        @post("/default")
+        @cache("PUBLIC_CACHE")
+        async def uncached(self, req):
+            calls.append(1)
+            return req.res.json({"calls": len(calls)})
+
+        @post("/enabled")
+        @cache("PUBLIC_CACHE", methods=("POST",))
+        async def enabled(self, req):
+            calls.append(1)
+            return req.res.json(await req.json())
+
+    app = make_app(extensions=[PublicCache], controllers=[Posts])
+    async with client_for(app) as client:
+        assert (await client.post("/post-cache/default")).json() == {"calls": 1}
+        assert (await client.post("/post-cache/default")).json() == {"calls": 2}
+        for value in (1, 2, 1):
+            assert (
+                await client.post("/post-cache/enabled", json={"id": value})
+            ).json() == {"id": value}
+    assert len(calls) == 4
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_callable_key_can_vary_by_header(make_app, client_for, asynchronous):
+    def key(req):
+        return req.headers.get("accept-language", "")
+
+    async def async_key(req):
+        return key(req)
+
+    @path("/language")
+    class Languages(Controller):
+        @get("")
+        @cache("PUBLIC_CACHE", key=async_key if asynchronous else key)
+        async def index(self, req):
+            return req.res.text(key(req))
+
+    app = make_app(extensions=[PublicCache], controllers=[Languages])
+    async with client_for(app) as client:
+        for language in ("en", "sl", "en"):
+            assert (
+                await client.get("/language", headers={"accept-language": language})
+            ).text == language

@@ -44,6 +44,77 @@ class OtherService(BaseExtension):
     maybe: Optional[str] = None
 
 
+def test_injection_overrides_follow_python_mro(make_app):
+    class Plain(Service):
+        greeter: str = "disabled"
+
+    class Unannotated(Service):
+        greeter = None
+
+    class Grandchild(Plain):
+        pass
+
+    class Diamond(Plain, Service):
+        pass
+
+    class Reintroduced(Plain):
+        greeter: Inject[Greeter]
+
+    app = make_app()
+    assert Plain(app).greeter == "disabled"
+    assert Grandchild(app).greeter == "disabled"
+    assert Diamond(app).greeter == "disabled"
+    assert Unannotated(app).greeter is None
+    assert isinstance(Reintroduced(app).greeter, Greeter)
+
+
+def test_failed_extension_rolls_back_registrations(make_app):
+    from patera.middleware import MiddlewareBase, middleware
+    from werkzeug.exceptions import NotFound
+
+    @middleware(order=123)
+    class AddedMiddleware(MiddlewareBase):
+        pass
+
+    @path("/temporary")
+    class AddedController(Controller):
+        @get("")
+        async def index(self, req):
+            return req.res.text("temporary")
+
+    class Broken(BaseExtension):
+        attempts = 0
+
+        def init(self):
+            type(self).attempts += 1
+            self.app.register_middleware(AddedMiddleware)
+            self.app.register_controller(AddedController)
+            self.app.add_on_shutdown_method(lambda: None)
+            self.app.add_template_path("temporary-templates")
+            self.app.register_alias("temporary-alias", "AddedController.index")
+            raise RuntimeError("failed initialization")
+
+    Consumer = type(
+        "Consumer",
+        (BaseExtension,),
+        {"__annotations__": {"dependency": Inject[Broken]}},
+    )
+    app = make_app()
+    shutdown = list(app._on_shutdown_methods)
+    for constructor in (Broken, Consumer, Consumer):
+        with pytest.raises(RuntimeError, match="failed initialization"):
+            constructor(app)
+        assert "BROKEN" not in app.extensions
+        assert "CONSUMER" not in app.extensions
+        assert AddedMiddleware not in app._middleware_classes.values()
+        assert app._on_shutdown_methods == shutdown
+        assert "temporary-templates" not in app._all_templates_paths
+        assert "temporary-alias" not in app._url_for_alias
+        with pytest.raises(NotFound):
+            app.router.match("/temporary", "GET")
+    assert Broken.attempts == 3
+
+
 @path("/greet")
 class GreetController(Controller):
     greeter: Inject[Greeter]

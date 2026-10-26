@@ -9,8 +9,7 @@
 site_name = "Patera"
 site_description = "Modular, async-first Python web framework with controllers, dependency injection and typed configuration."
 site_author = "Marko Šterk"
-# Change to the final documentation domain before the first publish.
-site_url = "https://markosterk.github.io/Patera/"
+site_url = "https://patera.markosterk.com/"
 repo_url = "https://github.com/MarkoSterk/Patera"
 repo_name = "MarkoSterk/Patera"
 edit_uri = "edit/main/docs/"

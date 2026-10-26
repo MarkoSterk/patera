@@ -26,8 +26,18 @@ checked for compatibility but do not create ordering cycles.
 ./scripts/bump_version.sh minor --update-dependency-floors
 ```
 
-Each package increments its own version, independently of core. Only stable
-`major.minor.patch` versions are accepted. All versions update without
+Each package increments its own version, independently of core. Incrementing
+accepts stable `major.minor.patch` versions. To explicitly set every release
+package to a coordinated candidate, use `bump_version.ps1 -Version 1.0.0rc1
+-UpdateDependencyFloors -DryRun` or `bump_version.sh --version 1.0.0rc1
+--update-dependency-floors --dry-run`. Remove dry-run only after reviewing the
+plan. Use `--version 1.0.0rc2` for the next candidate and `--version 1.0.0` for
+the final release. The explicit version must be newer than every selected
+package. This sets all workspace release packages; for independently versioned
+experimental packages, edit only the intended package versions with `uv version
+--package NAME VERSION --frozen`, then update constraints and run `uv lock`.
+
+All versions update without
 intermediate resolution, followed by internal compatibility checks and one
 `uv lock`. Failure restores original package metadata and the lockfile; the
 development environment is not synced. Review the resulting diff. Rollback
@@ -96,3 +106,12 @@ rebuild different contents under an already published version.
 6. Tag the release (`git tag v<core-version>`) and push the tag.
 
 Local release tests: `python -m pytest tests/unit/test_release_scripts.py`.
+
+Native types: `mypy src/patera packages --follow-imports=silent`. Browser bootstrap
+syntax: `python scripts/check_browser.py` (top-level await is intentional).
+
+After building, `python scripts/smoke_wheels.py` verifies the release manifest,
+installs all wheels together in a fresh environment, and checks isolated imports
+and bundled assets. It downloads runtime dependencies but never uploads packages.
+The CI workflow runs tests and these packaging checks on Windows, Linux and macOS
+with Python 3.13 and 3.14; a local run only verifies its own platform.

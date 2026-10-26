@@ -197,3 +197,55 @@ async def test_declared_jobs_get_a_default_id(make_app, client_for):
     app = make_app(extensions=[Named])
     async with client_for(app):
         assert list(app.get_extension(Named).jobs) == ["Named.cleanup"]
+
+
+async def test_persistent_managers_are_namespaced_and_unregistered(
+    make_app, client_for, tmp_path
+):
+    from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+    from patera.taskmanager.task_manager import run_scheduled_job
+
+    class Isolated(TaskManager):
+        def init(self):
+            self.job_stores = {
+                "default": SQLAlchemyJobStore(
+                    url=f"sqlite:///{tmp_path / (self.configs.JOB_NAMESPACE + '.db')}"
+                )
+            }
+            super().init()
+
+        async def identify(self):
+            return self.configs.JOB_NAMESPACE
+
+    one = make_app(extensions=[Isolated], ISOLATED={"JOB_NAMESPACE": "one"})
+    two = make_app(extensions=[Isolated], ISOLATED={"JOB_NAMESPACE": "two"})
+    first, second = one.get_extension(Isolated), two.get_extension(Isolated)
+    async with client_for(one), client_for(two):
+        for manager, expected in ((first, "one"), (second, "two")):
+            job = manager.add_job(manager.identify, "interval", hours=1, id="identify")
+            assert await run_scheduled_job(*job.args) == expected
+    with pytest.raises(RuntimeError, match="not running"):
+        await run_scheduled_job(first._persistent_key, "identify")
+
+    # The stored dispatch key still resolves after an application restart.
+    restarted = make_app(extensions=[Isolated], ISOLATED={"JOB_NAMESPACE": "one"})
+    async with client_for(restarted):
+        job = restarted.get_extension(Isolated).get_job("identify")
+        assert await run_scheduled_job(*job.args) == "one"
+
+
+async def test_duplicate_persistent_namespace_does_not_replace_running_manager(
+    make_app, client_for, tmp_path
+):
+    from patera.taskmanager.task_manager import _TASK_MANAGERS
+
+    stored = _persistent_jobs(tmp_path / "duplicate.db")
+    first_app = make_app(extensions=[stored])
+    first = first_app.get_extension(stored)
+    async with client_for(first_app):
+        second_app = make_app(extensions=[stored])
+        second = second_app.get_extension(stored)
+        with pytest.raises(RuntimeError, match="JOB_NAMESPACE"):
+            await second._start_scheduler()
+        assert _TASK_MANAGERS[first._persistent_key] is first
+        assert first.scheduler.running

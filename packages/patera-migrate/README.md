@@ -14,6 +14,11 @@ Requires Python 3.13 or newer and `patera>=0.121`.
 
 ## Usage
 
+`from patera.migrate import MigrateConfig` provides the public model for migration
+settings. Use its fields when combining migration and SQL configuration, or
+validate migration settings separately. The former private
+`_PateraPywayConfigs` name remains an alias for compatibility.
+
 `patera-migrate` adds SQL migrations based on [pyway](https://github.com/jasondcamp/pyway). Add the
 `Migrate` mixin to the database class:
 

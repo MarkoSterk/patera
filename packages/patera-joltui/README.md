@@ -31,7 +31,7 @@ class JoltuiInterface(PateraJoltui):
 ```
 
 Register `JoltuiInterface` in your application's `app_extensions`, or inject it
-with `joltui: Inject[JoltuiInterface]`. Set JolUI's `serverComponentsUrl` to
+with `joltui: Inject[JoltuiInterface]`. Set JoltUI's `serverComponentsUrl` to
 `/joltui/components` (including Patera's `URL_PREFIX`, if configured).
 Override the endpoint with application configuration:
 `JOLTUI_INTERFACE = {"COMPONENTS_PATH": "/components"}`.
@@ -39,7 +39,7 @@ The extension registers its own controller automatically; no application
 controller or manual dispatch route is needed. `JoltuiConfig.COMPONENTS_PATH`
 defaults to `/joltui/components`.
 
-JolUI sends a JSON POST containing `tagName`, `groupName`, `routeParameters`,
+JoltUI sends a JSON POST containing `tagName`, `groupName`, `routeParameters`,
 `queryParameters`, and `attributes`. Omitted/null groups default to `default`;
 omitted/null parameter mappings default to empty dictionaries. Tags are
 trimmed and lowercased, while group names remain case-sensitive.
@@ -94,9 +94,17 @@ Component selection runs before CORS, database, authentication, and application
 middleware. They see the selected bound component as `req.route_handler` and
 its group as `current_request.controller`. Normal controller hooks run once;
 after-request hooks receive the handler's HTML `Response`.
+Successful component responses must be HTML. Error responses (status 400 or
+higher), including `@consumes`' JSON 415 response and lifecycle-generated errors,
+retain their normal media type and status instead of being rejected as non-HTML.
 Decorators such as `@produces` that operate on a response expect handlers to
 return a `Response`, just as on ordinary endpoints. `@consumes` validates the
 original JSON envelope, not just its `attributes` field.
+
+Response caching defaults to GET/HEAD. To cache a read-only component RPC,
+explicitly use `@cache("PUBLIC_CACHE", methods=("POST",))`; the default key
+includes the complete body digest, including group, tag and route parameters.
+Use a callable cache key for additional header-dependent variations.
 
 All components share one HTTP POST URL: `@path`/HTTP method decorators do not
 create additional component URLs, and WebSocket transport is not provided by

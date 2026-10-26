@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: Desktop Environment",
 ]
 dependencies = [
+    "psutil>=7.0",
     "patera>=0.121",
     "pywebview>=6.2",
     "uvicorn>=0.42.0",

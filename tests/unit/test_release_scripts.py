@@ -216,6 +216,26 @@ def test_bump_dry_run_leaves_every_file_unchanged(repo, monkeypatch):
     assert before == {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
 
 
+def test_explicit_release_candidate_and_final(repo, monkeypatch):
+    def run(root, *args, **kwargs):
+        if args[:2] == ("uv", "version"):
+            package = next(p for p in release.discover(repo) if p.name == args[3])
+            package.path.write_text(
+                package.path.read_text().replace(
+                    f'version = "{package.version}"', f'version = "{args[4]}"'
+                )
+            )
+
+    monkeypatch.setattr(release, "run", run)
+    for version in ("2.0.0rc1", "2.0.0rc2", "2.0.0"):
+        release.bump(
+            repo, release.discover(repo), "patch", update_floors=True, version=version
+        )
+        assert {p.version for p in release.discover(repo)} == {version}
+    with pytest.raises(ValueError, match="newer"):
+        release.bump(repo, release.discover(repo), "patch", version="2.0.0rc1")
+
+
 def test_build_dry_run_leaves_every_file_unchanged(repo, monkeypatch, capsys):
     before = {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
     monkeypatch.setattr(

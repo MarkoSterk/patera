@@ -5,6 +5,35 @@ contain breaking changes; they are listed first in each release.
 
 ## Unreleased
 
+### Stabilization fixes
+
+- **Core:** failed extension initialization rolls back framework registrations,
+  routes, template paths and lifecycle callbacks. Injection cannot reuse an
+  instance still initializing. Ordinary subclass overrides now remove inherited
+  injection declarations, following the Python MRO.
+- **Caching:** response caching defaults to GET/HEAD. Explicitly opt into other
+  methods with `methods=("POST",)`; these keys include a request-body digest.
+  Default handler keys now use module and qualified names. Update manual cache
+  invalidation patterns using the former short names. `key` also accepts a
+  synchronous or asynchronous function of the request.
+- **Task manager:** persisted-job dispatch uses an optional stable
+  `JOB_NAMESPACE`. Conflicting active managers are rejected instead of silently
+  replacing another application's manager; registrations end at shutdown.
+- **API interface:** standalone/CLI calls close temporary HTTP clients within
+  their event loop. Lifespan calls continue to share a client. Explicit client
+  access requires closing in the owning loop before switching loops.
+- **Desktop:** shutdown waits for reloader children, with bounded forced cleanup
+  using `psutil`. Settings tests no longer spoof the whole interpreter platform.
+- **JoltUI:** structured error responses from decorators and lifecycle hooks
+  preserve their status and media type. Successful component responses still
+  require HTML. Brand spelling and package metadata are consistent.
+- **Public API:** exported `MigrateConfig` (old private alias retained), added
+  `patera[desktop-ui]`, and documented existing names and the `[all]` server bundle
+  in `PUBLIC_API.md`. Desktop UI now includes author, project and maturity metadata.
+- **Release verification:** explicit candidate/final versions are supported by
+  the bump helper. Added isolated wheel installation checks, a browser-bootstrap
+  syntax check, and a Python 3.13/3.14 CI matrix for Windows, Linux and macOS.
+
 ### Added
 
 - **patera-database:** `SqlDatabaseConfig.SQLITE_FOREIGN_KEYS` (default `False`) runs

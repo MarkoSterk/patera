@@ -494,7 +494,12 @@ class ApiInterface(
         )
         self._client = None
         self._client_loop = None
+        self._lifespan_active = False
+        self._app.add_on_startup_method(self._start_client_lifespan)
         self._app.add_on_shutdown_method(self.aclose)
+
+    def _start_client_lifespan(self) -> None:
+        self._lifespan_active = True
 
     def create_client(self) -> httpx.AsyncClient:
         """
@@ -510,18 +515,28 @@ class ApiInterface(
         """
         The shared HTTPX client, created on first use.
 
-        A client belongs to the event loop it was created in. When a call
-        runs in another loop (each CLI command, for example, starts one) a
-        new client is created for it.
+        Close explicitly acquired clients in their owning event loop before
+        switching loops. Endpoint calls outside an application lifespan use
+        a temporary client and close it before returning.
         """
         loop = asyncio.get_running_loop()
-        if self._client is None or self._client_loop is not loop:
+        if self._client is not None and self._client_loop is not loop:
+            raise RuntimeError(
+                "Close the API client in its owning event loop before switching loops"
+            )
+        if self._client is None:
             self._client = self.create_client()
             self._client_loop = loop
         return self._client
 
     async def aclose(self) -> None:
         """Closes the shared client. Runs automatically at shutdown."""
+        if (
+            self._client is not None
+            and self._client_loop is not asyncio.get_running_loop()
+        ):
+            raise RuntimeError("Close the API client in its owning event loop")
+        self._lifespan_active = False
         client, self._client, self._client_loop = self._client, None, None
         close = getattr(client, "aclose", None)
         if close is not None:
@@ -709,11 +724,13 @@ class ApiInterface(
                 if files is not None:
                     request_options["files"] = files
 
-        response = await self.client.request(
-            http_method,
-            url,
-            **request_options,
-        )
+        if self._lifespan_active or self._client is not None:
+            response = await self.client.request(http_method, url, **request_options)
+        else:
+            # CLI commands and standalone asyncio.run calls have no ASGI
+            # shutdown event. Release sockets before that loop can close.
+            async with self.create_client() as client:
+                response = await client.request(http_method, url, **request_options)
 
         if return_type is Response:
             # The caller asked for the raw response, status unchecked.
