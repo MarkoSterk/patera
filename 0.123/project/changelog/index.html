@@ -1,0 +1,3885 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Modular, async-first Python web framework with controllers, dependency injection and typed configuration.">
+      
+      
+        <meta name="author" content="Marko Šterk">
+      
+      
+        <link rel="canonical" href="https://markosterk.github.io/Patera/0.123/project/changelog/">
+      
+      
+      
+        <link rel="prev" href="../../reference/api/testing/">
+      
+      
+        <link rel="next" href="../versioning/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/patera_logo.png">
+      <meta name="generator" content="zensical-0.0.73">
+    
+    
+      
+        <title>Changelog - Patera</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.b60ce83d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Patera" class="md-header__button md-logo" aria-label="Patera" data-md-component="logo">
+      
+  <img src="../../assets/patera_logo.png" alt="Patera">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Patera
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun-moon" viewBox="0 0 24 24"><path d="M12 2v2M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715M16 12a4 4 0 0 0-4-4M19 5l-1.256 1.256M20 12h2"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/MarkoSterk/Patera" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MarkoSterk/Patera
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guide/" class="md-tabs__link">
+          
+  
+  Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../extensions/" class="md-tabs__link">
+          
+  
+  Extensions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../deployment/" class="md-tabs__link">
+        
+  
+  Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="././" class="md-tabs__link">
+          
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Patera" class="md-nav__button md-logo" aria-label="Patera" data-md-component="logo">
+      
+  <img src="../../assets/patera_logo.png" alt="Patera">
+
+    </a>
+    Patera
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MarkoSterk/Patera" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MarkoSterk/Patera
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Getting started
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Quick start
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Project layout and auto-discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Running the application
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Guide
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Guide
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fundamentals
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Fundamentals
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/application/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  The application class
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/dependency-injection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Services and dependency injection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  HTTP
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  HTTP
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controllers and routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/requests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requests
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/responses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Responses
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/exception-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Exception handling
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/middleware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Middleware
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/cors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CORS
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/websockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  WebSockets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Content
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Content
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Templates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/static-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Static files and static pages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/openapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  OpenAPI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Operations
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Logging
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Command line interface
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/coding-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Coding agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/custom-extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Custom extensions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../extensions/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Extensions
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Extensions
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Data
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  SQL databases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/migrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Migrations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/caching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Caching
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Security
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Authentication
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Admin dashboard
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Integrations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Integrations
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/taskmanager/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task manager
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/email/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  E-mail
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/apiinterface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  External APIs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/joltui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  JoltUI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../extensions/desktop-ui/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Experimental
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Experimental
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/aiinterface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  AI interface
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/desktop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Desktop applications
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/desktop-ui/runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Desktop UI runtime
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reference
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration options
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CLI commands
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/public-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Public API conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Python API
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Python API
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/patera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.controller
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.exceptions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/injectable/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.injectable
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/middleware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.middleware
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.logging
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  patera.testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Project
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Project
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unreleased
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stabilization-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stabilization fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patera-01210-and-extensions-0110-2026-10-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.121.0 and extensions 0.11.0 (2026-10-12)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="patera 0.121.0 and extensions 0.11.0 (2026-10-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experimental-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Experimental packages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Versioning and releases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Writing the documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  License
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unreleased
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stabilization-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stabilization fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patera-01210-and-extensions-0110-2026-10-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.121.0 and extensions 0.11.0 (2026-10-12)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="patera 0.121.0 and extensions 0.11.0 (2026-10-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experimental-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Experimental packages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="././" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Project
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+    <a href="https://github.com/MarkoSterk/Patera/edit/main/docs/project/changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/MarkoSterk/Patera/raw/main/docs/project/changelog.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<!-- The changelog is maintained in CHANGELOG.md at the repository root and included here. -->
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
+contain breaking changes; they are listed first in each release.</p>
+<h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="stabilization-fixes">Stabilization fixes<a class="headerlink" href="#stabilization-fixes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Core:</strong> failed extension initialization rolls back framework registrations,
+  routes, template paths and lifecycle callbacks. Injection cannot reuse an
+  instance still initializing. Ordinary subclass overrides now remove inherited
+  injection declarations, following the Python MRO.</li>
+<li><strong>Caching:</strong> response caching defaults to GET/HEAD. Explicitly opt into other
+  methods with <code>methods=("POST",)</code>; these keys include a request-body digest.
+  Default handler keys now use module and qualified names. Update manual cache
+  invalidation patterns using the former short names. <code>key</code> also accepts a
+  synchronous or asynchronous function of the request.</li>
+<li><strong>Task manager:</strong> persisted-job dispatch uses an optional stable
+  <code>JOB_NAMESPACE</code>. Conflicting active managers are rejected instead of silently
+  replacing another application's manager; registrations end at shutdown.</li>
+<li><strong>API interface:</strong> standalone/CLI calls close temporary HTTP clients within
+  their event loop. Lifespan calls continue to share a client. Explicit client
+  access requires closing in the owning loop before switching loops.</li>
+<li><strong>Desktop:</strong> shutdown waits for reloader children, with bounded forced cleanup
+  using <code>psutil</code>. Settings tests no longer spoof the whole interpreter platform.</li>
+<li><strong>JoltUI:</strong> structured error responses from decorators and lifecycle hooks
+  preserve their status and media type. Successful component responses still
+  require HTML. Brand spelling and package metadata are consistent.</li>
+<li><strong>Public API:</strong> exported <code>MigrateConfig</code> (old private alias retained), added
+  <code>patera[desktop-ui]</code>, and documented existing names and the <code>[all]</code> server bundle
+  in <code>PUBLIC_API.md</code>. Desktop UI now includes author, project and maturity metadata.</li>
+<li><strong>Release verification:</strong> explicit candidate/final versions are supported by
+  the bump helper. Added isolated wheel installation checks, a browser-bootstrap
+  syntax check, and a Python 3.13/3.14 CI matrix for Windows, Linux and macOS.</li>
+</ul>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>patera-database:</strong> <code>SqlDatabaseConfig.SQLITE_FOREIGN_KEYS</code> (default <code>False</code>) runs
+  <code>PRAGMA foreign_keys=ON</code> on every new SQLite connection, so <code>FOREIGN KEY</code> constraints such as
+  <code>ON DELETE CASCADE</code> are enforced; SQLite leaves them off by default. Set it in the settings
+  model or from the environment, for example <code>PATERA_MAIN_DB__SQLITE_FOREIGN_KEYS=true</code>. Other
+  databases ignore it. Applications no longer need to override <code>SqlDatabase.connect()</code> for this.</li>
+<li><strong>patera-database:</strong> <code>SqlDatabaseConfig.SQLITE_BUSY_TIMEOUT</code> (seconds, default <code>None</code>) runs
+  <code>PRAGMA busy_timeout</code> on every new SQLite connection: how long a connection waits for another
+  connection's lock before failing with "database is locked". <code>None</code> keeps the driver's default
+  of 5 seconds, or a <code>?timeout=</code> in <code>DATABASE_URI</code>; a value takes precedence over both. Other
+  databases ignore it, for example <code>PATERA_MAIN_DB__SQLITE_BUSY_TIMEOUT=10</code>.</li>
+<li><strong>patera-admin:</strong> <code>FileInput</code> and <code>DateInput</code> form elements in <code>patera.admin.custom_elements</code>,
+  for <code>Meta.custom_form_fields</code>. <code>FileInput</code> renders <code>&lt;input type="file"&gt;</code> (with <code>accept</code> and a
+  browser-side <code>max_size</code>); the model's admin hooks receive the chosen file as an <code>UploadedFile</code>,
+  and when no file is chosen the field is not sent, so an update keeps the current value.
+  <code>DateInput</code> renders a date or, with <code>include_time=True</code>, a date-and-time picker; its value is
+  converted to the column's type like a generated input, and <code>utc=True</code> shows a stored UTC
+  timestamp in the viewer's local time and submits it in UTC. Custom elements opt in to that
+  conversion with <code>converts_value = True</code>.</li>
+<li>
+<p><strong>patera-admin:</strong> <code>LatexInput</code> form element: a textarea, or a text input with
+  <code>multiline=False</code>, for text with LaTeX math, with a preview underneath that updates while the
+  user types. Math goes between <code>$...$</code> or <code>$$...$$</code>, and <code>\$</code> is a literal dollar sign. The
+  preview is rendered as MathML by <a href="https://temml.org">Temml</a> 0.14.0 (MIT), which Admin serves
+  from its own static assets (<code>js/vendors/temml/</code>) and loads only on pages with this input. The
+  inner control is an ordinary form field, so it is submitted and validated with the form.</p>
+</li>
+<li>
+<p><strong>Core:</strong> request observers. <code>app.add_request_observer(callback)</code> calls <code>callback(record)</code> after
+  every HTTP request, including router answers (404, 405), static resources and failed requests,
+  with a <code>patera.RequestRecord</code>: method, path, the matched URL rule (<code>/api/exams/&lt;exam_id&gt;</code>, or
+  <code>None</code> when no route matched), the status sent (500 for a failure before the response started),
+  the start time and the duration. An observer that raises is logged and skipped; applications
+  without observers take the previous code path. <code>Router.path_of(endpoint)</code> returns an endpoint's
+  URL rule.</p>
+</li>
+<li><strong>patera-admin:</strong> request statistics on the dashboard, above the logs: uptime and start time,
+  requests and average requests/s, 2xx/4xx/5xx counts with their share, average and approximate
+  95<sup>th</sup>-percentile response time, a stacked requests-per-second chart by status class, a response
+  time chart, the busiest endpoints and the most frequent 4xx/5xx statuses with their routes, for
+  the last 15 minutes, hour, 6 hours or 24 hours, refreshed every 10 seconds. Admin collects them
+  in memory through a request observer (24 hours, 10-second buckets), so each worker shows its own
+  requests since it started; the dashboard's own polling is not counted.
+  <code>AdminConfig.REQUEST_STATISTICS=False</code> turns the collection and the section off. The data is
+  served as JSON at <code>&lt;ADMIN_BASE_URL&gt;/&lt;lang&gt;/dashboard/stats?period=1h</code>.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>patera-admin:</strong> the log table's page links no longer run off the right edge when there are many
+  pages. Like the records table, they show the first and last page and two pages on each side of
+  the current one, with ellipses between; on small screens only the neighbouring pages and arrow
+  buttons are shown, and the links wrap if space runs out. Both tables share one template macro
+  (<code>_admin/layout/pagination.html</code>) and <code>patera.admin.pagination.page_items()</code>.</li>
+<li><strong>Core:</strong> a <code>Response[Model]</code> body made of ORM objects is converted through its declared type
+  as soon as the route handler returns, while the request's database sessions are still open.
+  Before, it was converted when the response was sent, after <code>patera-database</code> had rolled back
+  (requests without <code>@transactional</code>) or committed with <code>EXPIRE_ON_COMMIT=True</code> and closed the
+  session, so reading the expired objects failed with <code>DetachedInstanceError</code> (<code>500</code>). A body that
+  does not fit its type now fails inside the middleware chain, so a <code>@transactional</code> request is
+  rolled back instead of committed; the answer is still <code>500</code>. Streamed bodies are not converted
+  early, and relationships must be loaded eagerly. <code>patera.serializers.materialize()</code> and
+  <code>ResponseRenderer.materialize_body()</code> perform the conversion.</li>
+<li><strong>patera-admin:</strong> record dialogs no longer overflow the window: the form inside each dialog is
+  now the flex column, so the header and footer stay visible and the body scrolls.</li>
+<li><strong>patera-admin:</strong> a custom form element gets its own id in the create and update dialogs
+  (<code>create-field-&lt;name&gt;</code>, <code>update-field-&lt;name&gt;</code>); both used <code>create-field-&lt;name&gt;</code>, and the update
+  dialog's label pointed at the create form. Elements without content, such as <code>&lt;input&gt;</code>, are
+  rendered without a closing tag.</li>
+<li><strong>patera-admin:</strong> a model's <code>admin_delete()</code> hook can refuse a deletion by raising
+  <code>AdminFormError</code>: Admin answers <code>422</code> with the first error's message, which the records table
+  shows (it was a <code>500</code>).</li>
+<li><strong>patera-admin:</strong> an unknown database or model in a records-table URL shows the Admin error page
+  with <code>404</code> (rendering the page failed because the template context was missing).</li>
+<li><strong>patera-admin:</strong> the sign-in and "unauthorized" pages load Bootstrap and its icons from the
+  copies shipped with the package instead of jsDelivr, so Admin works without internet access.</li>
+</ul>
+<h2 id="patera-01210-and-extensions-0110-2026-10-12">patera 0.121.0 and extensions 0.11.0 (2026-10-12)<a class="headerlink" href="#patera-01210-and-extensions-0110-2026-10-12" title="Permanent link">&para;</a></h2>
+<p>Every package in this release requires <code>patera&gt;=0.121</code>. Upgrade the core and the extensions
+together.</p>
+<h3 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>patera-auth:</strong> signed cookie values carry a signing timestamp (<code>value|timestamp|signature</code>).
+  Values signed by earlier versions are rejected, which signs users out once.</li>
+<li><strong>patera-caching:</strong> Redis and SQLite keys default to the prefix <code>patera:&lt;app name&gt;:&lt;cache name&gt;:</code>
+  instead of <code>patera:cache:</code> (Redis) or no prefix (SQLite), so existing cache entries are not found.
+  Set <code>KEY_PREFIX</code> to keep the old keys. <code>BaseCacheBackend.from_configs()</code> takes a <code>namespace</code>
+  argument, and <code>configure_from_app()</code> is gone; use <code>backend_class</code> or <code>from_configs()</code>.</li>
+<li><strong>patera-migrate:</strong> <code>.pyway.conf</code> no longer contains connection details. The connection, including
+  the password, is read from <code>DATABASE_URI</code> each time a command runs. The file stays in the migration
+  directory and in <code>.gitignore</code>; regenerate it with <code>migrate:init</code> (delete the old one first) or
+  remove the connection lines, because a <code>database_*</code> value left in the file overrides the URI.</li>
+<li><strong>patera-admin:</strong> Slovenian uses the ISO code <code>sl</code> instead of <code>si</code> (URLs, <code>DEFAULT_LANGUAGE</code>).</li>
+<li><strong>patera-apiinterface:</strong> a 4xx or 5xx response raises <code>ApiInterfaceResponseError</code> instead of being
+  returned as data. Request forwarding is opt-in with <code>@forward_request</code>; method arguments fill
+  <code>&lt;name&gt;</code> placeholders and become query parameters or the body.</li>
+<li><strong>patera-database:</strong> <code>@query</code> methods annotated <code>-&gt; None</code> return <code>None</code>; <code>-&gt; int</code> on a statement
+  without result rows returns the number of affected rows.</li>
+<li><strong>Core:</strong> a settings model declared in the config class without a value (<code>MAIN_DB:
+  SqlDatabaseConfig</code>) is built from the environment (and <code>.env</code>), with the model's defaults for
+  the fields no variable sets; with no variable at all, from the defaults alone. A required field
+  that nothing sets is reported by name (<code>MAIN_DB.DATABASE_URI</code>), instead of the whole model
+  being "required".</li>
+<li><strong>Core:</strong> Granian is no longer installed with the core package. <code>patera prod</code> needs the new
+  <code>prod</code> extra: <code>uv add "patera[prod]"</code> (or <code>pip install "patera[prod]"</code>); without it, the command
+  says so. The core's own dependencies are now pure Python apart from pydantic-core.</li>
+<li><strong>Core:</strong> blank query and form values (<code>?q=</code>) are kept as <code>""</code> instead of being dropped.</li>
+<li><strong>Core:</strong> the OpenAPI document's server is relative (<code>URL_PREFIX</code>, or <code>/</code>) instead of
+  <code>PROTOCOL://HOST:PORT</code>, so Swagger's "Try it out" calls the origin that served the page.</li>
+<li><strong>Core:</strong> <code>patera test</code> loads <code>.env.test</code> only when it exists (an explicit <code>--env-file</code> must
+  exist), runs pytest without arguments by default so pytest's own configuration (<code>testpaths</code>)
+  applies, and no longer has the unused <code>--app</code> option.</li>
+<li><strong>Core:</strong> <code>Response.set_cookie()</code> raises <code>ValueError</code> for names or values a browser would change
+  (spaces, <code>;</code>, <code>,</code>, quotes, backslashes, control characters) and for <code>SameSite=None</code> without
+  <code>secure=True</code>.</li>
+<li><strong>Core:</strong> a request header sent several times is combined into one comma-separated value
+  (<code>Cookie</code> with <code>;</code>); use <code>Request.header_list()</code> for the separate values.</li>
+<li><strong>Core:</strong> loggers read their settings only under the UPPER_SNAKE_CASE name of their class.</li>
+<li><strong>Core:</strong> removed <code>patera.utilities.get_range_file()</code>, <code>get_file()</code> and <code>Response.send_file()</code>;
+  use <code>file_response()</code>, which streams the file and takes a <code>download_name</code>.</li>
+<li><strong>Core:</strong> <code>CORS_ALLOW_CREDENTIALS</code> defaults to <code>False</code>: by default no website may make
+  cross-origin requests with the user's cookies. Set it to <code>True</code> together with an explicit
+  <code>CORS_ALLOW_ORIGINS</code> list for a frontend on another origin.</li>
+<li><strong>patera-admin:</strong> a signed-in user without the needed Admin permission gets 403 instead of 401
+  (with <code>"status": "error"</code>), and an unknown database name gets 404.</li>
+<li><strong>Core:</strong> the <code>@app_path</code> decorator is replaced by the <code>URL_PREFIX</code> setting (<code>PATERA_URL_PREFIX</code>),
+  so the prefix can differ per environment: <code>@app_path("/demo")</code> becomes <code>URL_PREFIX: str = "/demo"</code>
+  in the configuration class. The value must start with <code>/</code>; a trailing <code>/</code> is removed.
+  <code>Patera.url_prefix</code> returns it, and <code>register_controller(with_base_path=...)</code> is now
+  <code>with_url_prefix=...</code>.</li>
+<li><strong>Core:</strong> invalid <code>@consumes</code> data raises <code>RequestValidationError</code> (a <code>BaseHttpException</code>):
+  <code>422</code> with <code>{"status", "message", "data": [errors]}</code>, without the submitted values. Handle
+  <code>RequestValidationError</code> instead of <code>pydantic.ValidationError</code>; its <code>errors</code> attribute is the list.
+  A <code>ValidationError</code> raised anywhere else (handler code, data from a database or another service)
+  is a server error (<code>500</code>) instead of a <code>422</code> that echoed the values. Validate query parameters and
+  other client data with the new <code>req.validate(Model, data)</code>.</li>
+<li><strong>Core:</strong> <code>res.json()</code> raises <code>TypeError</code> for <code>str</code> and <code>bytes</code>; use <code>text()</code>, or
+  <code>bytes(data, MediaType.APPLICATION_JSON.value)</code> for already encoded JSON.</li>
+<li><strong>Core:</strong> <code>UploadedFile.read(size)</code> reads like a file, from the current position onwards
+  (it always returned the first bytes, so chunked readers never finished).</li>
+<li><strong>Core:</strong> two controller classes with the same name raise <code>ValueError</code> at startup (the second was
+  silently skipped). A WebSocket handler, or its controller, marked with <code>@login_required</code>,
+  <code>@role_required</code> or <code>@transactional</code> raises <code>ValueError</code> at startup: middleware does not run for
+  sockets, so these had no effect.</li>
+<li><strong>Core:</strong> removed the unused <code>patera.request.extract_boundary()</code>.</li>
+<li><strong>patera-admin:</strong> every action needs <code>ADMIN_CAN_ENTER</code> and its own permission (<code>VIEW</code>, <code>CREATE</code>,
+  <code>EDIT</code>, <code>DELETE</code>); <code>ADMIN_CAN_ENTER</code> alone allowed every action. Give administrators all five.</li>
+<li><strong>patera-admin:</strong> record forms of models without a validation schema are converted to the column
+  types, and only the fields the form shows are written: a field excluded from the form can no
+  longer be set by adding it to the request. An unticked checkbox sets <code>False</code>.</li>
+<li><strong>patera-taskmanager:</strong> <code>@schedule_job</code> jobs without an <code>id</code> get <code>&lt;class&gt;.&lt;method&gt;</code> instead of a
+  random id, and every declared job replaces its stored copy at startup.</li>
+<li><strong>patera-caching:</strong> responses are cached as the bytes that are sent, and the Redis and SQLite
+  backends store JSON instead of pickle. Existing entries are treated as misses.</li>
+<li><strong>Core:</strong> dropped the unused dependencies h11, httpcore, idna, mako and markupsafe; websockets
+  moved to the <code>dev</code> extra (used by the uvicorn development server). httpx and asgi-lifespan, used
+  only by the test client, moved to the <code>testing</code> extra: install <code>patera[testing]</code> to use
+  <code>patera.testing.PateraTestClient</code>.</li>
+</ul>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Core:</strong> <code>MAX_CONTENT_LENGTH</code> (default 10 MB) and the <code>@max_content_length</code> decorator; larger
+  bodies get 413.</li>
+<li><strong>Core:</strong> <code>BACKGROUND_TASKS_SHUTDOWN_TIMEOUT</code> (default 10 s): on shutdown the application waits
+  for <code>run_in_background()</code> tasks before closing resources, then cancels and logs the rest.</li>
+<li><strong>Core:</strong> <code>STARTUP_BANNER</code> setting; the startup line is always logged.</li>
+<li><strong>Core:</strong> <code>patera dev</code> and <code>patera prod</code> resolve the address from <code>PATERA_HOST</code>/<code>PATERA_PORT</code>,
+  then the config class defaults, then <code>localhost:3000</code> (dev) or <code>0.0.0.0:80</code> (prod), and the
+  application reports the address actually used.</li>
+<li><strong>Core:</strong> <code>patera cli</code> without a command name lists every command.</li>
+<li><strong>Core:</strong> <code>Request.cookies</code>, <code>Request.header_list()</code>, <code>Request.query_list()</code>,
+  <code>Request.form_list()</code>.</li>
+<li><strong>Core:</strong> static files (and Admin static files) send <code>ETag</code>, <code>Last-Modified</code> and <code>Cache-Control</code>,
+  answer conditional requests with 304, honour <code>If-Range</code>, and are always sent zero-copy.</li>
+<li><strong>Core:</strong> NDJSON streaming with <code>ndjson_line()</code>; <code>SerializerRegistry.register(first=)</code>,
+  <code>replace()</code> and <code>unregister()</code>.</li>
+<li><strong>Core:</strong> <code>DuplicateRouteError</code> and <code>CircularDependencyError</code> with clear messages.</li>
+<li><strong>Core:</strong> <code>is_async_callable()</code> and <code>wait_for_background_tasks()</code> utilities; <code>py.typed</code> marker.</li>
+<li><strong>Core:</strong> <code>Request.validate()</code>, <code>RequestValidationError</code>, <code>ClientDisconnected</code> and
+  <code>Request.response_started</code>.</li>
+<li><strong>patera-auth:</strong> <code>role_required(..., require_all=True)</code> requires every listed role.</li>
+<li><strong>patera-auth:</strong> <code>decode_signed_cookie(..., max_age=...)</code> rejects old values.</li>
+<li><strong>patera-auth:</strong> new password hashes are <code>bcrypt-sha256$</code> + bcrypt over a SHA-256 digest, so
+  passwords of any length count in full. Plain bcrypt hashes from earlier versions still verify;
+  <code>password_hash_needs_update()</code> tells you when to store a new hash after a successful login.</li>
+<li><strong>patera-admin:</strong> severity filter for log records, notifications (<code>admin.notify()</code>, the header
+  bell, failed e-mail sends recorded automatically), the application and Admin versions in the
+  footer, and extension discovery on every request.</li>
+<li><strong>patera-apiinterface:</strong> <code>ApiInterfaceResponseError</code>; <code>-&gt; httpx.Response</code> returns the raw response
+  unchecked; NDJSON responses are parsed line by line; one shared HTTPX client per event loop, closed
+  at shutdown (<code>create_client()</code>, <code>aclose()</code>).</li>
+<li><strong>patera-caching:</strong> per-user cache entries by default (<code>per_user</code>, <code>user_cache_key()</code>),
+  <code>backend_class</code>, <code>Caching.cache_name</code>.</li>
+<li><strong>patera-database:</strong> <code>background_session()</code> and <code>SqlDatabase.session_scope()</code> for work outside a
+  request; <code>SqlDatabase.work_session()</code> for a service's own work (the request's session in a
+  <code>@transactional</code> request, its own transaction elsewhere), <code>request_session()</code> and
+  <code>in_transactional_request()</code>.</li>
+<li><strong>patera-email:</strong> <code>USE_SSL</code> (implicit TLS), HTML messages with a generated plain-text
+  alternative, and <code>Date</code> and <code>Message-ID</code> headers on every message.</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Core:</strong> uploaded files are no longer altered: the body is parsed as received (part headers
+  were rewritten anywhere in the body, including inside file content). Field and file names are
+  decoded as UTF-8.</li>
+<li><strong>Core:</strong> JSON bodies may contain models, lists of models, dates, UUIDs, decimals and enums
+  (they failed with 500), and <code>Response[list[Model]]</code> and other generic annotations filter every
+  item like <code>Response[Model]</code> does; ORM objects are accepted too. NDJSON rows are encoded the
+  same way. The declared type shapes only 2xx bodies, so error bodies such as the <code>415</code> from
+  <code>@consumes</code> keep their own fields.</li>
+<li><strong>Core:</strong> <code>file_response(download_name=...)</code> writes a correct <code>Content-Disposition</code> for names in
+  any language (<code>content_disposition()</code>).</li>
+<li><strong>Core:</strong> an explicit middleware order of <code>0</code> is kept.</li>
+<li><strong>Core:</strong> an error after a streamed or file response has started is logged and the connection is
+  closed, instead of a second response being attempted.</li>
+<li><strong>Core:</strong> a client that disconnects before its body has arrived raises <code>ClientDisconnected</code>; the
+  truncated body was handled as if it were complete. No response is sent.</li>
+<li><strong>Core:</strong> a malformed multipart body (missing or wrong boundary) answers <code>400</code> instead of <code>500</code>.</li>
+<li><strong>Core:</strong> a form field the <code>@consumes</code> model declares as a list accepts a single value.</li>
+<li><strong>Core:</strong> a controller property that needs a request (<code>current_request.user</code>) no longer fails
+  at registration.</li>
+<li><strong>Core:</strong> raw non-UTF-8 bytes in a query string no longer fail the request before a response.</li>
+<li><strong>Core:</strong> CLI arguments annotated <code>Optional[int]</code> or <code>int | None</code> are converted.</li>
+<li><strong>Core:</strong> <code>@produces(..., status_code)</code> no longer overrides an explicit <code>.status(200)</code>
+  (<code>Response.status_set</code>).</li>
+<li><strong>Core:</strong> every response of a route with CORS enabled carries <code>Vary: Origin</code>, also without an
+  <code>Origin</code> header, for a refused origin and for routing errors, so shared caches keep the
+  variants apart.</li>
+<li><strong>Core:</strong> logging works again when the application's lifespan runs a second time (the shutdown
+  removed the sinks for good).</li>
+<li><strong>patera-admin:</strong> record forms of models without a validation schema failed for boolean columns
+  (always) and number and date columns (PostgreSQL); records with an integer key could not be
+  viewed, edited or deleted on PostgreSQL. Values and keys are converted to the column types.</li>
+<li><strong>patera-admin:</strong> an unknown database or model on a record page answers 404, and an unknown
+  e-mail sender 400, instead of 500.</li>
+<li><strong>patera-taskmanager:</strong> a persistent job store (<code>SQLAlchemyJobStore</code>, ...) made startup fail,
+  because jobs were stored as bound methods. Methods of the task manager are now stored by name
+  (<code>run_scheduled_job</code>); <code>job_callable(job)</code> returns the method a job runs.</li>
+<li><strong>Core:</strong> the missing-configuration error names the <code>@app(...)</code> decorator.</li>
+<li><strong>Core:</strong> database sessions opened in a WebSocket handler are closed when it returns.</li>
+<li><strong>patera-database:</strong> <code>session_scope()</code> (and <code>work_session()</code> outside <code>@transactional</code>) inside a
+  request keeps the request's user and request object, leaves the request's sessions alone, and
+  closes other databases' sessions opened in the block (they leaked).</li>
+<li><strong>patera-auth:</strong> <code>@login_required</code> and <code>@role_required</code> keep a custom exception class in either
+  stacking order.</li>
+<li><strong>patera-taskmanager:</strong> jobs declared with <code>@schedule_job</code> are added again when the application's
+  lifespan runs again.</li>
+<li><strong>Core:</strong> an environment variable for one field of a nested setting
+  (<code>PATERA_ASSISTANT__API_KEY</code>) keeps the other fields of the class default instead of failing
+  them as missing.</li>
+<li><strong>Core:</strong> invalid UTF-8 in a form body answers 400 instead of failing; malformed cookies are
+  skipped; a file that shrinks while being sent ends the response properly; CORS headers on routing
+  errors; consistent <code>{"status", "message", "data"}</code> error bodies; <code>run_sync_or_async()</code> awaits
+  async callable objects and <code>functools.partial</code> objects instead of running them in a thread.</li>
+<li><strong>patera-admin:</strong> missing task manager translations; sorting by level follows severity and line
+  numbers sort numerically; unknown sort columns fall back to newest first.</li>
+<li><strong>patera-auth:</strong> passwords longer than 72 bytes no longer raise, and a malformed stored hash no
+  longer crashes the check.</li>
+<li><strong>patera-caching:</strong> the memory backend honours per-entry durations longer than its default; SQLite
+  <code>clear()</code> treats <code>_</code> and <code>%</code> in the prefix literally; Redis <code>clear()</code> refuses to run without a
+  prefix.</li>
+<li><strong>patera-database:</strong> <code>@query</code> INSERT, UPDATE and DELETE statements no longer crash.</li>
+<li><strong>patera-database:</strong> removed <code>DeclarativeBaseModel.db_configs_name()</code>, which always raised
+  <code>AttributeError</code>.</li>
+<li><strong>patera-database:</strong> <code>disconnect()</code> forgets the session factory, so a later session reconnects
+  instead of opening connections on the disposed engine that were never closed.</li>
+<li><strong>patera-migrate:</strong> per-database command prefixes; percent-encoded credentials in the URI are
+  decoded.</li>
+<li><strong>Core:</strong> <code>patera test</code> accepts pytest options in any order (<code>patera test -k login -q</code> failed with
+  "unrecognized arguments"), and a missing environment file is a one-line error instead of a
+  traceback.</li>
+<li><strong>Core:</strong> when auto-discovery finds no application because a module failed to import, the error
+  names that module instead of asking for an import string.</li>
+<li><strong>Core:</strong> routes joined from <code>@path("/")</code> and <code>@get("/hello")</code> are stored as <code>/hello</code>, not
+  <code>//hello</code>.</li>
+<li><strong>patera-migrate:</strong> <code>MIGRATE_SQL_MIGRATION_PREFIX</code>, <code>_SEPARATOR</code> and <code>_SUFFIXES</code> now take effect
+  (they were ignored); files in the migration folder with another ending are skipped, and a
+  misnamed migration is an error. pyway is limited to <code>&lt;0.4</code>.</li>
+<li><strong>patera-taskmanager:</strong> the scheduler is the single source of truth for job state; APScheduler is
+  limited to version 3 (<code>&lt;4</code>), since version 4 changes its API.</li>
+</ul>
+<h3 id="experimental-packages">Experimental packages<a class="headerlink" href="#experimental-packages" title="Permanent link">&para;</a></h3>
+<p><code>patera-aiinterface</code> and <code>patera-desktop</code> are marked Alpha.</p>
+<p><strong>patera-aiinterface 0.11.0:</strong>
+- The embedding libraries moved to the <code>augmentation</code> extra
+  (<code>pip install "patera-aiinterface[augmentation]"</code>) and are imported only when an augmentation
+  provider starts; the unused <code>openai</code> and <code>docstring-parser</code> dependencies are gone.
+- One vector column type: pgvector's (<code>augmentation_provider.embeddings.VectorColumn</code>); the
+  package's own <code>database_types.Vector</code> was removed.
+- Removed the unused <code>STREAM</code> and <code>TOOL_CHOICE</code> settings and the <code>@tool</code> decorator. <code>RESPONSE_FORMAT</code>
+  now defaults to plain text and is sent when set; <code>ORGANIZATION_ID</code>, <code>PROJECT_ID</code> and
+  <code>MAX_RETRIES</code> are used; <code>TEMPERATURE=None</code> leaves the provider's default.
+- The history stores the user's message without the augmentation texts, and nothing is saved when
+  the call fails.
+- <code>AUGMENTATION</code> settings default when not configured; the embedding model cache no longer changes
+  process-wide environment variables.
+- The chat pipeline lives in <code>AiService</code>: current system prompt, then the session's history, then
+  the user message (with augmentation texts when used). Service providers only send messages:
+  <code>BaseServiceProvider.complete(messages, configs)</code> and <code>stream(messages, configs)</code>.
+- <code>@history</code> methods take an explicit <code>session_id</code> argument (<code>None</code> starts a new session, returned
+  in <code>ChatResponse.session_id</code>); the route-based <code>@session_id</code> decorator was removed.
+- <code>BaseHistoryProvider</code> is a small interface (<code>load</code>, <code>append</code>, <code>new_session_id</code>), and
+  <code>SqlHistoryProvider</code> stores messages in its own transaction, so history works outside requests
+  and needs no commit by the handler.
+- The system prompt is no longer stored in the history; the current one is always sent.
+- <code>HISTORY_LIMIT</code> (default 10) caps how many earlier messages are sent.
+- <code>HISTORY_SUMMARY</code> (<code>HistorySummaryConfig</code>): a rolling summary of older messages is sent instead
+  of them and updated in the background (one extra call every <code>EVERY</code> messages). It is stored as a
+  <code>role="summary"</code> row of the messages table; <code>SqlHistoryProvider</code> supports it out of the box.
+- Streaming methods are iterated directly: <code>async for chunk in service.method(...)</code>.
+- Retrieved documents go in a context message before the user message (<code>CONTEXT_TEMPLATE</code>)
+  instead of being pasted under the question.
+- On PostgreSQL the document search is one pgvector query (closest documents by cosine distance);
+  other databases compare the candidates in Python (<code>RETRIEVAL</code>: auto, database or python).
+  <code>base_query()</code> limits the candidates; <code>add_documents()</code> / <code>add_document()</code> embed and store texts;
+  <code>embed()</code>, <code>search()</code> and <code>relevant_texts()</code> are public.
+- <code>REWRITE_QUERY</code>: with history, the model first rewrites a follow-up question into a standalone
+  one for the search (<code>REWRITE_PROMPT</code>).
+- <code>ChatMessage</code> has only <code>role</code> and <code>content</code> (the unused <code>thinking</code>, <code>name</code> and <code>tool_call_id</code>
+  fields and the <code>"tool"</code> role are gone). Ollama reports <code>finish_reason="length"</code> for an answer cut
+  off at the token limit; OpenAI answers fill <code>request_id</code>, and <code>created_at</code> is ISO 8601 text for
+  both providers.
+- <code>augmentation_provider.embeddings</code> keeps only <code>VectorColumn</code>; its Python distance helpers were
+  removed.
+- Methods without <code>@history</code> work outside a request, and a missing history or augmentation
+  provider fails at startup.
+- In a <code>@transactional</code> handler the SQL history and the documents use the request's session (no
+  "database is locked" on SQLite; they commit or roll back with the request). A streamed answer,
+  saved after the request's transaction has ended, uses a transaction of its own.
+- Concurrent writes to one chat session (two quick messages, or two summary updates) no longer get
+  the same position or a second summary row, also across worker processes and inside
+  <code>@transactional</code> requests that commit later: each write first locks the chat session until it
+  commits, with an advisory lock on PostgreSQL and the database's write lock on SQLite. That lock is
+  taken before the in-process one, so a write waiting for another request's commit no longer
+  deadlocks that request's next write (on PostgreSQL it waited forever). Other databases take turns
+  within a process.
+- <code>&lt;:name&gt;</code> placeholders are filled in one pass: text inserted by an argument, such as a user's
+  message, can no longer pull other arguments into the prompt.
+- The embedding model is loaded on first use, in a worker thread, instead of when the application
+  starts (CLI commands no longer load it); <code>load_embedding_model()</code> can be overridden.
+- Document search decides between pgvector and Python from the database URI, so it works before
+  the database has connected (it failed with "Engine not initialized", e.g. in CLI commands).</p>
+<p><strong>patera-desktop:</strong> rewritten, with only one feature for now. The <code>Desktop</code> extension adds the CLI
+command <code>desktop:run [dev|prod]</code>: it starts the application in a separate process, as <code>patera dev</code>
+or <code>patera prod</code> would (on <code>127.0.0.1</code> and the <code>PORT</code> setting), shows <code>DESKTOP.INDEX_PAGE</code> (default
+<code>/</code>) in a pywebview window, and stops the application when the window is closed. The launcher, the
+frontend bridge, frontend tools and the <code>PATERA_DESKTOP_*</code> settings are gone, and so is the core
+command <code>patera desktop</code>. <code>python -m patera.cli</code> now runs the <code>patera</code> command. <code>desktop:package
+[folder]</code> packages the application as a program with PyInstaller (extra
+<code>patera-desktop[pyinstaller]</code>), by default into <code>dist/desktop/&lt;APP_NAME&gt;/</code>: the program runs the
+server in a background thread with <code>run_in_window(App)</code>, on a free port, and writes its log files to
+<code>user_data_dir(APP_NAME)</code>. Before the application starts, <code>run_in_window</code> loads the installation's
+settings file, <code>settings_file(APP_NAME)</code> (<code>settings.env</code> in that folder), like <code>.env</code> during
+development. The package ships a PyInstaller hook so the <code>patera.*</code> extensions are found also in
+editable (workspace) installs. Window settings in <code>DESKTOP</code>: <code>TITLE</code>, <code>WIDTH</code>/<code>HEIGHT</code> (1024 × 720),
+<code>MIN_WIDTH</code>/<code>MIN_HEIGHT</code>, <code>REMEMBER_GEOMETRY</code> (size, position and maximized state restored at the
+next start, on by default), <code>MAXIMIZED</code>, <code>FULLSCREEN</code>, <code>RESIZABLE</code>, <code>ON_TOP</code>, <code>CONFIRM_CLOSE</code>,
+<code>BACKGROUND_COLOR</code>, <code>TEXT_SELECT</code> (on), <code>ZOOMABLE</code>, <code>PERSIST_STORAGE</code> (cookies and local storage
+kept in the user's data folder, on by default; pywebview forgets them at every close otherwise),
+<code>ICON</code> (also the spec file's default icon), <code>DEV_TOOLS</code> and <code>GUI</code>. <code>desktop:env</code> writes
+<code>desktop.env</code>, the packaged program's settings: every setting the configuration declares, defaults
+commented out, required ones empty. <code>desktop:package</code> bundles it, refuses to build while a required
+setting is empty, and warns about values that look like secrets. The program loads environment
+variables, then the installation's <code>settings.env</code>, then <code>desktop.env</code>; <code>${PATERA_DATA_DIR}</code> is the
+user's data folder. <code>desktop:run</code> loads <code>desktop.env</code> under the development <code>.env</code>. A configuration
+that declares <code>SECRET_KEY</code> gets a key per installation, made at the first start and kept in
+<code>settings.env</code>. A packaged program reuses the port of its last start, so the page's origin and local
+storage stay the same. <code>user_data_dir</code> also knows iOS (Application Support in the app's sandbox) and
+Android (the app's internal storage, <code>$HOME</code>). <code>desktop:spec [path]</code> writes a PyInstaller spec file
+(default <code>desktop.spec</code>) with the defaults as settings to edit (hidden imports, data files, icon,
+console, one file, own entry script). The application package is copied without what running and
+developing it leave there (<code>__pycache__</code>, log files, SQLite databases, <code>.env</code>, tool caches;
+<code>PACKAGE_EXCLUDES</code> in the spec file). <code>desktop:package [folder] [spec]</code> builds with the spec file
+when it exists, otherwise with a generated one in <code>build/desktop/</code>. patera-desktop now depends on
+uvicorn.</p>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../reference/api/testing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: patera.testing">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                patera.testing
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../versioning/" class="md-footer__link md-footer__link--next" aria-label="Next: Versioning and releases">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Versioning and releases
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; Marko Šterk. Released under the MIT License.
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/MarkoSterk/Patera" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/patera/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["announce.dismiss","content.action.edit","content.action.view","content.code.annotate","content.code.copy","content.code.select","content.footnote.tooltips","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.sections","navigation.tabs","navigation.top","navigation.tracking","search.highlight","toc.follow"],"redirect":null,"search":"../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"alias":true,"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.77dd0ce9.min.js"></script>
+      
+    
+  </body>
+</html>
