@@ -15,11 +15,13 @@ The specification is generated from your controllers:
 | docstrings | descriptions |
 
 ```python
+from patera import HttpStatus
+
 from patera.controller import Descriptor, open_api_docs
 
 
 @get("/<int:user_id>")
-@open_api_docs(Descriptor(404, "User not found", MediaType.APPLICATION_JSON, ErrorBody))
+@open_api_docs(Descriptor(HttpStatus.NOT_FOUND, "User not found", MediaType.APPLICATION_JSON, ErrorBody))
 async def get_user(self, req: Request, user_id: int) -> Response[UserOut]:
     """Returns one user."""
     ...

@@ -4,6 +4,7 @@ Handles Cross-Origin Resource Sharing (CORS) by adding appropriate headers to HT
 """
 
 from typing import Any, Callable, Optional, TYPE_CHECKING, cast
+from ..http_statuses import HttpStatus
 from ..middleware import MiddlewareBase
 
 # CORS responses differ by the request's Origin; caches must key on it.
@@ -51,7 +52,7 @@ class CORSMiddleware(MiddlewareBase):
         if origin and is_preflight:
             return req.res.json(
                 {"status": "error", "message": "CORS origin not allowed"}
-            ).status(403)
+            ).status(HttpStatus.FORBIDDEN)
         # Simple/actual requests are passed through without CORS headers; the
         # browser then blocks cross-origin reads. Same-origin requests
         # (browsers also send Origin on them) keep working.
@@ -207,7 +208,7 @@ class CORSMiddleware(MiddlewareBase):
         ):
             return req.res.json(
                 {"status": "error", "message": "Preflight method not allowed"}
-            ).status(405)
+            ).status(HttpStatus.METHOD_NOT_ALLOWED)
 
         headers = self._build_cors_headers_for_preflight(
             origin=origin,

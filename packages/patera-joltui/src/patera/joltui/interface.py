@@ -19,7 +19,14 @@ from typing import (
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from patera import BaseExtension, MediaType, Request, Response, run_sync_or_async
+from patera import (
+    HttpStatus,
+    BaseExtension,
+    MediaType,
+    Request,
+    Response,
+    run_sync_or_async,
+)
 from patera.controller.utilities import _build_model, _unwrap_annotated
 from patera.controller import Controller, path, post
 from patera.exceptions.http_exceptions import (
@@ -278,7 +285,9 @@ class PateraJoltui(BaseExtension[Any, JoltuiConfig]):
             raise InvalidRequestBody("tagName is required for component dispatch")
         handler = self._handlers.get((payload.group_name, payload.tag_name))
         if handler is None:
-            raise BaseHttpException("Unknown JoltUI component", status_code=404)
+            raise BaseHttpException(
+                "Unknown JoltUI component", status_code=HttpStatus.NOT_FOUND
+            )
         req.scope["patera.joltui"] = payload
         req._route_handler = handler
         get_request_context().controller = handler.__self__

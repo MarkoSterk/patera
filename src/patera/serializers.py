@@ -36,7 +36,7 @@ class ResponseSerializer(Protocol):
 class NoContentSerializer:
     BODYLESS_STATUS_CODES: tuple[int, ...] = (
         int(HttpStatus.NO_CONTENT),
-        304,
+        int(HttpStatus.NOT_MODIFIED),
     )
 
     def can_serialize(self, response: Response[Any]) -> bool:

@@ -4,6 +4,8 @@ Each request carries the response being built as `req.res`. Its methods return t
 calls can be chained:
 
 ```python
+from patera import HttpStatus
+
 return req.res.json({"ok": True}).status(HttpStatus.CREATED).set_header("x-id", "7")
 ```
 
@@ -19,7 +21,7 @@ constructing a response with only a body.
 | `await html(template, context)`, `await html_from_string(source, context)` | rendered [templates](templates.md) |
 | `problem(title, detail, status, type_="about:blank", instance=None, extra=None)` | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details |
 | `stream(iterable, media_type)`, `stream_text(iterable)` | streaming responses (sync or async iterables) |
-| `redirect(location, status=303)`, `no_content()` | redirects and `204` |
+| `redirect(location, status=HttpStatus.SEE_OTHER)`, `no_content()` | redirects and `204` |
 
 ## Status and headers
 

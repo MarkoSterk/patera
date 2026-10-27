@@ -4,7 +4,7 @@ import sqlite3
 
 from pydantic import BaseModel, Field
 
-from patera import MediaType, Request, abort
+from patera import HttpStatus, MediaType, Request, abort
 from patera.controller import Controller, consumes, delete, get, path, post, put
 from patera.desktop import user_data_dir
 
@@ -25,7 +25,7 @@ class NotesAPI(Controller):
                     "DELETE FROM notes WHERE id = ?", (note_id,)
                 )
                 if not cursor.rowcount:
-                    abort("Note not found", 404)
+                    abort("Note not found", HttpStatus.NOT_FOUND)
             return req.res.json({"deleted": note_id})
         finally:
             connection.close()
@@ -58,7 +58,7 @@ class NotesAPI(Controller):
                 "SELECT * FROM notes WHERE id = ?", (note_id,)
             ).fetchone()
             if row is None:
-                abort("Note not found", 404)
+                abort("Note not found", HttpStatus.NOT_FOUND)
             return req.res.json(dict(row))
         finally:
             connection.close()
@@ -74,7 +74,7 @@ class NotesAPI(Controller):
                     (data.title, data.body),
                 )
             return req.res.json({"id": cursor.lastrowid, **data.model_dump()}).status(
-                201
+                HttpStatus.CREATED
             )
         finally:
             connection.close()
@@ -90,7 +90,7 @@ class NotesAPI(Controller):
                     (data.title, data.body, note_id),
                 )
                 if not cursor.rowcount:
-                    abort("Note not found", 404)
+                    abort("Note not found", HttpStatus.NOT_FOUND)
             return req.res.json({"id": note_id, **data.model_dump()})
         finally:
             connection.close()

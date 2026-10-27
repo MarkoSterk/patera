@@ -1,7 +1,7 @@
 # Controllers and routing
 
 ```python
-from patera import Request, Response, MediaType
+from patera import HttpStatus, Request, Response, MediaType
 from patera.controller import Controller, path, get, post, consumes
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class NotesController(Controller):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     async def create(self, req: Request, data: NoteInput) -> Response:
-        return req.res.json(data.model_dump()).status(201)
+        return req.res.json(data.model_dump()).status(HttpStatus.CREATED)
 ```
 
 Place in `controllers/notes_controller.py` or the corresponding API discovery

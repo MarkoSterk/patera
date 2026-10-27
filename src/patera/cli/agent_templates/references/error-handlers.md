@@ -1,7 +1,7 @@
 # Exception handlers
 
 ```python
-from patera import Request, Response
+from patera import HttpStatus, Request, Response
 from patera.exceptions import ExceptionHandler, exception_handler, handles
 
 class MissingNote(Exception):
@@ -11,7 +11,7 @@ class MissingNote(Exception):
 class ApplicationErrors(ExceptionHandler):
     @handles(MissingNote)
     async def missing(self, req: Request, exc: MissingNote) -> Response:
-        return req.res.problem("Note not found", str(exc), 404)
+        return req.res.problem("Note not found", str(exc), HttpStatus.NOT_FOUND)
 ```
 
 Place in `exceptions/app_exception_handler.py`, or register the class with

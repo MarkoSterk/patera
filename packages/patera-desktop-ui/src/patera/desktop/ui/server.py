@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from patera import BaseExtension, MiddlewareBase, Request, Response
+from patera import HttpStatus, BaseExtension, MiddlewareBase, Request, Response
 from patera.cli import CLIController, cli_controller, command
 from patera.controller import Controller, get, path, post
 from patera.exceptions.http_exceptions import StaticAssetNotFound
@@ -102,18 +102,26 @@ class DesktopUIGuard(MiddlewareBase):
             except ValueError:
                 hostname = None
             if hostname not in {"127.0.0.1", "localhost", "::1"}:
-                return req.res.text("Desktop UI requires a loopback host").status(403)
+                return req.res.text("Desktop UI requires a loopback host").status(
+                    HttpStatus.FORBIDDEN
+                )
             origin = req.headers.get("origin")
             expected = req.scope.get("scheme", "http") + "://" + host
             if origin and origin != expected:
-                return req.res.text("Cross-origin desktop request rejected").status(403)
+                return req.res.text("Cross-origin desktop request rejected").status(
+                    HttpStatus.FORBIDDEN
+                )
             if req.headers.get("sec-fetch-site") == "cross-site":
-                return req.res.text("Cross-site desktop request rejected").status(403)
+                return req.res.text("Cross-site desktop request rejected").status(
+                    HttpStatus.FORBIDDEN
+                )
             if protected and not hmac.compare_digest(
                 req.headers.get("x-patera-ui-token", "").encode(),
                 extension.token.encode(),
             ):
-                return req.res.text("Desktop UI session required").status(403)
+                return req.res.text("Desktop UI session required").status(
+                    HttpStatus.FORBIDDEN
+                )
         return await self.next(req)
 
 
@@ -139,18 +147,24 @@ class DesktopUI(BaseExtension[Any, DesktopUIConfig]):
 
                     payload = await req.json()
                     if not isinstance(payload, dict):
-                        return req.res.text("Expected component request").status(400)
+                        return req.res.text("Expected component request").status(
+                            HttpStatus.BAD_REQUEST
+                        )
                     tag = payload.get("tag_name")
                     group = payload.get("group_name", "default")
                     if not isinstance(tag, str) or not isinstance(group, str):
-                        return req.res.text("Invalid component name").status(400)
+                        return req.res.text("Invalid component name").status(
+                            HttpStatus.BAD_REQUEST
+                        )
                     entry = extension.server_components.get(group + "/" + tag)
                     if entry is None:
-                        return req.res.text("Unknown server component").status(404)
+                        return req.res.text("Unknown server component").status(
+                            HttpStatus.NOT_FOUND
+                        )
                     for key in ("attributes", "route_parameters", "query_parameters"):
                         if not isinstance(payload.get(key, {}), dict):
                             return req.res.text("Invalid component arguments").status(
-                                400
+                                HttpStatus.BAD_REQUEST
                             )
                     template_name, factory = entry
                     values = await invoke(factory, req, payload) if factory else {}

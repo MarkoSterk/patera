@@ -23,10 +23,12 @@ Parsing is lazy. Await `req.body()`, `req.json()`, `req.form()`, `req.files()` o
 `req.form_and_files()` as needed; do not consume the ASGI `receive` channel yourself.
 
 ```python
+from patera import HttpStatus
+
 @post("/notes")
 async def create(self, req: Request) -> Response:
     data = await req.json()
-    return req.res.json({"title": data["title"]}).status(201)
+    return req.res.json({"title": data["title"]}).status(HttpStatus.CREATED)
 ```
 
 - An empty body gives `None`; malformed JSON is answered with `400`.

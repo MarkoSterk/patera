@@ -200,7 +200,7 @@ def consumes(media_type: MediaType) -> _EndpointDecorator:
                             "received": incoming_ct or None,
                         },
                     }
-                ).status(415)
+                ).status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
 
             payload = await _read_payload_for_consumes(req, media_type)
             # Parameters: [0]=self, [1]=req, others start at index 2

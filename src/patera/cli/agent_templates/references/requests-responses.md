@@ -1,6 +1,6 @@
 # Requests and responses
 
-Use the request's existing response builder: `req.res.json(data).status(201)`,
+Import `HttpStatus` from `patera` and use the request's existing response builder: `req.res.json(data).status(HttpStatus.CREATED)`,
 `req.res.text("ok")`, `req.res.no_content()`, or `req.res.redirect(url)`.
 HTML templates require `await req.res.html("page.html", context)` with a dictionary.
 `Response` is tied to an app and request; do not create a Flask-style response

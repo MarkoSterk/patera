@@ -334,7 +334,10 @@ def build_openapi(
                 produces = cast(str, cast(dict, ep_cfg).get("produces"))
                 mt_out = _as_media_type(produces) if produces else "application/json"
                 default_status = _as_status_code(
-                    cast(int, cast(dict, ep_cfg).get("default_status_code", 200))
+                    cast(
+                        int,
+                        cast(dict, ep_cfg).get("default_status_code", HttpStatus.OK),
+                    )
                 )
                 responses: Dict[int, Any] = {}
                 op_obj["responses"] = responses

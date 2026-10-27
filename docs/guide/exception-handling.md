@@ -23,7 +23,7 @@ class ApiExceptionHandler(ExceptionHandler):
 
     @handles(RequestValidationError)
     async def validation_error(self, req: Request, exc: RequestValidationError) -> Response:
-        return req.res.json({"message": "Invalid data", "details": exc.errors}).status(422)
+        return req.res.json({"message": "Invalid data", "details": exc.errors}).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
     @handles(BaseHttpException)          # also handles subclasses, e.g. EntityNotFound
     async def http_error(self, req: Request, exc: BaseHttpException) -> Response:
@@ -41,9 +41,11 @@ Put the class in an `exceptions` folder (file name containing `handler`) or regi
 A handler can return any response, for example RFC 9457 problem details:
 
 ```python
+from patera import HttpStatus
+
 @handles(MissingNote)
 async def missing(self, req: Request, exc: MissingNote) -> Response:
-    return req.res.problem("Note not found", str(exc), 404)
+    return req.res.problem("Note not found", str(exc), HttpStatus.NOT_FOUND)
 ```
 
 ## Default responses

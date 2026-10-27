@@ -95,6 +95,8 @@ of the request, the manager middleware commits it if the controller or endpoint 
 `@transactional` and no exception occurred; otherwise all changes are rolled back.
 
 ```python
+from patera import HttpStatus
+
 from patera.database.sql import Repository, query, transactional
 from patera.injectable import Inject
 
@@ -119,7 +121,7 @@ class NoteApi(Controller[App]):
     @transactional
     async def create(self, req: Request) -> Response:
         note = await self.notes.create_and_flush(title=(await req.json())["title"])
-        return req.res.json({"id": note.id}).status(201)
+        return req.res.json({"id": note.id}).status(HttpStatus.CREATED)
 ```
 
 - Successful body conversion happens before the commit. A failure after the commit (for example

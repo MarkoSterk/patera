@@ -120,7 +120,7 @@ class ResponseRenderer:
         """
         status_code = int(response.status_code)
 
-        if status_code in (int(HttpStatus.NO_CONTENT), 304):
+        if status_code in (int(HttpStatus.NO_CONTENT), int(HttpStatus.NOT_MODIFIED)):
             response.headers.pop("content-type", None)
             response.headers.pop("content-length", None)
             return

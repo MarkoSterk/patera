@@ -346,7 +346,7 @@ def file_response(
         if not fresh:
             range_header = None
 
-    start, end, status = 0, total - 1, 200
+    start, end, status = 0, total - 1, HttpStatus.OK
     if range_header:
         m = re.fullmatch(r"\s*bytes=(\d*)-(\d*)\s*", range_header)
         if m and (m.group(1) or m.group(2)):
@@ -356,9 +356,9 @@ def file_response(
             else:
                 start = int(m.group(1))
                 end = min(int(m.group(2)), total - 1) if m.group(2) else total - 1
-            status = 206
+            status = HttpStatus.PARTIAL_CONTENT
             if start >= total or start > end:
-                res.status(416)
+                res.status(HttpStatus.RANGE_NOT_SATISFIABLE)
                 res.set_headers(
                     {
                         "Content-Range": f"bytes */{total}",
@@ -370,7 +370,7 @@ def file_response(
         # A missing or unsupported (e.g. multi-range) header sends the file.
 
     length = max(end - start + 1, 0)
-    if status == 206:
+    if status == HttpStatus.PARTIAL_CONTENT:
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
 
     res.status(status)

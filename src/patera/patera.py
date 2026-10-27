@@ -1006,7 +1006,9 @@ class Patera(Injectable, Generic[ConfT]):
                     method=scope["method"].upper(),
                     path=scope["path"],
                     route=scope.get("patera.route"),
-                    status_code=status[0] if status else (500 if failed else None),
+                    status_code=status[0]
+                    if status
+                    else (HttpStatus.INTERNAL_SERVER_ERROR if failed else None),
                     started_at=started_at,
                     duration=time.perf_counter() - start,
                 )

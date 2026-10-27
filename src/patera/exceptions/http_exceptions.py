@@ -17,7 +17,7 @@ class BaseHttpException(Exception):
     def __init__(
         self,
         message: str = "",
-        status_code: int | HttpStatus = 500,
+        status_code: int | HttpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
         status="error",
         data=None,
     ):
@@ -41,7 +41,7 @@ class StaticPageNotFound(BaseHttpException):
     def __init__(
         self,
         page: str,
-        status_code: int = 404,
+        status_code: int = HttpStatus.NOT_FOUND,
         status: str = "error",
         data: Any = None,
     ):
@@ -56,7 +56,7 @@ class StaticAssetNotFound(BaseHttpException):
     def __init__(
         self,
         message: str = "Static asset not found",
-        status_code: int = 404,
+        status_code: int = HttpStatus.NOT_FOUND,
         status: str = "error",
         data: Any = None,
     ):
@@ -71,7 +71,7 @@ class AborterException(BaseHttpException):
     def __init__(
         self,
         message: str = "",
-        status_code: int = 400,
+        status_code: int = HttpStatus.BAD_REQUEST,
         status: str = "error",
         data: Optional[Any] = None,
     ):
@@ -87,7 +87,7 @@ class InvalidRequestBody(BaseHttpException):
     def __init__(
         self,
         message: str = "Malformed request body",
-        status_code: int = 400,
+        status_code: int = HttpStatus.BAD_REQUEST,
         status: str = "error",
         data: Any = None,
     ):
@@ -104,7 +104,7 @@ class RequestBodyTooLarge(BaseHttpException):
         self,
         max_content_length: int,
         message: str = "Request body too large",
-        status_code: int = 413,
+        status_code: int = HttpStatus.PAYLOAD_TOO_LARGE,
         status: str = "error",
     ):
         super().__init__(
@@ -129,7 +129,7 @@ class RequestValidationError(BaseHttpException):
         self,
         validation_error: ValidationError,
         message: str = "Validation failed",
-        status_code: int = 422,
+        status_code: int = HttpStatus.UNPROCESSABLE_ENTITY,
         status: str = "error",
     ):
         errors = validation_error.errors(

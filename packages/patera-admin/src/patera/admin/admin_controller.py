@@ -10,7 +10,7 @@ from werkzeug.security import safe_join
 from patera.exceptions import StaticAssetNotFound
 from patera.utilities import file_response
 from patera.controller import Controller, get, post, before_request
-from patera import Patera, Request, Response
+from patera import HttpStatus, Patera, Request, Response
 from patera.auth import role_required, login_required
 from patera.static import static_resource
 
@@ -178,7 +178,7 @@ class _AdminController(Controller[Patera]):
         if stats is None:
             return req.res.json(
                 {"status": "error", "message": "Request statistics are disabled."}
-            ).status(404)
+            ).status(HttpStatus.NOT_FOUND)
         period = str(req.query_parameters.get("period") or "1h")
         if period not in PERIODS:
             return req.res.json(
@@ -186,7 +186,7 @@ class _AdminController(Controller[Patera]):
                     "status": "error",
                     "message": f"Unknown period; use one of {', '.join(PERIODS)}.",
                 }
-            ).status(400)
+            ).status(HttpStatus.BAD_REQUEST)
         return req.res.json(stats.summary(period))
 
     @get("/notifications")

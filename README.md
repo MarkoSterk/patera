@@ -463,6 +463,8 @@ The current request is also available anywhere during request handling through
 `Response` (`req.res`) methods return the response, so calls can be chained:
 
 ```python
+from patera import HttpStatus
+
 return req.res.json({"ok": True}).status(HttpStatus.CREATED).set_header("x-id", "7")
 ```
 
@@ -474,7 +476,7 @@ return req.res.json({"ok": True}).status(HttpStatus.CREATED).set_header("x-id", 
 | `problem(title, detail, status, type_="about:blank", instance=None, extra=None)` | RFC 9457 problem details |
 | `stream(iterable, media_type)`, `stream_text(iterable)` | streaming responses (sync or async iterables); an error after the first chunk is logged and the connection closed, since the status is already sent |
 | `file_response(res, path, req.headers, download_name=...)` (from `patera.utilities`) | stream a file from disk, with ranges, `ETag` and 304; `download_name` makes it a download under any file name |
-| `redirect(location, status=303)`, `no_content()` | redirects and `204` |
+| `redirect(location, status=HttpStatus.SEE_OTHER)`, `no_content()` | redirects and `204` |
 | `status(code)` | status code (`int` or `HttpStatus`) |
 | `set_header()`, `set_headers()` | headers |
 | `set_cookie(name, value, max_age, path, domain, secure, http_only, same_site)`, `delete_cookie()`, `add_raw_cookie()` | cookies |
@@ -580,7 +582,7 @@ class ApiExceptionHandler(ExceptionHandler):
 
     @handles(RequestValidationError)
     async def validation_error(self, req: Request, exc: RequestValidationError) -> Response:
-        return req.res.json({"message": "Invalid data", "details": exc.errors}).status(422)
+        return req.res.json({"message": "Invalid data", "details": exc.errors}).status(HttpStatus.UNPROCESSABLE_ENTITY)
 
     @handles(BaseHttpException)          # also handles subclasses, e.g. EntityNotFound
     async def http_error(self, req: Request, exc: BaseHttpException) -> Response:
@@ -954,6 +956,8 @@ endpoint is marked `@transactional` and no exception occurred; otherwise all cha
 back.
 
 ```python
+from patera import HttpStatus
+
 from patera.database.sql import Repository, query, transactional
 from patera.injectable import Inject
 
@@ -978,7 +982,7 @@ class NoteApi(Controller[App]):
     @transactional
     async def create(self, req: Request) -> Response:
         note = await self.notes.create_and_flush(title=(await req.json())["title"])
-        return req.res.json({"id": note.id}).status(201)
+        return req.res.json({"id": note.id}).status(HttpStatus.CREATED)
 ```
 
 - `Model.query()` returns a chainable `AsyncQuery` (`where`/`filter`, `filter_by`, `join`,
