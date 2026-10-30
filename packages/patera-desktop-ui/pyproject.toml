@@ -1,6 +1,6 @@
 [project]
 name = "patera-desktop-ui"
-version = "0.3.1"
+version = "0.3.2"
 description = "Python browser UI for Patera desktop applications"
 readme = "README.md"
 license = "MIT AND MPL-2.0"

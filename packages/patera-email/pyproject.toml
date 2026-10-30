@@ -1,6 +1,6 @@
 [project]
 name = "patera-email"
-version = "0.13.1"
+version = "0.13.2"
 description = "Async SMTP e-mail client with Jinja templates for Patera"
 readme = "README.md"
 license = "MIT"
