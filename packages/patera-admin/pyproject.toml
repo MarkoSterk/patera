@@ -1,6 +1,6 @@
 [project]
 name = "patera-admin"
-version = "0.13.2"
+version = "0.13.3"
 description = "Admin dashboard for Patera applications: logs, databases, files, e-mail and task managers"
 readme = "README.md"
 license = "MIT"

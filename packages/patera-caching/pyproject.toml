@@ -1,6 +1,6 @@
 [project]
 name = "patera-caching"
-version = "0.13.2"
+version = "0.13.3"
 description = "Response caching for Patera with in-memory, Redis and SQLite backends"
 readme = "README.md"
 license = "MIT"
