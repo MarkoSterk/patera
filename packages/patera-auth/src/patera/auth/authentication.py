@@ -5,6 +5,7 @@ Authentication module of Patera
 
 from abc import ABC, abstractmethod
 from typing import (
+    ClassVar,
     Callable,
     Generic,
     Optional,
@@ -134,7 +135,7 @@ class AuthUtils:
 
     # Hashes from create_password_hash() start with this marker; plain bcrypt
     # hashes ("$2b$...") are from versions before 0.11 and still verify.
-    PASSWORD_HASH_PREFIX: str = "bcrypt-sha256$"
+    PASSWORD_HASH_PREFIX: ClassVar[str] = "bcrypt-sha256$"
 
     @staticmethod
     def _password_digest(password: str) -> bytes:

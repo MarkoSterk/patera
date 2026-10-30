@@ -9,7 +9,7 @@ import inspect
 from types import ModuleType
 from collections.abc import Callable
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import ClassVar, TYPE_CHECKING, Any, TypeVar
 from .lifecycle import Scope, Lifecycle, invoke, run_hooks
 from .metadata import ElementInitializationError
 from .view import Template, trusted_html
@@ -103,9 +103,9 @@ class Component:
     bound text/value nodes; they do not replace the component's DOM.
     """
 
-    tag = ""
-    dependencies = ()
-    __ui_component__: dict[str, Any] = {}
+    tag: ClassVar[str] = ""
+    dependencies: ClassVar[tuple[Any, ...]] = ()
+    __ui_component__: ClassVar[dict[str, Any]] = {}
 
     def __init__(self, app: Application, element: Any) -> None:
         self.app = app

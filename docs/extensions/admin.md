@@ -16,7 +16,7 @@ from patera.admin import AdminConfig, AdminInterface
 
 
 class Admin(AdminInterface):
-    MANAGED_MODELS = [Note]
+    managed_models = [Note]
 
 
 class Config(BaseConfig):
@@ -31,6 +31,16 @@ Register `Admin` in `app_extensions`. The dashboard is served at `/admin/<lang>/
 
 Admin looks up the extensions it manages (databases, task managers, e-mail clients) on every page
 load, so their order in `app_extensions` does not matter.
+
+To annotate the managed-model configuration explicitly, use its class-variable type:
+
+```python
+from typing import ClassVar
+from patera.database.sql import DeclarativeBaseModel
+
+class Admin(AdminInterface):
+    managed_models: ClassVar[list[type[DeclarativeBaseModel]]] = [Note]
+```
 
 ## Settings
 
@@ -79,6 +89,24 @@ The log view reads the application's [JSON Lines log files](../guide/logging.md#
 ## Model forms
 
 Form metadata derives from the model's `Meta` (`patera.database.sql.declarative_base.ModelMeta`).
+
+Inherit from your base model's `Meta` when defining model metadata. Its settings
+are class variables; explicit annotations should keep the same container types:
+
+```python
+from typing import ClassVar
+
+class Article(Base):
+    # Declare SQLAlchemy columns here.
+
+    class Meta(Base.Meta):
+        exclude_from_table: ClassVar[list[str]] = ["body"]
+        custom_labels: ClassVar[dict[str, str]] = {"body": "Article text"}
+```
+
+Replace lists and dictionaries in each subclass instead of mutating inherited
+defaults. `ClassVar` describes their ownership to type checkers; it does not copy
+the values or make them immutable.
 
 - Record forms are validated with `Meta.create_validation_schema` / `update_validation_schema`
   when the model has them.

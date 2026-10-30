@@ -5,6 +5,7 @@ Module for sql database connection/integration
 
 import inspect as py_inspect
 from typing import (
+    ClassVar,
     Any,
     Dict,
     Optional,
@@ -153,7 +154,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
     A simple async Database interface using SQLAlchemy.
     """
 
-    __db_name__: str
+    __db_name__: ClassVar[str]
 
     def init(self) -> None:
         """

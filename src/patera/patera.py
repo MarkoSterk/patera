@@ -14,6 +14,7 @@ from collections.abc import AsyncIterator, Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import (
+    ClassVar,
     Any,
     Callable,
     Generic,
@@ -202,7 +203,7 @@ def validate_config(config_type: type[ConfT]) -> ConfT:
 class Patera(Injectable, Generic[ConfT]):
     """Patera class implementation. Used to create a new application instance"""
 
-    app_extensions: list[Type[BaseExtension[Any, Any]]] = []
+    app_extensions: ClassVar[list[Type[BaseExtension[Any, Any]]]] = []
 
     def __init__(self, cli_mode: bool = False):
         """Init function"""
@@ -1602,7 +1603,7 @@ class Patera(Injectable, Generic[ConfT]):
 
     # Decorators that work through HTTP middleware (authentication and
     # database transactions), which does not run for WebSocket handlers.
-    _MIDDLEWARE_DECORATORS: dict[str, str] = {
+    _MIDDLEWARE_DECORATORS: ClassVar[dict[str, str]] = {
         "_authentication": "@login_required / @role_required",
         "_transactional": "@transactional",
     }

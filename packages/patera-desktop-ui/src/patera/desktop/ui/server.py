@@ -12,7 +12,7 @@ import sys
 import threading
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import ClassVar, Any
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -84,8 +84,8 @@ def _within(pathname, prefix):
 
 
 class DesktopUIGuard(MiddlewareBase):
-    _middleware = True
-    _order_ = -110
+    _middleware: ClassVar[bool] = True
+    _order_: ClassVar[int] = -110
 
     async def middleware(self, req: Request) -> Response:
         extension = req.app.get_extension(DesktopUI)

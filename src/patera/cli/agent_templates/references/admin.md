@@ -1,7 +1,7 @@
 # Administrative interfaces
 
 Install `patera-admin`. Subclass `AdminInterface` from `patera.admin` and set an
-explicit `MANAGED_MODELS` list. Register that class in `app_extensions`; configure
+explicit `managed_models` list. Register that class in `app_extensions`; configure
 the matching upper-snake key with `AdminConfig`.
 
 Key fields include `ADMIN_BASE_URL`, `DEFAULT_LANGUAGE`, `URL_FOR_FOR_LOGIN` and

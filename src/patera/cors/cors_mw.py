@@ -3,7 +3,7 @@ CORS middleware for Patera.
 Handles Cross-Origin Resource Sharing (CORS) by adding appropriate headers to HTTP responses.
 """
 
-from typing import Any, Callable, Optional, TYPE_CHECKING, cast
+from typing import ClassVar, Any, Callable, Optional, TYPE_CHECKING, cast
 from ..http_statuses import HttpStatus
 from ..middleware import MiddlewareBase
 
@@ -20,8 +20,8 @@ class CORSMiddleware(MiddlewareBase):
     Middleware to handle CORS by adding necessary headers to HTTP responses.
     """
 
-    _order_ = -101
-    _middleware = True
+    _order_: ClassVar[int] = -101
+    _middleware: ClassVar[bool] = True
 
     async def middleware(self, req: "Request") -> "Response":
         scope = req.scope

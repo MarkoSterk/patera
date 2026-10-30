@@ -33,7 +33,7 @@
   <script src="{{ admin_interface.url_for('_AdminController.static', filename='js/vendors/summernote/summernote-lite.min.js') }}"></script>
 
   <script type="module" src="{{ admin_interface.url_for('_AdminController.static', filename='js/file_explorer/file_explorer.js') }}"></script>
-  <script type="module" src="{{ admin_interface.url_for('_AdminController.static', filename='js/inputs/index.js') }}"></script>
+  <script type="module" src="{{ admin_interface.url_for('_AdminController.static', filename='js/inputs/index.js') }}?v={{ admin_interface_version|urlencode }}"></script>
 
   <style>
     body {

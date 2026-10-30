@@ -4,6 +4,7 @@ import re
 import sys
 from dataclasses import dataclass
 from typing import (
+    ClassVar,
     Any,
     TypeVar,
     Generic,
@@ -133,8 +134,8 @@ class Injectable:
     Patera application.
     """
 
-    __autowires__: dict[str, AutowireDef] = {}
-    __local_autowires__: dict[str, AutowireDef] = {}
+    __autowires__: ClassVar[dict[str, AutowireDef]] = {}
+    __local_autowires__: ClassVar[dict[str, AutowireDef]] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

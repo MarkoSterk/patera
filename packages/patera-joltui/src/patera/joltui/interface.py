@@ -7,6 +7,7 @@ import inspect
 from functools import wraps
 from types import MethodType
 from typing import (
+    ClassVar,
     Annotated,
     Any,
     Callable,
@@ -82,7 +83,7 @@ def component(tag: str) -> Callable[[F], F]:
 class JoltuiGroupHandler(Controller):
     """App-scoped controller with normal injection and lifecycle decorators."""
 
-    __joltui_group__: str
+    __joltui_group__: ClassVar[str]
 
     async def __call__(self, method: Callable, req: Request) -> Response:
         @wraps(method)
@@ -134,8 +135,8 @@ def _body_parameter(method: Callable) -> tuple[str, type[BaseModel]] | None:
 
 class _JoltuiDispatchMiddleware(MiddlewareBase):
     # Resolve before CORS (-101), database sessions (-100), and auth (-99).
-    _order_ = -102
-    _middleware = True
+    _order_: ClassVar[int] = -102
+    _middleware: ClassVar[bool] = True
 
     async def middleware(self, req: Request) -> Response:
         extension = getattr(req.route_handler, "__joltui_interface__", None)

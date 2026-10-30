@@ -9,6 +9,7 @@ from hashlib import sha256
 from collections.abc import Mapping
 from functools import wraps
 from typing import (
+    ClassVar,
     Any,
     Callable,
     Generic,
@@ -51,7 +52,7 @@ class Caching(BaseExtension[AppT, CachingConfig], Generic[AppT, BackendT]):
     """
 
     backend: BackendT
-    backend_class: type[BaseCacheBackend] = MemoryCacheBackend
+    backend_class: ClassVar[type[BaseCacheBackend]] = MemoryCacheBackend
 
     def init(self) -> None:
         self._duration = self.configs.DURATION

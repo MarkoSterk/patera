@@ -62,7 +62,7 @@ class DeclarativeBaseModel(DeclarativeBase):
 
     __abstract__ = True
 
-    __db_name__: str
+    __db_name__: ClassVar[str]
 
     Meta: ClassVar[type[ModelMeta]] = ModelMeta
 

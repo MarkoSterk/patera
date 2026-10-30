@@ -11,6 +11,7 @@ import aiosmtplib as smtplib
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
 from typing import (
+    ClassVar,
     TYPE_CHECKING,
     Any,
     Generic,
@@ -70,7 +71,7 @@ HTML_TEMPLATE_SUFFIXES: tuple[str, ...] = (".html", ".htm", ".xhtml")
 class _HtmlToText(HTMLParser):
     """Converts an HTML email to a readable plain-text alternative."""
 
-    _BLOCKS = {
+    _BLOCKS: ClassVar[set[str]] = {
         "p",
         "div",
         "br",
@@ -92,7 +93,7 @@ class _HtmlToText(HTMLParser):
         "blockquote",
         "hr",
     }
-    _SKIP = {"script", "style", "head", "title"}
+    _SKIP: ClassVar[set[str]] = {"script", "style", "head", "title"}
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)

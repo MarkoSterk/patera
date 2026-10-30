@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from html import escape
-from typing import Any, Mapping, Sequence
+from typing import ClassVar, Any, Mapping, Sequence
 
 from markupsafe import Markup
 
@@ -11,9 +11,9 @@ AttributeValue = str | int | float | bool | None
 
 
 class BaseHtmlElement:
-    tag_name: str = ""
+    tag_name: ClassVar[str] = ""
     # Void elements such as <input> have no content and no closing tag.
-    void_element: bool = False
+    void_element: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -120,7 +120,7 @@ class BaseHtmlElement:
 class BaseHtmlInput(BaseHtmlElement):
     # True: Admin converts the submitted text to the column's type, as for
     # generated inputs. False: the model receives the value as it was sent.
-    converts_value: bool = False
+    converts_value: ClassVar[bool] = False
 
     def __init__(
         self,

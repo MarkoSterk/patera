@@ -7,7 +7,16 @@ from enum import StrEnum
 import importlib.metadata
 import importlib.util
 import os
-from typing import Generic, Iterator, Optional, Type, TypeVar, Any
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Generic,
+    Iterator,
+    Optional,
+    Type,
+    TypeVar,
+    Any,
+)
 from pydantic import BaseModel, Field, field_validator
 
 from patera import Patera, BaseExtension, MediaType, RequestRecord
@@ -16,6 +25,9 @@ from patera.injectable import Injectable
 
 from .request_stats import RequestStats
 from .translations import TRANSLATIONS_MAP
+
+if TYPE_CHECKING:
+    from patera.database.sql import DeclarativeBaseModel
 
 
 class Permissions(StrEnum):
@@ -112,11 +124,11 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     Admin header, so they reach every worker and survive restarts.
     """
 
-    MANAGED_MODELS: list[Type] = []
-    TRANSLATIONS_MAP = TRANSLATIONS_MAP
+    managed_models: ClassVar[list[type["DeclarativeBaseModel"]]] = []
+    TRANSLATIONS_MAP: ClassVar[dict[str, dict[str, str]]] = TRANSLATIONS_MAP
 
-    _supported_languages: list[str] = ["en", "de", "sl", "es"]
-    _supported_extensions: list[str] = ["sqldatabase"]
+    _supported_languages: ClassVar[list[str]] = ["en", "de", "sl", "es"]
+    _supported_extensions: ClassVar[list[str]] = ["sqldatabase"]
 
     def init(self):
         """
@@ -414,13 +426,6 @@ class AdminInterface(BaseExtension[AppT, AdminConfig], Generic[AppT]):
     def task_managers(self) -> dict[str, Any]:
         """Task managers of the application, looked up on every access."""
         return self._extensions_of("TaskManager")
-
-    @property
-    def managed_models(self) -> list[Type]:
-        """
-        Get the models to be managed by the admin interface
-        """
-        return self.__class__.MANAGED_MODELS
 
     @property
     def current_language(self) -> str:

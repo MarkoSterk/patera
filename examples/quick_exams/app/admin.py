@@ -19,7 +19,7 @@ class Admin(AdminInterface):
     receive every Admin permission (see AccountService.roles_of).
     """
 
-    MANAGED_MODELS = [
+    managed_models = [
         User,
         Subject,
         Category,

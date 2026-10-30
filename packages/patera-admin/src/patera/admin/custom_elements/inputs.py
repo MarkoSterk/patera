@@ -1,5 +1,5 @@
 from html import escape
-from typing import Any, Mapping, Sequence
+from typing import ClassVar, Any, Mapping, Sequence
 
 from markupsafe import Markup
 
@@ -89,7 +89,7 @@ class SummernoteEditor(BaseHtmlInput):
 
     tag_name = "summernote-editor"
 
-    DEFAULT_FEATURES: list[str] = [
+    DEFAULT_FEATURES: ClassVar[list[str]] = [
         "headings",
         "font",
         "alignment",
@@ -323,7 +323,7 @@ class LatexInput(BaseHtmlInput):
     tag_name = "latex-input"
     converts_value = True
 
-    CONTROL_ATTRIBUTES = (
+    CONTROL_ATTRIBUTES: ClassVar[tuple[str, ...]] = (
         "name",
         "id",
         "value",

@@ -63,6 +63,19 @@ Distinguish the class and its config key (`MainDb` / `MAIN_DB`), the database na
 the session name. With several databases, give each one a unique `__db_name__` **and** a unique
 `DATABASE_SESSION_NAME`.
 
+For an explicit class-variable annotation, match the manager's declared list type:
+
+```python
+from typing import Any, ClassVar
+
+class Databases(SqlDatabaseManager):
+    databases: ClassVar[list[type[SqlDatabase[Any]]]] = [MainDb]
+```
+
+Use the base `SqlDatabase[Any]` element type even when registering a single database.
+Mutable lists are invariant, so narrowing the override to `list[type[MainDb]]`
+produces an incompatible-variable-override warning.
+
 !!! note "Schemas"
 
     Declaring models does not create or migrate tables. Use [migrations](migrations.md) for

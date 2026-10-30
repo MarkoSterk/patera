@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, cast
+from typing import ClassVar, TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, cast
 
 from sqlalchemy import false, func, select, text, update
 from sqlalchemy.engine import make_url
@@ -156,7 +156,7 @@ class SqlHistoryProvider(BaseHistoryProvider, Generic[ModelT]):
     """
 
     model: Type[ModelT]
-    SUMMARY_ROLE: str = "summary"
+    SUMMARY_ROLE: ClassVar[str] = "summary"
 
     def __init__(
         self,

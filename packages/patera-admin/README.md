@@ -24,7 +24,7 @@ from patera.admin import AdminConfig, AdminInterface
 
 
 class Admin(AdminInterface):
-    MANAGED_MODELS = [Note]
+    managed_models = [Note]
 
 
 class Config(BaseConfig):

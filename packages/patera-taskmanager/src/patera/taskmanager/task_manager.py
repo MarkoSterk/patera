@@ -3,6 +3,7 @@ Task manager class
 """
 
 from typing import (
+    ClassVar,
     Any,
     Callable,
     Generic,
@@ -102,12 +103,12 @@ class TaskManager(BaseExtension[AppT, TaskManagerConfig], Generic[AppT]):
     and run in the same way.
     """
 
-    scheduler_cls: Type[BaseScheduler] = AsyncIOScheduler
+    scheduler_cls: ClassVar[Type[BaseScheduler]] = AsyncIOScheduler
     # None -> a fresh MemoryJobStore / AsyncIOExecutor per TaskManager instance.
     # (Shared instances at class level would leak jobs between instances/apps.)
-    job_stores: Optional[dict[str, BaseJobStore]] = None
-    executors: Optional[dict[str, BaseExecutor]] = None
-    job_defaults: dict[str, bool | int] = {
+    job_stores: ClassVar[Optional[dict[str, BaseJobStore]]] = None
+    executors: ClassVar[Optional[dict[str, BaseExecutor]]] = None
+    job_defaults: ClassVar[dict[str, bool | int]] = {
         "coalesce": False,
         "max_instances": 3,
     }

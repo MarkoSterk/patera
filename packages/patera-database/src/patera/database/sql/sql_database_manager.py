@@ -206,8 +206,8 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
     It delegates session lifecycle operations to SqlDatabaseManager.
     """
 
-    _order_: int = -100
-    _middleware = True
+    _order_: ClassVar[int] = -100
+    _middleware: ClassVar[bool] = True
 
     def __init__(self, app: AppT, next_app: AppCallableType) -> None:
         super().__init__(app, next_app)

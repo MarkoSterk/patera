@@ -1,0 +1,6 @@
+{
+  "include": ["admin_database_config.py"],
+  "extraPaths": ["."],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic"
+}

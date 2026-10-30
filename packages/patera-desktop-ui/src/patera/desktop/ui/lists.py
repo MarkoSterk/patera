@@ -1,5 +1,6 @@
 """Opt-in Jinja keyed ranges and fixed-height virtual windows."""
 
+from typing import ClassVar
 from collections.abc import Mapping
 from html.parser import HTMLParser
 from math import ceil, isfinite
@@ -10,7 +11,7 @@ from markupsafe import Markup, escape
 
 
 class _KeyValidator(HTMLParser):
-    void = {
+    void: ClassVar[set[str]] = {
         "area",
         "base",
         "br",
@@ -103,7 +104,7 @@ def window_bounds(count, scroll_top, row_height, height, overscan):
 
 
 class ListExtension(Extension):
-    tags = {"keyed", "virtual"}
+    tags: ClassVar[set[str]] = {"keyed", "virtual"}
 
     def parse(self, parser):
         token = next(parser.stream)

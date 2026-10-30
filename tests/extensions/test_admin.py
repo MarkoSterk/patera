@@ -612,7 +612,7 @@ class NoteDatabases(SqlDatabaseManager):
 
 
 class NotesAdmin(AdminInterface):
-    MANAGED_MODELS = [AdminNote]
+    managed_models = [AdminNote]
 
 
 async def test_database_pages_only_accept_databases(make_app, client_for, tmp_path):
@@ -664,7 +664,7 @@ class MemberDatabases(SqlDatabaseManager):
 
 
 class MembersAdmin(AdminInterface):
-    MANAGED_MODELS = [Member]
+    managed_models = [Member]
 
 
 MEMBER_BACKENDS = ["sqlite"] + (
@@ -790,7 +790,7 @@ class GuardedDatabases(SqlDatabaseManager):
 
 
 class GuardedAdmin(AdminInterface):
-    MANAGED_MODELS = [GuardedItem]
+    managed_models = [GuardedItem]
 
 
 async def test_refused_deletes_and_unknown_models(make_app, client_for, tmp_path):
@@ -894,7 +894,7 @@ class UploadDatabases(SqlDatabaseManager):
 
 
 class UploadsAdmin(AdminInterface):
-    MANAGED_MODELS = [Upload]
+    managed_models = [Upload]
 
 
 def test_file_and_date_inputs_render_as_inputs():
