@@ -43,6 +43,16 @@ Read only the references relevant to the task:
 
 ## Working conventions
 
+- Place each application class in its own file: controllers, middleware,
+  exception handlers, CLI controllers, extensions, services, models, schemas,
+  and other components. Keep persistence models under `models/` and Pydantic
+  schemas under `schemas/`, with separate subpackages for individual models or
+  schemas unless they are directly connected. Connected classes may share a
+  subpackage, but each class still has its own file. See the
+  [application layout](references/application.md).
+- Reference snippets sometimes show several classes together to explain their
+  relationship. Split those classes into the appropriate files when creating
+  application code; do not copy the combined snippet as the application layout.
 - Keep request-specific data out of shared controller, middleware, and service
   attributes. Use locals, explicit arguments, or `patera.ctx.current_request`.
 - Match discovery folders **and filenames**; a class in an arbitrary module is

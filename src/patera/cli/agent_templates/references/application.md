@@ -1,5 +1,68 @@
 # Application construction
 
+## Application layout
+
+Keep each application class in its own file. This applies to controllers,
+middleware, exception handlers, CLI controllers, extensions, services,
+repositories, persistence models, Pydantic schemas, and configuration classes.
+Use descriptive snake-case filenames and preserve component discovery suffixes.
+
+Persistence models normally belong in `models/`; Pydantic request, response, and
+other data schemas belong in `schemas/`. Give each model or schema its own
+subpackage unless it is directly connected to others. For example, create and
+response schemas for the same note may share `schemas/note/`. Sharing a package
+does not mean sharing a file: each class still belongs in its own module.
+Keep package `__init__.py` files for exports and intentional registration imports.
+The application entry point shown below may live in `app/__init__.py` as its sole
+class. Framework-required nested metadata classes remain attached to their owner.
+
+Example structure (each package also has an `__init__.py`):
+
+```text
+app/
+  __init__.py                       # App
+  config.py                         # Config
+  models/
+    note/
+      note.py                       # Note
+    account/
+      account.py                    # Account
+  schemas/
+    note/
+      create_note.py                # CreateNote
+      note_response.py              # NoteResponse (directly connected)
+    account/
+      account_response.py           # AccountResponse
+  repositories/
+    notes_repository.py             # NotesRepository
+  services/
+    notes_service.py                # NotesService
+  controllers/
+    notes_controller.py             # NotesController
+  middleware/
+    request_id_middleware.py         # RequestIdMiddleware
+  exceptions/
+    missing_note.py                 # MissingNote
+    app_exception_handler.py        # ApplicationErrors
+  cli/
+    notes_cli.py                    # NotesCLI
+  extensions/
+    audit_service.py                # AuditService
+    audit_config.py                 # AuditConfig
+  templates/
+  static/
+```
+
+Import schemas into controllers and persistence models into repositories instead
+of defining them alongside those classes. Import model modules explicitly so ORM
+metadata is registered; creating folders alone does not discover models. These
+are application organization conventions, not additional discovery mechanisms.
+Apply them to new code and files being reorganized without moving unrelated
+existing code solely to match the example. Short multi-class examples elsewhere
+in the references illustrate relationships; split them into files in an app.
+
+## Application entry point
+
 Define configuration in `app/config.py`:
 
 ```python
