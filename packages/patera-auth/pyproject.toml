@@ -1,6 +1,6 @@
 [project]
 name = "patera-auth"
-version = "0.13.0"
+version = "0.13.1"
 description = "Authentication and authorization middleware for Patera: cookies, JWT, roles and password hashing"
 readme = "README.md"
 license = "MIT"
