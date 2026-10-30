@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 from types import CellType, FunctionType
-from typing import ClassVar, Any
+from typing import Any
 from jinja2 import DictLoader, Environment, StrictUndefined, nodes
 from jinja2.ext import Extension
 from jinja2.runtime import Macro
@@ -112,7 +112,10 @@ def freeze_macro(macro):
 
 
 class BindingExtension(Extension):
-    tags: ClassVar[set[str]] = {"bind"}
+    def __init__(self, environment: Environment) -> None:
+        super().__init__(environment)
+        # Match Jinja's instance-variable contract for extension tags.
+        self.tags = {"bind"}
 
     def preprocess(self, source, name, filename=None):
         return binding_blocks(source)

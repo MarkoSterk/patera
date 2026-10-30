@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from html.parser import HTMLParser
 from math import ceil, isfinite
 
-from jinja2 import nodes
+from jinja2 import Environment, nodes
 from jinja2.ext import Extension
 from markupsafe import Markup, escape
 
@@ -104,7 +104,10 @@ def window_bounds(count, scroll_top, row_height, height, overscan):
 
 
 class ListExtension(Extension):
-    tags: ClassVar[set[str]] = {"keyed", "virtual"}
+    def __init__(self, environment: Environment) -> None:
+        super().__init__(environment)
+        # Match Jinja's instance-variable contract for extension tags.
+        self.tags = {"keyed", "virtual"}
 
     def parse(self, parser):
         token = next(parser.stream)
