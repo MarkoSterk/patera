@@ -10,6 +10,71 @@ class TagsInput(BaseHtmlInput):
     tag_name = "tags-input"
 
 
+class PasswordInput(BaseHtmlInput):
+    """Masked input, never prefilled. Hash submitted passwords in an admin hook."""
+
+    tag_name = "input"
+    void_element = True
+
+    def __init__(
+        self, *, name: str, autocomplete: str = "new-password", **kwargs: Any
+    ) -> None:
+        kwargs.setdefault("classes", ["form-control"])
+        super().__init__(name=name, **kwargs)
+        self.autocomplete = autocomplete
+
+    def build_attributes(
+        self, field: dict[str, Any] | None = None
+    ) -> dict[str, AttributeValue]:
+        attrs = super().build_attributes(field)
+        attrs.pop("value", None)
+        attrs["type"] = "password"
+        attrs["autocomplete"] = self.autocomplete
+        return attrs
+
+
+class SelectInput(BaseHtmlInput):
+    """Single selection with (value, label) options declared in model metadata.
+
+    Options can be a mapping or a sequence of pairs. Validate allowed values
+    in the model's schema or admin hook; the choices only constrain the UI.
+    """
+
+    tag_name = "select"
+    converts_value = True
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        options: Mapping[str | int, str] | Sequence[tuple[str | int, str]],
+        **kwargs: Any,
+    ) -> None:
+        kwargs.setdefault("classes", ["form-select"])
+        super().__init__(name=name, **kwargs)
+        self.options = list(
+            options.items() if isinstance(options, Mapping) else options
+        )
+
+    def render(self, field: dict[str, Any] | None = None) -> Markup:
+        attrs = self.build_attributes(field)
+        value = attrs.pop("value", None)
+        options = []
+        for option_value, label in self.options:
+            option_attrs = self.render_attributes(
+                {
+                    "value": str(option_value),
+                    "selected": value is not None and str(option_value) == str(value),
+                }
+            )
+            options.append(
+                f"<option {option_attrs}>{escape(str(label), quote=False)}</option>"
+            )
+        return Markup(
+            f"<select {self.render_attributes(attrs)}>{''.join(options)}</select>"
+        )
+
+
 class SummernoteEditor(BaseHtmlInput):
     """
     Python wrapper for the <summernote-editor> custom element.

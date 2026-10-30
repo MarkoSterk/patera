@@ -40,7 +40,21 @@ or 24 hours: uptime, requests per second by status class, 2xx/4xx/5xx counts, av
 counts requests in memory, so each worker process shows its own requests since it started. Set
 `REQUEST_STATISTICS=False` in `AdminConfig` to turn this off.
 
-See the [Admin dashboard section of the Patera documentation](https://github.com/MarkoSterk/Patera#admin-dashboard) for the full guide.
+## Custom form fields
+
+Use `Meta.custom_form_fields` to replace generated model inputs with fields from
+`patera.admin.custom_elements`:
+
+- `TagsInput`: tag entry, submitted as a JSON array encoded as text.
+- `PasswordInput`: masked password entry, never prefilled with a stored value.
+- `SelectInput`: selection from value/label options declared in model metadata.
+- `SummernoteEditor`: rich text editing with configurable toolbar and image uploads.
+- `FileInput`: file uploads with file-type and browser-side size constraints.
+- `DateInput`: date or date-and-time selection, with optional UTC conversion.
+- `LatexInput`: single-line or multiline text with live LaTeX math preview.
+
+See the [Admin dashboard guide](../../docs/extensions/admin.md#custom-form-fields)
+for configuration examples and submitted-value handling.
 
 ## License
 

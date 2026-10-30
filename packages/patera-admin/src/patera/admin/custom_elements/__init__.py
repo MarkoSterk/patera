@@ -1,6 +1,14 @@
 from .base_elements import BaseHtmlElement, BaseHtmlInput
 
-from .inputs import DateInput, FileInput, LatexInput, SummernoteEditor, TagsInput
+from .inputs import (
+    DateInput,
+    FileInput,
+    LatexInput,
+    PasswordInput,
+    SelectInput,
+    SummernoteEditor,
+    TagsInput,
+)
 
 __all__ = [
     "BaseHtmlElement",
@@ -8,6 +16,8 @@ __all__ = [
     "DateInput",
     "FileInput",
     "LatexInput",
+    "PasswordInput",
+    "SelectInput",
     "SummernoteEditor",
     "TagsInput",
 ]

@@ -667,6 +667,11 @@
         return;
       }
 
+      if (field.type === "password") {
+        field.value = "";
+        return;
+      }
+
       if (field.type === "file") {
         field.value = "";
         setFileHint(field, value !== null && value !== undefined && value !== "");

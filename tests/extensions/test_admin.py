@@ -9,7 +9,13 @@ import pytest
 from patera import Request, UploadedFile
 from patera.admin import AdminInterface
 from patera.admin.admin_interface import AdminConfig, Permissions
-from patera.admin.custom_elements import DateInput, FileInput, LatexInput
+from patera.admin.custom_elements import (
+    DateInput,
+    FileInput,
+    LatexInput,
+    PasswordInput,
+    SelectInput,
+)
 from patera.admin.form_values import AdminFormError
 from patera.auth import Authentication
 from patera.middleware import middleware
@@ -909,6 +915,30 @@ def test_file_and_date_inputs_render_as_inputs():
     assert 'type="datetime-local"' in moment and 'data-utc="true"' in moment
     with pytest.raises(ValueError):
         DateInput(name="day", utc=True)
+
+
+def test_password_never_renders_existing_value():
+    element = PasswordInput(
+        name="password", value="secret", attributes={"value": "hash"}
+    )
+    html = str(element.render({"name": "password", "form": "update"}))
+    assert 'type="password"' in html
+    assert 'autocomplete="new-password"' in html
+    assert 'id="update-field-password"' in html
+    assert "value=" not in html and "secret" not in html and "hash" not in html
+
+
+def test_select_options_escape_and_select_values():
+    element = SelectInput(
+        name="status", options={0: "<Draft>", 1: "Published"}, value=0
+    )
+    html = str(element.render({"name": "status", "form": "update", "required": True}))
+    assert '<option value="0" selected>&lt;Draft&gt;</option>' in html
+    assert '<option value="1">Published</option>' in html
+    assert 'id="update-field-status"' in html and " required" in html
+    assert element.converts_value
+    html = str(SelectInput(name="x", options=[('a"b', "A&B")]).render())
+    assert '<option value="a&quot;b">A&amp;B</option>' in html
 
 
 def test_latex_input_renders_a_form_control_and_preview():

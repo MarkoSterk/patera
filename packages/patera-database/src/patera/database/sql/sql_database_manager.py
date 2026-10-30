@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Optional,
     Type,
     TypeVar,
@@ -46,7 +47,7 @@ class SqlDatabaseManager(BaseExtension[AppT, BaseModel]):
         - it does not depend on the HTTP middleware chain being built
     """
 
-    databases: list[Type["SqlDatabase[Any]"]] = []
+    databases: ClassVar[list[Type["SqlDatabase[Any]"]]] = []
 
     def init(self) -> None:
         """

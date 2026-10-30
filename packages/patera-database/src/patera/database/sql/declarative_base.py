@@ -38,21 +38,21 @@ class ModelMeta:
     Override them in subclasses instead.
     """
 
-    exclude_from_create_form: list[str] = []
-    exclude_from_update_form: list[str] = []
-    exclude_from_table: list[str] = []
+    exclude_from_create_form: ClassVar[list[str]] = []
+    exclude_from_update_form: ClassVar[list[str]] = []
+    exclude_from_table: ClassVar[list[str]] = []
 
-    add_to_form: dict[str, type[Any]] = {}
+    add_to_form: ClassVar[dict[str, type[Any]]] = {}
 
-    custom_labels: dict[str, str] = {}
-    custom_form_fields: list[Any] = []
+    custom_labels: ClassVar[dict[str, str]] = {}
+    custom_form_fields: ClassVar[list[Any]] = []
 
-    form_fields_order: list[str] = []
-    table_fields_order: list[str] = []
-    order_table_by: list[str] = []
+    form_fields_order: ClassVar[list[str]] = []
+    table_fields_order: ClassVar[list[str]] = []
+    order_table_by: ClassVar[list[str]] = []
 
-    create_validation_schema: type[BaseModel] | None = None
-    update_validation_schema: type[BaseModel] | None = None
+    create_validation_schema: ClassVar[type[BaseModel] | None] = None
+    update_validation_schema: ClassVar[type[BaseModel] | None] = None
 
 
 class DeclarativeBaseModel(DeclarativeBase):

@@ -189,7 +189,8 @@ export default class SummernoteEditor extends HTMLElement {
       height: this.#getHeight(),
       placeholder: this.getAttribute("placeholder") || "",
       toolbar: this.#buildToolbar(),
-      dialogsInBody: true,
+      // Keep dialogs in the native admin <dialog>'s top layer and focus scope.
+      dialogsInBody: false,
       callbacks: {
         onChange: () => {
           this.#commitValue();
