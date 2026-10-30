@@ -3586,7 +3586,7 @@ together.</p>
   at registration.</li>
 <li><strong>Core:</strong> raw non-UTF-8 bytes in a query string no longer fail the request before a response.</li>
 <li><strong>Core:</strong> CLI arguments annotated <code>Optional[int]</code> or <code>int | None</code> are converted.</li>
-<li><strong>Core:</strong> <code>@produces(..., status_code)</code> no longer overrides an explicit <code>.status(200)</code>
+<li><strong>Core:</strong> <code>@produces(..., status_code)</code> no longer overrides an explicit <code>.status(HttpStatus.OK)</code>
   (<code>Response.status_set</code>).</li>
 <li><strong>Core:</strong> every response of a route with CORS enabled carries <code>Vary: Origin</code>, also without an
   <code>Origin</code> header, for a refused origin and for routing errors, so shared caches keep the

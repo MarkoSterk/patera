@@ -3297,7 +3297,9 @@
 <h1 id="responses">Responses<a class="headerlink" href="#responses" title="Permanent link">&para;</a></h1>
 <p>Each request carries the response being built as <code>req.res</code>. Its methods return the response, so
 calls can be chained:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">return</span> <span class="n">req</span><span class="o">.</span><span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">({</span><span class="s2">"ok"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span><span class="o">.</span><span class="n">status</span><span class="p">(</span><span class="n">HttpStatus</span><span class="o">.</span><span class="n">CREATED</span><span class="p">)</span><span class="o">.</span><span class="n">set_header</span><span class="p">(</span><span class="s2">"x-id"</span><span class="p">,</span> <span class="s2">"7"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">patera</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpStatus</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">return</span> <span class="n">req</span><span class="o">.</span><span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">({</span><span class="s2">"ok"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span><span class="o">.</span><span class="n">status</span><span class="p">(</span><span class="n">HttpStatus</span><span class="o">.</span><span class="n">CREATED</span><span class="p">)</span><span class="o">.</span><span class="n">set_header</span><span class="p">(</span><span class="s2">"x-id"</span><span class="p">,</span> <span class="s2">"7"</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>Response</code> is tied to the application and the request: always start from <code>req.res</code> rather than
 constructing a response with only a body.</p>
@@ -3331,7 +3333,7 @@ constructing a response with only a body.</p>
 <td>streaming responses (sync or async iterables)</td>
 </tr>
 <tr>
-<td><code>redirect(location, status=303)</code>, <code>no_content()</code></td>
+<td><code>redirect(location, status=HttpStatus.SEE_OTHER)</code>, <code>no_content()</code></td>
 <td>redirects and <code>204</code></td>
 </tr>
 </tbody>
