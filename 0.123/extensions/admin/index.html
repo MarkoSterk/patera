@@ -1999,6 +1999,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#password-and-select-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Password and select example
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3183,6 +3194,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#password-and-select-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Password and select example
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3478,6 +3500,14 @@ model field (or a field declared in <code>Meta.add_to_form</code>).</p>
 <td>Tag entry: press Enter to add a tag and use its remove button to delete it. Empty and duplicate tags are ignored. Accepts <code>placeholder</code>.</td>
 </tr>
 <tr>
+<td><code>PasswordInput</code></td>
+<td>Masked text input that is never prefilled with a stored value. <code>autocomplete</code> defaults to <code>"new-password"</code>.</td>
+</tr>
+<tr>
+<td><code>SelectInput</code></td>
+<td>Single selection with <code>options</code> supplied as a mapping of values to labels or a sequence of <code>(value, label)</code> pairs. Submitted values use normal column-type conversion.</td>
+</tr>
+<tr>
 <td><code>SummernoteEditor</code></td>
 <td>Rich text editor. Configure <code>features</code>, <code>height</code>, and <code>upload_url</code>. The default features are <code>headings</code>, <code>font</code>, and <code>alignment</code>; supplying <code>upload_url</code> also enables images.</td>
 </tr>
@@ -3515,10 +3545,16 @@ model field (or a field declared in <code>Meta.add_to_form</code>).</p>
 </span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">LatexInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"formula"</span><span class="p">,</span> <span class="n">multiline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">maxlength</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="p">]</span>
 </span></code></pre></div>
-<p>All five accept <code>label</code>, <code>required</code>, <code>disabled</code>, and HTML customization through
+<p>All fields accept <code>label</code>, <code>required</code>, <code>disabled</code>, and HTML customization through
 <code>classes</code>, <code>attributes</code>, <code>data_attributes</code>, <code>aria_attributes</code>, and <code>styles</code>.</p>
 <h3 id="submitted-values">Submitted values<a class="headerlink" href="#submitted-values" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>PasswordInput</code> submits the entered text. Hash it in your admin hook before
+  storage. An empty input submits an empty string; handle that explicitly in
+  update hooks if it should preserve the current password. Exclude password/hash
+  columns from tables and use a separate <code>Meta.add_to_form</code> field when appropriate.</li>
+<li><code>SelectInput</code> restricts the visible choices, but your validation schema or admin
+  hook must enforce allowed values for direct requests as well.</li>
 <li><code>TagsInput</code> submits a JSON array encoded as text, such as <code>'["python", "web"]'</code>.
   Parse and validate that text in your validation schema or admin hook if the model
   stores a list. Existing values can be JSON arrays or comma-separated text.</li>
@@ -3535,6 +3571,20 @@ model field (or a field declared in <code>Meta.add_to_form</code>).</p>
   sign as <code>\$</code>. The preview uses the bundled Temml renderer, loaded only on pages
   containing this input.</li>
 </ul>
+<h3 id="password-and-select-example">Password and select example<a class="headerlink" href="#password-and-select-example" title="Permanent link">&para;</a></h3>
+<p>Declare the options directly in the model's metadata:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">patera.admin.custom_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">PasswordInput</span><span class="p">,</span> <span class="n">SelectInput</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">(</span><span class="n">Base</span><span class="o">.</span><span class="n">Meta</span><span class="p">):</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">add_to_form</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"new_password"</span><span class="p">:</span> <span class="nb">str</span><span class="p">}</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">custom_form_fields</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">PasswordInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"new_password"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">SelectInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"status"</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"draft"</span><span class="p">:</span> <span class="s2">"Draft"</span><span class="p">,</span> <span class="s2">"published"</span><span class="p">:</span> <span class="s2">"Published"</span><span class="p">}),</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<p>Here <code>status</code> is a model column. Consume <code>new_password</code> in the model's admin hook
+and store its hash in your password column.</p>
 
 
 
