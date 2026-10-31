@@ -3215,9 +3215,18 @@ routes to focused reference files. Generation works offline from the installed p
 not require the optional extensions.</p>
 <h2 id="application-conventions">Application conventions<a class="headerlink" href="#application-conventions" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Use named members of <code>patera.HttpStatus</code> wherever application code specifies or
+<li>
+<p>Type backend controllers and application-specific extensions with the concrete
+  application class, for example <code>Controller["App"]</code> and
+  <code>BaseExtension["App", AuditConfig]</code>. Import <code>App</code> under <code>if TYPE_CHECKING:</code>
+  to avoid circular imports. Keep config models and injected classes available
+  at runtime.</p>
+</li>
+<li>
+<p>Use named members of <code>patera.HttpStatus</code> wherever application code specifies or
   compares an HTTP status, including decorators, exceptions and test assertions.
-  For example, write <code>assert response.status_code == HttpStatus.OK</code>.</li>
+  For example, write <code>assert response.status_code == HttpStatus.OK</code>.</p>
+</li>
 <li>Put application setting values in <code>.env</code>, including defaults and nested extension
   settings. Declare custom fields on <code>Config</code> with type annotations only. Assign a
   value there only when it requires Python, such as <code>REQUEST_CLASS</code> or

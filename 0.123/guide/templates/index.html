@@ -1326,6 +1326,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flash-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Flash messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3078,6 +3089,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flash-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Flash messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3284,8 +3306,28 @@ HTML/XML) from <code>TEMPLATES_DIR</code> (default <code>templates</code>, relat
 <td><code>len</code></td>
 <td><code>len</code></td>
 </tr>
+<tr>
+<td><code>flashed_messages</code></td>
+<td>current context's <code>(message, status)</code> pairs; empty when none were added</td>
+</tr>
 </tbody>
 </table>
+<h2 id="flash-messages">Flash messages<a class="headerlink" href="#flash-messages" title="Permanent link">&para;</a></h2>
+<p>Applications, controllers, extensions, and middleware share the same synchronous method:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="bp">self</span><span class="o">.</span><span class="n">flash_message</span><span class="p">(</span><span class="s2">"Changes saved."</span><span class="p">,</span> <span class="s2">"success"</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">flash_message</span><span class="p">(</span><span class="s2">"Welcome!"</span><span class="p">)</span>  <span class="c1"># status defaults to None</span>
+</span></code></pre></div>
+<p>Messages appear in insertion order in every template, including templates rendered directly
+through <code>app.jinja_environment</code>:</p>
+<div class="language-jinja highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="cp">{%</span> <span class="k">for</span> <span class="nv">message</span><span class="o">,</span> <span class="nv">status</span> <span class="k">in</span> <span class="nv">flashed_messages</span> <span class="cp">%}</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="x">    &lt;span class="</span><span class="cp">{{</span> <span class="nv">status</span> <span class="k">or</span> <span class="s1">''</span> <span class="cp">}}</span><span class="x">"&gt;</span><span class="cp">{{</span> <span class="nv">message</span> <span class="cp">}}</span><span class="x">&lt;/span&gt;</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="cp">{%</span> <span class="k">endfor</span> <span class="cp">%}</span>
+</span></code></pre></div>
+<p><code>flashed_messages</code> behaves as an empty list when there are no messages, so loops and
+<code>{% if flashed_messages %}</code> need no special handling. Reading it does not consume messages.
+Each request has its own list; child contexts share their parent's messages. Messages last
+only for the current context and do not survive redirects. Calling <code>flash_message</code> without
+an active context raises <code>RuntimeError</code>.</p>
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
