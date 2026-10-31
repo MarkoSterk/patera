@@ -20,8 +20,9 @@ class AuditService(BaseExtension[Patera, AuditConfig]):
         self.app.logger.info("Audit stopped")
 ```
 
-Declare `AUDIT_SERVICE: AuditConfig = AuditConfig()` on app Config for nested
-environment settings. Register the class in `app_extensions` or inject it.
+Declare `AUDIT_SERVICE: AuditConfig` on app Config and set
+`PATERA_AUDIT_SERVICE__ENABLED=true` in `.env`. Register the class in
+`app_extensions` or inject it.
 The two generic parameters are application type then configuration type.
 
 Construction resolves injections, registers the instance, then calls synchronous

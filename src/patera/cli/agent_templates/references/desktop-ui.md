@@ -7,9 +7,10 @@ This is a Python/PyScript SPA runtime using Jinja2, not a TypeScript or doT laye
 
 ## Setup and interpreter boundary
 
-Register backend `app_extensions = [Desktop, DesktopUI]`. Configure
-`DESKTOP: DesktopConfig = DesktopConfig(INDEX_PAGE="/app/")` and
-`DESKTOP_UI: DesktopUIConfig = DesktopUIConfig(...)` on the backend config.
+Register backend `app_extensions = [Desktop, DesktopUI]`. When supplying
+settings, declare the corresponding fields (`DESKTOP: DesktopConfig` or
+`DESKTOP_UI: DesktopUIConfig`) on the backend config. Put their values in
+`.env`, for example `PATERA_DESKTOP__INDEX_PAGE=/app/`.
 Keep browser sources outside the backend app package:
 
 ```text

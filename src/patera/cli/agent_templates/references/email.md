@@ -4,16 +4,19 @@ Install `patera-email`. Subclass `EmailClient` from `patera.email`, e.g. `Mail`,
 register or inject it, and declare `MAIL: EmailConfig` with SMTP settings.
 
 ```python
-from patera.email import EmailClient, EmailConfig
+from patera.email import EmailClient
 
 class Mail(EmailClient):
     pass
 
-# Config field:
-# MAIL: EmailConfig = EmailConfig(
-#     SENDER_NAME_OR_ADDRESS="App <app@example.test>",
-#     SMTP_SERVER="localhost", SMTP_PORT=1025,
-# )
+```
+
+Put the SMTP settings in `.env`:
+
+```dotenv
+PATERA_MAIL__SENDER_NAME_OR_ADDRESS="App <app@example.test>"
+PATERA_MAIL__SMTP_SERVER=localhost
+PATERA_MAIL__SMTP_PORT=1025
 ```
 
 `await mail.send_email(recipient, subject, body)` accepts one address string or a

@@ -16,6 +16,19 @@ testing, deployment, custom extensions and all official extension packages. Its 
 routes to focused reference files. Generation works offline from the installed package and does
 not require the optional extensions.
 
+## Application conventions
+
+- Use named members of `patera.HttpStatus` wherever application code specifies or
+  compares an HTTP status, including decorators, exceptions and test assertions.
+  For example, write `assert response.status_code == HttpStatus.OK`.
+- Put application setting values in `.env`, including defaults and nested extension
+  settings. Declare custom fields on `Config` with type annotations only. Assign a
+  value there only when it requires Python, such as `REQUEST_CLASS` or
+  `RESPONSE_CLASS`, or is more practical to compute, such as `BASE_PATH` derived
+  from `__file__`.
+- Group related utility functions in a purpose-specific class and define each
+  with `@staticmethod`. Avoid standalone utility functions.
+
 ## Behaviour
 
 - Existing instruction files keep their content outside a marked Patera section.

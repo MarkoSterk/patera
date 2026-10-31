@@ -37,6 +37,8 @@ app/
     notes_repository.py             # NotesRepository
   services/
     notes_service.py                # NotesService
+  utils/
+    note_text.py                    # NoteText
   controllers/
     notes_controller.py             # NotesController
   middleware/
@@ -52,6 +54,10 @@ app/
   templates/
   static/
 ```
+
+Group related utility functions in a class named for their purpose. For example,
+define `excerpt` as a `@staticmethod` on `NoteText` and call it as
+`NoteText.excerpt(body)`. Avoid standalone utility functions.
 
 Import schemas into controllers and persistence models into repositories instead
 of defining them alongside those classes. Import model modules explicitly so ORM

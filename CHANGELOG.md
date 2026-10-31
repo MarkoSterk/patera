@@ -108,6 +108,12 @@ contain breaking changes; they are listed first in each release.
 - **patera-admin:** the sign-in and "unauthorized" pages load Bootstrap and its icons from the
   copies shipped with the package instead of jsDelivr, so Admin works without internet access.
 
+## patera 0.123.4 (2026-10-31)
+
+- Updated the generated Codex and Claude instructions and bundled examples to
+  require `HttpStatus` members, put application settings in `.env`, and group
+  related utility functions as static methods on purpose-specific classes.
+
 ## patera 0.121.0 and extensions 0.11.0 (2026-10-12)
 
 Every package in this release requires `patera>=0.121`. Upgrade the core and the extensions

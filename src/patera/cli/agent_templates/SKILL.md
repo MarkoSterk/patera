@@ -10,6 +10,17 @@ These references describe the APIs bundled with this Patera release; check the
 installed source when upgrading. They are distilled from the Patera tutorial and
 architecture books, with experimental package guidance checked against its source.
 
+Always import `HttpStatus` from `patera` when specifying or comparing an HTTP
+status. Use named members in application code, examples, and tests. This includes
+response builders, route decorators, exceptions, and assertions such as
+`assert response.status_code == HttpStatus.OK`. Never use bare integer status codes.
+
+Put application setting values in the project's `.env` file, including ordinary
+defaults and nested extension settings. Declare custom fields on `Config` with
+type annotations only. Reserve Python assignments for values that require Python
+(such as `REQUEST_CLASS` and `RESPONSE_CLASS`) or are impractical to store as
+literals (such as `BASE_PATH` derived from the module's location).
+
 Read only the references relevant to the task:
 
 | Task | Reference |
@@ -50,6 +61,8 @@ Read only the references relevant to the task:
   schemas unless they are directly connected. Connected classes may share a
   subpackage, but each class still has its own file. See the
   [application layout](references/application.md).
+- Group related utility functions in a utility class and define each with
+  `@staticmethod`. Avoid standalone utility functions.
 - Reference snippets sometimes show several classes together to explain their
   relationship. Split those classes into the appropriate files when creating
   application code; do not copy the combined snippet as the application layout.

@@ -5,6 +5,7 @@ configuration and an importable tests package where necessary.
 
 ```python
 import pytest
+from patera import HttpStatus
 from patera.testing import PateraTestClient
 from app import App
 
@@ -12,7 +13,7 @@ from app import App
 async def test_endpoint():
     async with PateraTestClient(App()) as client:
         response = await client.get("/hello/Ada")
-        assert response.status_code == 200
+        assert response.status_code == HttpStatus.OK
         assert response.json() == {"message": "Hello, Ada!"}
 ```
 
