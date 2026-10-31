@@ -1,6 +1,6 @@
 [project]
 name = "patera-aiinterface"
-version = "0.13.4"
+version = "0.13.5"
 description = "Experimental LLM interface for Patera: prompts, chat history and retrieval augmentation"
 readme = "README.md"
 license = "MIT"

@@ -1,13 +1,19 @@
 # Custom extensions
 
 ```python
-from patera import BaseExtension, Patera
+from typing import TYPE_CHECKING
+
+from patera import BaseExtension
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app import App
+
 
 class AuditConfig(BaseModel):
     ENABLED: bool = True
 
-class AuditService(BaseExtension[Patera, AuditConfig]):
+class AuditService(BaseExtension["App", AuditConfig]):
     def init(self) -> None:
         if self.configs.ENABLED:
             self.app.add_on_startup_method(self.start)

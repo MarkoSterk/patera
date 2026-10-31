@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+from patera.database.sql import Repository
 
 from patera import Service, UploadedFile
-from patera.database.sql import Repository
 from patera.injectable import Inject
 
 from ..errors import Conflict, ExamError, NotFound, require
@@ -27,8 +28,11 @@ from ..schemas import (
     to_utc_iso,
 )
 
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
-class AuthoringService(Service):
+
+class AuthoringService(Service["App"]):
     """
     An instructor's subjects and their content. A category belongs to one
     subject, a question to one subject and one of its categories, and an

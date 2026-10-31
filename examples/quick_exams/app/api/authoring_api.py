@@ -1,23 +1,8 @@
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import qrcode
 import qrcode.image.svg
-from patera import HttpStatus, MediaType, Request, Response
-from patera.auth import role_required
-from patera.controller import (
-    Controller,
-    consumes,
-    delete,
-    get,
-    path,
-    post,
-    produces,
-    put,
-)
-from patera.database.sql import transactional
-from patera.injectable import Inject
-
-from app import App
 from app.models import INSTRUCTOR
 from app.schemas import (
     CategoryIn,
@@ -30,11 +15,29 @@ from app.schemas import (
     SubjectOut,
 )
 from app.services.authoring import AuthoringService
+from patera.auth import role_required
+from patera.database.sql import transactional
+
+from patera import HttpStatus, MediaType, Request, Response
+from patera.controller import (
+    Controller,
+    consumes,
+    delete,
+    get,
+    path,
+    post,
+    produces,
+    put,
+)
+from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @path("/api/subjects", tags=["Subjects"])
 @role_required(INSTRUCTOR)
-class SubjectsApi(Controller[App]):
+class SubjectsApi(Controller["App"]):
     authoring: Inject[AuthoringService]
 
     @get("/")
@@ -69,7 +72,7 @@ class SubjectsApi(Controller[App]):
 
 @path("/api/categories", tags=["Categories"])
 @role_required(INSTRUCTOR)
-class CategoriesApi(Controller[App]):
+class CategoriesApi(Controller["App"]):
     authoring: Inject[AuthoringService]
 
     @get("/")
@@ -104,7 +107,7 @@ class CategoriesApi(Controller[App]):
 
 @path("/api/questions", tags=["Questions"])
 @role_required(INSTRUCTOR)
-class QuestionsApi(Controller[App]):
+class QuestionsApi(Controller["App"]):
     authoring: Inject[AuthoringService]
 
     @get("/")
@@ -139,7 +142,7 @@ class QuestionsApi(Controller[App]):
 
 @path("/api/exams", tags=["Exams"])
 @role_required(INSTRUCTOR)
-class ExamsApi(Controller[App]):
+class ExamsApi(Controller["App"]):
     authoring: Inject[AuthoringService]
 
     @get("/")

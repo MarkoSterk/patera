@@ -1,6 +1,8 @@
 from datetime import timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from app.database import Note, NoteRepository
+from patera.database.sql import transactional
 from pydantic import BaseModel, Field
 
 from patera import HttpStatus, MediaType, Request, Response, abort
@@ -14,11 +16,10 @@ from patera.controller import (
     produces,
     put,
 )
-from patera.database.sql import transactional
 from patera.injectable import Inject
 
-from app import App
-from app.database import Note, NoteRepository
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 class NoteIn(BaseModel):
@@ -39,7 +40,7 @@ def note_json(note: Note) -> dict[str, Any]:
 
 
 @path("/api/notes")
-class NotesApi(Controller[App]):
+class NotesApi(Controller["App"]):
     """
     The window's page talks to this JSON API like any web page would. JSON
     bodies also keep other websites out: a page elsewhere cannot send JSON to

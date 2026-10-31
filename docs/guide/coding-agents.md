@@ -18,6 +18,12 @@ not require the optional extensions.
 
 ## Application conventions
 
+- Type backend controllers and application-specific extensions with the concrete
+  application class, for example `Controller["App"]` and
+  `BaseExtension["App", AuditConfig]`. Import `App` under `if TYPE_CHECKING:`
+  to avoid circular imports. Keep config models and injected classes available
+  at runtime.
+
 - Use named members of `patera.HttpStatus` wherever application code specifies or
   compares an HTTP status, including decorators, exceptions and test assertions.
   For example, write `assert response.status_code == HttpStatus.OK`.

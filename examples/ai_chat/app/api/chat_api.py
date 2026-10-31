@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
+from app.assistant import Assistant
 from pydantic import BaseModel, Field
 
 from patera import MediaType, Request, Response
@@ -7,8 +8,8 @@ from patera.controller import Controller, consumes, get, path, post, produces
 from patera.injectable import Inject
 from patera.serializers import ndjson_line
 
-from app import App
-from app.assistant import Assistant
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 class ChatIn(BaseModel):
@@ -17,7 +18,7 @@ class ChatIn(BaseModel):
 
 
 @path("/api/chat")
-class ChatApi(Controller[App]):
+class ChatApi(Controller["App"]):
     assistant: Inject[Assistant]
 
     @post("/")

@@ -3,6 +3,8 @@
 A controller is a class that groups endpoints under a base path:
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
@@ -10,7 +12,8 @@ from patera.controller import (
     Controller, after_request, before_request, consumes, delete, get, path, post, produces,
 )
 
-from app import App
+if TYPE_CHECKING:
+    from app import App
 
 
 class UserIn(BaseModel):
@@ -24,7 +27,7 @@ class UserOut(BaseModel):
 
 
 @path("/api/v1/users", tags=["Users"], alias="users")
-class UserApi(Controller[App]):
+class UserApi(Controller["App"]):
 
     @get("/")
     async def list_users(self, req: Request) -> Response[list[UserOut]]:

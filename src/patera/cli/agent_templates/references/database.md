@@ -3,12 +3,18 @@
 Install `patera-database` plus the appropriate asynchronous SQLAlchemy driver.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.database.sql import SqlDatabase, SqlDatabaseManager, SqlDatabaseConfig
 
-class NotesDb(SqlDatabase):
+if TYPE_CHECKING:
+    from app import App
+
+
+class NotesDb(SqlDatabase["App"]):
     __db_name__ = "notes"
 
-class Databases(SqlDatabaseManager):
+class Databases(SqlDatabaseManager["App"]):
     databases = [NotesDb]
 ```
 

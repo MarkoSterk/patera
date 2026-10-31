@@ -3,10 +3,16 @@
 Install `patera-migrate`. Use its mixin on a managed database:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.database.sql import SqlDatabase
 from patera.migrate import Migrate
 
-class NotesDb(SqlDatabase, Migrate):
+if TYPE_CHECKING:
+    from app import App
+
+
+class NotesDb(SqlDatabase["App"], Migrate["App"]):
     __db_name__ = "notes"
 ```
 

@@ -1,10 +1,16 @@
 # CLI controllers
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.cli import CLIController, cli_controller, command
 
+if TYPE_CHECKING:
+    from app import App
+
+
 @cli_controller(name="greetings")
-class GreetingCLI(CLIController):
+class GreetingCLI(CLIController["App"]):
     @command("repeat", help="Print a greeting several times")
     async def repeat(self, name: str, times: int = 1):
         for _ in range(times):

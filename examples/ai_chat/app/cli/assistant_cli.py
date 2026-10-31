@@ -1,17 +1,19 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from app.assistant import Assistant
+from app.database import Base, Databases
 from sqlalchemy import text
 
 from patera.cli import CLIController, cli_controller, command
 from patera.injectable import Inject
 
-from app import App
-from app.assistant import Assistant
-from app.database import Base, Databases
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @cli_controller(name="assistant")
-class AssistantCLI(CLIController[App]):
+class AssistantCLI(CLIController["App"]):
     assistant: Inject[Assistant]
 
     @command("setup", help="Creates the chat and document tables")

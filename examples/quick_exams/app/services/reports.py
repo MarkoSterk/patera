@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from patera import Service
 from patera.injectable import Inject
@@ -8,8 +8,11 @@ from patera.injectable import Inject
 from ..repository import AttemptQuestions, Attempts, Exams, Questions
 from .attempts import AttemptService
 
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
-class ReportService(Service):
+
+class ReportService(Service["App"]):
     attempts: Inject[Attempts]
     attempt_questions: Inject[AttemptQuestions]
     questions: Inject[Questions]

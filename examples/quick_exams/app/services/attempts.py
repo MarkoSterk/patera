@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from patera import Service
 from patera.injectable import Inject
@@ -17,6 +17,9 @@ from ..schemas import (
     utc_now,
 )
 
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
+
 
 def _require_open(available_from: str, available_until: str) -> None:
     now = utc_now()
@@ -26,7 +29,7 @@ def _require_open(available_from: str, available_until: str) -> None:
     )
 
 
-class AttemptService(Service):
+class AttemptService(Service["App"]):
     exams: Inject[Exams]
     exam_questions: Inject[ExamQuestions]
     questions: Inject[Questions]

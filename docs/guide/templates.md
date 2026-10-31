@@ -28,6 +28,31 @@ Besides your context, templates receive:
 | `url_for` | URL building, as on the application |
 | `attribute` | `getattr` |
 | `len` | `len` |
+| `flashed_messages` | current context's `(message, status)` pairs; empty when none were added |
+
+## Flash messages
+
+Applications, controllers, extensions, and middleware share the same synchronous method:
+
+```python
+self.flash_message("Changes saved.", "success")
+self.flash_message("Welcome!")  # status defaults to None
+```
+
+Messages appear in insertion order in every template, including templates rendered directly
+through `app.jinja_environment`:
+
+```jinja
+{% for message, status in flashed_messages %}
+    <span class="{{ status or '' }}">{{ message }}</span>
+{% endfor %}
+```
+
+`flashed_messages` behaves as an empty list when there are no messages, so loops and
+`{% if flashed_messages %}` need no special handling. Reading it does not consume messages.
+Each request has its own list; child contexts share their parent's messages. Messages last
+only for the current context and do not survive redirects. Calling `flash_message` without
+an active context raises `RuntimeError`.
 
 ## Settings
 

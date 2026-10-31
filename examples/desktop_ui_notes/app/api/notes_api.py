@@ -1,12 +1,16 @@
 """A native SQLite API; the browser never imports this module."""
 
 import sqlite3
+from typing import TYPE_CHECKING
 
+from patera.desktop import user_data_dir
 from pydantic import BaseModel, Field
 
 from patera import HttpStatus, MediaType, Request, abort
 from patera.controller import Controller, consumes, delete, get, path, post, put
-from patera.desktop import user_data_dir
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 class NoteInput(BaseModel):
@@ -15,7 +19,7 @@ class NoteInput(BaseModel):
 
 
 @path("/api/notes")
-class NotesAPI(Controller):
+class NotesAPI(Controller["App"]):
     @delete("/<int:note_id>")
     async def remove(self, req: Request, note_id: int):
         connection = self.connect()

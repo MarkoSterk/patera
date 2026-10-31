@@ -1,11 +1,17 @@
 # WebSockets
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import Request
 from patera.controller import Controller, path, socket
 
+if TYPE_CHECKING:
+    from app import App
+
+
 @path("/live")
-class LiveController(Controller):
+class LiveController(Controller["App"]):
     @socket("/echo")
     async def echo(self, req: Request):
         if (await req.receive())["type"] != "websocket.connect":

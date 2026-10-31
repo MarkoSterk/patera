@@ -14,9 +14,15 @@ boundary or avoid sensitive URL parameters rather than relying on middleware.
 For HTTP metrics, a service can register an observer during `init()`:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import Service, RequestRecord
 
-class RequestMetrics(Service):
+if TYPE_CHECKING:
+    from app import App
+
+
+class RequestMetrics(Service["App"]):
     def init(self):
         self.app.add_request_observer(self.observe)
 

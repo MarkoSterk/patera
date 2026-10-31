@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Optional, TYPE_CHECKING
 
+from werkzeug.local import LocalProxy
+
 if TYPE_CHECKING:
     from .patera import Patera
     from .request import Request
@@ -38,12 +40,22 @@ class RequestContextData:
     user: Optional[Any] = None
     roles: Optional[list[Any]] = None
     extras: dict[str, Any] = field(default_factory=dict)
+    flashed_messages: list[tuple[str, str | None]] = field(default_factory=list)
 
 
 _current_context: ContextVar[Optional[RequestContextData]] = ContextVar(
     "patera_current_context",
     default=None,
 )
+
+
+def _get_flashed_messages() -> list[tuple[str, str | None]]:
+    ctx = _current_context.get()
+    return ctx.flashed_messages if ctx is not None else []
+
+
+# Resolve on use, never capture a request's list in shared Jinja globals.
+flashed_messages = LocalProxy(_get_flashed_messages)
 
 
 class CurrentContextProxy:
@@ -148,7 +160,8 @@ def child_context(*, app: Any = None) -> Iterator[RequestContextData]:
     scope.
 
     Inside a request it keeps the request's app, request, controller, user,
-    roles and a copy of its extras, so the block still sees who is asking,
+    roles, shared flashed messages and a copy of its extras, so the block
+    still sees who is asking,
     but it has sessions of its own: the block never replaces the request's
     sessions, and the request never sees the block's. Outside a request it
     is a fresh context for ``app``.
@@ -164,6 +177,7 @@ def child_context(*, app: Any = None) -> Iterator[RequestContextData]:
             user=parent.user,
             roles=parent.roles,
             extras=dict(parent.extras),
+            flashed_messages=parent.flashed_messages,
         )
     token: Token = _current_context.set(ctx)
     try:

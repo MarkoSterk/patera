@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import jwt
-from patera import Service
 from patera.admin import Permissions
 from patera.auth import AuthUtils
-from patera.injectable import Inject
 from werkzeug.security import check_password_hash as check_legacy_hash
+
+from patera import Service
+from patera.injectable import Inject
 
 from ..errors import (
     Conflict,
@@ -22,8 +23,11 @@ from ..models import ADMIN, User
 from ..repository import Users
 from ..schemas import Role, UserIn
 
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
-class AccountService(Service):
+
+class AccountService(Service["App"]):
     users: Inject[Users]
 
     def init(self) -> None:

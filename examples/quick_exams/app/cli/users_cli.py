@@ -1,12 +1,16 @@
 from getpass import getpass
+from typing import TYPE_CHECKING
 
-from patera.cli import CLIController, cli_controller, command
-from patera.database.sql import cli_session
-from patera.injectable import Inject
-
-from app import App
 from app.schemas import Role, UserIn
 from app.services.accounts import AccountService
+from patera.database.sql import cli_session
+
+from patera.cli import CLIController, cli_controller, command
+from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
+
 
 ROLE_CHOICES: dict[str, list[Role]] = {
     "instructor": ["INSTRUCTOR"],
@@ -16,7 +20,7 @@ ROLE_CHOICES: dict[str, list[Role]] = {
 
 
 @cli_controller(name="users")
-class UsersCLI(CLIController[App]):
+class UsersCLI(CLIController["App"]):
     accounts: Inject[AccountService]
 
     @command(

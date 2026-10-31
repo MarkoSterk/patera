@@ -4,9 +4,15 @@ Install `patera-email`. Subclass `EmailClient` from `patera.email`, e.g. `Mail`,
 register or inject it, and declare `MAIL: EmailConfig` with SMTP settings.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.email import EmailClient
 
-class Mail(EmailClient):
+if TYPE_CHECKING:
+    from app import App
+
+
+class Mail(EmailClient["App"]):
     pass
 
 ```

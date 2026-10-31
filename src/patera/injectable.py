@@ -137,6 +137,10 @@ class Injectable:
     __autowires__: ClassVar[dict[str, AutowireDef]] = {}
     __local_autowires__: ClassVar[dict[str, AutowireDef]] = {}
 
+    def flash_message(self, message: str, status: str | None = None) -> None:
+        """Add a message to the current request through the application."""
+        self.app.flash_message(message, status)  # type: ignore[attr-defined]
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
 

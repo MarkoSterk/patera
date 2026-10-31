@@ -108,10 +108,15 @@ of the request, the manager middleware commits it if the controller or endpoint 
 `@transactional` and no exception occurred; otherwise all changes are rolled back.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import HttpStatus
 
 from patera.database.sql import Repository, query, transactional
 from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class NoteRepository(Repository[Note]):
@@ -122,7 +127,7 @@ class NoteRepository(Repository[Note]):
 
 
 @path("/notes")
-class NoteApi(Controller[App]):
+class NoteApi(Controller["App"]):
     notes: Inject[NoteRepository]
 
     @get("/")

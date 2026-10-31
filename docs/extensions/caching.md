@@ -11,7 +11,12 @@ uv add "patera[caching-sqlite]"     # + SQLite backend
 ## Setup
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.caching import Caching, CachingConfig, cache
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class PublicCache(Caching):
@@ -24,7 +29,7 @@ class Config(BaseConfig):
 
 
 @path("/stats")
-class StatsApi(Controller[App]):
+class StatsApi(Controller["App"]):
     @get("/")
     @cache("PUBLIC_CACHE", duration=15)  # registered name of the extension
     async def stats(self, req: Request) -> Response:

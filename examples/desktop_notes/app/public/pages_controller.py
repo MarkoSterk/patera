@@ -1,12 +1,16 @@
-from patera import MediaType, Request, Response
-from patera.controller import Controller, get, path, produces
+from typing import TYPE_CHECKING
+
 from patera.desktop import settings_file, user_data_dir
 
-from app import App
+from patera import MediaType, Request, Response
+from patera.controller import Controller, get, path, produces
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @path("/")
-class PagesController(Controller[App]):
+class PagesController(Controller["App"]):
     @get("/")
     @produces(MediaType.TEXT_HTML)
     async def index(self, req: Request) -> Response:

@@ -20,6 +20,9 @@ last. Built-in CORS/database/auth middleware use -101/-100/-99 respectively.
 Register before the middleware chain is built, normally at first ASGI lifespan.
 An extension registers middleware classes in `init()`.
 
+For authentication, subclass `Authentication` and inherit its `middleware()`
+handler. Only `user_loader()` and `roles_loader()` must be implemented.
+
 Use locals or `current_request.set/get` for per-request data. The proxy also
 exposes request/app and session lookup; `has_request_context()` checks availability.
 Do not keep request-specific values on the middleware singleton.

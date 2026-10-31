@@ -14,7 +14,10 @@ Requires Python 3.13 or newer and `patera>=0.121`.
 
 ## Usage
 
-`patera-auth` provides an authentication middleware. Implement how users and roles are loaded:
+`Authentication` already implements the `middleware()` handler. Inherit it and
+implement only the two required async methods in your subclass. `user_loader(req)`
+returns the account or `None`. `roles_loader(user)` returns the user's roles, or
+an empty list if the user has none.
 
 ```python
 # app/middleware/auth_mw.py

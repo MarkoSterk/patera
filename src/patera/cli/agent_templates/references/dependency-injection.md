@@ -1,16 +1,22 @@
 # Services and dependency injection
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import Service, Request, Response
 from patera.injectable import Inject
 from patera.controller import Controller, path, get
 
-class GreetingService(Service):
+if TYPE_CHECKING:
+    from app import App
+
+
+class GreetingService(Service["App"]):
     def greet(self, name: str) -> str:
         return f"Hello, {name}!"
 
 @path("/hello")
-class HelloController(Controller):
+class HelloController(Controller["App"]):
     greetings: Inject[GreetingService]
 
     @get("/<name>")

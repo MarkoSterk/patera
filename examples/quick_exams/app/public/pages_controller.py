@@ -1,7 +1,11 @@
+from typing import TYPE_CHECKING
+
 from patera import Request, Response
 from patera.controller import Controller, after_request, get, path
 
-from app import App
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
+
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; "
@@ -10,7 +14,7 @@ CONTENT_SECURITY_POLICY = (
 
 
 @path("/", open_api_spec=False)
-class Pages(Controller[App]):
+class Pages(Controller["App"]):
     @get("/")
     async def index(self, req: Request) -> Response:
         return await req.res.html("index.html")

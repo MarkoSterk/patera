@@ -5,16 +5,21 @@ register controllers, middleware, exception handlers, CLI commands, template fol
 lifecycle hooks. The official [extension packages](../extensions/index.md) are built this way.
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
-from patera import BaseExtension, Patera
+from patera import BaseExtension
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class AuditConfig(BaseModel):
     ENABLED: bool = True
 
 
-class AuditService(BaseExtension[Patera, AuditConfig]):
+class AuditService(BaseExtension["App", AuditConfig]):
     def init(self) -> None:
         if self.configs.ENABLED:
             self.app.add_on_startup_method(self.start)

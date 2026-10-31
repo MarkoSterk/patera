@@ -242,8 +242,7 @@ AppT = TypeVar("AppT", bound="Patera[Any]", default="Patera[Any]")
 class Authentication(MiddlewareBase[AppT, AuthenticationConfig], ABC, Generic[AppT]):
     """
     Authentication middleware for Patera application
-    User must implement user_loader method and optionally role_check method
-    to define how users are loaded and how roles are checked.
+    Subclasses inherit middleware(). Only the two async loaders are required:
     1. user_loader: should return a user object (or None) loaded from the cookie/jwt/header token
     2. roles_loader: should return a list of user roles or an empty list
                     Returned list is compared to required roles on controller and endpoint handler.

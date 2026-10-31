@@ -1,7 +1,8 @@
 # Authentication and authorization
 
-Install `patera-auth`. Subclass `Authentication` from `patera.auth` and implement
-both `async def user_loader(self, req)` and `async def roles_loader(self, user)`.
+Install `patera-auth` and subclass `Authentication` from `patera.auth`. Inherit
+its `middleware()` handler. Implement only the two required async methods,
+`user_loader(self, req)` and `roles_loader(self, user)`.
 The former returns the account or None; the latter returns its role list. Inject
 an account service for credential lookup. Mark the class with `@middleware`
 without an order: Authentication inherits -99, inside the database boundary.

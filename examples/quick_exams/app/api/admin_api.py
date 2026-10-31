@@ -1,19 +1,23 @@
-from patera import HttpStatus, MediaType, Request, Response
-from patera.auth import role_required
-from patera.controller import Controller, consumes, get, path, post, produces, put
-from patera.database.sql import transactional
-from patera.injectable import Inject
+from typing import TYPE_CHECKING
 
-from app import App
 from app.models import ADMIN
 from app.schemas import AdminOverviewOut, UserIn, UserOut
 from app.services.accounts import AccountService
 from app.services.reports import ReportService
+from patera.auth import role_required
+from patera.database.sql import transactional
+
+from patera import HttpStatus, MediaType, Request, Response
+from patera.controller import Controller, consumes, get, path, post, produces, put
+from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @path("/api/admin", tags=["Administration"])
 @role_required(ADMIN)
-class AdminApi(Controller[App]):
+class AdminApi(Controller["App"]):
     accounts: Inject[AccountService]
     reports: Inject[ReportService]
 

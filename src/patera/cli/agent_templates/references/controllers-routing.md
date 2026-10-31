@@ -1,15 +1,21 @@
 # Controllers and routing
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import HttpStatus, Request, Response, MediaType
 from patera.controller import Controller, path, get, post, consumes
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app import App
+
 
 class NoteInput(BaseModel):
     title: str
 
 @path("/notes")
-class NotesController(Controller):
+class NotesController(Controller["App"]):
     @get("/<int:note_id>")
     async def read(self, req: Request, note_id: int) -> Response:
         return req.res.json({"id": note_id})

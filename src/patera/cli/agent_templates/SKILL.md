@@ -10,6 +10,12 @@ These references describe the APIs bundled with this Patera release; check the
 installed source when upgrading. They are distilled from the Patera tutorial and
 architecture books, with experimental package guidance checked against its source.
 
+Use the concrete application type in backend controller and application-specific
+extension bases, for example `Controller["App"]`, `CLIController["App"]`, and
+`BaseExtension["App", AuditConfig]`. Import `TYPE_CHECKING` from `typing` and
+place the application import inside `if TYPE_CHECKING:` to avoid circular
+imports. Keep config models and `Inject` targets available at runtime.
+
 Always import `HttpStatus` from `patera` when specifying or comparing an HTTP
 status. Use named members in application code, examples, and tests. This includes
 response builders, route decorators, exceptions, and assertions such as

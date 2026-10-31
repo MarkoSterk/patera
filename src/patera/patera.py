@@ -44,7 +44,12 @@ from jinja2 import (
     Undefined,
 )
 
-from .ctx import current_request, CurrentContextProxy
+from .ctx import (
+    current_request,
+    CurrentContextProxy,
+    flashed_messages,
+    get_request_context,
+)
 from .exceptions.http_exceptions import (
     BaseHttpException,
     HtmlAborterException,
@@ -252,6 +257,7 @@ class Patera(Injectable, Generic[ConfT]):
             auto_reload=self._configs.AUTO_RELOAD,
             enable_async=True,
         )
+        self._jinja_environment.globals["flashed_messages"] = flashed_messages
 
         self.response_serializers: SerializerRegistry = SerializerRegistry()
         self.response_serializers.register_defaults()
@@ -1915,6 +1921,13 @@ class Patera(Injectable, Generic[ConfT]):
     @property
     def current_request(self) -> CurrentContextProxy:
         return current_request
+
+    def flash_message(self, message: str, status: str | None = None) -> None:
+        """Append a message for this request's templates without consuming it.
+
+        Requires an active context. Messages do not survive redirects.
+        """
+        get_request_context().flashed_messages.append((message, status))
 
     async def __call__(self, scope, receive, send):
         """

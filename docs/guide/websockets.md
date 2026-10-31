@@ -3,12 +3,17 @@
 WebSocket endpoints are controller methods decorated with `@socket`:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import Request
 from patera.controller import Controller, path, socket
 
+if TYPE_CHECKING:
+    from app import App
+
 
 @path("/ws")
-class ChatSocket(Controller[App]):
+class ChatSocket(Controller["App"]):
     @socket("/chat/<room>")
     async def chat(self, req: Request, room: str) -> None:
         if (await req.receive())["type"] != "websocket.connect":

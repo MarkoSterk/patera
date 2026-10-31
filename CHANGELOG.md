@@ -108,6 +108,14 @@ contain breaking changes; they are listed first in each release.
 - **patera-admin:** the sign-in and "unauthorized" pages load Bootstrap and its icons from the
   copies shipped with the package instead of jsDelivr, so Admin works without internet access.
 
+## patera 0.123.5 (2026-10-31)
+
+- Added request-local `flash_message(message, status=None)` on applications,
+  controllers, extensions and middleware, with `flashed_messages` available in
+  Jinja templates. Child contexts share messages; separate requests stay isolated.
+- Clarified concrete application typing in coding-agent instructions, examples
+  and documentation, and the authentication middleware loader requirements.
+
 ## patera 0.123.4 (2026-10-31)
 
 - Updated the generated Codex and Claude instructions and bundled examples to

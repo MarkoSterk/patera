@@ -13,10 +13,16 @@ provider and a model available to the application; do not hardcode a model merel
 because an older example used it.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.aiinterface import AiService, ChatResponse, system_prompt, user_prompt
 from patera.aiinterface.service_provider.openai import OpenAIServiceProvider
 
-class Translator(AiService):
+if TYPE_CHECKING:
+    from app import App
+
+
+class Translator(AiService["App"]):
     service_provider = OpenAIServiceProvider()
 
     @system_prompt("Translate the supplied text.")

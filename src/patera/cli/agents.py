@@ -20,6 +20,11 @@ def _instructions(skill_path: str) -> str:
         "and the topic references relevant to the change.\n"
         "Follow this project's existing structure and dependency versions. "
         "Use the installed framework source to resolve API differences.\n"
+        "- Type backend controllers and application-specific extensions with the "
+        'concrete application class: `Controller["App"]` and '
+        '`BaseExtension["App", ExtensionConfig]`. Import the application class '
+        "under `if TYPE_CHECKING:` to avoid circular imports. Keep configuration "
+        "models and injected dependencies importable at runtime.\n"
         "- Always use named members of `HttpStatus` from `patera` for HTTP statuses "
         "in responses, decorators, exceptions, and test assertions. Never write a "
         "bare integer status code.\n"

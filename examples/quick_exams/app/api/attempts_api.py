@@ -1,15 +1,19 @@
-from patera import HttpStatus, MediaType, Request, Response
-from patera.controller import Controller, consumes, path, post, produces
-from patera.database.sql import transactional
-from patera.injectable import Inject
+from typing import TYPE_CHECKING
 
-from app import App
 from app.schemas import PublicAttemptOut, ResultOut, StartAttemptIn, SubmitIn
 from app.services.attempts import AttemptService
+from patera.database.sql import transactional
+
+from patera import HttpStatus, MediaType, Request, Response
+from patera.controller import Controller, consumes, path, post, produces
+from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @path("/api/attempts", tags=["Students"])
-class AttemptsApi(Controller[App]):
+class AttemptsApi(Controller["App"]):
     """
     Public student endpoints. The unpredictable exam id grants access to an
     exam, and the attempt id returned on start is the only way to submit it.

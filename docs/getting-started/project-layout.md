@@ -54,19 +54,24 @@ app/
   `register_exception_handler(...)`, `register_middleware(...)`.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import development, ignore
 from patera.controller import Controller, get, path
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @path("/debug")
 @development              # only exists with DEBUG=True
-class DebugApi(Controller):
+class DebugApi(Controller["App"]):
     ...
 
 
 @ignore                   # never registered
 @path("/legacy")
-class LegacyApi(Controller):
+class LegacyApi(Controller["App"]):
     ...
 ```
 

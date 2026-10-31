@@ -1,16 +1,20 @@
-from patera import MediaType, Request, Response
-from patera.auth import login_required
-from patera.controller import Controller, consumes, get, path, post
-from patera.database.sql import transactional
-from patera.injectable import Inject
+from typing import TYPE_CHECKING
 
-from app import App
 from app.schemas import LoginIn, TokenOut, UserOut
 from app.services.accounts import AccountService
+from patera.auth import login_required
+from patera.database.sql import transactional
+
+from patera import MediaType, Request, Response
+from patera.controller import Controller, consumes, get, path, post
+from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App  # noqa: F401 - used in quoted generic bases
 
 
 @path("/api/auth", tags=["Authentication"])
-class AuthApi(Controller[App]):
+class AuthApi(Controller["App"]):
     """
     JWT sign-in for the workspace, Patera Admin and API clients. The token is
     returned in the body and set in an HttpOnly, SameSite=Strict cookie.

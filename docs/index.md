@@ -14,12 +14,15 @@ with a structure inspired by Java frameworks: class-based controllers, decorator
 HTTP semantics, dependency injection of application services, and typed configuration objects.
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
 from patera.controller import Controller, consumes, get, path, post, produces
 
-from app import App
+if TYPE_CHECKING:
+    from app import App
 
 
 class Greeting(BaseModel):
@@ -27,7 +30,7 @@ class Greeting(BaseModel):
 
 
 @path("/api/v1/greetings")
-class GreetingApi(Controller[App]):
+class GreetingApi(Controller["App"]):
     @get("/")
     async def hello(self, req: Request) -> Response:
         return req.res.json({"message": "Hello, World!"})

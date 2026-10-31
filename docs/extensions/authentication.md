@@ -9,7 +9,10 @@ uv add "patera[auth]"
 
 ## The authentication middleware
 
-Subclass `Authentication` and implement how users and roles are loaded:
+`Authentication` already implements the `middleware()` handler. Inherit it and
+implement only the two required async methods in your subclass. `user_loader(req)`
+returns the account or `None`. `roles_loader(user)` returns the user's roles, or
+an empty list if the user has none.
 
 ```python
 # app/middleware/auth_mw.py
@@ -34,7 +37,6 @@ class TokenAuth(Authentication):
         return user.roles
 ```
 
-- `user_loader(req)` returns the account or `None`; `roles_loader(user)` returns its role list.
 - Mark the class with `@middleware` **without an order**: `Authentication` uses `-99`, inside the
   database session boundary, so loaders can use the database.
 - Inject an account service for credential lookup.
@@ -42,12 +44,17 @@ class TokenAuth(Authentication):
 ## Protecting routes
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.auth import login_required, role_required
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @path("/account")
 @login_required()                       # every endpoint requires a user
-class AccountApi(Controller[App]):
+class AccountApi(Controller["App"]):
 
     @get("/")
     async def me(self, req: Request) -> Response:

@@ -112,10 +112,15 @@ process-global, so applications in the same process share its sinks.
 For HTTP metrics, register an observer, typically from a service listed in `app_extensions`:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import RequestRecord, Service
 
+if TYPE_CHECKING:
+    from app import App
 
-class RequestMetrics(Service):
+
+class RequestMetrics(Service["App"]):
     def init(self):
         self.app.add_request_observer(self.observe)
 

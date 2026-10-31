@@ -6,18 +6,23 @@ controllers, services, middleware, exception handlers or CLI controllers: they a
 first use and shared.
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import Request, Response, Service
 from patera.controller import Controller, get, path
 from patera.injectable import ConfigVar, Inject
 
+if TYPE_CHECKING:
+    from app import App
+
 
 class GreetingSettings(BaseModel):
     PREFIX: str = "Hello"
 
 
-class Formatter(Service):
+class Formatter(Service["App"]):
     def format(self, prefix: str, name: str) -> str:
         return f"{prefix}, {name}!"
 
@@ -63,9 +68,12 @@ There is no automatic resolution by superclass. For an interface with a concrete
 implementation, use `Autowire`:
 
 ```python
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from patera.injectable import Autowire, Inject
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class NotesApi(Controller["App"]):

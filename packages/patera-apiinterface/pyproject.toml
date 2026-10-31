@@ -1,6 +1,6 @@
 [project]
 name = "patera-apiinterface"
-version = "0.13.4"
+version = "0.13.5"
 description = "Declarative async HTTP clients for external APIs in Patera applications"
 readme = "README.md"
 license = "MIT"

@@ -58,12 +58,15 @@ argument `Patera[Config]` gives your editor and type checker the configuration t
 `app/api/greeting_api.py`:
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
 from patera.controller import Controller, consumes, get, path, post, produces
 
-from app import App
+if TYPE_CHECKING:
+    from app import App
 
 
 class Greeting(BaseModel):
@@ -71,7 +74,7 @@ class Greeting(BaseModel):
 
 
 @path("/api/v1/greetings")
-class GreetingApi(Controller[App]):
+class GreetingApi(Controller["App"]):
     @get("/")
     @produces(MediaType.APPLICATION_JSON)
     async def hello(self, req: Request) -> Response:

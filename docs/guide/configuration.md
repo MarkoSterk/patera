@@ -79,7 +79,12 @@ variables change single fields of it.
 - The `ConfigVar` descriptor in controllers and services:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.injectable import ConfigVar
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @path("/greetings")

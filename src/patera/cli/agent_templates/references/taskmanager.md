@@ -3,9 +3,15 @@
 Install `patera-taskmanager`.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.taskmanager import TaskManager, schedule_job
 
-class Jobs(TaskManager):
+if TYPE_CHECKING:
+    from app import App
+
+
+class Jobs(TaskManager["App"]):
     @schedule_job("interval", seconds=60, id="heartbeat", max_instances=1)
     async def heartbeat(self):
         self.app.logger.info("Heartbeat")

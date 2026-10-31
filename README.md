@@ -136,12 +136,15 @@ class App(Patera[Config]):
 `app/api/greeting_api.py`:
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
 from patera.controller import Controller, consumes, get, path, post, produces
 
-from app import App
+if TYPE_CHECKING:
+    from app import App
 
 
 class Greeting(BaseModel):
@@ -149,7 +152,7 @@ class Greeting(BaseModel):
 
 
 @path("/api/v1/greetings")
-class GreetingApi(Controller[App]):
+class GreetingApi(Controller["App"]):
     @get("/")
     @produces(MediaType.APPLICATION_JSON)
     async def hello(self, req: Request) -> Response:
@@ -337,6 +340,8 @@ when `DEBUG` is on. Anything can also be registered explicitly with the `registe
 A controller is a class that groups endpoints under a base path:
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
@@ -344,7 +349,8 @@ from patera.controller import (
     Controller, after_request, before_request, consumes, delete, get, patch, path, post, produces, put,
 )
 
-from app import App
+if TYPE_CHECKING:
+    from app import App
 
 
 class UserIn(BaseModel):
@@ -358,7 +364,7 @@ class UserOut(BaseModel):
 
 
 @path("/api/v1/users", tags=["Users"], alias="users")
-class UserApi(Controller[App]):
+class UserApi(Controller["App"]):
 
     @get("/")
     async def list_users(self, req: Request) -> Response[list[UserOut]]:
@@ -418,11 +424,16 @@ class UserApi(Controller[App]):
 ### Websockets
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.controller import Controller, path, socket
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @path("/ws")
-class ChatSocket(Controller[App]):
+class ChatSocket(Controller["App"]):
     @socket("/chat/<room>")
     async def chat(self, req: Request, room: str) -> None:
         await req.receive()   # {"type": "websocket.connect"}
@@ -499,17 +510,22 @@ controllers, services, middleware, exception handlers or CLI controllers – the
 use and shared:
 
 ```python
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from patera import Service
 from patera.injectable import ConfigVar, Inject
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class GreetingSettings(BaseModel):
     PREFIX: str = "Hello"
 
 
-class Formatter(Service):
+class Formatter(Service["App"]):
     def format(self, prefix: str, name: str) -> str:
         return f"{prefix}, {name}!"
 
@@ -828,11 +844,16 @@ Maintenance commands are methods of CLI controllers:
 
 ```python
 # app/cli/maintenance_cli.py
+from typing import TYPE_CHECKING
+
 from patera.cli import CLIController, cli_controller, command
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @cli_controller(name="maintenance")
-class MaintenanceCLI(CLIController):
+class MaintenanceCLI(CLIController["App"]):
 
     @command("greet", help="Greets a user")
     async def greet(self, name: str, times: int = 1) -> None:
@@ -956,10 +977,15 @@ endpoint is marked `@transactional` and no exception occurred; otherwise all cha
 back.
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera import HttpStatus
 
 from patera.database.sql import Repository, query, transactional
 from patera.injectable import Inject
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class NoteRepository(Repository[Note]):
@@ -970,7 +996,7 @@ class NoteRepository(Repository[Note]):
 
 
 @path("/notes")
-class NoteApi(Controller[App]):
+class NoteApi(Controller["App"]):
     notes: Inject[NoteRepository]
 
     @get("/")
@@ -1034,7 +1060,10 @@ uv run patera cli migrate:validate
 
 ### Authentication
 
-`patera-auth` provides an authentication middleware. Implement how users and roles are loaded:
+`Authentication` already implements the `middleware()` handler. Inherit it and
+implement only the two required async methods in your subclass. `user_loader(req)`
+returns the account or `None`. `roles_loader(user)` returns the user's roles, or
+an empty list if the user has none.
 
 ```python
 # app/middleware/auth_mw.py
@@ -1060,12 +1089,17 @@ class TokenAuth(Authentication):
 ```
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.auth import login_required, role_required
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @path("/account")
 @login_required()                       # every endpoint requires a user
-class AccountApi(Controller[App]):
+class AccountApi(Controller["App"]):
 
     @get("/")
     async def me(self, req: Request) -> Response:
@@ -1100,7 +1134,12 @@ timestamp; `max_age` rejects older values) and
 `patera-caching` caches responses of endpoints:
 
 ```python
+from typing import TYPE_CHECKING
+
 from patera.caching import Caching, CachingConfig, cache
+
+if TYPE_CHECKING:
+    from app import App
 
 
 class PublicCache(Caching):
@@ -1113,7 +1152,7 @@ class Config(BaseConfig):
 
 
 @path("/stats")
-class StatsApi(Controller[App]):
+class StatsApi(Controller["App"]):
     @get("/")
     @cache("PUBLIC_CACHE", duration=15)  # registered name of the extension
     async def stats(self, req: Request) -> Response:

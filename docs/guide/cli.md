@@ -10,11 +10,16 @@ Commands are methods of CLI controllers:
 
 ```python
 # app/cli/maintenance_cli.py
+from typing import TYPE_CHECKING
+
 from patera.cli import CLIController, cli_controller, command
+
+if TYPE_CHECKING:
+    from app import App
 
 
 @cli_controller(name="maintenance")
-class MaintenanceCLI(CLIController):
+class MaintenanceCLI(CLIController["App"]):
 
     @command("greet", help="Greets a user")
     async def greet(self, name: str, times: int = 1) -> None:
