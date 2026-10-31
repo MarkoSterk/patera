@@ -1,174 +1,174 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/</loc>
+        <loc>https://patera.markosterk.com/dev/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/deployment/</loc>
+        <loc>https://patera.markosterk.com/dev/deployment/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/admin/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/admin/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/aiinterface/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/aiinterface/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/apiinterface/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/apiinterface/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/authentication/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/authentication/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/caching/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/caching/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/database/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/database/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/desktop-ui/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/desktop-ui/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/desktop-ui/runtime/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/desktop-ui/runtime/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/desktop/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/desktop/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/email/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/email/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/joltui/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/joltui/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/migrations/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/migrations/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/extensions/taskmanager/</loc>
+        <loc>https://patera.markosterk.com/dev/extensions/taskmanager/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/getting-started/</loc>
+        <loc>https://patera.markosterk.com/dev/getting-started/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/getting-started/installation/</loc>
+        <loc>https://patera.markosterk.com/dev/getting-started/installation/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/getting-started/project-layout/</loc>
+        <loc>https://patera.markosterk.com/dev/getting-started/project-layout/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/getting-started/quickstart/</loc>
+        <loc>https://patera.markosterk.com/dev/getting-started/quickstart/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/getting-started/running/</loc>
+        <loc>https://patera.markosterk.com/dev/getting-started/running/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/application/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/application/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/cli/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/cli/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/coding-agents/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/coding-agents/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/configuration/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/configuration/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/controllers/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/controllers/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/cors/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/cors/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/custom-extensions/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/custom-extensions/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/dependency-injection/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/dependency-injection/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/exception-handling/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/exception-handling/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/logging/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/logging/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/middleware/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/middleware/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/openapi/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/openapi/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/requests/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/requests/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/responses/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/responses/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/static-files/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/static-files/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/templates/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/templates/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/testing/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/testing/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/guide/websockets/</loc>
+        <loc>https://patera.markosterk.com/dev/guide/websockets/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/project/changelog/</loc>
+        <loc>https://patera.markosterk.com/dev/project/changelog/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/project/contributing/</loc>
+        <loc>https://patera.markosterk.com/dev/project/contributing/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/project/documentation/</loc>
+        <loc>https://patera.markosterk.com/dev/project/documentation/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/project/license/</loc>
+        <loc>https://patera.markosterk.com/dev/project/license/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/project/versioning/</loc>
+        <loc>https://patera.markosterk.com/dev/project/versioning/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/cli/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/cli/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/controller/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/controller/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/exceptions/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/exceptions/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/injectable/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/injectable/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/logging/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/logging/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/middleware/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/middleware/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/patera/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/patera/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/api/testing/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/api/testing/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/cli/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/cli/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/configuration/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/configuration/</loc>
       </url>
       <url>
-        <loc>https://markosterk.github.io/Patera/dev/reference/public-api/</loc>
+        <loc>https://patera.markosterk.com/dev/reference/public-api/</loc>
       </url>
 </urlset>

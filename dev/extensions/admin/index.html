@@ -12,7 +12,7 @@
         <meta name="author" content="Marko Šterk">
       
       
-        <link rel="canonical" href="https://markosterk.github.io/Patera/dev/extensions/admin/">
+        <link rel="canonical" href="https://patera.markosterk.com/dev/extensions/admin/">
       
       
       
@@ -26,7 +26,7 @@
       
       
       <link rel="icon" href="../../assets/patera_logo.png">
-      <meta name="generator" content="zensical-0.0.73">
+      <meta name="generator" content="zensical-0.0.74">
     
     
       
@@ -1976,6 +1976,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#custom-form-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Custom form fields
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Custom form fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#submitted-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Submitted values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-and-select-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Password and select example
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3132,6 +3171,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#custom-form-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Custom form fields
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Custom form fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#submitted-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Submitted values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-and-select-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Password and select example
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3271,7 +3349,7 @@ the static folder, task managers and e-mail clients.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Admin</span><span class="p">(</span><span class="n">AdminInterface</span><span class="p">):</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">MANAGED_MODELS</span> <span class="o">=</span> <span class="p">[</span><span class="n">Note</span><span class="p">]</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">managed_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">Note</span><span class="p">]</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">(</span><span class="n">BaseConfig</span><span class="p">):</span>
@@ -3284,6 +3362,13 @@ the static folder, task managers and e-mail clients.</p>
 <code>sl</code>, <code>es</code>), for example <code>/admin/en/dashboard</code>, plus <code>URL_PREFIX</code> when configured.</p>
 <p>Admin looks up the extensions it manages (databases, task managers, e-mail clients) on every page
 load, so their order in <code>app_extensions</code> does not matter.</p>
+<p>To annotate the managed-model configuration explicitly, use its class-variable type:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassVar</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">patera.database.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeclarativeBaseModel</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Admin</span><span class="p">(</span><span class="n">AdminInterface</span><span class="p">):</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">managed_models</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">DeclarativeBaseModel</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">Note</span><span class="p">]</span>
+</span></code></pre></div>
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3388,6 +3473,20 @@ Set <code>REQUEST_STATISTICS=False</code> to turn this off.</p>
 <p>The log view reads the application's <a href="../../guide/logging/#log-files">JSON Lines log files</a>.</p>
 <h2 id="model-forms">Model forms<a class="headerlink" href="#model-forms" title="Permanent link">&para;</a></h2>
 <p>Form metadata derives from the model's <code>Meta</code> (<code>patera.database.sql.declarative_base.ModelMeta</code>).</p>
+<p>Inherit from your base model's <code>Meta</code> when defining model metadata. Its settings
+are class variables; explicit annotations should keep the same container types:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassVar</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">Article</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="c1"># Declare SQLAlchemy columns here.</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">(</span><span class="n">Base</span><span class="o">.</span><span class="n">Meta</span><span class="p">):</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">exclude_from_table</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"body"</span><span class="p">]</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">custom_labels</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"body"</span><span class="p">:</span> <span class="s2">"Article text"</span><span class="p">}</span>
+</span></code></pre></div>
+<p>Replace lists and dictionaries in each subclass instead of mutating inherited
+defaults. <code>ClassVar</code> describes their ownership to type checkers; it does not copy
+the values or make them immutable.</p>
 <ul>
 <li>Record forms are validated with <code>Meta.create_validation_schema</code> / <code>update_validation_schema</code>
   when the model has them.</li>
@@ -3396,9 +3495,8 @@ Set <code>REQUEST_STATISTICS=False</code> to turn this off.</p>
   <code>exclude_from_create_form</code> / <code>exclude_from_update_form</code> cannot be set through a request.</li>
 <li>The <code>admin_create</code>, <code>admin_update</code> and <code>admin_delete</code> hooks implement application rules; raise
   <code>AdminFormError</code> from <code>patera.admin.form_values</code> for field errors.</li>
-<li>Custom form elements in <code>patera.admin.custom_elements</code> (for <code>Meta.custom_form_fields</code>) include
-  <code>FileInput</code> (the hooks receive an <code>UploadedFile</code>), <code>DateInput</code> (date or date-and-time, with
-  optional UTC conversion) and <code>LatexInput</code> (text with live LaTeX math preview).</li>
+<li>Use <code>Meta.custom_form_fields</code> to replace generated inputs with the
+  <a href="#custom-form-fields">custom form fields</a> below.</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -3406,6 +3504,108 @@ Set <code>REQUEST_STATISTICS=False</code> to turn this off.</p>
 sensitive fields, provide validation schemas, and test direct requests with forged fields and
 insufficient permissions, not only the displayed form.</p>
 </div>
+<h2 id="custom-form-fields">Custom form fields<a class="headerlink" href="#custom-form-fields" title="Permanent link">&para;</a></h2>
+<p>Import the built-in fields from <code>patera.admin.custom_elements</code>. Set
+<code>Meta.custom_form_fields</code> to a list of field instances, with each <code>name</code> matching a
+model field (or a field declared in <code>Meta.add_to_form</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Purpose and options</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TagsInput</code></td>
+<td>Tag entry: press Enter to add a tag and use its remove button to delete it. Empty and duplicate tags are ignored. Accepts <code>placeholder</code>.</td>
+</tr>
+<tr>
+<td><code>PasswordInput</code></td>
+<td>Masked text input that is never prefilled with a stored value. <code>autocomplete</code> defaults to <code>"new-password"</code>.</td>
+</tr>
+<tr>
+<td><code>SelectInput</code></td>
+<td>Single selection with <code>options</code> supplied as a mapping of values to labels or a sequence of <code>(value, label)</code> pairs. Submitted values use normal column-type conversion.</td>
+</tr>
+<tr>
+<td><code>SummernoteEditor</code></td>
+<td>Rich text editor. Configure <code>features</code>, <code>height</code>, and <code>upload_url</code>. The default features are <code>headings</code>, <code>font</code>, and <code>alignment</code>; supplying <code>upload_url</code> also enables images.</td>
+</tr>
+<tr>
+<td><code>FileInput</code></td>
+<td>File upload. <code>accept</code> takes MIME types or extensions, as a string or sequence; <code>max_size</code> is a limit in bytes checked by the browser.</td>
+</tr>
+<tr>
+<td><code>DateInput</code></td>
+<td>Date picker, or date and time with <code>include_time=True</code>. Supports <code>min</code> and <code>max</code>. With <code>include_time=True, utc=True</code>, displays timestamps in the viewer's local time and submits UTC.</td>
+</tr>
+<tr>
+<td><code>LatexInput</code></td>
+<td>Text with live LaTeX math preview. Multiline by default; set <code>multiline=False</code> for a single line. Supports <code>rows</code> (default <code>4</code>), <code>maxlength</code>, and <code>preview_label</code> (default <code>"Preview"</code>).</td>
+</tr>
+</tbody>
+</table>
+<p>For example, add this metadata to a model that defines <code>tags</code>, <code>body</code>, <code>attachment</code>,
+<code>published_at</code>, and <code>formula</code> fields:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">patera.admin.custom_elements</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">DateInput</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">FileInput</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">LatexInput</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">SummernoteEditor</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">TagsInput</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">(</span><span class="n">Base</span><span class="o">.</span><span class="n">Meta</span><span class="p">):</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">custom_form_fields</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="n">TagsInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"tags"</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"Type a tag and press Enter"</span><span class="p">),</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="n">SummernoteEditor</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"body"</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">300</span><span class="p">),</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="n">FileInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"attachment"</span><span class="p">,</span> <span class="n">accept</span><span class="o">=</span><span class="p">[</span><span class="s2">".pdf"</span><span class="p">],</span> <span class="n">max_size</span><span class="o">=</span><span class="mi">5</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">),</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="n">DateInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"published_at"</span><span class="p">,</span> <span class="n">include_time</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        <span class="n">LatexInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"formula"</span><span class="p">,</span> <span class="n">multiline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">maxlength</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<p>All fields accept <code>label</code>, <code>required</code>, <code>disabled</code>, and HTML customization through
+<code>classes</code>, <code>attributes</code>, <code>data_attributes</code>, <code>aria_attributes</code>, and <code>styles</code>.</p>
+<h3 id="submitted-values">Submitted values<a class="headerlink" href="#submitted-values" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>PasswordInput</code> submits the entered text. Hash it in your admin hook before
+  storage. An empty input submits an empty string; handle that explicitly in
+  update hooks if it should preserve the current password. Exclude password/hash
+  columns from tables and use a separate <code>Meta.add_to_form</code> field when appropriate.</li>
+<li><code>SelectInput</code> restricts the visible choices, but your validation schema or admin
+  hook must enforce allowed values for direct requests as well.</li>
+<li><code>TagsInput</code> submits a JSON array encoded as text, such as <code>'["python", "web"]'</code>.
+  Parse and validate that text in your validation schema or admin hook if the model
+  stores a list. Existing values can be JSON arrays or comma-separated text.</li>
+<li><code>SummernoteEditor</code> submits HTML text. An image upload requires your application
+  to provide the endpoint specified by <code>upload_url</code>.</li>
+<li><code>FileInput</code> passes a <code>patera.UploadedFile</code> to the admin hooks, which decide how to
+  store it. When no file is selected, the field is omitted so an update preserves
+  the current value. Validate uploads on the server as well; <code>accept</code> and
+  <code>max_size</code> only constrain the browser.</li>
+<li><code>DateInput</code> uses the normal column-type conversion for <code>Date</code>, <code>DateTime</code>, or
+  string columns. <code>utc=True</code> requires <code>include_time=True</code>.</li>
+<li><code>LatexInput</code> submits the original text and uses normal column-type conversion.
+  Write inline math as <code>$...$</code>, display math as <code>$$...$$</code>, and a literal dollar
+  sign as <code>\$</code>. The preview uses the bundled Temml renderer, loaded only on pages
+  containing this input.</li>
+</ul>
+<h3 id="password-and-select-example">Password and select example<a class="headerlink" href="#password-and-select-example" title="Permanent link">&para;</a></h3>
+<p>Declare the options directly in the model's metadata:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">patera.admin.custom_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">PasswordInput</span><span class="p">,</span> <span class="n">SelectInput</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">(</span><span class="n">Base</span><span class="o">.</span><span class="n">Meta</span><span class="p">):</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">add_to_form</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"new_password"</span><span class="p">:</span> <span class="nb">str</span><span class="p">}</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">custom_form_fields</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="n">PasswordInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"new_password"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="n">SelectInput</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"status"</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"draft"</span><span class="p">:</span> <span class="s2">"Draft"</span><span class="p">,</span> <span class="s2">"published"</span><span class="p">:</span> <span class="s2">"Published"</span><span class="p">}),</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<p>Here <code>status</code> is a model column. Consume <code>new_password</code> in the model's admin hook
+and store its hash in your password column.</p>
 
 
 
@@ -3540,10 +3740,10 @@ insufficient permissions, not only the displayed form.</p>
       
         
         
-      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["announce.dismiss","content.action.edit","content.action.view","content.code.annotate","content.code.copy","content.code.select","content.footnote.tooltips","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.sections","navigation.tabs","navigation.top","navigation.tracking","search.highlight","toc.follow"],"redirect":null,"search":"../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"alias":true,"default":"latest","provider":"mike"}}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["announce.dismiss","content.action.edit","content.action.view","content.code.annotate","content.code.copy","content.code.select","content.footnote.tooltips","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.sections","navigation.tabs","navigation.top","navigation.tracking","search.highlight","toc.follow"],"redirect":null,"search":"../../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"alias":true,"default":"latest","provider":"mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.77dd0ce9.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d31f0ffa.min.js"></script>
       
     
   </body>
