@@ -3,9 +3,9 @@
 ```python
 from typing import TYPE_CHECKING
 
-from patera import Service, Request, Response
+from patera import HttpStatus, MediaType, Service, Request, Response
 from patera.injectable import Inject
-from patera.controller import Controller, path, get
+from patera.controller import Controller, path, get, produces
 
 if TYPE_CHECKING:
     from app import App
@@ -20,6 +20,7 @@ class HelloController(Controller["App"]):
     greetings: Inject[GreetingService]
 
     @get("/<name>")
+    @produces(MediaType.APPLICATION_JSON, HttpStatus.OK)
     async def hello(self, req: Request, name: str) -> Response:
         return req.res.json({"message": self.greetings.greet(name)})
 ```

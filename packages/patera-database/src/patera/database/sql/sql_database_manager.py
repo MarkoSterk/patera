@@ -20,7 +20,7 @@ from patera.controller import Controller
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from .request_keys import TRANSACTION_OPEN
+from .request_keys import AFTER_COMMIT, TRANSACTION_OPEN
 
 if TYPE_CHECKING:
     from patera import Patera, Request, Response
@@ -260,7 +260,6 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
             else:
                 # Defensive rollback of any uncommitted work opened by this request.
                 await self._manager.rollback_all_sessions(ctx.sessions)
-            return res
         except SQLAlchemyError as e:
             self.app.logger.debug(
                 "Database exception occured. Rolling back SQL sessions"
@@ -276,8 +275,13 @@ class SqlDatabaseManagerMiddleware(MiddlewareBase[AppT, BaseModel]):
             raise
 
         finally:
+            callbacks = ctx.extras.pop(AFTER_COMMIT, ())
             ctx.extras.pop(TRANSACTION_OPEN, None)
             await self._manager.close_all_sessions(ctx)
+
+        for callback in callbacks:
+            callback()
+        return res
 
 
 def transactional(

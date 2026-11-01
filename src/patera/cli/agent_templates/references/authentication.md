@@ -11,9 +11,13 @@ model is exported as `AuthConfig`. HTTP metadata selects protected routes:
 
 ```python
 from patera.auth import login_required, role_required
+from patera import HttpStatus, MediaType
+from patera.controller import Descriptor, open_api_docs, produces
 
 @get("/account")
 @login_required()
+@produces(MediaType.APPLICATION_JSON, HttpStatus.OK)
+@open_api_docs(Descriptor(HttpStatus.UNAUTHORIZED, "Authentication required"))
 async def account(self, req: Request) -> Response:
     return req.res.json({"id": req.user.id})
 ```

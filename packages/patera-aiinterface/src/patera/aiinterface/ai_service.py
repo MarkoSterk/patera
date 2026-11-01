@@ -33,12 +33,14 @@ handed back to the client.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import inspect
 import re
+from weakref import WeakValueDictionary
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from functools import wraps
+from functools import partial, wraps
 from typing import Any, Callable, Generic, Optional, TypeVar, cast
 
 from pydantic import BaseModel, Field, model_validator
@@ -46,6 +48,7 @@ from pydantic import BaseModel, Field, model_validator
 from patera import Patera
 from patera.base_extension import BaseExtension
 from patera.ctx import current_request, has_request_context, request_context
+from patera.database.sql.request_keys import after_request_commit
 from patera.utilities import run_in_background
 
 from .augmentation_provider.config import AugmentationConfig
@@ -207,7 +210,9 @@ class AiService(
         needs_history = any(m.__use_history__ for m in methods)
         needs_augmentation = any(m.__use_augmentation__ for m in methods)
 
-        self._summarizing: set[Any] = set()
+        self._summary_locks: WeakValueDictionary[Any, asyncio.Lock] = (
+            WeakValueDictionary()
+        )
         if needs_history:
             if not isinstance(self.history_provider, BaseHistoryProvider):
                 raise TypeError(
@@ -326,10 +331,10 @@ class AiService(
         also from a CLI command or a scheduled job.
         """
         settings = self.configs.HISTORY_SUMMARY
-        if settings is None or session_id in self._summarizing:
+        if settings is None:
             return False
-        self._summarizing.add(session_id)
-        try:
+        # A later commit must recheck the history even if an earlier update is running.
+        async with self._summary_locks.setdefault(session_id, asyncio.Lock()):
             history = cast(BaseHistoryProvider, self.history_provider)
             summary = await history.load_summary(session_id)
             after = summary.covers_up_to if summary else None
@@ -345,8 +350,6 @@ class AiService(
                 return False
             new = HistorySummary(text=text, covers_up_to=older[-1].position)
             return await history.save_summary(session_id, new, summary)
-        finally:
-            self._summarizing.discard(session_id)
 
     async def _update_summary_later(self, session_id: Any) -> None:
         """
@@ -431,7 +434,11 @@ class AiService(
             )
             if self.configs.HISTORY_SUMMARY is not None:
                 # After the answer, so the user never waits for the summary.
-                run_in_background(self._update_summary_later, call.session_id)
+                after_request_commit(
+                    partial(
+                        run_in_background, self._update_summary_later, call.session_id
+                    )
+                )
 
     async def _complete(
         self, func: Callable[..., Any], arguments: dict[str, Any]

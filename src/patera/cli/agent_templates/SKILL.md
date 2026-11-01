@@ -27,6 +27,14 @@ type annotations only. Reserve Python assignments for values that require Python
 (such as `REQUEST_CLASS` and `RESPONSE_CLASS`) or are impractical to store as
 literals (such as `BASE_PATH` derived from the module's location).
 
+Explicitly declare the contract of every HTTP controller endpoint. Use
+`@produces(MediaType..., HttpStatus...)` for its response media type and success
+status, `@consumes(MediaType...)` when it accepts a request body, and
+`@open_api_docs(Descriptor(...))` for expected error responses. Import these
+decorators from `patera.controller`. Keep declarations aligned with the actual
+handler, validation, and authentication behavior. Follow the complete example
+in the controllers and routing reference.
+
 Read only the references relevant to the task:
 
 | Task | Reference |

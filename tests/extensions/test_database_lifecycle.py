@@ -255,9 +255,6 @@ async def test_session_scope_binds_the_session(jobs_app):
 
 
 async def test_disconnect_forgets_the_session_factory(make_app, tmp_path):
-    import gc
-    import warnings
-
     app = make_app(
         extensions=[JobsManager],
         JOBS_DB=SqlDatabaseConfig(DATABASE_URI=_uri(tmp_path, "lifecycle.db")),
@@ -268,13 +265,11 @@ async def test_disconnect_forgets_the_session_factory(make_app, tmp_path):
     with pytest.raises(RuntimeError, match="not connected"):
         db.create_session()
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        async with db.session_scope() as session:  # reconnects
-            assert (await session.execute(select(1))).scalar() == 1
-        await db.disconnect()  # and closes everything again
-        gc.collect()
+    async with db.session_scope() as session:  # reconnects
+        assert (await session.execute(select(1))).scalar() == 1
+        connection = await session.connection()
+        driver = (await connection.get_raw_connection()).driver_connection
+    await db.disconnect()
     assert db._engine is None
-    assert not [
-        str(w.message) for w in caught if issubclass(w.category, ResourceWarning)
-    ]
+    with pytest.raises(ValueError, match="no active connection"):
+        await driver.execute("SELECT 1")

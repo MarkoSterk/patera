@@ -344,6 +344,8 @@ class TransactionalChat(Controller):
     @transactional
     async def send(self, req: Request, session: str, message: str) -> Response:
         answer = await self.chat.chat(None if session == "new" else session, message)
+        # Force any prematurely scheduled summary to finish before commit.
+        await wait_for_background_tasks(None)
         return req.res.json({"session_id": answer.session_id})
 
 
@@ -363,7 +365,8 @@ async def test_summaries_after_transactional_requests(make_app, client_for, tmp_
         await conn.run_sync(SumBase.metadata.create_all, tables=[SumRow.__table__])
     async with client_for(app) as client:
         sid = (await client.post("/chat/new/one")).json()["session_id"]
-        await client.post(f"/chat/{sid}/two")
+        response = await client.post(f"/chat/{sid}/two")
+        assert response.status_code == 200
         # The update runs after the request, in its own context and session.
         await wait_for_background_tasks(None)
         service = app.get_extension(Chat)

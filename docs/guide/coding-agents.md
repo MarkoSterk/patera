@@ -18,6 +18,12 @@ not require the optional extensions.
 
 ## Application conventions
 
+- Explicitly decorate HTTP controller endpoints with `@produces` for response
+  media type and success status, `@consumes` when accepting a request body, and
+  `@open_api_docs(Descriptor(...))` for expected error responses. Import these
+  from `patera.controller`, use `HttpStatus` members, and keep the declarations
+  consistent with endpoint behavior and the generated OpenAPI.
+
 - Type backend controllers and application-specific extensions with the concrete
   application class, for example `Controller["App"]` and
   `BaseExtension["App", AuditConfig]`. Import `App` under `if TYPE_CHECKING:`
