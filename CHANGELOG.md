@@ -108,6 +108,13 @@ contain breaking changes; they are listed first in each release.
 - **patera-admin:** the sign-in and "unauthorized" pages load Bootstrap and its icons from the
   copies shipped with the package instead of jsDelivr, so Admin works without internet access.
 
+## patera 0.123.6 (2026-11-02)
+
+- Chat history summaries now start after a successful request transaction commit.
+  Overlapping updates for the same chat take turns and recheck the stored history.
+- The database disconnect regression test verifies that its own SQLite connection
+  closes after reconnecting. Expanded the bundled coding-agent guidance.
+
 ## patera 0.123.5 (2026-10-31)
 
 - Added request-local `flash_message(message, status=None)` on applications,
