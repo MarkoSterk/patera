@@ -3216,6 +3216,13 @@ not require the optional extensions.</p>
 <h2 id="application-conventions">Application conventions<a class="headerlink" href="#application-conventions" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
+<p>Explicitly decorate HTTP controller endpoints with <code>@produces</code> for response
+  media type and success status, <code>@consumes</code> when accepting a request body, and
+  <code>@open_api_docs(Descriptor(...))</code> for expected error responses. Import these
+  from <code>patera.controller</code>, use <code>HttpStatus</code> members, and keep the declarations
+  consistent with endpoint behavior and the generated OpenAPI.</p>
+</li>
+<li>
 <p>Type backend controllers and application-specific extensions with the concrete
   application class, for example <code>Controller["App"]</code> and
   <code>BaseExtension["App", AuditConfig]</code>. Import <code>App</code> under <code>if TYPE_CHECKING:</code>
