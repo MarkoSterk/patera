@@ -38,7 +38,8 @@ async def create(self, req: Request) -> Response:
 - A client that disconnects mid-body raises `ClientDisconnected`: the handler stops and no
   response is sent.
 
-For JSON and forms that map to a model, prefer `@consumes` with a Pydantic parameter; see
+For JSON, forms and query strings that map to a model, prefer `RequestBody[Model]` (with
+`@consumes`) and `QueryParams[Model]` parameters; see
 [Controllers](controllers.md#request-bodies-and-validation).
 
 ## Uploaded files
@@ -68,18 +69,19 @@ async def upload(self, req: Request) -> Response:
 
 ## Validation
 
-`req.validate(Model, data)` validates client data the handler reads itself, such as query
-parameters or route values. Invalid data raises `RequestValidationError`, answered with `422`:
+Query strings and bodies are validated by `QueryParams[Model]` and `RequestBody[Model]`
+parameters ([Controllers](controllers.md#request-bodies-and-validation)). `req.validate(Model,
+data)` validates other client data the handler reads itself, such as headers or route values
+combined into one model. Invalid data raises `RequestValidationError`, answered with `422`:
 
 ```python
-class Paging(BaseModel):
-    page: int = 1
-    per_page: int = 20
+class ClientInfo(BaseModel):
+    user_agent: str
 
 
 @get("/")
 async def index(self, req: Request) -> Response:
-    paging = req.validate(Paging, req.query_parameters)
+    info = req.validate(ClientInfo, {"user_agent": req.headers.get("user-agent", "")})
     ...
 ```
 

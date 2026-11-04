@@ -2,7 +2,9 @@
 
 For every HTTP endpoint, explicitly declare its response media type and success
 status with `@produces`. For endpoints accepting a request body, declare the
-accepted media type with `@consumes`. Document expected errors using
+accepted media type with `@consumes` and annotate the body model parameter as
+`RequestBody[Model]`. Annotate a query-string model as `QueryParams[Model]`.
+Document expected errors using
 `@open_api_docs` and `Descriptor`, including validation errors and applicable
 authentication, authorization, missing-resource, or conflict responses.
 Use `HttpStatus` members for every status.
@@ -18,6 +20,7 @@ from typing import TYPE_CHECKING
 from patera import HttpStatus, Request, Response, MediaType
 from patera.controller import (
     Controller, Descriptor, path, get, post, consumes, produces, open_api_docs,
+    QueryParams, RequestBody,
 )
 from pydantic import BaseModel
 
@@ -28,12 +31,23 @@ if TYPE_CHECKING:
 class NoteInput(BaseModel):
     title: str
 
+class NoteQuery(BaseModel):
+    page: int = 1
+
 @path("/notes")
 class NotesController(Controller["App"]):
     @get("/<int:note_id>")
     @produces(MediaType.APPLICATION_JSON, HttpStatus.OK)
     async def read(self, req: Request, note_id: int) -> Response:
         return req.res.json({"id": note_id})
+
+    @get("/")
+    @produces(MediaType.APPLICATION_JSON, HttpStatus.OK)
+    @open_api_docs(
+        Descriptor(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid query parameters"),
+    )
+    async def index(self, req: Request, query: QueryParams[NoteQuery]) -> Response:
+        return req.res.json({"page": query.page, "notes": []})
 
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
@@ -43,15 +57,17 @@ class NotesController(Controller["App"]):
         Descriptor(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Expected a JSON body"),
         Descriptor(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid note input"),
     )
-    async def create(self, req: Request, data: NoteInput) -> Response:
+    async def create(self, req: Request, data: RequestBody[NoteInput]) -> Response:
         return req.res.json(data.model_dump())
 ```
 
 Place in `controllers/notes_controller.py` or the corresponding API discovery
 folder/pattern. Routing uses Werkzeug-style `<name>` and `<int:name>` converters,
-not `{name}` syntax. Query parameters are read explicitly from
-`req.query_parameters`; they do not become handler arguments automatically.
-Validate them with `req.validate(QueryModel, req.query_parameters)`.
+not `{name}` syntax. Route values are passed to parameters of the same name.
+A Pydantic parameter must declare its source: `RequestBody[Model]` (requires
+`@consumes`) or `QueryParams[Model]`; an unmarked model parameter fails at
+registration. Invalid values are answered with 422 and each error's `loc` starts
+with `"body"` or `"query"`. A list field accepts a repeated query key.
 
 Use `@before_request`, `@after_request`, and `@after_init` from
 `patera.controller` for controller hooks. Inspect installed signatures when adding

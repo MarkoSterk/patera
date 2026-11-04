@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from patera import MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post
+from patera.controller import Controller, consumes, get, path, post, RequestBody
 
 pytestmark = pytest.mark.integration
 
@@ -28,7 +28,7 @@ class ItemsController(Controller):
 
     @post("/items/")
     @consumes(MediaType.APPLICATION_JSON)
-    async def create(self, req: Request, item: Item) -> Response:
+    async def create(self, req: Request, item: RequestBody[Item]) -> Response:
         return req.res.json(item.model_dump()).status(201)
 
     @post("/raw")

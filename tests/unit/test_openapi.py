@@ -12,6 +12,7 @@ from patera.controller import (
     path,
     post,
     produces,
+    RequestBody,
 )
 from patera.open_api import _convert_path_and_extract_params, _unique_operation_id
 
@@ -46,7 +47,9 @@ class PetController(Controller):
     @post("/owners")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def create_owner(self, req: Request, owner: Owner) -> Response[Owner]:
+    async def create_owner(
+        self, req: Request, owner: RequestBody[Owner]
+    ) -> Response[Owner]:
         return req.res.json(owner)
 
     @get("/hidden", open_api_spec=False)

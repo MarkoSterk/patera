@@ -10,6 +10,12 @@ from ..http_statuses import HttpStatus
 from ..injectable import Injectable
 from ..utilities import run_sync_or_async
 from ..exceptions.runtime_exceptions import DuplicateRouteError
+from .params import check_endpoint_params, handler_params
+from .utilities import (
+    _build_model,
+    _content_type_matches,
+    _read_payload_for_consumes,
+)
 
 if TYPE_CHECKING:
     from ..patera import Patera, Request, Response
@@ -122,6 +128,16 @@ class Controller(Injectable, Generic[AppT]):
                         *self._open_api_tags,
                     ]
                 http_method: str = handler_info.get("http_method")  # type: ignore
+                if http_method.upper() == "SOCKET":
+                    plan = handler_params(method)
+                    if plan.body is not None or plan.query:
+                        raise TypeError(
+                            f"{owner_cls.__name__}.{name} is a WebSocket handler; "
+                            "RequestBody and QueryParams parameters are only "
+                            "supported on HTTP handlers."
+                        )
+                else:
+                    check_endpoint_params(method, handler_info)
                 existing = endpoints[http_method.upper()].get(handler_info["path"])
                 if existing is not None and _same_function(existing["method"], method):
                     # The same function reachable under a second attribute name.
@@ -189,6 +205,11 @@ class Controller(Injectable, Generic[AppT]):
     async def __call__(self, method: Callable, req: "Request") -> "Response":
         """
         Handles request method call with before and after methods.
+
+        Route parameters are passed by name. After the before-request hooks,
+        a @consumes endpoint checks the Content-Type (415) and reads the
+        body; QueryParams[...] and RequestBody[...] parameters are then
+        built from the query string and the body (422 when invalid).
         """
         sig = inspect.signature(method)
         kwargs: dict[str, Any] = {}
@@ -197,10 +218,47 @@ class Controller(Injectable, Generic[AppT]):
                 kwargs[name] = req.route_parameters[name]
         for br_method in self._before_request_methods:
             await run_sync_or_async(br_method, req)
-        res: "Response" = await run_sync_or_async(method, req, **kwargs)
+        res: "Response" = await self._call_handler(method, req, kwargs)
         for ar_method in self._after_request_methods:
             await run_sync_or_async(ar_method, res)
         return res
+
+    async def _call_handler(
+        self, method: Callable, req: "Request", kwargs: dict[str, Any]
+    ) -> "Response":
+        handler_info: dict[str, Any] = getattr(method, "_handler", None) or {}
+        media_type: Optional[MediaType] = handler_info.get("consumes")
+        plan = handler_params(method)
+
+        payload: Any = None
+        if media_type is not None:
+            incoming_ct = req.headers.get("content-type", "")
+            if not _content_type_matches(incoming_ct, media_type):
+                return req.response.json(
+                    {
+                        "status": "error",
+                        "message": "Unsupported media type",
+                        "data": {
+                            "expected": media_type.value,
+                            "received": incoming_ct or None,
+                        },
+                    }
+                ).status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            payload = await _read_payload_for_consumes(req, media_type)
+
+        for param in plan.query:
+            if param.name not in kwargs:
+                kwargs[param.name] = _build_model(
+                    param.model, req.query_parameters, location="query"
+                )
+
+        body = plan.body
+        if body is not None and media_type is not None and body.name not in kwargs:
+            kwargs[body.name] = _build_model(
+                body.model, payload, media_type, location="body"
+            )
+
+        return await run_sync_or_async(method, req, **kwargs)
 
 
 class Descriptor:

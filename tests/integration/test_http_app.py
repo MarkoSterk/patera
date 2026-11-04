@@ -20,6 +20,7 @@ from patera.controller import (
     post,
     produces,
     put,
+    RequestBody,
 )
 from patera.exceptions import (
     BaseHttpException,
@@ -72,7 +73,7 @@ class UserController(Controller):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def create(self, req: Request, user: NewUser) -> Response:
+    async def create(self, req: Request, user: RequestBody[NewUser]) -> Response:
         return req.res.json(user)
 
     @put("/<int:user_id>")
@@ -202,7 +203,7 @@ async def test_consumes_validates_body(app, client_for):
         assert res.status_code == 422
         body = res.json()
         assert body["message"] == "Validation failed"
-        assert body["data"][0]["loc"] == ["age"]
+        assert body["data"][0]["loc"] == ["body", "age"]
         # The submitted values are not sent back.
         assert "input" not in body["data"][0]
 

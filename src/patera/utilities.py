@@ -446,3 +446,18 @@ def encode_response_headers(res: "Response[Any]") -> list[tuple[bytes, bytes]]:
         encoded.append((b"set-cookie", cookie.encode("latin-1")))
 
     return encoded
+
+
+def uvicorn_ws_protocol() -> str:
+    """
+    The WebSocket implementation to give uvicorn (its ``ws`` setting).
+
+    uvicorn's default ("auto") picks its older "websockets" implementation,
+    which is built on ``websockets.legacy``, deprecated since websockets 14.
+    When websockets is installed, use the implementation built on its
+    current (Sans-I/O) API instead; otherwise leave the choice to uvicorn,
+    which falls back to wsproto or runs without WebSockets.
+    """
+    if importlib.util.find_spec("websockets") is not None:
+        return "websockets-sansio"
+    return "auto"

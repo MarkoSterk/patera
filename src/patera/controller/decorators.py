@@ -10,21 +10,11 @@ from typing import (
     ParamSpec,
     Protocol,
     cast,
-    get_type_hints,
 )
 from functools import wraps
-import inspect
 
 from .controller import Controller, Descriptor
-from .utilities import (
-    _unwrap_annotated,
-    _is_pydantic_model,
-    _content_type_matches,
-    _read_payload_for_consumes,
-    _build_model,
-)
 from ..response import Response
-from ..request import Request
 from ..utilities import run_sync_or_async
 from ..exceptions import MethodNotControllerMethod, UnexpectedDecorator
 from ..media_types import MediaType
@@ -161,67 +151,28 @@ def socket(url_path: str) -> _EndpointDecorator:
 
 
 def consumes(media_type: MediaType) -> _EndpointDecorator:
-    """Decorator indicating what media type the endpoint consumes."""
+    """
+    Declares the media type of the request body (JSON, a form, a form with
+    files, ...). Requests with another Content-Type are answered with 415.
+
+    The handler parameter annotated ``RequestBody[Model]`` is built from the
+    body, read as this media type:
+
+        @post("/")
+        @consumes(MediaType.APPLICATION_JSON)
+        async def create(self, req: Request, data: RequestBody[CreateUser]):
+            ...
+    """
 
     def decorator(func: Callable[..., Any]) -> AsyncMethod:
-        sig = inspect.signature(func)
-
-        try:
-            hints = get_type_hints(func, include_extras=True)
-        # pylint: disable-next=W0718
-        except Exception:
-            hints = getattr(func, "__annotations__", {}) or {}
-
-        consumed_type: Optional[Any] = None
-        for name, param in list(sig.parameters.items())[2:]:
-            ann = hints.get(name, param.annotation)
-            ann = _unwrap_annotated(ann)
-            if _is_pydantic_model(ann):
-                consumed_type = ann
-                break
-
-        @wraps(func)
-        async def wrapper(self: Controller, *args: Any, **kwargs: Any) -> "Response":
-            # Request is auto-injected as the first arg after self
-            if not args:
-                raise RuntimeError(
-                    "Request must be auto-injected as the first argument after self."
-                )
-            req: "Request" = args[0]  # type: ignore[index]
-
-            incoming_ct = req.headers.get("content-type", "")
-            if not _content_type_matches(incoming_ct, media_type):
-                return req.response.json(
-                    {
-                        "status": "error",
-                        "message": "Unsupported media type",
-                        "data": {
-                            "expected": media_type.value,
-                            "received": incoming_ct or None,
-                        },
-                    }
-                ).status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-
-            payload = await _read_payload_for_consumes(req, media_type)
-            # Parameters: [0]=self, [1]=req, others start at index 2
-            for name, param in list(sig.parameters.items())[2:]:
-                if name in kwargs:
-                    continue
-
-                ann = _unwrap_annotated(hints.get(name, param.annotation))
-                if _is_pydantic_model(ann):
-                    kwargs[name] = _build_model(ann, payload, media_type)
-
-            return await run_sync_or_async(func, self, *args, **kwargs)
-
         prev = getattr(func, "_handler", {}) or {}
         merged = dict(prev)
-        merged.update({"consumes": media_type, "consumes_type": consumed_type})
+        merged.update({"consumes": media_type})
         # pylint: disable=protected-access
-        wrapper._handler = merged  # type: ignore[attr-defined]
-        return wrapper
+        func._handler = merged  # type: ignore[attr-defined]
+        return func
 
-    return decorator
+    return cast(_EndpointDecorator, decorator)
 
 
 def produces(

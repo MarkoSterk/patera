@@ -28,6 +28,7 @@ from patera.controller import (
     post,
     produces,
     put,
+    RequestBody,
 )
 from patera.injectable import Inject
 
@@ -49,7 +50,7 @@ class SubjectsApi(Controller["App"]):
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
     async def create_subject(
-        self, req: Request, data: SubjectIn
+        self, req: Request, data: RequestBody[SubjectIn]
     ) -> Response[SubjectOut]:
         return req.res.json(await self.authoring.create_subject(req.user.id, data))
 
@@ -57,7 +58,7 @@ class SubjectsApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def update_subject(
-        self, req: Request, subject_id: str, data: SubjectIn
+        self, req: Request, subject_id: str, data: RequestBody[SubjectIn]
     ) -> Response[SubjectOut]:
         return req.res.json(
             await self.authoring.update_subject(req.user.id, subject_id, data)
@@ -84,7 +85,7 @@ class CategoriesApi(Controller["App"]):
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
     async def create_category(
-        self, req: Request, data: CategoryIn
+        self, req: Request, data: RequestBody[CategoryIn]
     ) -> Response[CategoryOut]:
         return req.res.json(await self.authoring.create_category(req.user.id, data))
 
@@ -92,7 +93,7 @@ class CategoriesApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def update_category(
-        self, req: Request, category_id: str, data: CategoryIn
+        self, req: Request, category_id: str, data: RequestBody[CategoryIn]
     ) -> Response[CategoryOut]:
         return req.res.json(
             await self.authoring.update_category(req.user.id, category_id, data)
@@ -119,7 +120,7 @@ class QuestionsApi(Controller["App"]):
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
     async def create_question(
-        self, req: Request, data: QuestionIn
+        self, req: Request, data: RequestBody[QuestionIn]
     ) -> Response[QuestionOut]:
         return req.res.json(await self.authoring.create_question(req.user.id, data))
 
@@ -127,7 +128,7 @@ class QuestionsApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def update_question(
-        self, req: Request, question_id: str, data: QuestionIn
+        self, req: Request, question_id: str, data: RequestBody[QuestionIn]
     ) -> Response[QuestionOut]:
         return req.res.json(
             await self.authoring.update_question(req.user.id, question_id, data)
@@ -153,14 +154,16 @@ class ExamsApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
-    async def create_exam(self, req: Request, data: ExamIn) -> Response[ExamOut]:
+    async def create_exam(
+        self, req: Request, data: RequestBody[ExamIn]
+    ) -> Response[ExamOut]:
         return req.res.json(await self.authoring.create_exam(req.user.id, data))
 
     @put("/<exam_id>")
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def update_exam(
-        self, req: Request, exam_id: str, data: ExamIn
+        self, req: Request, exam_id: str, data: RequestBody[ExamIn]
     ) -> Response[ExamOut]:
         return req.res.json(
             await self.authoring.update_exam(req.user.id, exam_id, data)

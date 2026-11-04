@@ -79,14 +79,15 @@ Patera's normal [exception pipeline](../guide/exception-handling.md), including 
 
 ## Validated bodies
 
-Handlers may declare an optional third argument annotated with any Pydantic model. The extension
-validates the full JSON body into that model; `@consumes` is not required. Validation failures
+Handlers may declare an optional third argument annotated `RequestBody[Model]` (from
+`patera.controller`) with any Pydantic model. The extension validates the full JSON body into that model; `@consumes` is not required. Validation failures
 return `422` before the handler runs (after authentication and `@before_request` hooks).
 
 ```python
 from pydantic import BaseModel, Field
 
 from patera import Response
+from patera.controller import RequestBody
 
 
 class UserRoute(BaseModel):
@@ -101,13 +102,15 @@ class UserPageBody(BaseModel):
 @group("user-group")
 class UserGroupHandler(JoltuiGroupHandler):
     @component("user-page")
-    async def user_page(self, req: Request, body: UserPageBody) -> Response:
+    async def user_page(
+        self, req: Request, body: RequestBody[UserPageBody]
+    ) -> Response:
         return req.res.html_body(f"<h1>User {body.route_parameters.user_id}</h1>")
 ```
 
 For the body
 `{"tagName": "user-page", "groupName": "user-group", "routeParameters": {"user_id": "42"}}`,
-`body.route_parameters.user_id` is the integer `42`. Use `JoltuiRequest` as the third argument
+`body.route_parameters.user_id` is the integer `42`. Use `RequestBody[JoltuiRequest]` as the third argument
 when its standard fields suffice (`tag_name` defaults to `None`, `group_name` to `"default"`).
 
 ## Groups are controllers

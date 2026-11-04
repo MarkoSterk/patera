@@ -185,3 +185,29 @@ async def test_background_tasks_finish_or_are_cancelled():
     assert finished == ["quick"]
     assert slow_task.cancelled()
     assert await wait_for_background_tasks(timeout=0.2) == (0, 0)
+
+
+def test_uvicorn_ws_protocol_avoids_the_legacy_websockets_implementation(
+    monkeypatch,
+):
+    import importlib.util
+
+    from patera.utilities import uvicorn_ws_protocol
+
+    real_find_spec = importlib.util.find_spec
+
+    def find_spec(name, *args, **kwargs):
+        if name == "websockets":
+            return object()
+        return real_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib.util, "find_spec", find_spec)
+    assert uvicorn_ws_protocol() == "websockets-sansio"
+
+    def find_nothing(name, *args, **kwargs):
+        if name == "websockets":
+            return None
+        return real_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib.util, "find_spec", find_nothing)
+    assert uvicorn_ws_protocol() == "auto"

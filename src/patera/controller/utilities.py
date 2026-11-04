@@ -7,6 +7,7 @@ from types import NoneType, UnionType
 from typing import (
     Any,
     Annotated,
+    Optional,
     Type,
     Union,
     get_origin,
@@ -82,20 +83,28 @@ def _build_model(
     model_cls: Type[BaseModel],
     data: Any,
     media_type: "MediaType | None" = None,
+    location: Optional[str] = None,
 ) -> BaseModel:
     """
-    Builds the @consumes model from the request data. Invalid data raises
-    RequestValidationError (422).
+    Builds a RequestBody or QueryParams model from the request data. Form
+    data and query parameters send a field once per value, so list fields
+    given a single value get it wrapped in a list. Invalid data raises
+    RequestValidationError (422); ``location`` ("body", "query") prefixes
+    each error's ``loc``.
     """
-    if media_type in (
-        MediaType.APPLICATION_X_WWW_FORM_URLENCODED,
-        MediaType.MULTIPART_FORM_DATA,
+    if (
+        location == "query"
+        or media_type
+        in (
+            MediaType.APPLICATION_X_WWW_FORM_URLENCODED,
+            MediaType.MULTIPART_FORM_DATA,
+        )
     ) and isinstance(data, Mapping):
         data = _form_values_for_model(model_cls, data)
     try:
         return model_cls.model_validate(data)  # type: ignore[attr-defined]
     except ValidationError as exc:
-        raise RequestValidationError(exc) from exc
+        raise RequestValidationError(exc, location=location) from exc
 
 
 def _content_type_matches(incoming: str, expected: "MediaType") -> bool:

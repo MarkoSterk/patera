@@ -4,7 +4,15 @@ from app.assistant import Assistant
 from pydantic import BaseModel, Field
 
 from patera import MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post, produces
+from patera.controller import (
+    Controller,
+    consumes,
+    get,
+    path,
+    post,
+    produces,
+    RequestBody,
+)
 from patera.injectable import Inject
 from patera.serializers import ndjson_line
 
@@ -24,7 +32,7 @@ class ChatApi(Controller["App"]):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
-    async def chat(self, req: Request, body: ChatIn) -> Response:
+    async def chat(self, req: Request, body: RequestBody[ChatIn]) -> Response:
         """Answers in one response."""
         answer = await self.assistant.chat(body.session_id, body.message)
         return req.res.json(
@@ -33,7 +41,7 @@ class ChatApi(Controller["App"]):
 
     @post("/stream")
     @consumes(MediaType.APPLICATION_JSON)
-    async def stream(self, req: Request, body: ChatIn) -> Response:
+    async def stream(self, req: Request, body: RequestBody[ChatIn]) -> Response:
         """Streams the answer as NDJSON lines: {"session_id": ..., "text": ...}."""
 
         async def lines():

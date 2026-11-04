@@ -7,6 +7,7 @@ It is distinct from `patera.desktop.ui`'s Python/PyScript components.
 ```python
 from pydantic import BaseModel, Field
 from patera import Request, Response
+from patera.controller import RequestBody
 from patera.joltui import ComponentGroup, JoltuiGroupHandler, PateraJoltui, component, group
 
 class UserRoute(BaseModel):
@@ -18,7 +19,9 @@ class UserPageBody(BaseModel):
 @group("user-group")
 class UserGroupHandler(JoltuiGroupHandler):
     @component("user-page")
-    async def user_page(self, req: Request, body: UserPageBody) -> Response:
+    async def user_page(
+        self, req: Request, body: RequestBody[UserPageBody]
+    ) -> Response:
         return req.res.html_body(f"<h1>User {body.route_parameters.user_id}</h1>")
 
 class JoltuiInterface(PateraJoltui):
@@ -42,14 +45,14 @@ The request body is the complete RPC envelope:
 - Always return an HTML `Response`: `req.res.html_body(markup)` or
   `await req.res.html(template_name, ...)`. Plain strings and JSON/text responses
   are rejected. Escape client input in raw markup; use templates as appropriate.
-- The optional third parameter must be annotated with a Pydantic model. The
+- The optional third parameter must be annotated `RequestBody[Model]`. The
   extension validates the **full body**, not just `attributes`, and injects the
   model by parameter name. No `@consumes` is needed. Use aliases for camelCase
   fields and nested models for typed route/query/attribute data. Normal Pydantic
   coercion and extra-field rules apply. Models need not declare routing names;
   Pydantic's default ignores those extra fields. An `extra="forbid"` model must
   explicitly account for the envelope fields it accepts.
-- `JoltuiRequest` can also be the third parameter. Its Python names are
+- `RequestBody[JoltuiRequest]` can also be the third parameter. Its Python names are
   `tag_name`, `group_name`, `route_parameters`, `query_parameters`, `attributes`.
   Names are optional when constructing this model; dispatch still requires a
   nonempty `tagName`. Omitted/null groups select `default`; omitted/null maps

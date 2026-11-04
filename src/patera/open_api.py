@@ -12,6 +12,7 @@ from .media_types import MediaType
 from .response import Response
 from .request import Request
 from .controller import Controller, get, produces
+from .controller.params import handler_params
 from .utilities import _extract_response_type
 
 # Matches werkzeug route parameters such as <id>, <int:id>, <int(signed=True):id>
@@ -146,6 +147,38 @@ def _ensure_schema(
     return {"$ref": f"#/components/schemas/{name}"}
 
 
+def _query_parameters(
+    components: Dict[str, Any], model: Type[BaseModel]
+) -> List[Dict[str, Any]]:
+    """
+    OpenAPI ``in: query`` parameters for the fields of a QueryParams model.
+    Field aliases are used (they are the names a client sends); nested
+    models are registered in components.
+    """
+    schema, defs = _pydantic_schema_and_defs(model)
+    components.setdefault("schemas", {})
+    for def_name, def_schema in defs.items():
+        components["schemas"].setdefault(def_name, def_schema)
+
+    schema = schema or {}
+    required = set(schema.get("required", []))
+    parameters: List[Dict[str, Any]] = []
+    for name, field_schema in (schema.get("properties") or {}).items():
+        field_schema = dict(field_schema)
+        param: Dict[str, Any] = {
+            "name": name,
+            "in": "query",
+            "required": name in required,
+        }
+        description = field_schema.pop("description", None)
+        if description:
+            param["description"] = description
+        field_schema.pop("title", None)
+        param["schema"] = field_schema or {}
+        parameters.append(param)
+    return parameters
+
+
 _TYPE_MAP = {
     "int": {"type": "integer", "format": "int64"},
     "float": {"type": "number", "format": "double"},
@@ -230,7 +263,6 @@ def build_openapi(
                     "method": <callable>,
                     "produces": <MediaType>,
                     "consumes": <MediaType>,
-                    "consumes_type": <PydanticModel>,
                     "response_type": <PydanticModel>, # optional
                     "default_status_code": <HttpStatus>,
                     "http_method": <HTTP_METHOD>,
@@ -246,6 +278,10 @@ def build_openapi(
         }
     }
     Descriptor has: media_type, body, description, status (default BAD_REQUEST).
+
+    The request body schema comes from the handler's RequestBody[...]
+    parameter, and each QueryParams[...] model's fields become ``in: query``
+    parameters.
     """
     spec: Dict[str, Any] = {
         "openapi": openapi_version,
@@ -315,19 +351,33 @@ def build_openapi(
                     operation_id, used_operation_ids
                 )
 
-                # Path parameters
-                if path_params:
-                    op_obj["parameters"] = [*path_params]
+                # Handler parameters: QueryParams[...] and RequestBody[...]
+                plan = handler_params(handler)
+
+                # Path and query parameters
+                parameters: List[Dict[str, Any]] = [*path_params]
+                for query_param in plan.query:
+                    taken = {(p["in"], p["name"]) for p in parameters}
+                    parameters.extend(
+                        p
+                        for p in _query_parameters(components, query_param.model)
+                        if ("query", p["name"]) not in taken
+                    )
+                if parameters:
+                    op_obj["parameters"] = parameters
 
                 # Request body
-                consumes = cast(str, cast(dict, ep_cfg).get("consumes"))
-                consumes_type = cast(Type, cast(dict, ep_cfg).get("consumes_type"))
-                if consumes or consumes_type:
-                    mt = _as_media_type(consumes) if consumes else "application/json"
-                    schema_ref = _ensure_schema(components, consumes_type)
+                consumes = cast(dict, ep_cfg).get("consumes")
+                if consumes:
+                    request_model = plan.body.model if plan.body is not None else None
+                    schema_ref = _ensure_schema(components, request_model)
                     op_obj["requestBody"] = {
-                        "required": True if consumes_type else False,
-                        "content": {mt: {"schema": schema_ref or {"type": "object"}}},
+                        "required": request_model is not None,
+                        "content": {
+                            _as_media_type(consumes): {
+                                "schema": schema_ref or {"type": "object"}
+                            }
+                        },
                     }
 
                 # Responses

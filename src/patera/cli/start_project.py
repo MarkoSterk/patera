@@ -446,6 +446,7 @@ def _start_dev(
 ):
     import uvicorn
     from ..patera import Patera
+    from ..utilities import uvicorn_ws_protocol
 
     load_env_file(cwd, env_file)
     os.environ["PATERA_DEBUG"] = "True"
@@ -475,6 +476,7 @@ def _start_dev(
         port=port,
         loop=loop,
         lifespan="on",
+        ws=uvicorn_ws_protocol(),
         reload=debug,
         factory=True,
         reload_dirs=[str(root)],

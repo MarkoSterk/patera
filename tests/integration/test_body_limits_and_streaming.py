@@ -20,6 +20,7 @@ from patera.controller import (
     max_content_length,
     path,
     post,
+    RequestBody,
 )
 from patera.serializers import JsonSerializer
 
@@ -38,7 +39,7 @@ class Row(BaseModel):
 class LimitsController(Controller):
     @post("/json")
     @consumes(MediaType.APPLICATION_JSON)
-    async def json_note(self, req: Request, note: Note) -> Response:
+    async def json_note(self, req: Request, note: RequestBody[Note]) -> Response:
         return req.res.json({"length": len(note.text)})
 
     @post("/form")

@@ -28,7 +28,8 @@ from patera import (
     Response,
     run_sync_or_async,
 )
-from patera.controller.utilities import _build_model, _unwrap_annotated
+from patera.controller.params import BodySource, _split_annotation
+from patera.controller.utilities import _build_model
 from patera.controller import Controller, path, post
 from patera.exceptions.http_exceptions import (
     BaseHttpException,
@@ -89,9 +90,12 @@ class JoltuiGroupHandler(Controller):
         @wraps(method)
         async def render(request: Request, **kwargs: Any) -> Response:
             body_parameter = _body_parameter(method)
-            if body_parameter is not None:
+            if body_parameter is not None and body_parameter[0] not in kwargs:
+                # Without @consumes the component body is the JSON payload.
                 name, model = body_parameter
-                kwargs[name] = _build_model(model, await request.json())
+                kwargs[name] = _build_model(
+                    model, await request.json(), location="body"
+                )
             result = await run_sync_or_async(method, request, **kwargs)
             _require_html_response(result)
             return result
@@ -123,13 +127,22 @@ def _body_parameter(method: Callable) -> tuple[str, type[BaseModel]] | None:
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         inspect.Parameter.KEYWORD_ONLY,
     ):
-        raise TypeError("Component handlers require (self, req[, body: BaseModel])")
+        raise TypeError(
+            "Component handlers require (self, req[, body: RequestBody[Model]])"
+        )
     parameter = parameters[1]
-    model = _unwrap_annotated(
+    model, source = _split_annotation(
         get_type_hints(method, include_extras=True).get(parameter.name)
     )
-    if not isinstance(model, type) or not issubclass(model, BaseModel):
-        raise TypeError("The third component handler argument must be a Pydantic model")
+    if (
+        not isinstance(source, BodySource)
+        or not isinstance(model, type)
+        or not issubclass(model, BaseModel)
+    ):
+        raise TypeError(
+            "The third component handler argument must be RequestBody[Model] "
+            "with a Pydantic model"
+        )
     return parameter.name, model
 
 

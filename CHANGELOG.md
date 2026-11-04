@@ -5,6 +5,22 @@ contain breaking changes; they are listed first in each release.
 
 ## Unreleased
 
+### Breaking changes
+
+- **Core:** handler model parameters declare their source with `RequestBody[Model]` or
+  `QueryParams[Model]` from `patera.controller`. Both are `Annotated` aliases, so type checkers
+  see a plain `Model`. A bare Pydantic model parameter is no longer filled from the body: it
+  fails at registration with an error naming the annotation to add. Replace
+  `data: Model` with `data: RequestBody[Model]` on `@consumes` endpoints.
+- **Core:** `@consumes` only records the media type; the controller checks the Content-Type
+  (415), reads the body and builds `RequestBody`/`QueryParams` models after the before-request
+  hooks. A `RequestBody` without
+  `@consumes`, two `RequestBody` parameters, or `@consumes` on GET fail at registration, in any
+  decorator order. The `consumes_type` endpoint metadata key is gone.
+- **Core:** `RequestValidationError` locations of handler parameters start with their source:
+  `["body", "age"]`, `["query", "page"]`. `req.validate()` locations are unchanged.
+- **JoltUI:** a component's body parameter is annotated `RequestBody[Model]`.
+
 ### Stabilization fixes
 
 - **Core:** failed extension initialization rolls back framework registrations,
@@ -35,6 +51,12 @@ contain breaking changes; they are listed first in each release.
   syntax check, and a Python 3.13/3.14 CI matrix for Windows, Linux and macOS.
 
 ### Added
+
+- **Core:** `QueryParams[Model]` builds a model from the query string, replacing
+  `req.validate(Model, req.query_parameters)`. A list field accepts a single value or a
+  repeated key. Each model field is documented as an OpenAPI `in: query` parameter (alias,
+  required, default, constraints and description); the request body schema comes from the
+  `RequestBody` model.
 
 - **patera-database:** `SqlDatabaseConfig.SQLITE_FOREIGN_KEYS` (default `False`) runs
   `PRAGMA foreign_keys=ON` on every new SQLite connection, so `FOREIGN KEY` constraints such as

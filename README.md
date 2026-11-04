@@ -141,7 +141,9 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post, produces
+from patera.controller import (
+    Controller, RequestBody, consumes, get, path, post, produces,
+)
 
 if TYPE_CHECKING:
     from app import App
@@ -161,7 +163,7 @@ class GreetingApi(Controller["App"]):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def greet(self, req: Request, greeting: Greeting) -> Response:
+    async def greet(self, req: Request, greeting: RequestBody[Greeting]) -> Response:
         return req.res.json({"message": f"Hello, {greeting.name}!"})
 ```
 
@@ -346,7 +348,8 @@ from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
 from patera.controller import (
-    Controller, after_request, before_request, consumes, delete, get, patch, path, post, produces, put,
+    Controller, QueryParams, RequestBody, after_request, before_request, consumes, delete, get,
+    patch, path, post, produces, put,
 )
 
 if TYPE_CHECKING:
@@ -355,6 +358,11 @@ if TYPE_CHECKING:
 
 class UserIn(BaseModel):
     name: str
+
+
+class UserQuery(BaseModel):
+    page: int = 1
+    tags: list[str] = []
     email: str
 
 
@@ -367,7 +375,9 @@ class UserOut(BaseModel):
 class UserApi(Controller["App"]):
 
     @get("/")
-    async def list_users(self, req: Request) -> Response[list[UserOut]]:
+    async def list_users(
+        self, req: Request, query: QueryParams[UserQuery]
+    ) -> Response[list[UserOut]]:
         return req.res.json([{"id": 1, "name": "Ana"}])
 
     @get("/<int:user_id>")
@@ -377,7 +387,7 @@ class UserApi(Controller["App"]):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def create_user(self, req: Request, user: UserIn) -> Response[UserOut]:
+    async def create_user(self, req: Request, user: RequestBody[UserIn]) -> Response[UserOut]:
         return req.res.json({"id": 2, "name": user.name})
 
     @delete("/<int:user_id>")
@@ -401,13 +411,18 @@ class UserApi(Controller["App"]):
   arguments. Handlers may be `async` or plain functions (these run in a thread pool).
 - Route parameters use [Werkzeug converters](https://werkzeug.palletsprojects.com/en/stable/routing/#built-in-converters):
   `<name>`, `<int:id>`, `<float:x>`, `<uuid:key>`, `<path:rest>` (matches slashes), ...
-- `@consumes(MediaType)` – the request must have this content type (otherwise `415`). Parameters
-  annotated with a Pydantic model are validated from the JSON body, url-encoded form or multipart
-  form (including `UploadedFile` fields). For forms, a single value of a field the model declares
-  as a list (checkboxes, multi-selects) arrives as a one-item list. Invalid data raises
-  `RequestValidationError`: `422` with the validation errors, without the submitted values, unless
-  you [handle](#exception-handling) it yourself. Validate other client data (query parameters,
-  route values) with `req.validate(Model, data)`, which raises the same error.
+- `RequestBody[Model]` and `QueryParams[Model]` (from `patera.controller`) declare where a model
+  parameter comes from: the request body or the query string. Both are `Annotated` aliases, so
+  type checkers see a plain `Model`. A handler has at most one `RequestBody` and any number of
+  `QueryParams` models. A model parameter without either annotation, or a `RequestBody` without
+  `@consumes`, fails at startup.
+- `@consumes(MediaType)` – the request must have this content type (otherwise `415`); the
+  `RequestBody` model is built from the JSON body, url-encoded form or multipart form (including
+  `UploadedFile` fields). A single value of a list field (checkboxes, multi-selects, a query key
+  given once) arrives as a one-item list. Invalid data raises `RequestValidationError`: `422` with
+  the validation errors, without the submitted values, unless you [handle](#exception-handling) it
+  yourself; each error's `loc` starts with `"body"` or `"query"`. Validate other client data
+  (headers, route values) with `req.validate(Model, data)`, which raises the same error.
 - `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
   explicitly set content type or status wins, also `.status(HttpStatus.OK)`). Documented in OpenAPI.
 - `-> Response[Model]` – the body is validated and serialized through `Model`, which filters
@@ -614,7 +629,7 @@ Without a matching handler:
 | Exception | Response |
 | --- | --- |
 | `BaseHttpException` and subclasses (`abort()`, authentication errors, ...) | JSON `{"status", "message", "data"}` with the exception's status code |
-| `RequestValidationError` (from `@consumes` or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
+| `RequestValidationError` (from `RequestBody`/`QueryParams` parameters or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
 | anything else, including a `pydantic.ValidationError` from your own code or data | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
 
 Override `default_exception_response(req, exc)` on the application class to change this fallback.
@@ -719,7 +734,8 @@ middleware.
 
 With `OPEN_API=True` the specification is served at `/openapi/specs.json` and a Swagger UI at
 `/openapi/docs`. It is generated from your controllers: paths and path parameters, request bodies
-from `@consumes` + Pydantic parameters, responses from `@produces` and `Response[Model]`
+from `@consumes` + `RequestBody[Model]`, query parameters from the fields of `QueryParams[Model]`,
+responses from `@produces` and `Response[Model]`
 annotations, error responses from `@open_api_docs`, tags from `@path(tags=...)` and descriptions
 from docstrings. Exclude a controller or endpoint with `open_api_spec=False`. The document's server
 is relative (`URL_PREFIX`, or `/`), so "Try it out" calls the origin that served the page, behind a

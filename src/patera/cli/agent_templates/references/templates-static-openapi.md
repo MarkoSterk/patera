@@ -15,8 +15,9 @@ controller; its templates and URL prefix have their own settings.
 
 HTTP route metadata and body/response annotations feed OpenAPI. Every HTTP
 controller endpoint must explicitly declare `@produces` for its response media
-type and success status. Add `@consumes` for request bodies and
-`@open_api_docs(Descriptor(...))` for expected error responses. Import these
+type and success status. Add `@consumes` with a `RequestBody[Model]` parameter
+for request bodies and `@open_api_docs(Descriptor(...))` for expected error
+responses. `QueryParams[Model]` fields are documented as query parameters. Import these
 from `patera.controller`. The controllers and routing reference shows a complete
 example. Inspect `OPEN_API` and related BaseConfig fields for document/UI
 locations and settings. Verify the generated schema after changing annotations.

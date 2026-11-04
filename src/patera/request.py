@@ -403,12 +403,13 @@ class Request:
     def validate(self, model: type[ModelT], data: Any) -> ModelT:
         """
         Validates data the client sent, which the handler reads itself
-        (query parameters, route values, a header), with a Pydantic model:
+        (route values, a header), with a Pydantic model:
 
-            query = req.validate(SearchQuery, req.query_parameters)
+            info = req.validate(ClientInfo, {"agent": req.headers.get("user-agent")})
 
-        Invalid data raises RequestValidationError, answered with 422 like an
-        invalid @consumes body. A ValidationError raised any other way is the
+        Query strings and bodies are better declared as QueryParams[Model]
+        and RequestBody[Model] handler parameters. Invalid data raises
+        RequestValidationError, answered with 422 like an invalid body. A ValidationError raised any other way is the
         server's own data failing and is answered with 500.
         """
         try:

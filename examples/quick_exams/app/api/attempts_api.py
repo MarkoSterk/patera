@@ -5,7 +5,7 @@ from app.services.attempts import AttemptService
 from patera.database.sql import transactional
 
 from patera import HttpStatus, MediaType, Request, Response
-from patera.controller import Controller, consumes, path, post, produces
+from patera.controller import Controller, consumes, path, post, produces, RequestBody
 from patera.injectable import Inject
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ class AttemptsApi(Controller["App"]):
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
     async def start_attempt(
-        self, req: Request, data: StartAttemptIn
+        self, req: Request, data: RequestBody[StartAttemptIn]
     ) -> Response[PublicAttemptOut]:
         return req.res.json(await self.attempts.start(data))
 
@@ -35,6 +35,6 @@ class AttemptsApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def submit_attempt(
-        self, req: Request, attempt_id: str, data: SubmitIn
+        self, req: Request, attempt_id: str, data: RequestBody[SubmitIn]
     ) -> Response[ResultOut]:
         return req.res.json(await self.attempts.submit(attempt_id, data))

@@ -115,10 +115,13 @@ class RequestBodyTooLarge(BaseHttpException):
 
 class RequestValidationError(BaseHttpException):
     """
-    Raised when @consumes cannot build the declared model from the request
-    body. Answered with 422 Unprocessable Content; ``data`` (and ``errors``)
-    lists each problem's location, message and type. The submitted values are
-    left out, so a rejected password is never sent back.
+    Raised when a RequestBody[...] or QueryParams[...] parameter (or
+    req.validate) cannot build its model from what the client sent.
+    Answered with 422 Unprocessable Content; ``data`` (and ``errors``) lists
+    each problem's location, message and type. For handler parameters the
+    location starts with where the value came from ("body" or "query"). The
+    submitted values are left out, so a rejected password is never sent
+    back.
 
     The original Pydantic error is ``validation_error``. A ValidationError
     raised anywhere else (in handler code, or validating data from a database
@@ -131,12 +134,18 @@ class RequestValidationError(BaseHttpException):
         message: str = "Validation failed",
         status_code: int = HttpStatus.UNPROCESSABLE_ENTITY,
         status: str = "error",
+        location: Optional[str] = None,
     ):
         errors = validation_error.errors(
             include_url=False, include_input=False, include_context=False
         )
+        if location:
+            errors = [
+                {**error, "loc": (location, *error.get("loc", ()))} for error in errors
+            ]
         super().__init__(message, status_code, status, errors)
         self.validation_error = validation_error
+        self.location = location
         self.errors: list[Any] = list(errors)
 
 

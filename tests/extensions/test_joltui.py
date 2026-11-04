@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel, Field
 from typing import Annotated
 from patera import Response, MediaType
-from patera.controller import produces
+from patera.controller import RequestBody, produces
 
 from patera import BaseExtension, Request
 from patera.ctx import current_request
@@ -278,7 +278,7 @@ async def test_controller_and_endpoint_decorators(make_app, client_for):
 
         @component("json-page")
         @consumes(MediaType.APPLICATION_JSON)
-        async def json_page(self, req, body: JoltuiRequest):
+        async def json_page(self, req, body: RequestBody[JoltuiRequest]):
             return req.res.html_body(body.tag_name)
 
         @component("tiny-page")
@@ -370,16 +370,16 @@ class UserPageBody(BaseModel):
 class TypedGroup(JoltuiGroupHandler):
     @component("typed-page")
     @produces(MediaType.TEXT_HTML)
-    async def typed(self, req: Request, body: UserPageBody) -> Response:
+    async def typed(self, req: Request, body: RequestBody[UserPageBody]) -> Response:
         assert (await req.json())["routeParameters"]["user_id"] == "42"
         return req.res.html_body(f"<h1>{body.route_parameters.user_id + 1}</h1>")
 
     @component("sync-page")
-    def sync(self, req: Request, *, body: Annotated[UserPageBody, "body"]):
+    def sync(self, req: Request, *, body: Annotated[RequestBody[UserPageBody], "body"]):
         return req.res.html_body(f"<h1>{body.route_parameters.user_id}</h1>")
 
     @component("envelope-page")
-    async def envelope(self, req: Request, body: JoltuiRequest):
+    async def envelope(self, req: Request, body: RequestBody[JoltuiRequest]):
         return req.res.html_body(f"<h1>{body.tag_name}</h1>")
 
     @component("string-page")
@@ -538,3 +538,19 @@ async def test_lifecycle_error_preserved_but_success_requires_html(
             )
             assert response.status_code == 503
             assert response.json() == {"error": "unavailable"}
+
+
+def test_bare_model_body_fails_at_registration(make_app):
+    @group("bare")
+    class BareGroup(JoltuiGroupHandler):
+        @component("bare-page")
+        async def bare(self, req, body: UserPageBody):
+            return req.res.html_body("bare")
+
+    cls = type(
+        "BareInterface",
+        (PateraJoltui,),
+        {"__annotations__": {"bare": ComponentGroup[BareGroup]}},
+    )
+    with pytest.raises(TypeError, match=r"RequestBody\[Model\]"):
+        make_app(extensions=[cls])

@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post, produces
+from patera.controller import (
+    Controller, RequestBody, consumes, get, path, post, produces,
+)
 
 if TYPE_CHECKING:
     from app import App
@@ -38,7 +40,7 @@ class GreetingApi(Controller["App"]):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def greet(self, req: Request, greeting: Greeting) -> Response:
+    async def greet(self, req: Request, greeting: RequestBody[Greeting]) -> Response:
         return req.res.json({"message": f"Hello, {greeting.name}!"})
 ```
 

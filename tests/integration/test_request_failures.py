@@ -12,7 +12,7 @@ import pytest
 from pydantic import BaseModel
 
 from patera import MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post, socket
+from patera.controller import Controller, consumes, get, path, post, socket, RequestBody
 
 from tests.helpers import make_scope
 
@@ -55,7 +55,7 @@ class FailuresController(Controller):
 
     @post("/tags")
     @consumes(MediaType.APPLICATION_X_WWW_FORM_URLENCODED)
-    async def tags(self, req: Request, data: Tags) -> Response:
+    async def tags(self, req: Request, data: RequestBody[Tags]) -> Response:
         return req.res.json(data.model_dump(mode="json"))
 
     @get("/query")
@@ -140,7 +140,7 @@ async def test_a_single_form_value_fills_a_list_field(app, client_for):
     assert one.json() == {"tags": ["a"], "labels": ["x"], "note": ""}
     assert two.json()["tags"] == ["a", "b"]
     assert none.status_code == 422
-    assert none.json()["data"][0]["loc"] == ["tags"]
+    assert none.json()["data"][0]["loc"] == ["body", "tags"]
 
 
 async def test_raw_bytes_in_the_query_string_do_not_fail_the_request(app):

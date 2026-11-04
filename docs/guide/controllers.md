@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from patera import HttpStatus, MediaType, Request, Response
 from patera.controller import (
-    Controller, after_request, before_request, consumes, delete, get, path, post, produces,
+    Controller, QueryParams, RequestBody, after_request, before_request, consumes, delete, get,
+    path, post, produces,
 )
 
 if TYPE_CHECKING:
@@ -18,6 +19,11 @@ if TYPE_CHECKING:
 
 class UserIn(BaseModel):
     name: str
+
+
+class UserQuery(BaseModel):
+    page: int = 1
+    tags: list[str] = []
     email: str
 
 
@@ -30,7 +36,9 @@ class UserOut(BaseModel):
 class UserApi(Controller["App"]):
 
     @get("/")
-    async def list_users(self, req: Request) -> Response[list[UserOut]]:
+    async def list_users(
+        self, req: Request, query: QueryParams[UserQuery]
+    ) -> Response[list[UserOut]]:
         return req.res.json([{"id": 1, "name": "Ana"}])
 
     @get("/<int:user_id>")
@@ -40,7 +48,7 @@ class UserApi(Controller["App"]):
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
-    async def create_user(self, req: Request, user: UserIn) -> Response[UserOut]:
+    async def create_user(self, req: Request, user: RequestBody[UserIn]) -> Response[UserOut]:
         return req.res.json({"id": 2, "name": user.name})
 
     @delete("/<int:user_id>")
@@ -94,19 +102,48 @@ not `{name}` syntax:
 | `<uuid:key>` | a UUID |
 | `<path:rest>` | a string including slashes |
 
-Query parameters do **not** become handler arguments. Read them from `req.query_parameters` and
-validate them with `req.validate(Model, data)` (see [Requests](requests.md#validation)).
+Query parameters are declared with a model; see below.
 
 ## Request bodies and validation
 
-`@consumes(MediaType)` requires the request to have this content type (otherwise `415`).
-Parameters annotated with a Pydantic model are validated from the JSON body, url-encoded form or
-multipart form (including `UploadedFile` fields).
+A Pydantic model parameter declares where its data comes from with one of two annotations from
+`patera.controller`:
 
-- For forms, a single value of a field the model declares as a list (checkboxes, multi-selects)
-  arrives as a one-item list.
+| Annotation | Built from |
+| --- | --- |
+| `RequestBody[Model]` | the request body, read as the `@consumes` media type |
+| `QueryParams[Model]` | the query string |
+
+Both are `Annotated` aliases: editors and type checkers see a plain `Model`.
+
+```python
+@post("/")
+@consumes(MediaType.APPLICATION_JSON)
+@produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
+async def create_user(
+    self, req: Request, data: RequestBody[UserIn], query: QueryParams[UserQuery]
+) -> Response[UserOut]:
+    ...
+```
+
+`@consumes(MediaType)` requires the request to have this content type (otherwise `415`) and reads
+the body: JSON, url-encoded form or multipart form (including `UploadedFile` fields). The
+`RequestBody` parameter is built from it.
+
+- A handler has at most one `RequestBody`; it may have several `QueryParams` models, each built
+  from the same query string.
+- Query values are strings that Pydantic converts (`"2"` to `2`). A list field accepts a single
+  value or a repeated key: `?tags=a` and `?tags=a&tags=b`. The same applies to form fields
+  (checkboxes, multi-selects).
 - Invalid data raises `RequestValidationError`: `422` with the validation errors, without the
-  submitted values, unless you [handle](exception-handling.md) it yourself.
+  submitted values, unless you [handle](exception-handling.md) it yourself. Each error's `loc`
+  starts with `"body"` or `"query"`.
+- Mistakes fail at startup, when the controller is registered: a model parameter without
+  `RequestBody` or `QueryParams`, a `RequestBody` without `@consumes`, two `RequestBody`
+  parameters, or `@consumes` on a GET endpoint.
+- Raw values stay available: `req.query_parameters`, `await req.json()`, `await req.form()`.
+  Validate data the handler assembles itself with `req.validate(Model, data)`
+  (see [Requests](requests.md#validation)).
 
 ## Responses and response models
 

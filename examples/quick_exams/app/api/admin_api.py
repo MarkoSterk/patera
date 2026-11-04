@@ -8,7 +8,16 @@ from patera.auth import role_required
 from patera.database.sql import transactional
 
 from patera import HttpStatus, MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post, produces, put
+from patera.controller import (
+    Controller,
+    consumes,
+    get,
+    path,
+    post,
+    produces,
+    put,
+    RequestBody,
+)
 from patera.injectable import Inject
 
 if TYPE_CHECKING:
@@ -35,7 +44,9 @@ class AdminApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
-    async def create_user(self, req: Request, data: UserIn) -> Response[UserOut]:
+    async def create_user(
+        self, req: Request, data: RequestBody[UserIn]
+    ) -> Response[UserOut]:
         user = await self.accounts.create_user(data)
         return req.res.json(user)
 
@@ -43,7 +54,7 @@ class AdminApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
     async def update_user(
-        self, req: Request, user_id: str, data: UserIn
+        self, req: Request, user_id: str, data: RequestBody[UserIn]
     ) -> Response[UserOut]:
         user = await self.accounts.update_user(user_id, data)
         return req.res.json(user)

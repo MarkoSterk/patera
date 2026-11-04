@@ -6,9 +6,11 @@ HTML templates require `await req.res.html("page.html", context)` with a diction
 `Response` is tied to an app and request; do not create a Flask-style response
 with only a body argument. Headers use `set_header` and cookies use `set_cookie`.
 
-`@consumes(MediaType.APPLICATION_JSON)` checks media type and loads the annotated
-body model. Query validation is explicit. `req.validate(Model, data)` translates
-Pydantic errors into request validation errors. Plain `ValidationError` elsewhere
+`@consumes(MediaType.APPLICATION_JSON)` checks the media type and reads the body;
+the parameter annotated `RequestBody[Model]` is built from it. A parameter
+annotated `QueryParams[Model]` is built from the query string. For other client
+data the handler reads itself (headers, cookies), `req.validate(Model, data)`
+translates Pydantic errors into request validation errors. Plain `ValidationError` elsewhere
 is an application failure, not automatically a client error.
 
 Parsing is lazy. Await `req.body()`, `req.json()`, `req.form()`, `req.files()`, or

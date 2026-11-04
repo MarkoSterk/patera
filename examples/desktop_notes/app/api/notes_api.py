@@ -15,6 +15,8 @@ from patera.controller import (
     post,
     produces,
     put,
+    QueryParams,
+    RequestBody,
 )
 from patera.injectable import Inject
 
@@ -25,6 +27,10 @@ if TYPE_CHECKING:
 class NoteIn(BaseModel):
     title: str = Field(default="", max_length=200)
     body: str = Field(default="", max_length=200_000)
+
+
+class NoteSearch(BaseModel):
+    q: str = Field(default="", max_length=200)
 
 
 def note_json(note: Note) -> dict[str, Any]:
@@ -51,10 +57,12 @@ class NotesApi(Controller["App"]):
 
     @get("/")
     @produces(MediaType.APPLICATION_JSON)
-    async def list_notes(self, req: Request) -> Response:
+    async def list_notes(
+        self, req: Request, search: QueryParams[NoteSearch]
+    ) -> Response:
         """The notes, most recently changed first; ?q= searches titles and text."""
         query = self.notes.query.order_by(Note.updated_at.desc(), Note.id.desc())
-        text = str(req.query_parameters.get("q", "")).strip()
+        text = search.q.strip()
         if text:
             query = query.where(
                 Note.title.icontains(text, autoescape=True)
@@ -66,7 +74,7 @@ class NotesApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON, HttpStatus.CREATED)
     @transactional
-    async def create(self, req: Request, data: NoteIn) -> Response:
+    async def create(self, req: Request, data: RequestBody[NoteIn]) -> Response:
         note = await self.notes.create_and_flush(title=data.title, body=data.body)
         return req.res.json(note_json(note)).status(HttpStatus.CREATED)
 
@@ -74,7 +82,9 @@ class NotesApi(Controller["App"]):
     @consumes(MediaType.APPLICATION_JSON)
     @produces(MediaType.APPLICATION_JSON)
     @transactional
-    async def update(self, req: Request, note_id: int, data: NoteIn) -> Response:
+    async def update(
+        self, req: Request, note_id: int, data: RequestBody[NoteIn]
+    ) -> Response:
         note = await self._note(note_id)
         note.title = data.title
         note.body = data.body

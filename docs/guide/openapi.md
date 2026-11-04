@@ -8,7 +8,8 @@ The specification is generated from your controllers:
 | Source | Becomes |
 | --- | --- |
 | routes and path parameters | paths |
-| `@consumes` + Pydantic parameters | request bodies |
+| `@consumes` + `RequestBody[Model]` | request bodies |
+| `QueryParams[Model]` | query parameters, one per model field (aliases, defaults, constraints and descriptions included) |
 | `@produces` and `Response[Model]` annotations | responses |
 | `@open_api_docs(Descriptor(...))` | additional (error) responses |
 | `@path(tags=...)`, endpoint `tags=...` | tags |
@@ -45,6 +46,7 @@ The specification is also available in code as `app.json_spec`.
 
 !!! tip
 
-    Use `@consumes`, `@produces` and `@open_api_docs` from `patera.controller` for incoming HTTP
-    endpoints, not the identically named decorators of the [API interface](../extensions/apiinterface.md).
+    Use `@consumes`, `RequestBody`, `QueryParams`, `@produces` and `@open_api_docs` from
+    `patera.controller` for incoming HTTP endpoints, not the identically named decorators of the
+    [API interface](../extensions/apiinterface.md).
     Verify the generated schema after changing annotations.

@@ -37,6 +37,7 @@ import psutil
 
 from patera.base_extension import BaseExtension
 from patera.cli import CLIController, cli_controller, command
+from patera.utilities import uvicorn_ws_protocol
 
 from .envfile import (
     DEFAULT_ENV_FILE,
@@ -575,6 +576,7 @@ def run_in_window(app_class: "type[Patera[Any]]") -> None:
             host=HOST,
             port=port,
             lifespan="on",
+            ws=uvicorn_ws_protocol(),
             log_config=None,
             access_log=False,
         )

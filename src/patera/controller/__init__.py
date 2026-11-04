@@ -18,6 +18,7 @@ from .decorators import (
     socket,
     max_content_length,
 )
+from .params import RequestBody, QueryParams
 
 __all__ = [
     "Controller",
@@ -29,6 +30,8 @@ __all__ = [
     "delete",
     "consumes",
     "produces",
+    "RequestBody",
+    "QueryParams",
     "Descriptor",
     "open_api_docs",
     "before_request",

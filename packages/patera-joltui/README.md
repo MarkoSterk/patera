@@ -120,14 +120,15 @@ not an authorization source. Escape values inserted into raw HTML, or use
 your application's templates.
 
 
-Handlers may declare an optional third argument annotated with any Pydantic
-model. The extension validates the full JSON body into that model automatically;
+Handlers may declare an optional third argument annotated
+`RequestBody[Model]` (from `patera.controller`) with any Pydantic model. The extension validates the full JSON body into that model automatically;
 `@consumes` is not required. Model validation failures return 422 before the
 handler runs. Authentication and controller before-request hooks run first.
 
 ```python
 from pydantic import BaseModel, Field
 from patera import Response
+from patera.controller import RequestBody
 
 class UserRoute(BaseModel):
     user_id: int
@@ -140,7 +141,9 @@ class UserPageBody(BaseModel):
 @group("user-group")
 class UserGroupHandler(JoltuiGroupHandler):
     @component("user-page")
-    async def user_page(self, req: Request, body: UserPageBody) -> Response:
+    async def user_page(
+        self, req: Request, body: RequestBody[UserPageBody]
+    ) -> Response:
         return req.res.html_body(f"<h1>User {body.route_parameters.user_id}</h1>")
 ```
 
@@ -151,8 +154,8 @@ For example, the request body is:
 ```
 
 `body.route_parameters.user_id` is validated and converted to the integer 42.
-The original `Request` and its JSON body remain available. Use `JoltuiRequest`
-as the third argument if its standard fields suffice, or define your own model
+The original `Request` and its JSON body remain available. Use
+`RequestBody[JoltuiRequest]` as the third argument if its standard fields suffice, or define your own model
 with nested models and aliases as above. `JoltuiRequest.tag_name` defaults to
 `None` and `group_name` to `"default"`, so neither field is required when
 constructing the model. The actual RPC envelope still requires `tagName` to

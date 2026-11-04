@@ -209,6 +209,11 @@ async def test_documented_controller_and_service_examples_run(make_app, client_f
         assert response.json() == {"title": "Example"}
         assert (await client.post("/notes/", json={})).status_code == 422
         assert (await client.get("/notes/3")).json() == {"id": 3}
+        listing = await client.get("/notes/", params={"page": "2"})
+        assert listing.json() == {"page": 2, "notes": []}
+        invalid = await client.get("/notes/", params={"page": "x"})
+        assert invalid.status_code == 422
+        assert invalid.json()["data"][0]["loc"] == ["query", "page"]
         assert (await client.get("/hello/Ada")).json() == {"message": "Hello, Ada!"}
 
 

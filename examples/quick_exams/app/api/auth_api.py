@@ -6,7 +6,7 @@ from patera.auth import login_required
 from patera.database.sql import transactional
 
 from patera import MediaType, Request, Response
-from patera.controller import Controller, consumes, get, path, post
+from patera.controller import Controller, consumes, get, path, post, RequestBody
 from patera.injectable import Inject
 
 if TYPE_CHECKING:
@@ -25,7 +25,9 @@ class AuthApi(Controller["App"]):
     @post("/login")
     @consumes(MediaType.APPLICATION_JSON)
     @transactional
-    async def login(self, req: Request, data: LoginIn) -> Response[TokenOut]:
+    async def login(
+        self, req: Request, data: RequestBody[LoginIn]
+    ) -> Response[TokenOut]:
         user = await self.accounts.authenticate(data.email, data.password)
         token = self.accounts.issue_token(user)
         configs = self.app.configs

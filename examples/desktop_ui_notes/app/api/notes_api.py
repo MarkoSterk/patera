@@ -7,7 +7,16 @@ from patera.desktop import user_data_dir
 from pydantic import BaseModel, Field
 
 from patera import HttpStatus, MediaType, Request, abort
-from patera.controller import Controller, consumes, delete, get, path, post, put
+from patera.controller import (
+    Controller,
+    consumes,
+    delete,
+    get,
+    path,
+    post,
+    put,
+    RequestBody,
+)
 
 if TYPE_CHECKING:
     from app import App  # noqa: F401 - used in quoted generic bases
@@ -69,7 +78,7 @@ class NotesAPI(Controller["App"]):
 
     @post("/")
     @consumes(MediaType.APPLICATION_JSON)
-    async def create(self, req: Request, data: NoteInput):
+    async def create(self, req: Request, data: RequestBody[NoteInput]):
         connection = self.connect()
         try:
             with connection:
@@ -85,7 +94,7 @@ class NotesAPI(Controller["App"]):
 
     @put("/<int:note_id>")
     @consumes(MediaType.APPLICATION_JSON)
-    async def update(self, req: Request, note_id: int, data: NoteInput):
+    async def update(self, req: Request, note_id: int, data: RequestBody[NoteInput]):
         connection = self.connect()
         try:
             with connection:
