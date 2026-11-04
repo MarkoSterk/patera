@@ -3286,7 +3286,7 @@
 <td>JSON <code>{"status", "message", "data"}</code> with the exception's status code</td>
 </tr>
 <tr>
-<td><code>RequestValidationError</code> (from <code>@consumes</code> or <code>req.validate()</code>, a <code>BaseHttpException</code>)</td>
+<td><code>RequestValidationError</code> (from <code>RequestBody</code>/<code>QueryParams</code> parameters or <code>req.validate()</code>, a <code>BaseHttpException</code>)</td>
 <td><code>422</code> with <code>{"status": "error", "message": "Validation failed", "data": [...]}</code></td>
 </tr>
 <tr>

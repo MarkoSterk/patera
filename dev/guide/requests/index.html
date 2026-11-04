@@ -3328,7 +3328,8 @@
 <li>A client that disconnects mid-body raises <code>ClientDisconnected</code>: the handler stops and no
   response is sent.</li>
 </ul>
-<p>For JSON and forms that map to a model, prefer <code>@consumes</code> with a Pydantic parameter; see
+<p>For JSON, forms and query strings that map to a model, prefer <code>RequestBody[Model]</code> (with
+<code>@consumes</code>) and <code>QueryParams[Model]</code> parameters; see
 <a href="../controllers/#request-bodies-and-validation">Controllers</a>.</p>
 <h2 id="uploaded-files">Uploaded files<a class="headerlink" href="#uploaded-files" title="Permanent link">&para;</a></h2>
 <p>Files are <code>UploadedFile</code> objects (importable from <code>patera</code>):</p>
@@ -3371,17 +3372,18 @@
 uploads under the public static directory.</p>
 </div>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
-<p><code>req.validate(Model, data)</code> validates client data the handler reads itself, such as query
-parameters or route values. Invalid data raises <code>RequestValidationError</code>, answered with <code>422</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Paging</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">per_page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span>
+<p>Query strings and bodies are validated by <code>QueryParams[Model]</code> and <code>RequestBody[Model]</code>
+parameters (<a href="../controllers/#request-bodies-and-validation">Controllers</a>). <code>req.validate(Model,
+data)</code> validates other client data the handler reads itself, such as headers or route values
+combined into one model. Invalid data raises <code>RequestValidationError</code>, answered with <code>422</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ClientInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">user_agent</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nd">@get</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Response</span><span class="p">:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">paging</span> <span class="o">=</span> <span class="n">req</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">Paging</span><span class="p">,</span> <span class="n">req</span><span class="o">.</span><span class="n">query_parameters</span><span class="p">)</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="o">...</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nd">@get</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Response</span><span class="p">:</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">info</span> <span class="o">=</span> <span class="n">req</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">ClientInfo</span><span class="p">,</span> <span class="p">{</span><span class="s2">"user_agent"</span><span class="p">:</span> <span class="n">req</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"user-agent"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)})</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="o">...</span>
 </span></code></pre></div>
 <p>A plain <code>pydantic.ValidationError</code> raised elsewhere in your code is an application failure, not
 a client error. Use <code>req.validate</code> for user input.</p>

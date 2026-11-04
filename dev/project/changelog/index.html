@@ -2856,6 +2856,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stabilization-fixes" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2894,6 +2905,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#patera-01236-2026-11-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.123.6 (2026-11-02)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patera-01235-2026-10-31" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.123.5 (2026-10-31)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patera-01234-2026-10-31" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2917,7 +2950,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Breaking changes
@@ -3143,6 +3176,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stabilization-fixes" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3181,6 +3225,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#patera-01236-2026-11-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.123.6 (2026-11-02)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patera-01235-2026-10-31" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        patera 0.123.5 (2026-10-31)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patera-01234-2026-10-31" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3204,7 +3270,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#breaking-changes" class="md-nav__link">
+  <a href="#breaking-changes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Breaking changes
@@ -3356,6 +3422,22 @@
 <p>All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Core:</strong> handler model parameters declare their source with <code>RequestBody[Model]</code> or
+  <code>QueryParams[Model]</code> from <code>patera.controller</code>. Both are <code>Annotated</code> aliases, so type checkers
+  see a plain <code>Model</code>. A bare Pydantic model parameter is no longer filled from the body: it
+  fails at registration with an error naming the annotation to add. Replace
+  <code>data: Model</code> with <code>data: RequestBody[Model]</code> on <code>@consumes</code> endpoints.</li>
+<li><strong>Core:</strong> <code>@consumes</code> only records the media type; the controller checks the Content-Type
+  (415), reads the body and builds <code>RequestBody</code>/<code>QueryParams</code> models after the before-request
+  hooks. A <code>RequestBody</code> without
+  <code>@consumes</code>, two <code>RequestBody</code> parameters, or <code>@consumes</code> on GET fail at registration, in any
+  decorator order. The <code>consumes_type</code> endpoint metadata key is gone.</li>
+<li><strong>Core:</strong> <code>RequestValidationError</code> locations of handler parameters start with their source:
+  <code>["body", "age"]</code>, <code>["query", "page"]</code>. <code>req.validate()</code> locations are unchanged.</li>
+<li><strong>JoltUI:</strong> a component's body parameter is annotated <code>RequestBody[Model]</code>.</li>
+</ul>
 <h3 id="stabilization-fixes">Stabilization fixes<a class="headerlink" href="#stabilization-fixes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Core:</strong> failed extension initialization rolls back framework registrations,
@@ -3387,11 +3469,20 @@ contain breaking changes; they are listed first in each release.</p>
 </ul>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>patera-database:</strong> <code>SqlDatabaseConfig.SQLITE_FOREIGN_KEYS</code> (default <code>False</code>) runs
+<li>
+<p><strong>Core:</strong> <code>QueryParams[Model]</code> builds a model from the query string, replacing
+  <code>req.validate(Model, req.query_parameters)</code>. A list field accepts a single value or a
+  repeated key. Each model field is documented as an OpenAPI <code>in: query</code> parameter (alias,
+  required, default, constraints and description); the request body schema comes from the
+  <code>RequestBody</code> model.</p>
+</li>
+<li>
+<p><strong>patera-database:</strong> <code>SqlDatabaseConfig.SQLITE_FOREIGN_KEYS</code> (default <code>False</code>) runs
   <code>PRAGMA foreign_keys=ON</code> on every new SQLite connection, so <code>FOREIGN KEY</code> constraints such as
   <code>ON DELETE CASCADE</code> are enforced; SQLite leaves them off by default. Set it in the settings
   model or from the environment, for example <code>PATERA_MAIN_DB__SQLITE_FOREIGN_KEYS=true</code>. Other
-  databases ignore it. Applications no longer need to override <code>SqlDatabase.connect()</code> for this.</li>
+  databases ignore it. Applications no longer need to override <code>SqlDatabase.connect()</code> for this.</p>
+</li>
 <li><strong>patera-database:</strong> <code>SqlDatabaseConfig.SQLITE_BUSY_TIMEOUT</code> (seconds, default <code>None</code>) runs
   <code>PRAGMA busy_timeout</code> on every new SQLite connection: how long a connection waits for another
   connection's lock before failing with "database is locked". <code>None</code> keeps the driver's default
@@ -3462,6 +3553,21 @@ contain breaking changes; they are listed first in each release.</p>
 <li><strong>patera-admin:</strong> the sign-in and "unauthorized" pages load Bootstrap and its icons from the
   copies shipped with the package instead of jsDelivr, so Admin works without internet access.</li>
 </ul>
+<h2 id="patera-01236-2026-11-02">patera 0.123.6 (2026-11-02)<a class="headerlink" href="#patera-01236-2026-11-02" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Chat history summaries now start after a successful request transaction commit.
+  Overlapping updates for the same chat take turns and recheck the stored history.</li>
+<li>The database disconnect regression test verifies that its own SQLite connection
+  closes after reconnecting. Expanded the bundled coding-agent guidance.</li>
+</ul>
+<h2 id="patera-01235-2026-10-31">patera 0.123.5 (2026-10-31)<a class="headerlink" href="#patera-01235-2026-10-31" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Added request-local <code>flash_message(message, status=None)</code> on applications,
+  controllers, extensions and middleware, with <code>flashed_messages</code> available in
+  Jinja templates. Child contexts share messages; separate requests stay isolated.</li>
+<li>Clarified concrete application typing in coding-agent instructions, examples
+  and documentation, and the authentication middleware loader requirements.</li>
+</ul>
 <h2 id="patera-01234-2026-10-31">patera 0.123.4 (2026-10-31)<a class="headerlink" href="#patera-01234-2026-10-31" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Updated the generated Codex and Claude instructions and bundled examples to
@@ -3471,7 +3577,7 @@ contain breaking changes; they are listed first in each release.</p>
 <h2 id="patera-01210-and-extensions-0110-2026-10-12">patera 0.121.0 and extensions 0.11.0 (2026-10-12)<a class="headerlink" href="#patera-01210-and-extensions-0110-2026-10-12" title="Permanent link">&para;</a></h2>
 <p>Every package in this release requires <code>patera&gt;=0.121</code>. Upgrade the core and the extensions
 together.</p>
-<h3 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
+<h3 id="breaking-changes_1">Breaking changes<a class="headerlink" href="#breaking-changes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>patera-auth:</strong> signed cookie values carry a signing timestamp (<code>value|timestamp|signature</code>).
   Values signed by earlier versions are rejected, which signs users out once.</li>

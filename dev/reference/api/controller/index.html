@@ -4141,7 +4141,15 @@ for the same HTTP method and path.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Decorator indicating what media type the endpoint consumes.</p>
+        <p>Declares the media type of the request body (JSON, a form, a form with
+files, ...). Requests with another Content-Type are answered with 415.</p>
+<p>The handler parameter annotated <code>RequestBody[Model]</code> is built from the
+body, read as this media type:</p>
+<div class="language-text highlight"><pre><span></span><code>@post("/")
+@consumes(MediaType.APPLICATION_JSON)
+async def create(self, req: Request, data: RequestBody[CreateUser]):
+    ...
+</code></pre></div>
 
 
     </div>

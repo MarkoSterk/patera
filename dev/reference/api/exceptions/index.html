@@ -3742,7 +3742,7 @@
 
 
 <a href="#patera.exceptions.RequestValidationError" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">RequestValidationError</span><span class="p">(</span><span class="n">validation_error</span><span class="p">:</span> <span class="n"><span title="pydantic.ValidationError">ValidationError</span></span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">'Validation failed'</span><span class="p">,</span> <span class="n">status_code</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">=</span> <span class="n"><span title="patera.http_statuses.HttpStatus.UNPROCESSABLE_ENTITY">UNPROCESSABLE_ENTITY</span></span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">'error'</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">RequestValidationError</span><span class="p">(</span><span class="n">validation_error</span><span class="p">:</span> <span class="n"><span title="pydantic.ValidationError">ValidationError</span></span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">'Validation failed'</span><span class="p">,</span> <span class="n">status_code</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">=</span> <span class="n"><span title="patera.http_statuses.HttpStatus.UNPROCESSABLE_ENTITY">UNPROCESSABLE_ENTITY</span></span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">'error'</span><span class="p">,</span> <span class="n">location</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -3751,10 +3751,13 @@
 
 
 
-        <p>Raised when @consumes cannot build the declared model from the request
-body. Answered with 422 Unprocessable Content; <code>data</code> (and <code>errors</code>)
-lists each problem's location, message and type. The submitted values are
-left out, so a rejected password is never sent back.</p>
+        <p>Raised when a RequestBody[...] or QueryParams[...] parameter (or
+req.validate) cannot build its model from what the client sent.
+Answered with 422 Unprocessable Content; <code>data</code> (and <code>errors</code>) lists
+each problem's location, message and type. For handler parameters the
+location starts with where the value came from ("body" or "query"). The
+submitted values are left out, so a rejected password is never sent
+back.</p>
 <p>The original Pydantic error is <code>validation_error</code>. A ValidationError
 raised anywhere else (in handler code, or validating data from a database
 or another service) is a server error, answered with 500.</p>
