@@ -3218,7 +3218,9 @@ not require the optional extensions.</p>
 <li>
 <p>Explicitly decorate HTTP controller endpoints with <code>@produces</code> for response
   media type and success status, <code>@consumes</code> with a <code>RequestBody[Model]</code> parameter
-  when accepting a request body, <code>QueryParams[Model]</code> for query-string models, and
+  when accepting a request body (JSON bodies may also use types such as
+  <code>RequestBody[list[Model]]</code>), <code>QueryParams[Model]</code> for query-string models,
+  <code>Files[...]</code> parameters for multipart files kept apart from the form fields, and
   <code>@open_api_docs(Descriptor(...))</code> for expected error responses. Import these
   from <code>patera.controller</code>, use <code>HttpStatus</code> members, and keep the declarations
   consistent with endpoint behavior and the generated OpenAPI.</p>
