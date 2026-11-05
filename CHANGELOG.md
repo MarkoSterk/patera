@@ -3,6 +3,15 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
+## patera 0.125.1 and extensions 0.15.1 (2026-11-05)
+
+### Fixed
+
+- **Core:** the coding-agent conventions written by `patera agents` (and the bundled skill
+  entry point) mention `Files[...]` parameters and JSON bodies such as
+  `RequestBody[list[Model]]`, not only the detailed references. The OpenAPI reference
+  describes array bodies and multipart file properties.
+
 ## patera 0.125.0 and extensions 0.15.0 (2026-11-05)
 
 ### Breaking changes
