@@ -9,6 +9,7 @@ import json
 import os
 import re
 import inspect
+import sys
 import time
 from collections.abc import AsyncIterator, Iterable, Mapping
 from enum import StrEnum
@@ -117,6 +118,33 @@ PATERA_VERSION: str = _installed_version()
 OPEN_API_VERSION: str = "3.0.3"
 
 
+def startup_banner(
+    host: str,
+    port: int,
+    debug_mode: bool,
+    *,
+    app_name: str = "Application",
+    scheme: str = "http",
+    url_prefix: str = "",
+) -> str:
+    """The Patera ASCII art and the address box, as one block of text."""
+    url = f"{scheme}://{host}:{port}{url_prefix}"
+    mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
+    lines = [
+        PATERA_ASCIIART.rstrip("\n"),
+        "",
+        "═" * 64,
+        f"  {app_name} is running",
+        "─" * 64,
+        f"  Mode:    {mode_label}",
+        f"  Host:    {host}",
+        f"  Port:    {port}",
+        f"  URL:     \033]8;;{url}\033\\{url}\033]8;;\033\\",
+        "═" * 64,
+    ]
+    return "\n".join(lines) + "\n\n"
+
+
 def print_startup_message(
     host: str,
     port: int,
@@ -126,20 +154,27 @@ def print_startup_message(
     scheme: str = "http",
     url_prefix: str = "",
 ) -> None:
-    url = f"{scheme}://{host}:{port}{url_prefix}"
+    """
+    Writes the startup banner to stdout in one piece.
 
-    mode_label = "DEVELOPMENT" if debug_mode else "PRODUCTION"
-
-    print()
-    print("═" * 64)
-    print(f"  {app_name} is running")
-    print("─" * 64)
-    print(f"  Mode:    {mode_label}")
-    print(f"  Host:    {host}")
-    print(f"  Port:    {port}")
-    print(f"  URL:     \033]8;;{url}\033\\{url}\033]8;;\033\\")
-    print("═" * 64)
-    print()
+    Log sinks added with ``enqueue=True`` are written by a background
+    thread, so a message logged just before the banner could otherwise
+    appear in the middle of it. The queue is drained first, and the banner
+    is written with a single call and flushed.
+    """
+    logger.complete()
+    sys.stderr.flush()
+    sys.stdout.write(
+        startup_banner(
+            host,
+            port,
+            debug_mode,
+            app_name=app_name,
+            scheme=scheme,
+            url_prefix=url_prefix,
+        )
+    )
+    sys.stdout.flush()
 
 
 T = TypeVar("T", bound="Patera[Any]")
@@ -1435,9 +1470,6 @@ class Patera(Injectable, Generic[ConfT]):
         Lower middleware order values are processed first and become outer
         middleware.
         """
-        if self.configs.STARTUP_BANNER:
-            print(PATERA_ASCIIART)
-
         built_app: AppCallableType = self._base_app
 
         for order_key in sorted(self._middleware_classes.keys(), reverse=True):

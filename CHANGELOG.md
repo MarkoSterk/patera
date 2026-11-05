@@ -3,6 +3,15 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
+## patera 0.125.2 and extensions 0.15.2 (2026-11-05)
+
+### Fixed
+
+- **Core:** the startup banner is no longer split by log messages. Console log sinks write from a
+  background queue (`ENQUEUE`), so messages logged before the banner could appear in the middle
+  of it. The queue is now drained first, and the ASCII art and address box are written together
+  in one block after the "started" log line. `startup_banner()` returns the block as text.
+
 ## patera 0.125.1 and extensions 0.15.1 (2026-11-05)
 
 ### Fixed

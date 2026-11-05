@@ -163,3 +163,59 @@ async def test_startup_is_logged_and_the_banner_can_be_disabled(
     async with client_for(app) as client:
         await client.get("/missing")
     assert f"{app.configs.HOST}:{app.configs.PORT}" in capsys.readouterr().out
+
+
+def test_startup_banner_waits_for_queued_logs_and_is_one_write(monkeypatch):
+    import io
+    import sys
+    import time
+
+    from loguru import logger
+
+    from patera.patera import print_startup_message
+
+    events: list[tuple[str, str]] = []
+
+    def slow_sink(message):
+        # A background writer that falls behind, like a busy console.
+        time.sleep(0.02)
+        events.append(("log", message.record["message"]))
+
+    class RecordingStdout(io.StringIO):
+        def write(self, text):
+            events.append(("stdout", text))
+            return super().write(text)
+
+    sink_id = logger.add(slow_sink, enqueue=True, format="{message}")
+    monkeypatch.setattr(sys, "stdout", RecordingStdout())
+    try:
+        for number in range(3):
+            logger.info(f"queued {number}")
+        print_startup_message("localhost", 3000, True, app_name="Demo")
+    finally:
+        logger.remove(sink_id)
+
+    assert events[:3] == [("log", f"queued {n}") for n in range(3)]
+    assert [kind for kind, _ in events[3:]] == ["stdout"]
+    banner = events[3][1]
+    assert banner.index("A Fast, Simple") < banner.index("Demo is running")
+    assert "Port:    3000" in banner
+
+
+async def test_app_prints_the_whole_banner_once(make_app, client_for, capsys):
+    from patera.patera import startup_banner
+
+    app = make_app(STARTUP_BANNER=True)
+    async with client_for(app) as client:
+        await client.get("/missing")
+    out = capsys.readouterr().out
+    expected = startup_banner(
+        app.configs.HOST,
+        app.configs.PORT,
+        app.configs.DEBUG,
+        app_name=app.app_name,
+        scheme=app.configs.PROTOCOL,
+        url_prefix=app.url_prefix,
+    )
+    assert out.count(expected) == 1
+    assert out.count("A Fast, Simple") == 1
