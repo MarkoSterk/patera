@@ -38,13 +38,15 @@ async def create(self, req: Request) -> Response:
 - A client that disconnects mid-body raises `ClientDisconnected`: the handler stops and no
   response is sent.
 
-For JSON, forms and query strings that map to a model, prefer `RequestBody[Model]` (with
-`@consumes`) and `QueryParams[Model]` parameters; see
+For JSON, forms, files and query strings that map to a model, prefer `RequestBody[...]` (with
+`@consumes`), `Files[...]` and `QueryParams[Model]` parameters; see
 [Controllers](controllers.md#request-bodies-and-validation).
 
 ## Uploaded files
 
-Files are `UploadedFile` objects (importable from `patera`):
+Files are `UploadedFile` objects (importable from `patera`). Declare them as `UploadedFile` fields
+of a multipart `RequestBody` model or with `Files[...]` parameters (see
+[Controllers](controllers.md#uploaded-files)); `await req.files()` reads them by hand:
 
 | Member | Description |
 | --- | --- |

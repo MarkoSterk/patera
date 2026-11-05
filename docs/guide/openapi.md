@@ -8,7 +8,8 @@ The specification is generated from your controllers:
 | Source | Becomes |
 | --- | --- |
 | routes and path parameters | paths |
-| `@consumes` + `RequestBody[Model]` | request bodies |
+| `@consumes` + `RequestBody[...]` | request bodies (an object, an array, ...) |
+| `Files[...]` | file properties of the `multipart/form-data` body (`format: binary`) |
 | `QueryParams[Model]` | query parameters, one per model field (aliases, defaults, constraints and descriptions included) |
 | `@produces` and `Response[Model]` annotations | responses |
 | `@open_api_docs(Descriptor(...))` | additional (error) responses |

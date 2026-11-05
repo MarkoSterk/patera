@@ -17,7 +17,12 @@ Parsing is lazy. Await `req.body()`, `req.json()`, `req.form()`, `req.files()`, 
 `req.form_and_files()` as needed; do not consume ASGI receive repeatedly yourself.
 `req.query_list(name)` and `await req.form_list(name)` preserve repeated values.
 `UploadedFile` from
-`patera` represents uploaded bytes and supports read/seek/save. Pick safe storage
+`patera` represents uploaded bytes and supports read/seek/save. A multipart
+`RequestBody[Model]` may declare `UploadedFile`/`list[UploadedFile]` fields; or
+keep files apart with `Files[UploadedFile]`, `Files[list[UploadedFile]]` (bound by
+parameter name), `Files[Model]` (validators/aliases) or
+`Files[dict[str, list[UploadedFile]]]`, in which case the body model gets text
+fields only and must not declare file fields. Pick safe storage
 names rather than trusting an upload filename; uploads are not automatically
 private merely because they came through a form.
 

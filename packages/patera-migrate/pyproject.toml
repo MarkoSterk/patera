@@ -1,6 +1,6 @@
 [project]
 name = "patera-migrate"
-version = "0.14.0"
+version = "0.15.0"
 description = "SQL migrations for Patera databases, based on pyway"
 readme = "README.md"
 license = "MIT"

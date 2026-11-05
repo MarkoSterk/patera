@@ -6,13 +6,14 @@ import inspect
 import re
 from typing import Any, Dict, Optional, Set, Type, Tuple, List, cast, Callable
 from pydantic import BaseModel, TypeAdapter
+from pydantic.json_schema import JsonSchemaMode
 
 from .http_statuses import HttpStatus
 from .media_types import MediaType
 from .response import Response
 from .request import Request
 from .controller import Controller, get, produces
-from .controller.params import handler_params
+from .controller.params import HandlerParams, handler_params
 from .utilities import _extract_response_type
 
 # Matches werkzeug route parameters such as <id>, <int:id>, <int(signed=True):id>
@@ -82,6 +83,9 @@ def _model_name(model: Type) -> str:
 
 
 _REF_TEMPLATE = "#/components/schemas/{model}"
+# Remembers in which mode each component was registered; removed from the
+# finished document.
+_MODES_KEY = "x-patera-schema-modes"
 
 
 def _is_model_class(tp: Any) -> bool:
@@ -90,13 +94,17 @@ def _is_model_class(tp: Any) -> bool:
 
 def _pydantic_schema_and_defs(
     model: Optional[Type],
+    mode: JsonSchemaMode = "validation",
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     """
     Returns (schema_for_type, defs) where defs are nested component schemas
     that must be merged into components/schemas.
 
     Pydantic models and any other type Pydantic understands (list[Model],
-    dict[str, int], unions, ...) are supported.
+    dict[str, int], unions, ...) are supported. Request data is described
+    in "validation" mode (what the server accepts, an UploadedFile is a
+    binary file), responses in "serialization" mode (what it sends, an
+    UploadedFile is its metadata).
     """
     if model is None:
         return None, {}
@@ -104,9 +112,11 @@ def _pydantic_schema_and_defs(
     try:
         if _is_model_class(model):
             model.model_rebuild()
-            schema = model.model_json_schema(ref_template=_REF_TEMPLATE)
+            schema = model.model_json_schema(ref_template=_REF_TEMPLATE, mode=mode)
         else:
-            schema = TypeAdapter(model).json_schema(ref_template=_REF_TEMPLATE)
+            schema = TypeAdapter(model).json_schema(
+                ref_template=_REF_TEMPLATE, mode=mode
+            )
     except Exception:
         # Types Pydantic cannot describe are documented as generic objects.
         return {"type": "object"}, {}
@@ -116,20 +126,25 @@ def _pydantic_schema_and_defs(
 
 
 def _ensure_schema(
-    components: Dict[str, Any], model: Optional[Type]
+    components: Dict[str, Any],
+    model: Optional[Type],
+    mode: JsonSchemaMode = "validation",
 ) -> Optional[Dict[str, Any]]:
     """
     Registers the schema of ``model`` in components and returns a schema
     object for it: a $ref for Pydantic models, an inline schema otherwise.
+    A model whose request and response schemas differ (it has file fields,
+    computed fields, ...) gets a second component suffixed Input or Output.
     """
     if model is None:
         return None
 
     if "schemas" not in components:
         components["schemas"] = {}
+    modes: Dict[str, str] = components.setdefault(_MODES_KEY, {})
 
     # Get schema and nested defs
-    schema, defs = _pydantic_schema_and_defs(model)
+    schema, defs = _pydantic_schema_and_defs(model, mode)
 
     # Merge nested defs first (don't overwrite if already present)
     for def_name, def_schema in defs.items():
@@ -139,12 +154,57 @@ def _ensure_schema(
         return schema or {"type": "object"}
 
     name = _model_name(model)
+    schema = schema or {"type": "object"}
+    registered = components["schemas"].get(name)
+    if (
+        registered is not None
+        and registered != schema
+        and modes.get(name, mode) != mode
+    ):
+        name += "Input" if mode == "validation" else "Output"
     # Register the model schema itself (if not already present)
     if name not in components["schemas"]:
-        components["schemas"][name] = schema or {"type": "object"}
+        components["schemas"][name] = schema
+        modes[name] = mode
 
     # Return a $ref to the component
     return {"$ref": f"#/components/schemas/{name}"}
+
+
+_BINARY = {"type": "string", "format": "binary"}
+
+
+def _multipart_schema(
+    components: Dict[str, Any], plan: "HandlerParams"
+) -> Dict[str, Any]:
+    """
+    One multipart/form-data object for an endpoint with Files parameters:
+    the RequestBody model's form fields plus one binary property (or array
+    of them) per Files parameter. A Files[dict[...]] parameter accepts files
+    under any name.
+    """
+    components.setdefault("schemas", {})
+    properties: Dict[str, Any] = {}
+    required: List[str] = []
+    for model in (
+        plan.body.model if plan.body is not None else None,
+        plan.files_model,
+        *(p.model for p in plan.file_models),
+    ):
+        schema, defs = _pydantic_schema_and_defs(model)
+        for def_name, def_schema in defs.items():
+            components["schemas"].setdefault(def_name, def_schema)
+        if not schema:
+            continue
+        properties.update(schema.get("properties") or {})
+        required.extend(schema.get("required") or [])
+
+    result: Dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        result["required"] = required
+    if plan.all_files is not None:
+        result["additionalProperties"] = {"type": "array", "items": dict(_BINARY)}
+    return result
 
 
 def _query_parameters(
@@ -370,9 +430,13 @@ def build_openapi(
                 consumes = cast(dict, ep_cfg).get("consumes")
                 if consumes:
                     request_model = plan.body.model if plan.body is not None else None
-                    schema_ref = _ensure_schema(components, request_model)
+                    schema_ref: Optional[Dict[str, Any]]
+                    if plan.reads_files:
+                        schema_ref = _multipart_schema(components, plan)
+                    else:
+                        schema_ref = _ensure_schema(components, request_model)
                     op_obj["requestBody"] = {
-                        "required": request_model is not None,
+                        "required": request_model is not None or plan.reads_files,
                         "content": {
                             _as_media_type(consumes): {
                                 "schema": schema_ref or {"type": "object"}
@@ -396,7 +460,9 @@ def build_openapi(
                     cast(str, cast(dict, ep_cfg).get("method"))
                 )
                 resp_schema_ref = (
-                    _ensure_schema(components, response_type) if response_type else None
+                    _ensure_schema(components, response_type, "serialization")
+                    if response_type
+                    else None
                 )
 
                 responses[default_status] = {
@@ -420,7 +486,7 @@ def build_openapi(
                     body_model = getattr(desc, "body", None)
                     err_desc = getattr(desc, "description", None) or ""
 
-                    schema_ref = _ensure_schema(components, body_model)
+                    schema_ref = _ensure_schema(components, body_model, "serialization")
 
                     if status_code not in responses:
                         responses[status_code] = {
@@ -434,4 +500,5 @@ def build_openapi(
                         "schema": schema_ref or {"type": "object"}
                     }
 
+    components.pop(_MODES_KEY, None)
     return spec

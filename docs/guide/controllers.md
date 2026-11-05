@@ -132,6 +132,9 @@ the body: JSON, url-encoded form or multipart form (including `UploadedFile` fie
 
 - A handler has at most one `RequestBody`; it may have several `QueryParams` models, each built
   from the same query string.
+- A JSON body may be any type Pydantic validates, such as `RequestBody[list[UserIn]]`; an
+  invalid item is reported as `["body", 1, "name"]`. A form body is one set of fields, so form
+  and multipart endpoints need a model.
 - Query values are strings that Pydantic converts (`"2"` to `2`). A list field accepts a single
   value or a repeated key: `?tags=a` and `?tags=a&tags=b`. The same applies to form fields
   (checkboxes, multi-selects).
@@ -144,6 +147,59 @@ the body: JSON, url-encoded form or multipart form (including `UploadedFile` fie
 - Raw values stay available: `req.query_parameters`, `await req.json()`, `await req.form()`.
   Validate data the handler assembles itself with `req.validate(Model, data)`
   (see [Requests](requests.md#validation)).
+
+### Uploaded files
+
+A multipart `RequestBody[Model]` receives text fields and files together: declare files as
+`UploadedFile` or `list[UploadedFile]` fields of the model. To keep files out of the model, take
+them with `Files[...]` parameters, bound to the file field of the same name:
+
+```python
+@post("/profile")
+@consumes(MediaType.MULTIPART_FORM_DATA)
+async def update_profile(
+    self,
+    req: Request,
+    data: RequestBody[ProfileForm],
+    avatar: Files[UploadedFile],
+    attachments: Files[list[UploadedFile]],
+) -> Response:
+    ...
+```
+
+| Annotation | Receives |
+| --- | --- |
+| `Files[UploadedFile]` | exactly one file; missing or repeated is `422` (`["files", "avatar"]`) |
+| `Files[UploadedFile \| None]` (or `= None`) | one file, or `None` |
+| `Files[list[UploadedFile]]` | every file of that field; `[]` when none was sent |
+| `Files[Model]` | a model whose fields are files, named by field name or alias |
+| `Files[dict[str, list[UploadedFile]]]` | every file of the request, by field name |
+
+`Files[Model]` validates files like any model, so a `field_validator` can check a file's name,
+type or size; its errors are `422` at `["files", "<field>", ...]`. A field alias binds a file
+field whose name is not a Python identifier:
+
+```python
+class ProfileFiles(BaseModel):
+    picture: UploadedFile = Field(alias="profile-picture")
+    documents: list[UploadedFile] = []
+
+    @field_validator("picture")
+    @classmethod
+    def must_be_png(cls, value: UploadedFile) -> UploadedFile:
+        if not value.filename.lower().endswith(".png"):
+            raise ValueError("The profile picture must be a PNG file")
+        return value
+```
+
+Every field of a `Files` model must be a file field, and each file field is bound by one
+parameter only.
+
+With `Files` parameters the `RequestBody` model gets the text fields only, so it must not
+declare file fields or fields named like a `Files` parameter; both fail at startup, as does
+`Files` without `@consumes(MediaType.MULTIPART_FORM_DATA)`. A handler may also take only `Files`
+parameters. OpenAPI documents the form fields and the files as one `multipart/form-data` object
+with binary file properties.
 
 ## Responses and response models
 

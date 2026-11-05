@@ -15,7 +15,7 @@ from typing import (
     Mapping,
 )
 import inspect
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ..exceptions.http_exceptions import RequestValidationError
 
@@ -80,18 +80,25 @@ def _form_values_for_model(
 
 
 def _build_model(
-    model_cls: Type[BaseModel],
+    model_cls: Any,
     data: Any,
     media_type: "MediaType | None" = None,
     location: Optional[str] = None,
-) -> BaseModel:
+    adapter: Optional[TypeAdapter[Any]] = None,
+) -> Any:
     """
-    Builds a RequestBody or QueryParams model from the request data. Form
-    data and query parameters send a field once per value, so list fields
-    given a single value get it wrapped in a list. Invalid data raises
-    RequestValidationError (422); ``location`` ("body", "query") prefixes
-    each error's ``loc``.
+    Builds a RequestBody, QueryParams or Files value from the request data.
+    Form data and query parameters send a field once per value, so list
+    fields given a single value get it wrapped in a list. A body that is not
+    a Pydantic model (``list[Model]``, ...) is validated with ``adapter``.
+    Invalid data raises RequestValidationError (422); ``location`` ("body",
+    "query", "files") prefixes each error's ``loc``.
     """
+    if adapter is not None:
+        try:
+            return adapter.validate_python(data)
+        except ValidationError as exc:
+            raise RequestValidationError(exc, location=location) from exc
     if (
         location == "query"
         or media_type
@@ -131,17 +138,16 @@ def _content_type_matches(incoming: str, expected: "MediaType") -> bool:
     return base == exp
 
 
-async def _read_payload_for_consumes(
-    req: "Request", mt: "MediaType"
-) -> Mapping[str, Any]:
+async def _read_payload_for_consumes(req: "Request", mt: "MediaType") -> Any:
     """
     Map declared MediaType → Request loader.
-    Returns mapping suitable for building Pydantic models. An empty JSON
-    body becomes an empty mapping; malformed JSON raises InvalidRequestBody
+    Returns the payload for building the RequestBody value. An empty JSON
+    body becomes an empty mapping (a valid JSON ``[]`` or ``0`` is kept); malformed JSON raises InvalidRequestBody
     (400), and a body over the size limit raises RequestBodyTooLarge (413).
     """
     if mt in (MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON):
-        return (await req.json()) or {}
+        data = await req.json()
+        return {} if data is None else data
     if mt == MediaType.APPLICATION_X_WWW_FORM_URLENCODED:
         return await req.form()
     if mt == MediaType.MULTIPART_FORM_DATA:

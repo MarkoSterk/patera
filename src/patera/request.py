@@ -153,8 +153,19 @@ class UploadedFile:
         handler: Any,
     ) -> core_schema.CoreSchema:
         def validate(v: Any) -> "UploadedFile":
+            # ValueError, not TypeError: Pydantic reports it as a validation
+            # error (422 for client input) instead of letting it escape.
+            try:
+                return convert(v)
+            except TypeError as exc:
+                raise ValueError(str(exc)) from exc
+
+        def convert(v: Any) -> "UploadedFile":
             if isinstance(v, UploadedFile):
                 return v
+
+            if isinstance(v, list):
+                raise ValueError("Expected one uploaded file, got several")
 
             if isinstance(v, Mapping):
                 return cls._from_mapping(v)
@@ -209,6 +220,10 @@ class UploadedFile:
         core_schema: core_schema.CoreSchema,
         handler: Any,
     ) -> dict[str, Any]:
+        # A request (validation) receives a file; a response (serialization)
+        # sends its metadata.
+        if getattr(handler, "mode", "validation") == "validation":
+            return {"type": "string", "format": "binary"}
         return {
             "type": "object",
             "title": "UploadedFile",

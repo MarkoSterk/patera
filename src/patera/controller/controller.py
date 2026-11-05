@@ -129,12 +129,11 @@ class Controller(Injectable, Generic[AppT]):
                     ]
                 http_method: str = handler_info.get("http_method")  # type: ignore
                 if http_method.upper() == "SOCKET":
-                    plan = handler_params(method)
-                    if plan.body is not None or plan.query:
+                    if handler_params(method).has_sources:
                         raise TypeError(
                             f"{owner_cls.__name__}.{name} is a WebSocket handler; "
-                            "RequestBody and QueryParams parameters are only "
-                            "supported on HTTP handlers."
+                            "RequestBody, QueryParams and Files parameters are "
+                            "only supported on HTTP handlers."
                         )
                 else:
                     check_endpoint_params(method, handler_info)
@@ -252,10 +251,38 @@ class Controller(Injectable, Generic[AppT]):
                     param.model, req.query_parameters, location="query"
                 )
 
+        if plan.reads_files and media_type is not None:
+            files = await req.files()
+            if plan.files_model is not None:
+                values = _build_model(
+                    plan.files_model, files, media_type, location="files"
+                )
+                for param in plan.files:
+                    kwargs.setdefault(param.name, getattr(values, param.name))
+            for param in plan.file_models:
+                if param.name not in kwargs:
+                    kwargs[param.name] = _build_model(
+                        param.model, files, media_type, location="files"
+                    )
+            if plan.all_files is not None:
+                kwargs.setdefault(
+                    plan.all_files,
+                    {
+                        key: value if isinstance(value, list) else [value]
+                        for key, value in files.items()
+                    },
+                )
+            # With Files parameters, the body model gets the form fields only.
+            payload = await req.form()
+
         body = plan.body
         if body is not None and media_type is not None and body.name not in kwargs:
             kwargs[body.name] = _build_model(
-                body.model, payload, media_type, location="body"
+                body.model,
+                payload,
+                media_type,
+                location="body",
+                adapter=body.adapter,
             )
 
         return await run_sync_or_async(method, req, **kwargs)

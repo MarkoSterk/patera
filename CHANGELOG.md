@@ -3,7 +3,33 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
-## Unreleased
+## patera 0.125.0 and extensions 0.15.0 (2026-11-05)
+
+### Breaking changes
+
+- **Core:** OpenAPI response schemas are generated in Pydantic's serialization mode (what the
+  server sends), request schemas in validation mode. A model whose two schemas differ gets a
+  second component suffixed `Output` or `Input`. `UploadedFile` is a binary file in requests and
+  its metadata object in responses.
+
+### Added
+
+- **Core:** `RequestBody[T]` accepts any type Pydantic validates for JSON bodies, such as
+  `RequestBody[list[Model]]`; form and multipart bodies still need a model, checked at startup.
+- **Core:** `Files[UploadedFile]`, `Files[list[UploadedFile]]` (optional with `| None` or a
+  default), `Files[Model]` (a model of file fields, with its validators and aliases) and
+  `Files[dict[str, list[UploadedFile]]]` take a multipart body's files by field name, separate
+  from a `RequestBody` model of the text fields. A model with `UploadedFile` fields still
+  receives fields and files together. Multipart request bodies are documented as one object with
+  binary file properties.
+
+### Fixed
+
+- **Core:** a JSON body of `[]` or `0` is no longer replaced by `{}`.
+- **Core:** text sent for an `UploadedFile` field, or several files for a single-file field, is a
+  422 validation error instead of a 500.
+
+## patera 0.124.0 and extensions 0.14.0 (2026-11-04)
 
 ### Breaking changes
 

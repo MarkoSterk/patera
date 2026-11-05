@@ -415,13 +415,19 @@ class UserApi(Controller["App"]):
   parameter comes from: the request body or the query string. Both are `Annotated` aliases, so
   type checkers see a plain `Model`. A handler has at most one `RequestBody` and any number of
   `QueryParams` models. A model parameter without either annotation, or a `RequestBody` without
-  `@consumes`, fails at startup.
+  `@consumes`, fails at startup. A JSON body may be any type Pydantic validates, such as
+  `RequestBody[list[UserIn]]`; form bodies need a model.
+- `Files[...]` takes the files of a multipart body apart from its text fields:
+  `Files[UploadedFile]` and `Files[list[UploadedFile]]` bind the file field with the parameter's
+  name, `Files[Model]` validates a model of file fields (validators and aliases included), and
+  `Files[dict[str, list[UploadedFile]]]` takes every file. With `Files` parameters the
+  `RequestBody` model gets the text fields only; without them it gets fields and files together.
 - `@consumes(MediaType)` – the request must have this content type (otherwise `415`); the
   `RequestBody` model is built from the JSON body, url-encoded form or multipart form (including
   `UploadedFile` fields). A single value of a list field (checkboxes, multi-selects, a query key
   given once) arrives as a one-item list. Invalid data raises `RequestValidationError`: `422` with
   the validation errors, without the submitted values, unless you [handle](#exception-handling) it
-  yourself; each error's `loc` starts with `"body"` or `"query"`. Validate other client data
+  yourself; each error's `loc` starts with `"body"`, `"query"` or `"files"`. Validate other client data
   (headers, route values) with `req.validate(Model, data)`, which raises the same error.
 - `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
   explicitly set content type or status wins, also `.status(HttpStatus.OK)`). Documented in OpenAPI.
