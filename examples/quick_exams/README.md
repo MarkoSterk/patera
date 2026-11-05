@@ -39,6 +39,7 @@ Every field of `app/configs.py` can be set from the environment or `.env`:
 | --- | --- | --- |
 | `PATERA_SECRET_KEY` | (required) | Signs the JWT access tokens. |
 | `PATERA_PUBLIC_URL` | `http://localhost:3000` | Origin used in exam QR codes; `https://` also makes the auth cookie Secure. |
+| `PATERA_CLOUDFLARE_TUNNEL_URL` | (unset) | Name of a cloudflared quick tunnel, the `<name>` in `https://<name>.trycloudflare.com`. When set, exam QR codes use the tunnel instead of `PATERA_PUBLIC_URL`. |
 | `PATERA_EXAMS_DB__DATABASE_URI` | `sqlite+aiosqlite:///…/examples/quick_exams/exams.sqlite3` | The exams database. |
 | `PATERA_EXAMS_DB__SQLITE_FOREIGN_KEYS` | `true` | Enforce foreign keys on SQLite; the schema's cascades and restrictions rely on it. |
 | `PATERA_EXAMS_DB__SQLITE_BUSY_TIMEOUT` | driver default, 5 seconds | Seconds a write waits for another connection's lock before failing. |
@@ -62,6 +63,47 @@ command-line arguments. Duplicate emails, unknown roles, short passwords and
 mismatched confirmations fail without creating a user. The command
 (`app/cli/users_cli.py`) runs in a database session opened by `@cli_session`.
 
+### Import a question bank
+
+```sh
+patera cli questions:import teacher@example.com
+patera cli questions:import teacher@example.com path/to/questions.json
+```
+
+`questions:import` loads a question bank into the account of an existing
+instructor, identified by email. Without a path it imports the bundled
+**Biomehanika** bank, `data/biomehanika/questions.json`: 120 Slovenian
+multiple-choice questions in 11 categories (the course's content units),
+15 of them with a diagram from `data/biomehanika/images/`.
+
+The bank names its subject, declares its categories, and lists questions:
+
+```json
+{
+  "subject": {"name": "Biomehanika", "description": "..."},
+  "categories": [{"key": "sklepi", "name": "Biomehanika sklepov"}],
+  "questions": [{
+    "category": "sklepi",
+    "question_text": "Kateri sklep je najbolj prosto gibljiv?",
+    "answers": ["Kolenski", "Glenohumeralni", "Sternoklavikularni", "Korakoklavikularni"],
+    "correct_answer": 1,
+    "points": 1,
+    "image": ""
+  }]
+}
+```
+
+`correct_answer` is the 0-based index of the correct answer, as in the
+`questions` table. `image` is empty or a PNG/JPEG/GIF/WebP path relative to
+the bank file; it is stored as a data URL, like an upload. The subject and
+categories are created when the user does not have them yet, and questions
+whose text the subject already contains are skipped, so a bank can be
+imported again after it grows. The import runs in one transaction: an
+unknown email, a user without the INSTRUCTOR role or an invalid question
+leaves the database unchanged. `data/biomehanika/build_questions.py`
+regenerates the JSON (it shuffles each question's answers and records the
+correct index) and `build_images.py` redraws the diagrams.
+
 ## Structure
 
 ```
@@ -79,8 +121,9 @@ app/
   public/              the HTML page
   static/              exams.js, math_text.js and the vendored Temml library
   middleware/          JwtAuthentication, BrowserSecurity
-  cli/                 users:create
+  cli/                 users:create, questions:import
   migrations/          versioned SQL for Patera Migrate
+data/biomehanika/      Biomehanika question bank (JSON) and its images
 tests/                 pytest suite (PateraTestClient)
 ```
 

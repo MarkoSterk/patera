@@ -178,7 +178,7 @@ class ExamsApi(Controller["App"]):
     @get("/<exam_id>/qr")
     async def exam_qr_code(self, req: Request, exam_id: str) -> Response:
         exam = await self.authoring.get_exam(req.user.id, exam_id)
-        link = f"{self.app.configs.PUBLIC_URL.rstrip('/')}/exam/{exam.id}"
+        link = f"{self.app.configs.exam_base_url}/exam/{exam.id}"
         svg = BytesIO()
         qrcode.make(link, image_factory=qrcode.image.svg.SvgPathImage).save(svg)
         return req.res.bytes(svg.getvalue(), "image/svg+xml")

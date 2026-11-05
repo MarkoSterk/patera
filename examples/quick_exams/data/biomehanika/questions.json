@@ -1,0 +1,1614 @@
+{
+  "subject": {
+    "name": "Biomehanika",
+    "description": "Biomehanika – Fizioterapija, 2. letnik (študijsko leto 2025/26). Vprašanja pripravljena po predavanjih."
+  },
+  "categories": [
+    {
+      "key": "zgodovina",
+      "name": "Zgodovinski razvoj biomehanike"
+    },
+    {
+      "key": "osnove",
+      "name": "Fizikalne osnove biomehanike in mehanike"
+    },
+    {
+      "key": "sklepi",
+      "name": "Biomehanika sklepov"
+    },
+    {
+      "key": "elastomehanika",
+      "name": "Elastomehanika tkiv"
+    },
+    {
+      "key": "kinetika",
+      "name": "Kinetične veličine in njihovo merjenje"
+    },
+    {
+      "key": "diagnostika",
+      "name": "Biomehanska diagnostika in analiza gibov"
+    },
+    {
+      "key": "registracija",
+      "name": "Registracija gibanja in kvantitativna analiza gibanja"
+    },
+    {
+      "key": "termoregulacija",
+      "name": "Osnove termoregulacije med fizično obremenitvijo"
+    },
+    {
+      "key": "misice",
+      "name": "Biomehanika mišic"
+    },
+    {
+      "key": "emg",
+      "name": "Kineziološka elektromiografija (EMG) in analiza signalov"
+    },
+    {
+      "key": "mreze",
+      "name": "Anatomske in funkcionalne mreže nevromuskularnega sistema"
+    }
+  ],
+  "questions": [
+    {
+      "category": "zgodovina",
+      "question_text": "Kdo velja za očeta (začetnika) biomehanike?",
+      "answers": [
+        "Isaac Newton",
+        "Giovanni Alfonso Borelli",
+        "Leonardo da Vinci",
+        "Gaston Carlet"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Kako je naslov Aristotelovega dela o gibanju živali, katerega naslov si je pozneje izposodil tudi Borelli?",
+      "answers": [
+        "De Motu Animalium",
+        "Philosophiæ Naturalis Principia Mathematica",
+        "Biomechanics and Motor Control of Human Movement",
+        "De humani corporis fabrica"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Katero delo je napisal Andreas Vesalius (1514–1564)?",
+      "answers": [
+        "Philosophiæ Naturalis Principia Mathematica",
+        "De Motu Animalium",
+        "Basic Biomechanics",
+        "De humani corporis fabrica"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Kdo je razvil čevelj s tremi tlačnimi pretvorniki v podplatu in naredil prvi posnetek sile reakcije podlage?",
+      "answers": [
+        "Otto Fischer",
+        "Jules Amar",
+        "Gaston Carlet",
+        "Étienne-Jules Marey"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Kdo sta izvedla prvo 3D analizo hoje?",
+      "answers": [
+        "Étienne-Jules Marey in Eadweard Muybridge",
+        "Gage in Perry",
+        "Wilhelm Braune in Otto Fischer",
+        "Basmajian in Winter"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Kaj sta Étienne-Jules Marey in Eadweard Muybridge prva uporabila za analizo gibanja?",
+      "answers": [
+        "Inercialne senzorje (IMU)",
+        "Visokohitrostno filmsko snemanje",
+        "Površinsko elektromiografijo",
+        "Trikomponentno pritiskovno ploščo"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Po čem je znan Jules Amar (1879–1935)?",
+      "answers": [
+        "Po prvi analizi možganskih omrežij",
+        "Po prvi kameri, ki je na eno sliko postavila več posnetkov s časovnim zamikom",
+        "Po zakonih gibanja, objavljenih leta 1687",
+        "Po 3-komponentni pritiskovni plošči in rehabilitaciji vojnih poškodovancev"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "S katerim področjem je v računalniški dobi povezan Basmajian?",
+      "answers": [
+        "Z elektromiografijo (EMG) in razumevanjem mišične funkcije",
+        "Z vključevanjem analize hoje v ortopedske operacije",
+        "Z razvojem videoprocesorjev za zajem gibanja",
+        "Z odkritjem zlatega reza v človeškem telesu"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "zgodovina",
+      "question_text": "Katera ugotovitev je značilna za Borellijevo delo?",
+      "answers": [
+        "Gibanje je treba opisovati brez upoštevanja sil",
+        "Biomehanski procesi so v osnovi neizmerljivi",
+        "Mišica lahko kost tudi potiska, ne le vleče",
+        "Mišice delujejo preko mehanskih vzvodov, sklepi so vrtišča, mišične sile ustvarjajo navor"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Katera trditev o biomehaniki NE DRŽI?",
+      "answers": [
+        "Biomehanika je aplikacija principov mehanike na žive strukture.",
+        "Biomehanika preučuje mehanske dejavnike, ki vplivajo na telo v mirovanju in v gibanju.",
+        "V področje biomehanike spada tudi preučevanje delovanja lokomotornega sistema.",
+        "Biomehanika se ukvarja izključno s preučevanjem mehanskih principov v človeškem telesu."
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kaj preučuje kinematika?",
+      "answers": [
+        "Deformacije tkiv pod obremenitvijo",
+        "Gibanje telesa brez preučevanja sil, ki ga povzročajo",
+        "Sile, ki povzročajo gibanje",
+        "Telo v stanju ravnovesja"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kaj preučuje kinetika (dinamika)?",
+      "answers": [
+        "Termoregulacijo med obremenitvijo",
+        "Gibanje skupaj s silami, ki ga povzročajo",
+        "Izključno telesa v mirovanju",
+        "Le geometrijo gibanja (lego, hitrost, pospešek)"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kaj je značilno za kvantitativno analizo gibanja?",
+      "answers": [
+        "Upoštevamo samo sile, ne pa gibanja",
+        "Uporabljamo jo samo za telesa v mirovanju",
+        "Komponente gibanja le poimenujemo in ocenimo opisno",
+        "Komponente gibanja štejemo in merimo (numerično)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kateri Newtonov zakon pravi: če je vsota vseh zunanjih sil na telo enaka nič, telo miruje ali se giblje premo enakomerno?",
+      "answers": [
+        "Zakon o ohranitvi gibalne količine",
+        "2. Newtonov zakon",
+        "3. Newtonov zakon (akcija – reakcija)",
+        "1. Newtonov zakon (zakon o vztrajnosti)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Ko stojimo, delujemo na tla s silo teže, tla pa na nas z enako veliko silo v nasprotni smeri. Kateri zakon to opisuje?",
+      "answers": [
+        "3. Newtonov zakon",
+        "Hookov zakon",
+        "2. Newtonov zakon",
+        "1. Newtonov zakon"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kako imenujemo zunanjo silo, ki NI usmerjena skozi težišče telesa, in kaj povzroči?",
+      "answers": [
+        "Centrična sila; spremeni le kotno gibanje",
+        "Par sil; spremeni le linearno gibanje",
+        "Ekscentrična sila; spremeni linearno in kotno gibanje",
+        "Centrična sila; spremeni le linearno gibanje"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Kaj povzroči par sil (dve nasprotno enaki sili z različnima premicama delovanja)?",
+      "answers": [
+        "Samo spremembo kotnega gibanja (vrtenje)",
+        "Spremembo linearnega in kotnega gibanja",
+        "Nobene spremembe gibanja",
+        "Samo spremembo linearnega gibanja"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Mišica deluje s silo 600 N, pravokotna ročica sile glede na os sklepa je 5 cm. Kolikšen navor ustvari ($M = F \\cdot r$)?",
+      "answers": [
+        "3000 N m",
+        "12 N m",
+        "120 N m",
+        "30 N m"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "osnove",
+      "question_text": "Zakaj se nagnemo vstran, ko v eni roki nosimo težko breme?",
+      "answers": [
+        "Da skupno težišče ostane nad podporno ploskvijo in zmanjšamo navor bremena",
+        "Da povečamo ročico bremena",
+        "Da zmanjšamo maso bremena",
+        "Ker se tako poveča trenje med podplati in tlemi"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Slika prikazuje vzvod, pri katerem mišična sila deluje med vrtiščem in bremenom. Za kateri razred vzvoda gre?",
+      "answers": [
+        "Vzvod 1. razreda",
+        "Vzvod 3. razreda",
+        "Vzvod 2. razreda",
+        "To ni vzvod, ker ni ravnovesja"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": "images/vzvod.png"
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Kaj velja za večino vzvodov mišica–kost v človeškem telesu?",
+      "answers": [
+        "So 1. razreda, njihova mehanska prednost je vedno enaka 1",
+        "So 3. razreda, mišična sila je zato manjša od sile bremena",
+        "So 3. razreda, njihova mehanska prednost je manjša od 1",
+        "So 2. razreda, njihova mehanska prednost je večja od 1"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Zakaj so mišice pripete tako blizu sklepov?",
+      "answers": [
+        "Ker se tako zmanjša obremenitev sklepa",
+        "Ker se tako zmanjša obseg gibanja in poveča stabilnost",
+        "Majhno skrčenje mišice povzroči velik in hiter gib okončine",
+        "Ker tako mišica potrebuje manj sile"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Podlaket je vodoravna, nadlaket navpična (slika). Biceps je pripet 4 cm od komolca, masa podlakti je 1,5 kg (težišče 15 cm od komolca), v dlani je utež 5 kg (35 cm od komolca). Približno kolikšna je sila bicepsa? ($g = 9{,}81$ m/s²)",
+      "answers": [
+        "≈ 484 N",
+        "≈ 429 N",
+        "≈ 66 N",
+        "≈ 1940 N"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": "images/podlaket_biceps.png"
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Športnik z maso 80 kg stoji na prstih ene noge. Vodoravna razdalja med prsti in gležnjem je 13 cm, med gležnjem in prijemališčem Ahilove tetive 3 cm. Približno kolikšna je sila v mečni mišici?",
+      "answers": [
+        "≈ 0,18 kN",
+        "≈ 0,8 kN",
+        "≈ 3,4 kN",
+        "≈ 10,2 kN"
+      ],
+      "correct_answer": 2,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "V poenostavljeni shemi ramenskega sklepa je deltoidna mišica pripeta 12 cm od sklepa pod kotom 15° glede na nadlahtnico. Iztegnjena roka ima maso 3,5 kg, težišče je 30 cm od sklepa. Približno kolikšna je sila v deltoidni mišici?",
+      "answers": [
+        "≈ 330 N",
+        "≈ 34 N",
+        "≈ 89 N",
+        "≈ 86 N"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Kateri del ramenskega sklepnega kompleksa NI pravi sklep, temveč prostor med prsnim košem in lopatico?",
+      "answers": [
+        "Glenohumeralni sklep",
+        "Skapulotorakalni sklep",
+        "Akromioklavikularni sklep",
+        "Sternoklavikularni sklep"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Kateri sklep je najbolj prosto gibljiv sklep v človeškem telesu?",
+      "answers": [
+        "Kolenski sklep",
+        "Glenohumeralni sklep",
+        "Korakoklavikularni sklep",
+        "Sternoklavikularni sklep"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Mišično silo lahko razstavimo na komponento, pravokotno na kost, in komponento, vzporedno s kostjo. Katera komponenta povzroči vrtenje kosti okoli sklepa?",
+      "answers": [
+        "Obe vzporedni komponenti skupaj",
+        "Dislokacijska (vzporedna s kostjo, stran od sklepa)",
+        "Rotacijska (pravokotna na kost)",
+        "Stabilizacijska (vzporedna s kostjo, proti sklepu)"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "sklepi",
+      "question_text": "Kdaj je telo bolj stabilno?",
+      "answers": [
+        "Ko ima večjo podporno ploskev in višje težišče",
+        "Ko ima večjo podporno ploskev in nižje težišče",
+        "Ko ima manjšo podporno ploskev in višje težišče",
+        "Stabilnost ni odvisna od lege težišča"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Kako je definirana mehanska napetost in v kateri enoti jo merimo?",
+      "answers": [
+        "$\\sigma = F/S$, enota Pa (N/m²)",
+        "$\\sigma = F \\cdot S$, enota N m",
+        "$\\sigma = m \\cdot a$, enota N",
+        "$\\sigma = \\Delta L / L$, brez enote"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Na kost s prečnim presekom 5 cm² deluje tlačna sila 1000 N. Kolikšna je mehanska napetost?",
+      "answers": [
+        "2 MPa",
+        "200 Pa",
+        "5 kPa",
+        "0,2 MPa"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Nadlahtnica dolžine 20 cm se pod obremenitvijo skrči za 0,1 mm. Kolikšen je relativni raztezek?",
+      "answers": [
+        "$5 \\cdot 10^{-3}$ (0,5 %)",
+        "0,1 mm",
+        "$2 \\cdot 10^{-3}$ (0,2 %)",
+        "$5 \\cdot 10^{-4}$ (0,05 %)"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Graf prikazuje napetost v nadlahtnici v odvisnosti od relativnega raztezka. Do približno katere napetosti velja območje elastičnosti?",
+      "answers": [
+        "≈ 120 MPa",
+        "≈ 140 MPa",
+        "≈ 85 MPa",
+        "≈ 40 MPa"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": "images/napetost_raztezek.png"
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Iz grafa ocenite: za koliko se lahko raztegne 20 cm dolga nadlahtnica, preden pride do zloma?",
+      "answers": [
+        "≈ 28 mm",
+        "≈ 1,0 mm",
+        "≈ 0,28 mm",
+        "≈ 2,8 mm"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": "images/napetost_raztezek.png"
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Kaj se zgodi, ko obremenitev preseže mejo elastičnosti (mejo plastičnosti)?",
+      "answers": [
+        "Struktura se vedno vrne v prvotno obliko",
+        "Del deformacije ostane trajen (plastična deformacija)",
+        "Takoj pride do zloma kosti",
+        "Modul elastičnosti se poveča"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Kakšna obremenitev nastane, ko se konstrukcija zasuka okoli svoje vzdolžne osi (npr. zlom golenice pri smučanju, ko je stopalo fiksirano)?",
+      "answers": [
+        "Strižna",
+        "Torzijska",
+        "Upogibna",
+        "Kompresijska"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Sila, ki na kolenski sklep deluje vzporedno s tibialno ploskvijo, povzroča ...",
+      "answers": [
+        "raztezno obremenitev",
+        "torzijsko obremenitev",
+        "strižno obremenitev",
+        "kompresijsko obremenitev"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Kako imenujemo poškodbo, ki nastane zaradi ponavljajočega se delovanja razmeroma majhnih sil?",
+      "answers": [
+        "Kronična poškodba, mehanizem je makrotravma",
+        "Akutna poškodba, mehanizem je mikrotravma",
+        "Akutna poškodba, mehanizem je makrotravma",
+        "Kronična (stresna) poškodba, mehanizem je mikrotravma"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Katere celice usmerjajo procese modeliranja in remodeliranja kosti glede na mehansko obremenitev?",
+      "answers": [
+        "Hondrociti",
+        "Osteociti",
+        "Miociti",
+        "Fibroblasti"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Pri katerih skupinah je bila ugotovljena izguba kostne mase zaradi premajhne mehanske obremenitve?",
+      "answers": [
+        "Pri teniških igralcih v dominantni roki",
+        "Pri tekačih na dolge proge",
+        "Pri dvigovalcih uteži",
+        "Pri bolnikih, priklenjenih na posteljo, in pri astronavtih"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Kaj je značilno za viskoelastična biološka tkiva (tetive, ligamente, hrustanec)?",
+      "answers": [
+        "Pri počasnem raztezanju so bolj toga kot pri hitrem",
+        "Njihov odziv ni odvisen od hitrosti deformacije",
+        "Pri hitrejšem raztezanju se pri enakem raztezku pojavi večja sila",
+        "Energije ne shranjujejo, samo jo disipirajo"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Vretence je glede na navpičnico nagnjeno za 30° in podpira težo zgornjega dela trupa $W$. Kolikšna strižna sila deluje nanj?",
+      "answers": [
+        "$\\frac{\\sqrt{3}}{2} W$",
+        "$W$",
+        "$2W$",
+        "$W/2$"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "elastomehanika",
+      "question_text": "Zaradi slabe drže se nagib vretenca poveča s 30° na 40°. Za približno koliko se poveča strižna obremenitev?",
+      "answers": [
+        "Ne spremeni se",
+        "Za približno 10 %",
+        "Za približno 60 %",
+        "Za približno 30 %"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Čemu je enak sunek sile?",
+      "answers": [
+        "Spremembi gibalne količine",
+        "Zmnožku sile in poti",
+        "Opravljenemu delu",
+        "Spremembi kinetične energije"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Graf prikazuje silo pri udarcu boksarja v 90 kg težko vrečo. S kolikšno hitrostjo se premakne vreča po udarcu?",
+      "answers": [
+        "≈ 0,89 m/s",
+        "≈ 0,44 m/s",
+        "≈ 8,9 m/s",
+        "≈ 1,78 m/s"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": "images/udarec_sila_cas.png"
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Kaj pri analizi teka pomeni hitrost obremenjevanja (loading rate, LR)?",
+      "answers": [
+        "Hitrost teka v m/s",
+        "Čas stika stopala s podlago",
+        "Največjo silo reakcije podlage",
+        "Spremembo sile reakcije podlage na časovno enoto ($\\Delta F/\\Delta t$)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "S katero napravo neposredno merimo silo reakcije podlage pri hoji ali skoku?",
+      "answers": [
+        "Z goniometrom",
+        "S tenziometrijsko (silovno) ploščo",
+        "S pletizmografom",
+        "Z elektromiografom"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Kako se po raziskavi (Scientific Reports, 2018) spremeni udarna obremenitev pri teku v močno blaženih copatih?",
+      "answers": [
+        "Poveča se togost noge in udarna obremenitev se poveča",
+        "Udarna obremenitev se izrazito zmanjša",
+        "Spremeni se le hitrost teka",
+        "Udarna obremenitev se ne spremeni"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Koliko so pri pristanku po navpičnem skoku (meritve košarkarjev) v povprečju znašale sile reakcije podlage?",
+      "answers": [
+        "Približno 2-kratnik telesne teže",
+        "Približno polovico telesne teže",
+        "Več kot 5-kratnik telesne teže",
+        "Približno 1-kratnik telesne teže"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Oseba z maso 70 kg se povzpne za 1500 m višinske razlike. Mehansko delo (dvig težišča) predstavlja 20 % celotne porabljene energije. Približno koliko energije porabi?",
+      "answers": [
+        "≈ 5,2 MJ",
+        "≈ 0,2 MJ",
+        "≈ 21 MJ",
+        "≈ 1,0 MJ"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Kako je definirana moč?",
+      "answers": [
+        "Moč je sprememba gibalne količine",
+        "Moč je sila na enoto površine",
+        "Moč je zmnožek sile in časa",
+        "Moč je delo, opravljeno v časovni enoti ($P = A/t$)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "kinetika",
+      "question_text": "Kolikšen je tipični izkoristek pretvorbe metabolne energije v mehansko delo pri človeku?",
+      "answers": [
+        "≈ 90 %",
+        "≈ 20–30 %",
+        "≈ 2–3 %",
+        "≈ 50–60 %"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Kaj je antropometrija?",
+      "answers": [
+        "Merjenje sil reakcije podlage",
+        "Merjenje porabe kisika",
+        "Merjenje človeškega telesa in njegovih mer",
+        "Merjenje električne aktivnosti mišic"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Za kakšen namen je Alphonse Bertillon prvotno uvedel antropometrične meritve?",
+      "answers": [
+        "Za izbor vrhunskih športnikov",
+        "Za lažjo identifikacijo kriminalcev",
+        "Za izdelavo ortopedskih pripomočkov",
+        "Za načrtovanje letalskih kabin"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Koliko približno znaša zlato razmerje?",
+      "answers": [
+        "2,718",
+        "1,414",
+        "3,142",
+        "1,618"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Katera vrstica podaja prvih sedem števil Fibonaccijevega zaporedja?",
+      "answers": [
+        "1, 2, 3, 5, 7, 11, 13",
+        "0, 1, 1, 2, 3, 5, 8",
+        "0, 1, 2, 4, 8, 16, 32",
+        "1, 1, 2, 4, 6, 10, 16"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Prazna plošča dolžine 1,7 m pritiska na obe podpori s silama po 25 N. Ko se nanjo uleže človek, sta sili $F_1 = 340$ N in $F_2 = 280$ N. Kako daleč od podpore 1 je težišče človeka?",
+      "answers": [
+        "≈ 0,76 m",
+        "≈ 0,94 m",
+        "≈ 0,55 m",
+        "≈ 0,85 m"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Katero tkivo ima med naštetimi najmanjšo gostoto?",
+      "answers": [
+        "Maščoba (≈ 0,9 kg/l)",
+        "Lobanja (≈ 1,8 kg/l)",
+        "Mišično tkivo (≈ 1,0 kg/l)",
+        "Vsa imajo enako gostoto"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Na čem temelji merjenje telesnega volumna s pletizmografijo (Bod Pod)?",
+      "answers": [
+        "Na izpodrinjenem volumnu vode pri potopitvi",
+        "Na rentgenski absorpciji (DEXA)",
+        "Na električni prevodnosti tkiv",
+        "Na spremembah tlaka v zaprti komori (Boylov zakon)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Zakaj imajo šprinterji relativno dolge, a ne čim daljše noge?",
+      "answers": [
+        "Ker daljše noge vedno pomenijo večjo maso mišic",
+        "Predolge noge znižajo frekvenco korakov; hitrost = dolžina koraka × frekvenca koraka",
+        "Ker dolžina nog na hitrost ne vpliva",
+        "Ker dolge noge povečajo upor zraka"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Katera antropometrična značilnost je pri vrhunskih plavalcih (npr. M. Phelps) prednost?",
+      "answers": [
+        "Visoko težišče in kratke roke",
+        "Relativno dolg trup, krajše noge in dolge roke",
+        "Relativno kratek trup in zelo dolge noge",
+        "Majhna telesna višina in kratke roke"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "diagnostika",
+      "question_text": "Katere metode razločijo maščobno, mišično in kostno tkivo in veljajo za najsodobnejši pristop?",
+      "answers": [
+        "Hidrostatično tehtanje",
+        "Goniometrija",
+        "DEXA, CT in MRI",
+        "Antropometrični meter"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "registracija",
+      "question_text": "Graf prikazuje vertikalno gibanje težišča med hojo. Kolikšna je amplituda gibanja (razlika med najvišjo in najnižjo lego)?",
+      "answers": [
+        "≈ 100 cm",
+        "≈ 10 cm",
+        "≈ 5 cm",
+        "≈ 2,5 cm"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": "images/tezisce_hoja.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Iz istega grafa gibanja težišča določite kadenco hoje (en nihaj težišča ustreza enemu koraku).",
+      "answers": [
+        "240 korakov/min",
+        "90 korakov/min",
+        "60 korakov/min",
+        "120 korakov/min"
+      ],
+      "correct_answer": 3,
+      "points": 2,
+      "image": "images/tezisce_hoja.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Dolžina koraka je 0,7 m, en korak traja 0,5 s (graf). S kolikšno hitrostjo hodi oseba?",
+      "answers": [
+        "1,4 m/s",
+        "0,7 m/s",
+        "0,35 m/s",
+        "2,8 m/s"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": "images/tezisce_hoja.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Graf prikazuje višino glave med navpičnim skokom. Koliko časa je bila oseba v zraku?",
+      "answers": [
+        "≈ 1,8 s",
+        "≈ 1,0 s",
+        "≈ 0,5 s",
+        "≈ 0,3 s"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": "images/navpicni_skok.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Oseba je bila pri navpičnem skoku v zraku 0,5 s (graf). Kolikšna je bila vzletna hitrost težišča?",
+      "answers": [
+        "≈ 4,9 m/s",
+        "≈ 9,8 m/s",
+        "≈ 2,45 m/s",
+        "≈ 1,2 m/s"
+      ],
+      "correct_answer": 2,
+      "points": 2,
+      "image": "images/navpicni_skok.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Za približno koliko se je oseba na grafu počepnila pred odrivom?",
+      "answers": [
+        "≈ 60 cm",
+        "≈ 15 cm",
+        "≈ 30 cm",
+        "≈ 45 cm"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": "images/navpicni_skok.png"
+    },
+    {
+      "category": "registracija",
+      "question_text": "Kaj merimo z goniometrom?",
+      "answers": [
+        "Sile reakcije podlage",
+        "Kote v sklepih",
+        "Porabo kisika",
+        "Električno aktivnost mišic"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "registracija",
+      "question_text": "Kaj omogoča inverzna dinamika?",
+      "answers": [
+        "Merjenje telesne gostote",
+        "Neposredno merjenje mišičnih sil z elektrodami",
+        "Filtriranje signalov v frekvenčnem prostoru",
+        "Izračun sklepnih sil in navorov iz izmerjene kinematike in zunanjih sil"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "registracija",
+      "question_text": "Katere tehnologije spadajo med nosljive senzorje za analizo gibanja?",
+      "answers": [
+        "Silovne plošče, vgrajene v tla",
+        "IMU, pametni vložki in pametna oblačila",
+        "Hidrostatična tehtnica in Bod Pod",
+        "MRI in CT"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "registracija",
+      "question_text": "Kaj je ključna ideja analize gibanja, ki sta jo uvedla Braune in Fischer?",
+      "answers": [
+        "Telo obravnavamo kot sistem povezanih segmentov s težišči in masnimi lastnostmi",
+        "Telo obravnavamo kot eno samo togo telo brez segmentov",
+        "Gibanje opisujemo izključno kvalitativno",
+        "Merimo le električno aktivnost mišic"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kolikšen delež dnevne energijske porabe v povprečju predstavlja bazalni metabolizem?",
+      "answers": [
+        "5–10 %",
+        "15–20 %",
+        "50–70 %",
+        "90–95 %"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kolikšna je tipična mehanska učinkovitost skeletne mišice?",
+      "answers": [
+        "≈ 5 %",
+        "≈ 80 %",
+        "≈ 50 %",
+        "≈ 20 % (preostanek je toplota)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kaj pomeni kratica EPOC?",
+      "answers": [
+        "Povečana poraba kisika po vadbi",
+        "Največja poraba kisika med vadbo",
+        "Prag kopičenja laktata v krvi",
+        "Bazalni metabolizem v mirovanju"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kateri energijski sistem prevladuje pri zelo kratkih, eksplozivnih obremenitvah (prvih nekaj sekund, npr. skok)?",
+      "answers": [
+        "Lipoliza (oksidacija maščob)",
+        "Jetrna glikogenoliza",
+        "ATP–CP sistem (ATP in kreatinfosfat)",
+        "Glukoneogeneza"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kateri proces postane prevladujoč približno med 10. in 60. sekundo intenzivne vadbe in proizvaja laktat?",
+      "answers": [
+        "Razpad kreatinfosfata",
+        "Glukoneogeneza",
+        "Anaerobna glikoliza",
+        "Lipoliza"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Pri kolikšni intenzivnosti se laktatni prag običajno pojavi pri netreniranih osebah?",
+      "answers": [
+        "Pri 65–80 % VO₂max",
+        "Pri 20–30 % VO₂max",
+        "Pri 90–100 % VO₂max",
+        "Pri 50–60 % VO₂max"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kaj pomeni OBLA?",
+      "answers": [
+        "Bazalni metabolizem",
+        "Intenzivnost, pri kateri koncentracija laktata v krvi doseže 4 mM",
+        "Porabo kisika po vadbi",
+        "Največjo porabo kisika"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "V kateri enoti izražamo relativno porabo kisika VO₂, ki je primerljiva med osebami?",
+      "answers": [
+        "kcal/dan",
+        "L/min",
+        "mL/kg/min",
+        "W"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kateri del možganov je glavni center za uravnavanje telesne temperature?",
+      "answers": [
+        "Sprednji del hipotalamusa",
+        "Mali možgani",
+        "Podaljšana hrbtenjača",
+        "Okcipitalni reženj"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kateri mehanizem je pri sedeči goli osebi odgovoren za približno 60 % toplotnih izgub?",
+      "answers": [
+        "Izhlapevanje znoja",
+        "Dihanje",
+        "Sevanje (radiacija)",
+        "Kondukcija s predmeti"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Kaj se zgodi s kožnimi žilami, ko je telesu prehladno?",
+      "answers": [
+        "Ostanejo nespremenjene",
+        "Poveča se izločanje znoja",
+        "Razširijo se (vazodilatacija)",
+        "Skrčijo se (vazokonstrikcija)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Pod katero temperaturo jedra govorimo o hipotermiji?",
+      "answers": [
+        "Pod 30 °C",
+        "Pod 25 °C",
+        "Pod 35 °C",
+        "Pod 37 °C"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Koliko toplote telo odda z izhlapevanjem 1 g vode (znoja)?",
+      "answers": [
+        "≈ 2,4 kJ (0,58 kcal)",
+        "≈ 4,2 kJ",
+        "≈ 24 kJ",
+        "≈ 0,24 kJ"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "termoregulacija",
+      "question_text": "Zakaj se pri bolnikih po srčnem zastoju uporablja terapevtska hipotermija?",
+      "answers": [
+        "Ker zniža porabo kisika v možganih in upočasni nastajanje prostih radikalov",
+        "Ker pospeši metabolizem v možganih",
+        "Ker poveča pretok krvi skozi kožo",
+        "Ker poveča srčni utrip"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Katera vedenjska lastnost je edinstvena za mišično tkivo?",
+      "answers": [
+        "Vzdražnost",
+        "Raztegljivost",
+        "Elastičnost",
+        "Sposobnost aktivnega razvijanja napetosti"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Katere mišice uravnava avtonomni živčni sistem in delujejo nezavedno v stenah notranjih organov?",
+      "answers": [
+        "Skeletne (progaste) mišice",
+        "Gladke mišice",
+        "Vse mišice okončin",
+        "Mišice, ki so pripete na kosti"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kje se nahaja serijska elastična komponenta mišice (SEC), ki shranjuje elastično energijo?",
+      "answers": [
+        "V kostnem mozgu",
+        "V motoričnih nevronih",
+        "V mišičnih membranah",
+        "V tetivah"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Mišična vlakna pernate mišice ustvarijo silo $F_f = 100$ N in s kito oklepajo kot 60° (slika). Kolikšna je sila v kiti $F_t$?",
+      "answers": [
+        "100 N",
+        "50 N",
+        "200 N",
+        "87 N"
+      ],
+      "correct_answer": 1,
+      "points": 2,
+      "image": "images/pernata_misica.png"
+    },
+    {
+      "category": "misice",
+      "question_text": "Mišična vlakna pernate mišice ustvarijo silo 60 N in s kito oklepajo kot 30°. Kaj velja za silo v kiti?",
+      "answers": [
+        "Zagotovo je manjša od 60 N",
+        "Enaka je 60 N",
+        "Enaka je 0 N",
+        "Zagotovo je večja od 60 N"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kaj sestavlja motorično enoto?",
+      "answers": [
+        "En motorični nevron in eno mišično vlakno",
+        "En motorični nevron in vsa mišična vlakna, ki jih oživčuje",
+        "Več motoričnih nevronov in več mišic",
+        "Več motoričnih nevronov in eno mišično vlakno"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kakšen je pri šprinterjih na 100 m tipični delež hitrih (FT, tip II) mišičnih vlaken?",
+      "answers": [
+        "Približno 25 %",
+        "Približno 75 %",
+        "Približno 10 %",
+        "Približno 50 %"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kaj je glavni mehanizem povečanja mišične mase pri človeku po vadbi za moč?",
+      "answers": [
+        "Hipertrofija – povečanje premera vlaken",
+        "Hiperplazija – povečanje števila vlaken",
+        "Povečanje števila motoričnih nevronov",
+        "Povečanje deleža maščobe v mišici"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kdaj se po težki vadbi običajno pojavi zakasnela mišična bolečina (DOMS) in katera vrsta kontrakcij jo najbolj povzroča?",
+      "answers": [
+        "Takoj po vadbi; izometrične kontrakcije",
+        "Med vadbo; koncentrične kontrakcije",
+        "12–48 ur po vadbi; ekscentrične kontrakcije",
+        "Po enem tednu; koncentrične kontrakcije"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kakšno je krčenje, pri katerem se mišica med razvijanjem napetosti podaljšuje (npr. spuščanje bremena)?",
+      "answers": [
+        "Ekscentrično",
+        "Izometrično",
+        "Tetanično",
+        "Koncentrično"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Kako imenujemo krčenje, pri katerem mišica razvija napetost, njena dolžina pa se ne spreminja?",
+      "answers": [
+        "Koncentrično",
+        "Izometrično",
+        "Ekscentrično",
+        "Izotonično"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Slika prikazuje odvisnost sile in moči mišice od hitrosti krčenja. Pri kateri točki je mehanska moč največja?",
+      "answers": [
+        "B (pri približno tretjini največje hitrosti)",
+        "Pri hitrosti nič (izometrično)",
+        "A (pri zelo majhni hitrosti)",
+        "C (pri skoraj največji hitrosti)"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": "images/sila_hitrost_moc.png"
+    },
+    {
+      "category": "misice",
+      "question_text": "Kaj je tetanus v mišični fiziologiji?",
+      "answers": [
+        "Trajna največja napetost vlakna zaradi hitro ponavljajočih se dražljajev",
+        "Popolna sprostitev mišice",
+        "Zakasnela bolečina v mišicah",
+        "Ekscentrično krčenje pod velikim bremenom"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "misice",
+      "question_text": "Katera mišica se skrči pri patelarnem (pogačičnem) refleksu?",
+      "answers": [
+        "Dvoglava stegenska mišica",
+        "Prednja golenska mišica",
+        "Mečna mišica",
+        "Štiriglava stegenska mišica (kvadriceps)"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Kaj je najmanjša enota živčno-mišičnega sistema, ki jo lahko nadzoruje centralni živčni sistem?",
+      "answers": [
+        "Senzorični nevron",
+        "Sarkomera",
+        "Mišični snop",
+        "Motorična enota"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Kako se med akcijskim potencialom spremeni membranski potencial mišične celice?",
+      "answers": [
+        "Z okoli −80 mV na okoli +30 mV (depolarizacija)",
+        "Ostane nespremenjen",
+        "Z 0 mV na +120 mV",
+        "Z okoli +30 mV na okoli −80 mV"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Kaj pomeni elektromehanska sklopitev?",
+      "answers": [
+        "Povezava elektrod z ojačevalnikom",
+        "Prenos signala po senzoričnem živcu",
+        "Sprostitev kalcijevih ionov sproži skrajšanje kontraktilnih elementov",
+        "Pretvorba EMG signala v digitalno obliko"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Signal je vsota treh sinusov: $x = \\sin(2\\pi t) + \\sin(10\\pi t) + \\sin(0{,}5\\pi t)$. Pri katerih frekvencah so vrhovi v njegovem spektru (slika)?",
+      "answers": [
+        "0,25 Hz, 1 Hz in 5 Hz",
+        "π Hz, 2π Hz in 10π Hz",
+        "1 Hz, 2 Hz in 5 Hz",
+        "0,5 Hz, 2 Hz in 10 Hz"
+      ],
+      "correct_answer": 0,
+      "points": 2,
+      "image": "images/spekter.png"
+    },
+    {
+      "category": "emg",
+      "question_text": "Kateri filter iz signala s spektra na sliki ohrani samo komponento pri 1 Hz?",
+      "answers": [
+        "Visokoprepustni filter z mejo 0,5 Hz",
+        "Nizkoprepustni filter z mejo 0,5 Hz",
+        "Pasovni filter, ki prepušča 0,5–1,5 Hz",
+        "Visokoprepustni filter z mejo 2 Hz"
+      ],
+      "correct_answer": 2,
+      "points": 2,
+      "image": "images/spekter.png"
+    },
+    {
+      "category": "emg",
+      "question_text": "Kaj odstrani visokoprepustni filter?",
+      "answers": [
+        "Počasne komponente (npr. lezenje bazne linije)",
+        "Vse komponente razen ene",
+        "Nič, le ojača signal",
+        "Hitre komponente (npr. šum)"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Kaj naredi nizkoprepustni filter?",
+      "answers": [
+        "Poveča frekvenco vzorčenja",
+        "Prepusti počasne komponente, odstrani hitre (šum)",
+        "Prepusti hitre komponente, odstrani počasne",
+        "Odstrani amplitudo signala"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Zakaj pri EMG signalih običajno uporabimo pasovno filtracijo?",
+      "answers": [
+        "Ker spremeni signal iz časovnega v prostorski prostor",
+        "Spodnja meja odreže počasne bazalne variacije, zgornja meja šum",
+        "Ker iz signala izloči vse frekvence",
+        "Ker poveča amplitudo signala"
+      ],
+      "correct_answer": 1,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Kako deluje glajenje s povprečenjem sosednjih točk (NN averaging)?",
+      "answers": [
+        "Točke razvrstimo po velikosti",
+        "Odstranimo vsako drugo točko",
+        "Vrednost točke nadomestimo s povprečjem sosednjih točk v izbranem oknu",
+        "Signal pomnožimo s konstanto"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "emg",
+      "question_text": "Za kaj se elektromiografija NE uporablja?",
+      "answers": [
+        "Za neposredno merjenje telesne gostote",
+        "Za študije mišičnih odzivov v ergonomiji",
+        "Za optimizacijo treninga in rehabilitacije",
+        "Za ocenjevanje mišične zmogljivosti"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Iz katerih osnovnih gradnikov je sestavljeno kompleksno omrežje?",
+      "answers": [
+        "Iz signalov in filtrov",
+        "Iz motoričnih enot in tetiv",
+        "Iz sil in navorov",
+        "Iz vozlov in povezav"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kaj je matrika sosednosti anatomskega omrežja z N kostmi?",
+      "answers": [
+        "Kvadratna matrika N × N, ki zapisuje, katere kosti so povezane",
+        "Seznam N mas kosti",
+        "Spekter EMG signala N mišic",
+        "Matrika 2 × N s koordinatami kosti"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kdaj se v anatomskem omrežju dve kosti štejeta za povezani?",
+      "answers": [
+        "Ko si delita stično površino (šiv, sinhondroza, sinovijski sklep)",
+        "Ko ju oživčuje isti živec",
+        "Ko imata enako maso",
+        "Ko ležita v isti ravnini"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kako iz meritev možganske aktivnosti (npr. fMRI) dobimo funkcionalno omrežje?",
+      "answers": [
+        "Preštejemo kosti lobanje",
+        "Izračunamo gostoto možganovine",
+        "Izmerimo silo reakcije podlage",
+        "Izračunamo korelacijsko matriko sinhronosti regij in jo binariziramo s pragom"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Na koliko modulov je analiza razdelila anatomsko omrežje skeletnih mišic (Kerkman et al., 2018)?",
+      "answers": [
+        "Na 8 modulov lobanje",
+        "Na 2 modula: zgornji in spodnji del telesa",
+        "Omrežje ni modularno",
+        "Na 5 modulov: desna roka, leva roka, trup, desna noga, leva noga"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kaj je MoBI (Mobile Brain/Body Imaging)?",
+      "answers": [
+        "Merjenje sil reakcije podlage med tekom",
+        "Slikanje kosti z magnetno resonanco",
+        "Metoda za merjenje telesne gostote",
+        "Sočasno merjenje možganske aktivnosti in gibanja telesa v naravnih pogojih"
+      ],
+      "correct_answer": 3,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kaj velja za fNIRS v primerjavi z EEG pri MoBI meritvah?",
+      "answers": [
+        "Ima boljšo časovno ločljivost (milisekunde)",
+        "Meri globoke možganske strukture",
+        "Je manj občutljiv na artefakte gibanja, a ima slabšo časovno ločljivost",
+        "Meri neposredno električne potenciale na lasišču"
+      ],
+      "correct_answer": 2,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "S čim se ukvarja mrežna fiziologija (network physiology)?",
+      "answers": [
+        "Z interakcijami med organi in fiziološkimi sistemi kot celostno mrežo",
+        "Z delovanjem posameznega organa ločeno od ostalih",
+        "Z gradnjo računalniških omrežij v bolnišnicah",
+        "Izključno z anatomijo kosti"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Kaj so pokazale raziskave o treningu hoje pri bolnikih po možganski kapi?",
+      "answers": [
+        "Večje izboljšanje povezanosti možganskega omrežja je spremljal večji napredek pri hoji",
+        "Možganska povezanost se med rehabilitacijo ne spreminja",
+        "Trening hoje vpliva le na mišice, ne pa na možgane",
+        "Napredek pri hoji je obratno sorazmeren z izboljšanjem povezanosti"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    },
+    {
+      "category": "mreze",
+      "question_text": "Od česa je po Boonstri in sodelavcih (2015) odvisna povezanost mišic v omrežju, izračunanem iz EMG?",
+      "answers": [
+        "Od podobnosti frekvenčnih spektrov EMG signalov",
+        "Od dolžine tetiv",
+        "Od števila kosti, na katere je mišica pripeta",
+        "Od mase posameznih mišic"
+      ],
+      "correct_answer": 0,
+      "points": 1,
+      "image": ""
+    }
+  ]
+}

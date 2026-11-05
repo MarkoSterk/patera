@@ -1,11 +1,11 @@
 const root = document.querySelector('#app');
 const identity = document.querySelector('#identity');
 const accountActions = document.querySelector('#account-actions');
-const TAGLINE = 'A little preparation. A clear result.';
 
 let user = null;
 let data = {subjects: [], categories: [], questions: [], exams: []};
 let subjectFilter = '';
+let categoryFilter = []; // category ids shown in the Questions list; empty = all
 let section = new URLSearchParams(location.search).get('view') === 'admin' ? 'admin' : 'exams';
 let imageData = '';
 
@@ -67,7 +67,7 @@ function localDate(value) {
 }
 
 function showLogin() {
-  identity.textContent = TAGLINE;
+  identity.textContent = '';
   accountActions.replaceChildren();
   root.innerHTML = `<section class="card narrow"><p>INSTRUCTOR WORKSPACE</p><h1>Ready for the next exam?</h1>
     <p>Sign in to manage your question bank, publish exams, and review results.</p>
@@ -99,6 +99,7 @@ async function refresh() {
       ['subjects', 'categories', 'questions', 'exams'].map(name => api('GET', `/api/${name}/`)));
     data = {subjects, categories, questions, exams};
     if (!subjects.some(s => s.id === subjectFilter)) subjectFilter = '';
+    categoryFilter = categoryFilter.filter(id => categories.some(c => c.id === id));
   }
   render();
 }
@@ -150,6 +151,58 @@ function recordDetails(record) {
   return '';
 }
 
+// A dropdown (details/summary) holding one checkbox per category.
+function categoryDropdown(name, categories, selected, emptyLabel, withSubject = false) {
+  const label = c => esc(c.name) + (withSubject ? ` <small>(${esc(subjectName(c.subject_id))})</small>` : '');
+  return `<details class="multiselect" data-multiselect="${name}" data-empty="${esc(emptyLabel)}">
+    <summary>${multiselectSummary(categories.filter(c => selected.includes(c.id)), categories.length, emptyLabel)}</summary>
+    <div class="multiselect-menu">
+      ${categories.length ? `<div class="row multiselect-actions"><button type="button" class="secondary" data-select="all">Select all</button>
+        <button type="button" class="secondary" data-select="none">Clear</button></div>
+        ${categories.map(c => `<label><input type="checkbox" name="${name}" value="${c.id}" ${selected.includes(c.id) ? 'checked' : ''}><span>${label(c)}</span>
+          <small class="count">${inSubject(data.questions, c.subject_id).filter(q => q.category_id === c.id).length}</small></label>`).join('')}`
+        : '<p><small>No categories.</small></p>'}
+    </div></details>`;
+}
+
+function multiselectSummary(chosen, total, emptyLabel) {
+  if (!chosen.length) return esc(emptyLabel);
+  if (chosen.length === total && total > 1) return `All categories (${total})`;
+  return chosen.length <= 2 ? chosen.map(c => esc(c.name)).join(', ') : `${chosen.length} categories selected`;
+}
+
+// Wires a dropdown: select all/clear, a live summary, and onChange(selected ids).
+function wireCategoryDropdown(box, onChange) {
+  const boxes = () => [...box.querySelectorAll('input[type="checkbox"]')];
+  const changed = () => {
+    const ids = boxes().filter(b => b.checked).map(b => b.value);
+    const chosen = data.categories.filter(c => ids.includes(c.id));
+    box.querySelector('summary').innerHTML = multiselectSummary(chosen, boxes().length, box.dataset.empty);
+    onChange(ids);
+  };
+  boxes().forEach(b => b.onchange = changed);
+  box.querySelectorAll('[data-select]').forEach(button => button.onclick = () => {
+    boxes().forEach(b => b.checked = button.dataset.select === 'all');
+    changed();
+  });
+}
+
+// Close open dropdowns on an outside click or Escape.
+document.addEventListener('click', event => {
+  if (!event.target.isConnected) return; // the click re-rendered its own dropdown
+  document.querySelectorAll('details.multiselect[open]').forEach(box => { if (!box.contains(event.target)) box.open = false; });
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') document.querySelectorAll('details.multiselect[open]').forEach(box => { box.open = false; });
+});
+
+function categoryFilterControl() {
+  if (section !== 'questions' || !data.categories.length) return '';
+  const categories = subjectFilter ? inSubject(data.categories, subjectFilter) : data.categories;
+  return `<div class="category-filter"><span class="filter-label">Categories</span>
+    ${categoryDropdown('category_filter', categories, categoryFilter, 'All categories', !subjectFilter)}</div>`;
+}
+
 function subjectFilterControl() {
   if (section === 'subjects' || !data.subjects.length) return '';
   return `<label class="subject-filter">Subject<select id="subject-filter">
@@ -159,15 +212,40 @@ function subjectFilterControl() {
 function shareExam(exam) {
   return `<details><summary>Share exam · link & QR code</summary>
     <p><a href="/exam/${exam.id}" target="_blank" rel="noopener">${esc(location.origin)}/exam/${exam.id}</a></p>
-    <img class="qr" src="/api/exams/${exam.id}/qr" alt="Exam QR code">
+    <button type="button" class="qr-button" data-qr="${exam.id}" title="Show a larger QR code" aria-label="Show a larger QR code for ${esc(exam.title)}">
+      <img class="qr" src="/api/exams/${exam.id}/qr" alt="Exam QR code"></button>
     <p><a href="/api/exams/${exam.id}/qr" download="exam-qr.svg">Download QR code</a></p></details>`;
+}
+
+// A large QR code in a modal dialog, for showing on a projector or screen.
+function showQrDialog(exam) {
+  let dialog = document.querySelector('#qr-dialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'qr-dialog';
+    dialog.className = 'qr-dialog';
+    document.body.append(dialog);
+    // A click outside the content (on the backdrop) closes the dialog.
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  }
+  const link = `${location.origin}/exam/${exam.id}`;
+  dialog.setAttribute('aria-label', `QR code for ${exam.title}`);
+  dialog.innerHTML = `<div class="qr-dialog-body">
+    <h2>${esc(exam.title)}</h2>
+    <img class="qr-large" src="/api/exams/${exam.id}/qr" alt="Exam QR code">
+    <p><a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a></p>
+    <div class="row qr-dialog-actions"><a class="button secondary" href="/api/exams/${exam.id}/qr" download="exam-qr.svg">Download QR code</a>
+    <button type="button" id="qr-close">Close</button></div></div>`;
+  dialog.querySelector('#qr-close').onclick = () => dialog.close();
+  dialog.showModal();
 }
 
 function listView() {
   const {kind, path, label} = KINDS[section];
-  const records = section !== 'subjects' && subjectFilter ? inSubject(data[section], subjectFilter) : data[section];
+  let records = section !== 'subjects' && subjectFilter ? inSubject(data[section], subjectFilter) : data[section];
+  if (section === 'questions' && categoryFilter.length) records = records.filter(q => categoryFilter.includes(q.category_id));
   document.querySelector('#content').innerHTML = `<div class="row between"><h2>${title(section)}</h2><button id="new">+ New ${kind}</button></div>
-    ${subjectFilterControl()}
+    <div class="row filters">${subjectFilterControl()}${categoryFilterControl()}</div>
     <div id="editor"></div>
     ${records.length ? records.map(record => `<article class="card"><div class="row between">
       <div><h2>${label(record)}</h2>${recordDetails(record)}</div>
@@ -177,7 +255,10 @@ function listView() {
 
   document.querySelector('#new').onclick = () => editor(kind, section !== 'subjects' && subjectFilter ? {subject_id: subjectFilter} : {});
   const filter = document.querySelector('#subject-filter');
-  if (filter) filter.onchange = () => { subjectFilter = filter.value; listView(); };
+  if (filter) filter.onchange = () => { subjectFilter = filter.value; categoryFilter = []; listView(); };
+  const categoryBox = document.querySelector('[data-multiselect="category_filter"]');
+  if (categoryBox) wireCategoryDropdown(categoryBox, ids => { categoryFilter = ids; listView(); document.querySelector('[data-multiselect="category_filter"]').open = true; });
+  root.querySelectorAll('[data-qr]').forEach(button => button.onclick = () => showQrDialog(records.find(r => r.id === button.dataset.qr)));
   root.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editor(kind, records.find(r => r.id === button.dataset.edit)));
   root.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => {
     if (confirm('Delete this item? Archived submissions will remain.')) {
@@ -225,12 +306,37 @@ function examSelection(subjectId, record) {
   const categories = inSubject(data.categories, subjectId);
   const questions = inSubject(data.questions, subjectId);
   if (!questions.length) return '<p><small>This subject has no questions yet.</small></p>';
-  return `<label><input name="random" type="checkbox">Generate a random selection from categories (replaces manual selection)</label>
+  return `<div class="exam-categories"><span class="filter-label">Categories <small>(filter the questions below and choose the pool for random generation)</small></span>
+    ${categoryDropdown('category_ids', categories, [], 'All categories')}</div>
+    <label><input name="random" type="checkbox">Generate a random selection from the selected categories (replaces manual selection)</label>
     ${field('Number of random questions', 'count', 10, 'number', 'min="1" step="1"')}
-    <p>Categories for random generation</p>
-    ${categories.map(c => `<label><input type="checkbox" name="category_ids" value="${c.id}">${esc(c.name)}</label>`).join('')}
-    <p>Or select questions manually</p>
-    ${questions.map(q => `<label><input type="checkbox" name="question_ids" value="${q.id}" ${record.question_ids?.includes(q.id) ? 'checked' : ''}>${math(q.question_text)} <small>(${esc(categoryName(q.category_id))} · ${points(q.points)})</small></label>`).join('')}`;
+    <p id="random-pool"><small></small></p>
+    <p>Or select questions manually · <small id="manual-count"></small></p>
+    <div id="exam-questions">
+    ${questions.map(q => `<label data-category="${q.category_id}"><input type="checkbox" name="question_ids" value="${q.id}" ${record.question_ids?.includes(q.id) ? 'checked' : ''}>${math(q.question_text)} <small>(${esc(categoryName(q.category_id))} · ${points(q.points)})</small></label>`).join('')}
+    </div>`;
+}
+
+// Shows only the questions of the selected categories; hidden ticked questions stay selected.
+function wireExamSelection(form) {
+  const box = form.querySelector('[data-multiselect="category_ids"]');
+  if (!box) return;
+  const apply = ids => {
+    const items = [...form.querySelectorAll('#exam-questions [data-category]')];
+    items.forEach(item => item.hidden = ids.length > 0 && !ids.includes(item.dataset.category));
+    const visible = items.filter(item => !item.hidden);
+    const ticked = items.filter(item => item.querySelector('input').checked);
+    const hiddenTicked = ticked.filter(item => item.hidden).length;
+    form.querySelector('#manual-count').textContent = `${visible.length} shown · ${ticked.length} selected`
+      + (hiddenTicked ? ` (${hiddenTicked} in categories not shown)` : '');
+    form.querySelector('#random-pool small').textContent = ids.length
+      ? `Random pool: ${visible.length} questions in ${ids.length} selected ${ids.length === 1 ? 'category' : 'categories'}.`
+      : 'Select at least one category to generate a random selection.';
+  };
+  wireCategoryDropdown(box, apply);
+  form.querySelectorAll('#exam-questions input').forEach(input => input.addEventListener('change', () =>
+    apply([...box.querySelectorAll('input:checked')].map(b => b.value))));
+  apply([]);
 }
 
 function examFields(record) {
@@ -310,9 +416,13 @@ function wireSubjectChoice(kind, record, form) {
   };
   subject.onchange = () => {
     if (kind === 'question') category.innerHTML = categoryOptions(subject.value, '');
-    if (kind === 'exam') form.querySelector('#selection').innerHTML = examSelection(subject.value, {});
+    if (kind === 'exam') {
+      form.querySelector('#selection').innerHTML = examSelection(subject.value, {});
+      wireExamSelection(form);
+    }
     update();
   };
+  if (kind === 'exam') wireExamSelection(form);
   if (category) category.onchange = update;
   update();
 }
@@ -361,10 +471,36 @@ function attemptDetails(attempt) {
   const {result} = attempt;
   return `<details><summary>${esc(attempt.student_email)} · ${pct(result.percentage)} · ${result.passed ? 'Pass' : 'Fail'} · ${when(attempt.submitted_at)}</summary>
     <p>${result.points} / ${result.maximum} points · Pass threshold: ${attempt.pass_percentage}%</p>
-    ${attempt.questions.map(q => `<fieldset><legend>${points(q.points)}</legend><p>${math(q.question_text)}</p>
+    ${attempt.questions.map(q => `<fieldset><legend>${points(q.points)}</legend>${answerOutcome(q)}<p>${math(q.question_text)}</p>
       ${q.image ? `<img class="question-image" src="${esc(q.image)}" alt="Question image">` : ''}
-      ${q.answers.map((answer, i) => `<p>${i === q.selected_answer ? 'Selected · ' : ''}${i === q.correct_answer ? 'Correct · ' : ''}${math(answer)}</p>`).join('')}
+      ${q.answers.map((answer, i) => reviewedAnswer(q, i, answer)).join('')}
       </fieldset>`).join('')}</details>`;
+}
+
+// Archived answer outcome: shown at the top of each reviewed question.
+function answerOutcome(q) {
+  if (q.selected_answer === null || q.selected_answer === undefined) {
+    return '<span class="outcome unanswered">Not answered</span>';
+  }
+  return q.selected_answer === q.correct_answer
+    ? `<span class="outcome correct">${mark('correct')} Correct answer</span>`
+    : `<span class="outcome wrong">${mark('wrong')} Incorrect answer</span>`;
+}
+
+// A green check marks the correct answer, a red cross a wrong selection.
+function mark(kind) {
+  const label = kind === 'correct' ? 'Correct' : 'Selected, incorrect';
+  return `<span class="mark ${kind}" role="img" aria-label="${label}" title="${label}">${kind === 'correct' ? '✓' : '✕'}</span>`;
+}
+
+function reviewedAnswer(q, i, answer) {
+  const selected = i === q.selected_answer;
+  const correct = i === q.correct_answer;
+  const marker = correct ? mark('correct') : selected ? mark('wrong') : '<span class="mark none"></span>';
+  const classes = ['reviewed-answer', selected ? 'selected' : '', selected && !correct ? 'wrong' : '', correct ? 'correct' : '']
+    .filter(Boolean).join(' ');
+  const note = selected ? '<span class="visually-hidden"> (selected)</span>' : '';
+  return `<p class="${classes}">${marker}<span>${math(answer)}${note}</span></p>`;
 }
 
 function reportsView(reports, target = '#content') {

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from patera import BaseConfig
 from patera.admin import AdminConfig
@@ -25,6 +26,9 @@ class Config(BaseConfig):
     AUTH_COOKIE_NAME: str = "quick_exams_token"
 
     PUBLIC_URL: str = "http://localhost:3000"
+    # Name of a cloudflared quick tunnel, the <name> in
+    # https://<name>.trycloudflare.com. When set, exam QR codes use the tunnel.
+    CLOUDFLARE_TUNNEL_URL: Optional[str] = None
 
     MAX_CONTENT_LENGTH: int = 4 * 1024 * 1024
     CORS_ENABLED: bool = False
@@ -38,6 +42,17 @@ class Config(BaseConfig):
         URL_FOR_FOR_LOGIN="AuthApi.login",
         URL_FOR_FOR_LOGOUT="AuthApi.logout",
     )
+
+    @property
+    def exam_base_url(self) -> str:
+        """Origin used in exam QR codes: the Cloudflare tunnel if set, else PUBLIC_URL."""
+        tunnel = (self.CLOUDFLARE_TUNNEL_URL or "").strip()
+        if tunnel:
+            # Accept the bare name, or a pasted host or URL of the tunnel.
+            tunnel = tunnel.removeprefix("https://").removeprefix("http://").strip("/")
+            tunnel = tunnel.removesuffix(".trycloudflare.com")
+            return f"https://{tunnel}.trycloudflare.com"
+        return self.PUBLIC_URL.rstrip("/")
 
     @property
     def secure_cookies(self) -> bool:
