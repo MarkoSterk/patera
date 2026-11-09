@@ -106,15 +106,17 @@ Query parameters are declared with a model; see below.
 
 ## Request bodies and validation
 
-A Pydantic model parameter declares where its data comes from with one of two annotations from
+A Pydantic model parameter declares where its data comes from with one of these annotations from
 `patera.controller`:
 
 | Annotation | Built from |
 | --- | --- |
 | `RequestBody[Model]` | the request body, read as the `@consumes` media type |
 | `QueryParams[Model]` | the query string |
+| `Files[...]` | the files of a multipart body ([Uploaded files](#uploaded-files)) |
+| `Headers[Model]`, `Cookies[Model]` | request headers and cookies ([Headers and cookies](#headers-and-cookies)) |
 
-Both are `Annotated` aliases: editors and type checkers see a plain `Model`.
+All are `Annotated` aliases: editors and type checkers see a plain `Model`.
 
 ```python
 @post("/")
@@ -140,10 +142,10 @@ the body: JSON, url-encoded form or multipart form (including `UploadedFile` fie
   (checkboxes, multi-selects).
 - Invalid data raises `RequestValidationError`: `422` with the validation errors, without the
   submitted values, unless you [handle](exception-handling.md) it yourself. Each error's `loc`
-  starts with `"body"` or `"query"`.
-- Mistakes fail at startup, when the controller is registered: a model parameter without
-  `RequestBody` or `QueryParams`, a `RequestBody` without `@consumes`, two `RequestBody`
-  parameters, or `@consumes` on a GET endpoint.
+  starts with `"body"`, `"query"`, `"files"`, `"header"` or `"cookie"`.
+- Mistakes fail at startup, when the controller is registered: a model parameter without one of
+  these annotations, a `RequestBody` without `@consumes`, two `RequestBody` parameters, or
+  `@consumes` on a GET endpoint.
 - Raw values stay available: `req.query_parameters`, `await req.json()`, `await req.form()`.
   Validate data the handler assembles itself with `req.validate(Model, data)`
   (see [Requests](requests.md#validation)).
@@ -200,6 +202,52 @@ declare file fields or fields named like a `Files` parameter; both fail at start
 `Files` without `@consumes(MediaType.MULTIPART_FORM_DATA)`. A handler may also take only `Files`
 parameters. OpenAPI documents the form fields and the files as one `multipart/form-data` object
 with binary file properties.
+
+### Headers and cookies
+
+`Headers[Model]` and `Cookies[Model]` build a model from request headers and cookies, like
+`QueryParams[Model]` does from the query string. The parameter's name does not matter; the
+model's fields name the headers or cookies:
+
+```python
+class ClientHeaders(BaseModel):
+    user_agent: str                                     # User-Agent
+    x_request_id: UUID | None = None                    # X-Request-Id
+    client_ip: str = Field(alias="X-Forwarded-For")
+    accept_language: list[str] = []                     # every Accept-Language line
+
+
+class SessionCookies(BaseModel):
+    session_id: str
+    token: str | None = Field(default=None, alias="__Host-token")
+
+
+@get("/")
+async def index(
+    self,
+    req: Request,
+    headers: Headers[ClientHeaders],
+    cookies: Cookies[SessionCookies],
+) -> Response:
+    ...
+```
+
+| | Headers | Cookies |
+| --- | --- | --- |
+| Name without an alias | the field name with `-` for `_`: `x_request_id` reads `X-Request-Id` | the field name |
+| Letter case | ignored, as in HTTP | must match exactly |
+| Other names | `Field(alias="X-Forwarded-For")` | `Field(alias="__Host-token")` |
+| `list[...]` field | every value of a header sent several times, one per header line | |
+
+- Only the declared headers and cookies are passed to the model, so `extra="forbid"` is safe.
+  A missing name leaves the field's default.
+- Errors name what the client sent: `["header", "x-request-id"]`, `["cookie", "session_id"]`.
+- An alias must be a plain string, and two fields may not read the same header or cookie; both
+  fail at startup.
+- OpenAPI lists each field as an `in: header` or `in: cookie` parameter. `Accept`,
+  `Content-Type` and `Authorization` are left out, because OpenAPI ignores them as header
+  parameters.
+- WebSocket handlers do not take these parameters; read `req.headers` and `req.cookies` there.
 
 ## Responses and response models
 

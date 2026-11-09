@@ -8,9 +8,14 @@ with only a body argument. Headers use `set_header` and cookies use `set_cookie`
 
 `@consumes(MediaType.APPLICATION_JSON)` checks the media type and reads the body;
 the parameter annotated `RequestBody[Model]` is built from it. A parameter
-annotated `QueryParams[Model]` is built from the query string. For other client
-data the handler reads itself (headers, cookies), `req.validate(Model, data)`
-translates Pydantic errors into request validation errors. Plain `ValidationError` elsewhere
+annotated `QueryParams[Model]` is built from the query string. `Headers[Model]`
+and `Cookies[Model]` build models from headers and cookies: a header field
+`x_request_id` reads `X-Request-Id` (underscores become hyphens, case ignored), a
+cookie field reads the cookie of the same name, and `Field(alias="X-Forwarded-For")`
+names anything else; a `list[str]` header field gets every repeated header line.
+For other client data the handler assembles itself (route values combined into
+one model), `req.validate(Model, data)` translates Pydantic errors into request
+validation errors. Plain `ValidationError` elsewhere
 is an application failure, not automatically a client error.
 
 Parsing is lazy. Await `req.body()`, `req.json()`, `req.form()`, `req.files()`, or

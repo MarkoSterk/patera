@@ -65,10 +65,11 @@ Place in `controllers/notes_controller.py` or the corresponding API discovery
 folder/pattern. Routing uses Werkzeug-style `<name>` and `<int:name>` converters,
 not `{name}` syntax. Route values are passed to parameters of the same name.
 A Pydantic parameter must declare its source: `RequestBody[Model]` (requires
-`@consumes`), `QueryParams[Model]` or `Files[...]` (multipart only); an unmarked
-model parameter fails at registration. JSON bodies may use other types, such as
-`RequestBody[list[Model]]`; form bodies need a model. Invalid values are answered
-with 422 and each error's `loc` starts with `"body"`, `"query"` or `"files"`. A list field accepts a repeated query key.
+`@consumes`), `QueryParams[Model]`, `Files[...]` (multipart only), `Headers[Model]`
+or `Cookies[Model]`; an unmarked model parameter fails at registration. JSON
+bodies may use other types, such as `RequestBody[list[Model]]`; form bodies need a
+model. Invalid values are answered with 422 and each error's `loc` starts with
+`"body"`, `"query"`, `"files"`, `"header"` or `"cookie"`. A list field accepts a repeated query key.
 
 Use `@before_request`, `@after_request`, and `@after_init` from
 `patera.controller` for controller hooks. Inspect installed signatures when adding

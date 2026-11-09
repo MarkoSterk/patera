@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING, Any
 
 from patera import Service
@@ -7,7 +8,15 @@ from patera.injectable import Inject
 
 from ..errors import ExamError, NotFound, require
 from ..models import Attempt, AttemptQuestion
-from ..repository import AttemptQuestions, Attempts, ExamQuestions, Exams, Questions
+from ..models import Exam
+from ..repository import (
+    AttemptQuestions,
+    Attempts,
+    ExamCategories,
+    ExamQuestions,
+    Exams,
+    Questions,
+)
 from ..schemas import (
     StartAttemptIn,
     SubmitIn,
@@ -32,6 +41,7 @@ def _require_open(available_from: str, available_until: str) -> None:
 class AttemptService(Service["App"]):
     exams: Inject[Exams]
     exam_questions: Inject[ExamQuestions]
+    exam_categories: Inject[ExamCategories]
     questions: Inject[Questions]
     attempts: Inject[Attempts]
     attempt_questions: Inject[AttemptQuestions]
@@ -40,8 +50,7 @@ class AttemptService(Service["App"]):
         exam = await self.exams.get(data.exam_id)
         require(exam, "Exam not found", NotFound)
         _require_open(exam.available_from, exam.available_until)
-        question_ids = (await self.exam_questions.for_exams([exam.id]))[exam.id]
-        require(question_ids, "This exam has no questions yet")
+        question_ids = await self._questions_for_attempt(exam)
         questions = {
             question.id: question
             for question in await self.questions.query.where(
@@ -86,6 +95,26 @@ class AttemptService(Service["App"]):
             "available_until": attempt.available_until,
             "questions": copies,
         }
+
+    async def _questions_for_attempt(self, exam: Exam) -> list[str]:
+        """
+        The exam's fixed selection, or, for a random-per-attempt exam, a new
+        sample from the current questions of its categories.
+        """
+        if not exam.random_per_attempt:
+            question_ids = (await self.exam_questions.for_exams([exam.id]))[exam.id]
+            require(question_ids, "This exam has no questions yet")
+            return question_ids
+        category_ids = (await self.exam_categories.for_exams([exam.id]))[exam.id]
+        pool = await self.questions.ids_in_categories(
+            exam.owner_id, exam.subject_id, category_ids
+        )
+        count = exam.random_count or 0
+        require(
+            category_ids and count >= 1 and len(pool) >= count,
+            "This exam does not have enough questions in its categories yet",
+        )
+        return random.SystemRandom().sample(pool, count)
 
     async def submit(self, attempt_id: str, data: SubmitIn) -> dict[str, Any]:
         """

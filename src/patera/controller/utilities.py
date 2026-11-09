@@ -85,6 +85,7 @@ def _build_model(
     media_type: "MediaType | None" = None,
     location: Optional[str] = None,
     adapter: Optional[TypeAdapter[Any]] = None,
+    names: Optional[Mapping[str, str]] = None,
 ) -> Any:
     """
     Builds a RequestBody, QueryParams or Files value from the request data.
@@ -92,13 +93,14 @@ def _build_model(
     fields given a single value get it wrapped in a list. A body that is not
     a Pydantic model (``list[Model]``, ...) is validated with ``adapter``.
     Invalid data raises RequestValidationError (422); ``location`` ("body",
-    "query", "files") prefixes each error's ``loc``.
+    "query", "files", "header", "cookie") prefixes each error's ``loc``;
+    ``names`` renames its first part (a field's alias to its header name).
     """
     if adapter is not None:
         try:
             return adapter.validate_python(data)
         except ValidationError as exc:
-            raise RequestValidationError(exc, location=location) from exc
+            raise RequestValidationError(exc, location=location, names=names) from exc
     if (
         location == "query"
         or media_type
@@ -111,7 +113,7 @@ def _build_model(
     try:
         return model_cls.model_validate(data)  # type: ignore[attr-defined]
     except ValidationError as exc:
-        raise RequestValidationError(exc, location=location) from exc
+        raise RequestValidationError(exc, location=location, names=names) from exc
 
 
 def _content_type_matches(incoming: str, expected: "MediaType") -> bool:

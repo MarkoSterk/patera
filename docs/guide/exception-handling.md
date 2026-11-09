@@ -55,7 +55,7 @@ Without a matching handler:
 | Exception | Response |
 | --- | --- |
 | `BaseHttpException` and subclasses (`abort()`, authentication errors, ...) | JSON `{"status", "message", "data"}` with the exception's status code |
-| `RequestValidationError` (from `RequestBody`/`QueryParams` parameters or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
+| `RequestValidationError` (from `RequestBody`/`QueryParams`/`Files`/`Headers`/`Cookies` parameters or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
 | anything else, including a `pydantic.ValidationError` from your own code or data | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
 
 Other built-in statuses: a malformed body is `400`, a media type mismatch `415`, an oversized

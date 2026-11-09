@@ -5,6 +5,7 @@ Every endpoint receives a `Request` as its first argument after `self`.
 | Member | Description |
 | --- | --- |
 | `method`, `path`, `query_string`, `headers` (lower-case keys) | request line and headers |
+| `header_list(name)`, `cookies` | every value of a repeated header; cookies by name |
 | `query_parameters` | dict; repeated keys become lists |
 | `query_list(name)` | all values of a query parameter as a list |
 | `route_parameters` | parsed route parameters |
@@ -71,19 +72,27 @@ async def upload(self, req: Request) -> Response:
 
 ## Validation
 
-Query strings and bodies are validated by `QueryParams[Model]` and `RequestBody[Model]`
-parameters ([Controllers](controllers.md#request-bodies-and-validation)). `req.validate(Model,
-data)` validates other client data the handler reads itself, such as headers or route values
-combined into one model. Invalid data raises `RequestValidationError`, answered with `422`:
+Bodies, query strings, files, headers and cookies are validated by handler parameters:
+`RequestBody`, `QueryParams`, `Files`, `Headers` and `Cookies`
+([Controllers](controllers.md#request-bodies-and-validation)). `req.validate(Model, data)`
+validates other client data the handler assembles itself, such as route values combined into one
+model. Invalid data raises `RequestValidationError`, answered with `422`:
 
 ```python
-class ClientInfo(BaseModel):
-    user_agent: str
+class Range(BaseModel):
+    start: int
+    end: int
+
+    @model_validator(mode="after")
+    def ordered(self) -> "Range":
+        if self.end < self.start:
+            raise ValueError("end must not be before start")
+        return self
 
 
-@get("/")
-async def index(self, req: Request) -> Response:
-    info = req.validate(ClientInfo, {"user_agent": req.headers.get("user-agent", "")})
+@get("/<int:start>/<int:end>")
+async def window(self, req: Request, start: int, end: int) -> Response:
+    span = req.validate(Range, {"start": start, "end": end})
     ...
 ```
 

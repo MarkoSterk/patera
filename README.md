@@ -414,7 +414,7 @@ class UserApi(Controller["App"]):
 - `RequestBody[Model]` and `QueryParams[Model]` (from `patera.controller`) declare where a model
   parameter comes from: the request body or the query string. Both are `Annotated` aliases, so
   type checkers see a plain `Model`. A handler has at most one `RequestBody` and any number of
-  `QueryParams` models. A model parameter without either annotation, or a `RequestBody` without
+  `QueryParams` models. A model parameter without a source annotation, or a `RequestBody` without
   `@consumes`, fails at startup. A JSON body may be any type Pydantic validates, such as
   `RequestBody[list[UserIn]]`; form bodies need a model.
 - `Files[...]` takes the files of a multipart body apart from its text fields:
@@ -422,13 +422,19 @@ class UserApi(Controller["App"]):
   name, `Files[Model]` validates a model of file fields (validators and aliases included), and
   `Files[dict[str, list[UploadedFile]]]` takes every file. With `Files` parameters the
   `RequestBody` model gets the text fields only; without them it gets fields and files together.
+- `Headers[Model]` and `Cookies[Model]` build a model from request headers and cookies. A header
+  field `x_request_id` reads `X-Request-Id` (underscores become hyphens, case is ignored); a
+  cookie field reads the cookie of the same name. `Field(alias=...)` gives any other name, such
+  as `X-Forwarded-For` or `__Host-token`, and a `list[str]` header field receives every value
+  of a repeated header.
 - `@consumes(MediaType)` – the request must have this content type (otherwise `415`); the
   `RequestBody` model is built from the JSON body, url-encoded form or multipart form (including
   `UploadedFile` fields). A single value of a list field (checkboxes, multi-selects, a query key
   given once) arrives as a one-item list. Invalid data raises `RequestValidationError`: `422` with
   the validation errors, without the submitted values, unless you [handle](#exception-handling) it
-  yourself; each error's `loc` starts with `"body"`, `"query"` or `"files"`. Validate other client data
-  (headers, route values) with `req.validate(Model, data)`, which raises the same error.
+  yourself; each error's `loc` starts with `"body"`, `"query"`, `"files"`, `"header"` or
+  `"cookie"`. Validate other client data (route values combined into one model, say) with
+  `req.validate(Model, data)`, which raises the same error.
 - `@produces(MediaType, status_code=HttpStatus.OK)` – default media type and status code (an
   explicitly set content type or status wins, also `.status(HttpStatus.OK)`). Documented in OpenAPI.
 - `-> Response[Model]` – the body is validated and serialized through `Model`, which filters
@@ -635,7 +641,7 @@ Without a matching handler:
 | Exception | Response |
 | --- | --- |
 | `BaseHttpException` and subclasses (`abort()`, authentication errors, ...) | JSON `{"status", "message", "data"}` with the exception's status code |
-| `RequestValidationError` (from `RequestBody`/`QueryParams` parameters or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
+| `RequestValidationError` (from `RequestBody`/`QueryParams`/`Files`/`Headers`/`Cookies` parameters or `req.validate()`, a `BaseHttpException`) | `422` with `{"status": "error", "message": "Validation failed", "data": [...]}` |
 | anything else, including a `pydantic.ValidationError` from your own code or data | `DEBUG=True`: the exception propagates (traceback in the server log). `DEBUG=False`: `500` `{"status": "error", "message": "Internal server error"}` and the error is logged |
 
 Override `default_exception_response(req, exc)` on the application class to change this fallback.
@@ -740,7 +746,8 @@ middleware.
 
 With `OPEN_API=True` the specification is served at `/openapi/specs.json` and a Swagger UI at
 `/openapi/docs`. It is generated from your controllers: paths and path parameters, request bodies
-from `@consumes` + `RequestBody[Model]`, query parameters from the fields of `QueryParams[Model]`,
+from `@consumes` + `RequestBody[Model]`, query, header and cookie parameters from the fields of
+`QueryParams[Model]`, `Headers[Model]` and `Cookies[Model]`,
 responses from `@produces` and `Response[Model]`
 annotations, error responses from `@open_api_docs`, tags from `@path(tags=...)` and descriptions
 from docstrings. Exclude a controller or endpoint with `open_api_spec=False`. The document's server

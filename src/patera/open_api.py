@@ -207,13 +207,22 @@ def _multipart_schema(
     return result
 
 
+# OpenAPI 3.0 ignores header parameters with these names; they are described
+# by the request body's media type and the security schemes instead.
+_IGNORED_HEADER_PARAMETERS = {"accept", "content-type", "authorization"}
+
+
 def _query_parameters(
-    components: Dict[str, Any], model: Type[BaseModel]
+    components: Dict[str, Any],
+    model: Type[BaseModel],
+    location: str = "query",
+    names: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    OpenAPI ``in: query`` parameters for the fields of a QueryParams model.
-    Field aliases are used (they are the names a client sends); nested
-    models are registered in components.
+    OpenAPI parameters (``in: query``, ``header`` or ``cookie``) for the
+    fields of a QueryParams, Headers or Cookies model. Field aliases are
+    used, or ``names`` maps them to the header and cookie names a client
+    sends; nested models are registered in components.
     """
     schema, defs = _pydantic_schema_and_defs(model)
     components.setdefault("schemas", {})
@@ -223,12 +232,15 @@ def _query_parameters(
     schema = schema or {}
     required = set(schema.get("required", []))
     parameters: List[Dict[str, Any]] = []
-    for name, field_schema in (schema.get("properties") or {}).items():
+    for key, field_schema in (schema.get("properties") or {}).items():
+        name = (names or {}).get(key, key)
+        if location == "header" and name.lower() in _IGNORED_HEADER_PARAMETERS:
+            continue
         field_schema = dict(field_schema)
         param: Dict[str, Any] = {
             "name": name,
-            "in": "query",
-            "required": name in required,
+            "in": location,
+            "required": key in required,
         }
         description = field_schema.pop("description", None)
         if description:
@@ -414,14 +426,20 @@ def build_openapi(
                 # Handler parameters: QueryParams[...] and RequestBody[...]
                 plan = handler_params(handler)
 
-                # Path and query parameters
+                # Path, query, header and cookie parameters
                 parameters: List[Dict[str, Any]] = [*path_params]
-                for query_param in plan.query:
+                for sourced in (*plan.query, *plan.headers, *plan.cookies):
+                    location = sourced.source.location
                     taken = {(p["in"], p["name"]) for p in parameters}
                     parameters.extend(
                         p
-                        for p in _query_parameters(components, query_param.model)
-                        if ("query", p["name"]) not in taken
+                        for p in _query_parameters(
+                            components,
+                            sourced.model,
+                            location,
+                            {key: name for key, name, _ in sourced.names},
+                        )
+                        if (location, p["name"]) not in taken
                     )
                 if parameters:
                     op_obj["parameters"] = parameters

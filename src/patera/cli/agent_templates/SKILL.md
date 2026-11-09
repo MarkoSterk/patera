@@ -32,9 +32,10 @@ Explicitly declare the contract of every HTTP controller endpoint. Use
 status, `@consumes(MediaType...)` with a `RequestBody[Model]` parameter when it
 accepts a request body (JSON bodies may also use types such as
 `RequestBody[list[Model]]`), `QueryParams[Model]` for query-string models,
-`Files[...]` parameters for multipart files kept apart from the form fields (see
-the requests and responses reference), and `@open_api_docs(Descriptor(...))` for
-expected error responses. Import these
+`Files[...]` parameters for multipart files kept apart from the form fields,
+`Headers[Model]`/`Cookies[Model]` for headers and cookies (see the requests and
+responses reference), and `@open_api_docs(Descriptor(...))` for expected error
+responses. Import these
 decorators from `patera.controller`. Keep declarations aligned with the actual
 handler, validation, and authentication behavior. Follow the complete example
 in the controllers and routing reference.

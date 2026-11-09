@@ -5,6 +5,7 @@ from .models import (
     AttemptQuestion,
     Category,
     Exam,
+    ExamCategory,
     ExamQuestion,
     Question,
     Subject,
@@ -26,6 +27,7 @@ class Admin(AdminInterface):
         Question,
         Exam,
         ExamQuestion,
+        ExamCategory,
         Attempt,
         AttemptQuestion,
     ]

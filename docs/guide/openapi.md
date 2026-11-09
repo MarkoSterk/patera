@@ -10,6 +10,7 @@ The specification is generated from your controllers:
 | routes and path parameters | paths |
 | `@consumes` + `RequestBody[...]` | request bodies (an object, an array, ...) |
 | `Files[...]` | file properties of the `multipart/form-data` body (`format: binary`) |
+| `Headers[Model]`, `Cookies[Model]` | `in: header` / `in: cookie` parameters under the HTTP names (`Accept`, `Content-Type` and `Authorization` are left out, as OpenAPI requires) |
 | `QueryParams[Model]` | query parameters, one per model field (aliases, defaults, constraints and descriptions included) |
 | `@produces` and `Response[Model]` annotations | responses |
 | `@open_api_docs(Descriptor(...))` | additional (error) responses |
@@ -47,7 +48,8 @@ The specification is also available in code as `app.json_spec`.
 
 !!! tip
 
-    Use `@consumes`, `RequestBody`, `QueryParams`, `@produces` and `@open_api_docs` from
+    Use `@consumes`, `RequestBody`, `QueryParams`, `Files`, `Headers`, `Cookies`, `@produces` and
+    `@open_api_docs` from
     `patera.controller` for incoming HTTP endpoints, not the identically named decorators of the
     [API interface](../extensions/apiinterface.md).
     Verify the generated schema after changing annotations.

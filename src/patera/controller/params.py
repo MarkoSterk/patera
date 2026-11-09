@@ -28,6 +28,15 @@ body sent under the parameter's name:
         attachments: Files[list[UploadedFile]],
     ) -> Response: ...
 
+``Headers[M]`` and ``Cookies[M]`` build a model from request headers and
+cookies. A header field ``x_request_id`` reads the header ``X-Request-Id``
+(underscores become hyphens, case is ignored); a cookie field reads the
+cookie of the same name. A field alias gives any other name:
+
+    class ClientHeaders(BaseModel):
+        user_agent: str
+        client_ip: str = Field(alias="X-Forwarded-For")
+
 All markers are ``Annotated`` aliases, so type checkers see a plain ``T``.
 
 The controller resolves a handler's parameters once (the plan is cached per
@@ -97,6 +106,25 @@ RequestBody: TypeAlias = Annotated[T, BodySource()]
 QueryParams: TypeAlias = Annotated[ModelT, QuerySource()]
 """``QueryParams[M]``: the model is built from the query parameters."""
 
+
+class HeaderSource(ParamSource):
+    """Request headers, matched by name without regard to case."""
+
+    location = "header"
+
+
+class CookieSource(ParamSource):
+    """Request cookies, matched by exact name."""
+
+    location = "cookie"
+
+
+Headers: TypeAlias = Annotated[ModelT, HeaderSource()]
+"""``Headers[M]``: the model is built from the request headers."""
+
+Cookies: TypeAlias = Annotated[ModelT, CookieSource()]
+"""``Cookies[M]``: the model is built from the request cookies."""
+
 Files: TypeAlias = Annotated[T, FileSource()]
 """
 ``Files[UploadedFile]``, ``Files[list[UploadedFile]]`` (either optional with
@@ -121,6 +149,8 @@ class SourcedParam:
     source: ParamSource
     #: Validates a body that is not a Pydantic model (``list[Model]``, ...).
     adapter: Optional[TypeAdapter[Any]] = field(default=None, compare=False)
+    #: Headers/Cookies: (model input key, HTTP name, list field) per field.
+    names: tuple[tuple[str, str, bool], ...] = ()
 
     @property
     def is_model(self) -> bool:
@@ -133,6 +163,8 @@ class HandlerParams:
 
     body: Optional[SourcedParam] = None
     query: tuple[SourcedParam, ...] = ()
+    headers: tuple[SourcedParam, ...] = ()
+    cookies: tuple[SourcedParam, ...] = ()
     #: Files[...] parameters bound to the file field of the same name.
     files: tuple[SourcedParam, ...] = ()
     #: Validates the named file fields together (one field per parameter).
@@ -146,7 +178,13 @@ class HandlerParams:
 
     @property
     def has_sources(self) -> bool:
-        return bool(self.body is not None or self.query or self.reads_files)
+        return bool(
+            self.body is not None
+            or self.query
+            or self.headers
+            or self.cookies
+            or self.reads_files
+        )
 
     @property
     def reads_files(self) -> bool:
@@ -254,7 +292,13 @@ def _parameter_hints(func: Callable[..., Any], qualname: str) -> dict[str, Any]:
         except Exception as exc:
             if any(
                 marker in annotation
-                for marker in ("RequestBody", "QueryParams", "Files")
+                for marker in (
+                    "RequestBody",
+                    "QueryParams",
+                    "Files",
+                    "Headers",
+                    "Cookies",
+                )
             ):
                 raise TypeError(
                     f"{qualname}: cannot resolve the annotation {annotation!r} "
@@ -309,6 +353,8 @@ def _build_plan(func: Callable[..., Any]) -> HandlerParams:
 
     body: Optional[SourcedParam] = None
     query: list[SourcedParam] = []
+    headers: list[SourcedParam] = []
+    cookies: list[SourcedParam] = []
     files: list[SourcedParam] = []
     file_models: list[SourcedParam] = []
     file_fields: dict[str, Any] = {}
@@ -338,6 +384,22 @@ def _build_plan(func: Callable[..., Any]) -> HandlerParams:
                     f"QuerySource but {inner!r} is not a Pydantic model."
                 )
             query.append(SourcedParam(param.name, inner, source))
+
+        elif isinstance(source, (HeaderSource, CookieSource)):
+            marker = "Headers" if isinstance(source, HeaderSource) else "Cookies"
+            if not _is_model(inner):
+                raise TypeError(
+                    f"{qualname}: parameter {param.name!r} is {marker}[{inner!r}], "
+                    "but it needs a Pydantic model whose fields name the "
+                    f"{source.location}s."
+                )
+            sourced = SourcedParam(
+                param.name,
+                inner,
+                source,
+                names=_http_names(qualname, param.name, inner, source),
+            )
+            (headers if isinstance(source, HeaderSource) else cookies).append(sourced)
 
         elif isinstance(source, FileSource):
             shape, optional = _file_shape(inner)
@@ -397,12 +459,58 @@ def _build_plan(func: Callable[..., Any]) -> HandlerParams:
     return HandlerParams(
         body=body,
         query=tuple(query),
+        headers=tuple(headers),
+        cookies=tuple(cookies),
         files=tuple(files),
         files_model=files_model,
         file_models=tuple(file_models),
         all_files=all_files,
         unmarked=tuple(unmarked),
     )
+
+
+def _http_names(
+    qualname: str, param_name: str, model: Type[BaseModel], source: ParamSource
+) -> tuple[tuple[str, str, bool], ...]:
+    """
+    (model input key, HTTP name, list field) for each field of a Headers or
+    Cookies model. The input key is the field's alias, or its name. A header
+    without an alias is the field name with hyphens, lower-cased (headers
+    ignore case); a cookie is the alias or name as written.
+    """
+    names: list[tuple[str, str, bool]] = []
+    seen: dict[str, str] = {}
+    is_header = isinstance(source, HeaderSource)
+    for field_name, info in model.model_fields.items():
+        alias = (
+            info.validation_alias if info.validation_alias is not None else (info.alias)
+        )
+        if alias is not None and not isinstance(alias, str):
+            raise TypeError(
+                f"{qualname}: {model.__name__}.{field_name} of parameter "
+                f"{param_name!r} needs a plain string alias to name its "
+                f"{source.location}."
+            )
+        key = alias if isinstance(alias, str) else field_name
+        if is_header:
+            http_name = (alias or field_name.replace("_", "-")).lower()
+        else:
+            http_name = key
+        if http_name in seen:
+            raise TypeError(
+                f"{qualname}: {model.__name__}.{seen[http_name]} and "
+                f"{model.__name__}.{field_name} both read the {source.location} "
+                f"{http_name!r}."
+            )
+        seen[http_name] = field_name
+        names.append((key, http_name, _is_collection(info.annotation)))
+    return tuple(names)
+
+
+def _is_collection(annotation: Any) -> bool:
+    """list[str], set[str], Optional[list[str]], ... (not str or bytes)."""
+    inner, _ = _strip_optional(annotation)
+    return get_origin(inner) in (list, set, tuple, frozenset)
 
 
 def _field_keys(name: str, info: Any) -> set[str]:

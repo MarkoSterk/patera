@@ -71,11 +71,13 @@ class QuestionOut(BaseModel):
 class RandomSelection(Input):
     """
     Sample ``count`` distinct questions from the categories, which belong to
-    the exam's subject, once, at save time.
+    the exam's subject: once, at save time, or, with ``per_attempt``, anew
+    for every attempt when a student starts the exam.
     """
 
     category_ids: Annotated[list[str], Field(min_length=1)]
     count: Annotated[StrictInt, Field(ge=1)] = 10
+    per_attempt: bool = False
 
 
 class ExamSettingsIn(Input):
@@ -114,3 +116,6 @@ class ExamOut(BaseModel):
     available_until: str
     pass_percentage: float
     question_ids: list[str]
+    random_per_attempt: bool = False
+    random_count: Optional[int] = None
+    category_ids: list[str] = []

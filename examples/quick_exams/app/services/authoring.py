@@ -12,6 +12,7 @@ from ..errors import Conflict, ExamError, NotFound, require
 from ..models import Base, Category, Exam, Question, Subject
 from ..repository import (
     Categories,
+    ExamCategories,
     ExamQuestions,
     Exams,
     Questions,
@@ -36,7 +37,9 @@ class AuthoringService(Service["App"]):
     """
     An instructor's subjects and their content. A category belongs to one
     subject, a question to one subject and one of its categories, and an
-    exam to one subject, from which it selects its questions.
+    exam to one subject, from which it selects its questions: a fixed
+    selection, or, for a random-per-attempt exam, a pool of categories from
+    which every attempt draws its own questions.
     """
 
     users: Inject[Users]
@@ -45,6 +48,7 @@ class AuthoringService(Service["App"]):
     questions: Inject[Questions]
     exams: Inject[Exams]
     exam_questions: Inject[ExamQuestions]
+    exam_categories: Inject[ExamCategories]
 
     async def _owned(
         self, repository: Repository[Any], record_id: str, owner_id: str, label: str
@@ -121,10 +125,19 @@ class AuthoringService(Service["App"]):
         )
 
     async def _check_category_move(self, category: Category, subject_id: str) -> None:
+        if subject_id == category.subject_id:
+            return
         require(
-            subject_id == category.subject_id
-            or not await self.questions.exists(category_id=category.id),
+            not await self.questions.exists(category_id=category.id),
             "A category with questions cannot move to another subject",
+            Conflict,
+        )
+        await self._check_category_unused_by_exams(category)
+
+    async def _check_category_unused_by_exams(self, category: Category) -> None:
+        require(
+            not await self.exam_categories.exists(category_id=category.id),
+            "Remove the category from exams that draw random questions from it first",
             Conflict,
         )
 
@@ -150,6 +163,7 @@ class AuthoringService(Service["App"]):
             "Move or delete the category's questions first",
             Conflict,
         )
+        await self._check_category_unused_by_exams(category)
         await self.categories.delete(category)
 
     async def list_questions(self, owner_id: str) -> list[Question]:
@@ -214,8 +228,12 @@ class AuthoringService(Service["App"]):
 
     async def list_exams(self, owner_id: str) -> list[dict[str, Any]]:
         exams = await self.exams.owned_by(owner_id)
-        selected = await self.exam_questions.for_exams([exam.id for exam in exams])
-        return [self._exam_out(exam, selected[exam.id]) for exam in exams]
+        exam_ids = [exam.id for exam in exams]
+        selected = await self.exam_questions.for_exams(exam_ids)
+        pools = await self.exam_categories.for_exams(exam_ids)
+        return [
+            self._exam_out(exam, selected[exam.id], pools[exam.id]) for exam in exams
+        ]
 
     async def get_exam(self, owner_id: str, exam_id: str) -> Exam:
         exam: Exam = await self._owned(self.exams, exam_id, owner_id, "Exam")
@@ -223,28 +241,37 @@ class AuthoringService(Service["App"]):
 
     async def create_exam(self, owner_id: str, data: ExamIn) -> dict[str, Any]:
         await self._check_subject(owner_id, data.subject_id)
-        question_ids = await self._select_questions(owner_id, data)
+        question_ids, category_ids = await self._select_questions(owner_id, data)
         exam = await self.exams.save(self._fill_exam(Exam(owner_id=owner_id), data))
         await self.exam_questions.add_selection(exam.id, exam.subject_id, question_ids)
-        return self._exam_out(exam, question_ids)
+        await self.exam_categories.add_pool(exam.id, exam.subject_id, category_ids)
+        return self._exam_out(exam, question_ids, category_ids)
 
     async def update_exam(
         self, owner_id: str, exam_id: str, data: ExamIn
     ) -> dict[str, Any]:
         exam = await self.get_exam(owner_id, exam_id)
         await self._check_subject(owner_id, data.subject_id)
-        question_ids = await self._select_questions(owner_id, data)
-        # The old selection refers to the exam's current subject, so it goes
-        # before the subject can change.
+        question_ids, category_ids = await self._select_questions(owner_id, data)
+        # The old selection and pool refer to the exam's current subject, so
+        # they go before the subject can change.
         await self.exam_questions.clear(exam.id)
+        await self.exam_categories.clear(exam.id)
         await self.exams.save(self._fill_exam(exam, data))
         await self.exam_questions.add_selection(exam.id, exam.subject_id, question_ids)
-        return self._exam_out(exam, question_ids)
+        await self.exam_categories.add_pool(exam.id, exam.subject_id, category_ids)
+        return self._exam_out(exam, question_ids, category_ids)
 
     async def delete_exam(self, owner_id: str, exam_id: str) -> None:
         await self.exams.delete(await self.get_exam(owner_id, exam_id))
 
-    async def _select_questions(self, owner_id: str, data: ExamIn) -> list[str]:
+    async def _select_questions(
+        self, owner_id: str, data: ExamIn
+    ) -> tuple[list[str], list[str]]:
+        """
+        The exam's fixed question selection and its category pool. A
+        random-per-attempt exam has only a pool; other exams only a selection.
+        """
         if data.random is not None:
             category_ids = set(data.random.category_ids)
             in_subject = await self.categories.query.where(
@@ -262,7 +289,9 @@ class AuthoringService(Service["App"]):
                 data.random.count <= len(pool),
                 "Not enough questions in the selected categories",
             )
-            return random.SystemRandom().sample(pool, data.random.count)
+            if data.random.per_attempt:
+                return [], list(dict.fromkeys(data.random.category_ids))
+            return random.SystemRandom().sample(pool, data.random.count), []
         owned = await self.questions.query.where(
             Question.id.in_(data.question_ids),
             Question.owner_id == owner_id,
@@ -272,19 +301,24 @@ class AuthoringService(Service["App"]):
             owned == len(data.question_ids),
             "Select only questions of the exam's subject",
         )
-        return data.question_ids
+        return data.question_ids, []
 
     @staticmethod
-    def _fill_exam(exam: Exam, data: ExamSettingsIn) -> Exam:
+    def _fill_exam(exam: Exam, data: ExamIn) -> Exam:
         exam.subject_id = data.subject_id
         exam.title = data.title
         exam.available_from = to_utc_iso(data.available_from)
         exam.available_until = to_utc_iso(data.available_until)
         exam.pass_percentage = data.pass_percentage
+        per_attempt = data.random is not None and data.random.per_attempt
+        exam.random_per_attempt = per_attempt
+        exam.random_count = data.random.count if per_attempt else None  # type: ignore[union-attr]
         return exam
 
     @staticmethod
-    def _exam_out(exam: Exam, question_ids: list[str]) -> dict[str, Any]:
+    def _exam_out(
+        exam: Exam, question_ids: list[str], category_ids: list[str]
+    ) -> dict[str, Any]:
         return {
             "id": exam.id,
             "subject_id": exam.subject_id,
@@ -293,6 +327,9 @@ class AuthoringService(Service["App"]):
             "available_until": exam.available_until,
             "pass_percentage": exam.pass_percentage,
             "question_ids": question_ids,
+            "random_per_attempt": bool(exam.random_per_attempt),
+            "random_count": exam.random_count,
+            "category_ids": category_ids,
         }
 
     async def _admin_owner(
@@ -373,17 +410,40 @@ class AuthoringService(Service["App"]):
         require(
             creating
             or data.subject_id == record.subject_id
-            or not await self.exam_questions.exists(exam_id=record.id),
-            "Remove the exam's questions before changing its subject",
+            or not (
+                await self.exam_questions.exists(exam_id=record.id)
+                or await self.exam_categories.exists(exam_id=record.id)
+            ),
+            "Remove the exam's questions and categories before changing its subject",
             Conflict,
         )
+        per_attempt = bool(values.get("random_per_attempt"))
+        count = values.get("random_count")
+        if per_attempt:
+            require(
+                isinstance(count, int) and count >= 1,
+                "A random-per-attempt exam needs a positive number of questions",
+            )
         values.update(
             subject_id=data.subject_id,
             title=data.title,
             available_from=to_utc_iso(data.available_from),
             available_until=to_utc_iso(data.available_until),
             pass_percentage=data.pass_percentage,
+            random_per_attempt=per_attempt,
+            random_count=count if per_attempt else None,
         )
+        return values
+
+    async def admin_clean_exam_category(self, values):
+        exam = await self.exams.get(values.get("exam_id") or "")
+        category = await self.categories.get(values.get("category_id") or "")
+        require(exam and category, "Choose an existing exam and category")
+        require(
+            exam.subject_id == category.subject_id,
+            "The category must belong to the exam's subject",
+        )
+        values["subject_id"] = exam.subject_id
         return values
 
     async def admin_clean_exam_question(self, values):

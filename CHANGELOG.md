@@ -3,6 +3,19 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
+## Unreleased
+
+### Added
+
+- **Core:** `Headers[Model]` and `Cookies[Model]` handler parameters build models from request
+  headers and cookies. A header field `x_request_id` reads `X-Request-Id` (underscores become
+  hyphens, letter case is ignored); a cookie field reads the cookie of the same name. A plain
+  string alias names anything else, such as `X-Forwarded-For` or `__Host-token`. A `list[...]`
+  header field receives every value of a repeated header, one per header line. Errors are
+  reported under the HTTP name, such as `["header", "x-request-id"]`, and OpenAPI documents
+  the fields as `in: header` / `in: cookie` parameters (without `Accept`, `Content-Type` and
+  `Authorization`, which OpenAPI ignores there).
+
 ## patera 0.125.2 and extensions 0.15.2 (2026-11-05)
 
 ### Fixed

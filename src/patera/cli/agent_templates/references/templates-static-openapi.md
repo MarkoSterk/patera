@@ -20,7 +20,9 @@ for request bodies and `@open_api_docs(Descriptor(...))` for expected error
 responses. `QueryParams[Model]` fields are documented as query parameters, a
 `RequestBody[list[Model]]` as an array, and `Files[...]` parameters as binary
 properties of the `multipart/form-data` body; validators are not part of the
-schema. Import these
+schema. `Headers[Model]`/`Cookies[Model]` fields become `in: header`/`in: cookie`
+parameters (OpenAPI ignores `Accept`, `Content-Type` and `Authorization` there, so
+they are left out). Import these
 from `patera.controller`. The controllers and routing reference shows a complete
 example. Inspect `OPEN_API` and related BaseConfig fields for document/UI
 locations and settings. Verify the generated schema after changing annotations.

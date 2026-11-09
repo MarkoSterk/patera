@@ -2,7 +2,7 @@
 Collection of http exceptions that can be raised
 """
 
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from pydantic import ValidationError
 
@@ -113,6 +113,13 @@ class RequestBodyTooLarge(BaseHttpException):
         self.max_content_length = max_content_length
 
 
+def _rename_first(loc: Any, names: Mapping[str, str]) -> tuple[Any, ...]:
+    loc = tuple(loc)
+    if loc and isinstance(loc[0], str) and loc[0] in names:
+        return (names[loc[0]], *loc[1:])
+    return loc
+
+
 class RequestValidationError(BaseHttpException):
     """
     Raised when a RequestBody[...] or QueryParams[...] parameter (or
@@ -135,10 +142,18 @@ class RequestValidationError(BaseHttpException):
         status_code: int = HttpStatus.UNPROCESSABLE_ENTITY,
         status: str = "error",
         location: Optional[str] = None,
+        names: Optional[Mapping[str, str]] = None,
     ):
         errors = validation_error.errors(
             include_url=False, include_input=False, include_context=False
         )
+        if names:
+            # Report the name the client sent (a header or cookie name), not
+            # the model's field name or alias.
+            errors = [
+                {**error, "loc": _rename_first(error.get("loc", ()), names)}
+                for error in errors
+            ]
         if location:
             errors = [
                 {**error, "loc": (location, *error.get("loc", ()))} for error in errors

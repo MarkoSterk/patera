@@ -10,7 +10,7 @@ from ..http_statuses import HttpStatus
 from ..injectable import Injectable
 from ..utilities import run_sync_or_async
 from ..exceptions.runtime_exceptions import DuplicateRouteError
-from .params import check_endpoint_params, handler_params
+from .params import HeaderSource, SourcedParam, check_endpoint_params, handler_params
 from .utilities import (
     _build_model,
     _content_type_matches,
@@ -251,6 +251,15 @@ class Controller(Injectable, Generic[AppT]):
                     param.model, req.query_parameters, location="query"
                 )
 
+        for param in (*plan.headers, *plan.cookies):
+            if param.name not in kwargs:
+                kwargs[param.name] = _build_model(
+                    param.model,
+                    _header_or_cookie_values(req, param),
+                    location=param.source.location,
+                    names={key: http_name for key, http_name, _ in param.names},
+                )
+
         if plan.reads_files and media_type is not None:
             files = await req.files()
             if plan.files_model is not None:
@@ -286,6 +295,32 @@ class Controller(Injectable, Generic[AppT]):
             )
 
         return await run_sync_or_async(method, req, **kwargs)
+
+
+def _header_or_cookie_values(req: "Request", param: SourcedParam) -> dict[str, Any]:
+    """
+    The values of a Headers or Cookies model's fields, keyed as the model
+    expects them. A list field of a Headers model receives every value of a
+    header sent several times (one per header line); other fields get the
+    combined value. Absent names are left out, so defaults apply.
+    """
+    data: dict[str, Any] = {}
+    if isinstance(param.source, HeaderSource):
+        headers = req.headers
+        for key, http_name, is_list in param.names:
+            if is_list:
+                values = req.header_list(http_name)
+                if values:
+                    data[key] = values
+            elif http_name in headers:
+                data[key] = headers[http_name]
+    else:
+        cookies = req.cookies
+        for key, http_name, is_list in param.names:
+            if http_name in cookies:
+                value = cookies[http_name]
+                data[key] = [value] if is_list else value
+    return data
 
 
 class Descriptor:

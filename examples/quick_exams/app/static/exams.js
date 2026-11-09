@@ -134,7 +134,10 @@ const KINDS = {
 
 function recordDetails(record) {
   if (section === 'exams') {
-    return `<p>${esc(subjectName(record.subject_id))} · ${plural(record.question_ids.length, 'question')} · Pass: ${record.pass_percentage}%</p>
+    const selection = record.random_per_attempt
+      ? `Random per attempt: ${plural(record.random_count, 'question')} from ${record.category_ids.length} ${record.category_ids.length === 1 ? 'category' : 'categories'}`
+      : plural(record.question_ids.length, 'question');
+    return `<p>${esc(subjectName(record.subject_id))} · ${selection} · Pass: ${record.pass_percentage}%</p>
       <p>${when(record.available_from)} – ${when(record.available_until)}</p>`;
   }
   if (section === 'questions') {
@@ -307,14 +310,16 @@ function examSelection(subjectId, record) {
   const questions = inSubject(data.questions, subjectId);
   if (!questions.length) return '<p><small>This subject has no questions yet.</small></p>';
   return `<div class="exam-categories"><span class="filter-label">Categories <small>(filter the questions below and choose the pool for random generation)</small></span>
-    ${categoryDropdown('category_ids', categories, [], 'All categories')}</div>
-    <label><input name="random" type="checkbox">Generate a random selection from the selected categories (replaces manual selection)</label>
-    ${field('Number of random questions', 'count', 10, 'number', 'min="1" step="1"')}
+    ${categoryDropdown('category_ids', categories, record.category_ids || [], 'All categories')}</div>
+    <label><input name="random" type="checkbox" ${record.random_per_attempt ? 'checked' : ''}>Generate a random selection from the selected categories (replaces manual selection)</label>
+    <label class="sub-option"><input name="per_attempt" type="checkbox" ${record.random_per_attempt ? 'checked' : ''}>Random for each attempt <small>– every student gets a different random set, drawn from the selected categories when they start</small></label>
+    ${field('Number of random questions', 'count', record.random_count || 10, 'number', 'min="1" step="1"')}
     <p id="random-pool"><small></small></p>
+    <fieldset class="plain" id="manual-selection">
     <p>Or select questions manually · <small id="manual-count"></small></p>
     <div id="exam-questions">
     ${questions.map(q => `<label data-category="${q.category_id}"><input type="checkbox" name="question_ids" value="${q.id}" ${record.question_ids?.includes(q.id) ? 'checked' : ''}>${math(q.question_text)} <small>(${esc(categoryName(q.category_id))} · ${points(q.points)})</small></label>`).join('')}
-    </div>`;
+    </div></fieldset>`;
 }
 
 // Shows only the questions of the selected categories; hidden ticked questions stay selected.
@@ -336,7 +341,14 @@ function wireExamSelection(form) {
   wireCategoryDropdown(box, apply);
   form.querySelectorAll('#exam-questions input').forEach(input => input.addEventListener('change', () =>
     apply([...box.querySelectorAll('input:checked')].map(b => b.value))));
-  apply([]);
+  // "Random for each attempt" implies a random selection and makes the manual list irrelevant.
+  const random = form.querySelector('[name="random"]');
+  const perAttempt = form.querySelector('[name="per_attempt"]');
+  const syncRandom = () => { form.querySelector('#manual-selection').disabled = perAttempt.checked; };
+  random.addEventListener('change', () => { if (!random.checked) perAttempt.checked = false; syncRandom(); });
+  perAttempt.addEventListener('change', () => { if (perAttempt.checked) random.checked = true; syncRandom(); });
+  syncRandom();
+  apply([...box.querySelectorAll('input:checked')].map(b => b.value));
 }
 
 function examFields(record) {
@@ -390,7 +402,9 @@ function formBody(kind, form) {
     available_until: new Date(form.get('available_until')).toISOString(),
     pass_percentage: Number(form.get('pass_percentage')),
     question_ids: form.getAll('question_ids'),
-    random: form.has('random') ? {category_ids: form.getAll('category_ids'), count: Number(form.get('count'))} : null,
+    random: form.has('random')
+      ? {category_ids: form.getAll('category_ids'), count: Number(form.get('count')), per_attempt: form.has('per_attempt')}
+      : null,
   };
 }
 

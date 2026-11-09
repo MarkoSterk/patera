@@ -417,13 +417,14 @@ class Request:
 
     def validate(self, model: type[ModelT], data: Any) -> ModelT:
         """
-        Validates data the client sent, which the handler reads itself
-        (route values, a header), with a Pydantic model:
+        Validates data the client sent, which the handler assembles itself
+        (route values combined into one model, say), with a Pydantic model:
 
-            info = req.validate(ClientInfo, {"agent": req.headers.get("user-agent")})
+            span = req.validate(Range, {"start": start, "end": end})
 
-        Query strings and bodies are better declared as QueryParams[Model]
-        and RequestBody[Model] handler parameters. Invalid data raises
+        Bodies, query strings, files, headers and cookies are better declared
+        as RequestBody, QueryParams, Files, Headers and Cookies handler
+        parameters. Invalid data raises
         RequestValidationError, answered with 422 like an invalid body. A ValidationError raised any other way is the
         server's own data failing and is answered with 500.
         """

@@ -192,8 +192,9 @@ application never creates or alters tables at startup.
 | `subjects` | Instructor ID, name (unique per instructor) and description |
 | `categories` | Instructor/subject IDs and category name |
 | `questions` | Instructor/subject/category IDs, question text, image, four answer columns, correct answer index, points |
-| `exams` | Instructor/subject IDs, title, availability timestamps, pass percentage |
+| `exams` | Instructor/subject IDs, title, availability timestamps, pass percentage, random-per-attempt flag and question count |
 | `exam_questions` | Exam/question links, their shared subject ID and display position |
+| `exam_categories` | The categories a random-per-attempt exam draws from, with the exam's subject ID |
 | `attempts` | Student email, timestamps, copied exam settings, grade |
 | `attempt_questions` | Copied question text, image, answers and points, plus the student's selected answer |
 
@@ -202,7 +203,9 @@ application never creates or alters tables at startup.
 adds subjects and recreates the categories, questions, exams and exam
 selections with their subject: **it deletes the existing categories,
 questions and exams.** Users and archived attempts are kept. An existing
-database is upgraded with `patera cli migrate:migrate`. Keep applied migration
+database is upgraded with `patera cli migrate:migrate`. `V1_3__random_per_attempt.sql`
+adds `exams.random_per_attempt`, `exams.random_count` and the `exam_categories`
+table; existing exams keep their fixed selection. Keep applied migration
 files unchanged and add new versions for later changes.
 
 Timestamps are ISO 8601 UTC strings. Foreign keys, unique constraints and checks
@@ -231,6 +234,11 @@ traffic.
 5. Select questions of the exam's subject manually, or choose some of its
    categories and generate a random set (default 10). The sample is drawn once
    when the exam is saved, so every student receives the same selection.
+   Tick **Random for each attempt** instead to store only the categories and
+   the number of questions: every attempt then draws its own random set from
+   the categories' current questions when the student starts. Saving checks
+   that the categories hold enough questions; if questions are later removed
+   below the count, starting the exam fails with 400 until more are added.
 6. Expand **Share exam** to copy or open the link or download its SVG QR code.
 7. Open **Reports** after submissions: count, pass rate, mean, minimum and
    maximum score, and each submission with its answers. Download a report as JSON.
@@ -239,15 +247,18 @@ The category, question and exam lists can be filtered by subject. Instructors
 see and change only their own records; another instructor's record is answered
 with 404. A question used by a live exam must be removed from that exam before
 it is deleted or moved to another subject, a category must be empty before it
-is deleted or moved, and a subject must have no categories or exams before
-deletion (409). Changing an exam's subject replaces its question selection.
+is deleted or moved, a category that a random-per-attempt exam draws from
+cannot be deleted or moved, and a subject must have no categories or exams
+before deletion (409). Changing an exam's subject replaces its question
+selection and category pool.
 There is no archive deletion API.
 
 ## Students and grading
 
 Anyone with the unpredictable exam link can enter an email and start during the
 availability window. The email is self-reported, not verified; repeat attempts
-are allowed and reported separately. Starting copies the exam, its pass
+are allowed and reported separately. For a random-per-attempt exam, each
+start draws a new set of questions. Starting copies the exam, its pass
 threshold, deadline, questions, images and answer keys into the archive, so
 later edits or deletion of the live exam do not change a started attempt.
 
@@ -282,7 +293,7 @@ The **Admin** link in the header opens Patera Admin at `/admin/en/dashboard`
 configured by `Config.ADMIN`. Users with the ADMIN role receive every Admin
 permission; an INSTRUCTOR without ADMIN is sent to Admin's "unauthorized" page.
 
-All eight models are registered under **Databases → Quick Exams**. Admin forms
+All nine models are registered under **Databases → Quick Exams**. Admin forms
 go through the models' `admin_clean` hooks, which call the same service rules as
 the API: owners cannot change, subjects must be their owner's, a question's
 category must belong to its subject, an exam's selected questions must belong

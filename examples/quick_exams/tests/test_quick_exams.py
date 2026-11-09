@@ -560,6 +560,7 @@ async def test_admin_crud_obeys_domain_rules(exams_app, db):
             "Question",
             "Exam",
             "ExamQuestion",
+            "ExamCategory",
             "Attempt",
             "AttemptQuestion",
         ):
