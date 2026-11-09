@@ -12,6 +12,13 @@ class LoginIn(BaseModel):
     password: str
 
 
+class PasswordChangeIn(Input):
+    """A signed-in user's own password change; the current password confirms it."""
+
+    current_password: Annotated[str, StringConstraints(max_length=1024)]
+    new_password: Password
+
+
 class UserIn(Input):
     email: Email
     password: Optional[Password] = None

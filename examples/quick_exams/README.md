@@ -146,6 +146,13 @@ database row decides on every request:
   tokens of that user;
 - a user without roles has no staff access and cannot sign in.
 
+Users change their own password from the account menu (their email in the
+header) → **Change password**, which calls `POST /api/auth/password`. The
+current password must be given, and the new one must differ from it and have
+12+ characters. The change increments the token version, so every other
+session ends; the response carries a fresh token and cookie, so the current
+browser stays signed in.
+
 Signing out (`GET /api/auth/logout`, also used by Patera Admin's logout button)
 removes the cookie. Because tokens are stateless, a token copied elsewhere stays
 valid until it expires; keep the lifetime short for hosted deployments.
@@ -165,6 +172,7 @@ other content types are answered with 415 and invalid bodies with 422.
 | `POST /api/auth/login` | public | Sign in; returns the token and sets the cookie. |
 | `GET /api/auth/logout` | public | Remove the cookie. |
 | `GET /api/auth/me` | signed in | The current user and roles. |
+| `POST /api/auth/password` | signed in | Change one's own password (`current_password`, `new_password`); returns a new token. |
 | `GET, POST /api/subjects/`, `PUT, DELETE /api/subjects/<id>` | INSTRUCTOR | Own subjects. |
 | `GET, POST /api/categories/`, `PUT, DELETE /api/categories/<id>` | INSTRUCTOR | Own categories. |
 | `GET, POST /api/questions/`, `PUT, DELETE /api/questions/<id>` | INSTRUCTOR | Own questions. |

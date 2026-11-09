@@ -120,6 +120,24 @@ class AccountService(Service["App"]):
         await self.users.flush()
         return user
 
+    async def change_password(
+        self, user_id: str, current_password: str, new_password: str
+    ) -> User:
+        """
+        Sets a signed-in user's own password. The current password must be
+        given, and the token version increases so every other session ends.
+        """
+        user = await self.users.get(user_id)
+        require(user is not None, "User not found", NotFound)
+        if not await self._password_matches(current_password, user.password_hash):
+            raise ExamError("The current password is incorrect")
+        if current_password == new_password:
+            raise ExamError("Choose a new password that differs from the current one")
+        user.password_hash = await self.hash_password(new_password)
+        user.token_version = (user.token_version or 0) + 1
+        await self.users.flush()
+        return user
+
     async def ensure_admin_remains(self, user: User) -> None:
         if user.is_admin:
             require(

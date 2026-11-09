@@ -1,4 +1,4 @@
-from .accounts import LoginIn, TokenOut, UserIn, UserOut
+from .accounts import LoginIn, PasswordChangeIn, TokenOut, UserIn, UserOut
 from .attempts import (
     PublicAttemptOut,
     PublicQuestionOut,
@@ -54,6 +54,7 @@ __all__ = [
     "ExamSettingsIn",
     "LoginIn",
     "Password",
+    "PasswordChangeIn",
     "PublicAttemptOut",
     "PublicQuestionOut",
     "QuestionIn",

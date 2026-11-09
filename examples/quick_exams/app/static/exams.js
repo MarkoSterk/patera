@@ -104,10 +104,26 @@ async function refresh() {
   render();
 }
 
+// The signed-in user's email opens a menu with account actions.
+function accountMenu() {
+  return `<details class="account-menu">
+    <summary title="Account"><span class="account-email">${esc(user.email)}</span></summary>
+    <div class="account-menu-items">
+      <button type="button" data-account="password">Change password</button>
+      <button type="button" data-account="logout">Sign out</button>
+    </div></details>`;
+}
+
 function render() {
-  identity.textContent = user.email;
-  accountActions.innerHTML = `${isAdmin() ? '<a class="header-admin" href="/admin/en/dashboard">Admin</a>' : ''}<button id="logout" class="header-logout">Sign out</button>`;
-  document.querySelector('#logout').onclick = () => run(logout);
+  identity.textContent = '';
+  accountActions.innerHTML = `${isAdmin() ? '<a class="header-admin" href="/admin/en/dashboard">Admin</a>' : ''}${accountMenu()}`;
+  accountActions.querySelector('[data-account="logout"]').onclick = () => run(logout);
+  accountActions.querySelector('[data-account="password"]').onclick = () => {
+    accountActions.querySelector('.account-menu').open = false;
+    section = 'password';
+    notice('');
+    render();
+  };
 
   const tabs = isInstructor() ? ['exams', 'questions', 'categories', 'subjects', 'reports'] : [];
   root.innerHTML = `<h1>Your exam workspace</h1><p>Build a question bank. Share an exam. See how everyone did.</p>
@@ -116,6 +132,8 @@ function render() {
     <div id="content"></div>`;
   root.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { section = button.dataset.tab; run(refresh); });
 
+  if (section === 'password') { passwordView(); return; }
+
   if (section === 'admin' || !isInstructor()) {
     if (isAdmin()) run(adminView);
     else document.querySelector('#content').textContent = 'No roles assigned. Contact an administrator.';
@@ -123,6 +141,39 @@ function render() {
   }
   if (section === 'reports') { run(async () => reportsView(await api('GET', '/api/reports/'))); return; }
   listView();
+}
+
+function passwordView() {
+  const content = document.querySelector('#content');
+  content.innerHTML = `<form class="card narrow-form" id="password-form"><h2>Change password</h2>
+    <p>Signed in as ${esc(user.email)}. Changing your password signs you out everywhere else.</p>
+    <input type="email" name="username" value="${esc(user.email)}" autocomplete="username" hidden>
+    ${field('Current password', 'current_password', '', 'password', 'required autocomplete="current-password"')}
+    ${field('New password <small>(at least 12 characters)</small>', 'new_password', '', 'password', 'required minlength="12" maxlength="1024" autocomplete="new-password"')}
+    ${field('Repeat the new password', 'confirm_password', '', 'password', 'required minlength="12" maxlength="1024" autocomplete="new-password"')}
+    <div class="row"><button>Change password</button><button type="button" id="cancel" class="secondary">Cancel</button></div></form>`;
+  const form = content.querySelector('#password-form');
+  const confirm = form.querySelector('[name="confirm_password"]');
+  const matches = () => confirm.setCustomValidity(
+    confirm.value && confirm.value !== form.querySelector('[name="new_password"]').value ? 'The passwords do not match' : '');
+  form.querySelector('[name="new_password"]').addEventListener('input', matches);
+  confirm.addEventListener('input', matches);
+  content.querySelector('#cancel').onclick = () => { section = 'exams'; render(); };
+  form.onsubmit = event => {
+    event.preventDefault();
+    const values = new FormData(form);
+    run(async () => {
+      const response = await api('POST', '/api/auth/password', {
+        current_password: values.get('current_password'),
+        new_password: values.get('new_password'),
+      });
+      user = response.user;
+      content.innerHTML = `<section class="card narrow-form" role="status"><h2>Password changed</h2>
+        <p>Your new password is active. Other browsers and devices where you were signed in have been signed out.</p>
+        <button type="button" id="back">Back to the workspace</button></section>`;
+      content.querySelector('#back').onclick = () => { section = isInstructor() ? 'exams' : 'admin'; run(refresh); };
+    });
+  };
 }
 
 const KINDS = {
@@ -193,10 +244,10 @@ function wireCategoryDropdown(box, onChange) {
 // Close open dropdowns on an outside click or Escape.
 document.addEventListener('click', event => {
   if (!event.target.isConnected) return; // the click re-rendered its own dropdown
-  document.querySelectorAll('details.multiselect[open]').forEach(box => { if (!box.contains(event.target)) box.open = false; });
+  document.querySelectorAll('details.multiselect[open], details.account-menu[open]').forEach(box => { if (!box.contains(event.target)) box.open = false; });
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') document.querySelectorAll('details.multiselect[open]').forEach(box => { box.open = false; });
+  if (event.key === 'Escape') document.querySelectorAll('details.multiselect[open], details.account-menu[open]').forEach(box => { box.open = false; });
 });
 
 function categoryFilterControl() {
