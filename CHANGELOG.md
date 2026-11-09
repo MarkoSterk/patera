@@ -5,6 +5,12 @@ contain breaking changes; they are listed first in each release.
 
 ## Unreleased
 
+### Breaking changes
+
+- **Core:** any other parameter after `req` on a middleware method or a `@before_request` hook is
+  a startup error. Nothing ever filled such parameters; keep those values in a local variable or
+  a class attribute.
+
 ### Added
 
 - **Core:** `Headers[Model]` and `Cookies[Model]` handler parameters build models from request
@@ -15,6 +21,11 @@ contain breaking changes; they are listed first in each release.
   reported under the HTTP name, such as `["header", "x-request-id"]`, and OpenAPI documents
   the fields as `in: header` / `in: cookie` parameters (without `Accept`, `Content-Type` and
   `Authorization`, which OpenAPI ignores there).
+- **Core:** middleware methods and `@before_request` hooks accept `Headers[Model]`,
+  `Cookies[Model]` and `QueryParams[Model]` parameters after `req`, validated per request (422)
+  and documented on the OpenAPI operations they apply to: every operation for middleware (opt
+  out with `open_api_spec = False` on the class), the controller's operations for hooks.
+  `middleware(self, req)` and `(self, req)` hooks work unchanged.
 
 ## patera 0.125.2 and extensions 0.15.2 (2026-11-05)
 

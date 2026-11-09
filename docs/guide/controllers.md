@@ -267,9 +267,20 @@ Annotating the return type as `-> Response[Model]` validates and serializes the 
 
 | Decorator | Runs |
 | --- | --- |
-| `@before_request` | before every endpoint of the controller; receives the request |
+| `@before_request` | before every endpoint of the controller; receives the request, and may declare `Headers`, `Cookies` and `QueryParams` parameters |
 | `@after_request` | after every endpoint; receives the response |
 | `@after_init` | once, after the controller is created and its dependencies are injected |
+
+A `@before_request` hook's parameters are validated like a middleware's (see
+[Middleware](middleware.md#headers-cookies-and-query-parameters)): they run before the endpoint,
+so a `422` stops the request there, and they are documented on each of the controller's
+operations. Any other parameter after `req` fails at registration.
+
+```python
+@before_request
+async def remember_locale(self, req: Request, locale: QueryParams[Locale]) -> None:
+    req.context.set("lang", locale.lang)
+```
 
 ## Other endpoint decorators
 

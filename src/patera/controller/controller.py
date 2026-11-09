@@ -10,11 +10,17 @@ from ..http_statuses import HttpStatus
 from ..injectable import Injectable
 from ..utilities import run_sync_or_async
 from ..exceptions.runtime_exceptions import DuplicateRouteError
-from .params import HeaderSource, SourcedParam, check_endpoint_params, handler_params
+from .params import (
+    HandlerParams,
+    check_endpoint_params,
+    check_request_hook_params,
+    handler_params,
+)
 from .utilities import (
     _build_model,
     _content_type_matches,
     _read_payload_for_consumes,
+    bind_request_values,
 )
 
 if TYPE_CHECKING:
@@ -75,6 +81,7 @@ class Controller(Injectable, Generic[AppT]):
         self._app = app
         self._path = url_path
         self._before_request_methods: list[Callable] = []
+        self._before_request_plans: list[HandlerParams] = []
         self._after_request_methods: list[Callable] = []
         self._endpoints_map: dict[str, dict[str, str | Callable | dict]] = {}
         self._open_api_spec = open_api_spec
@@ -161,10 +168,15 @@ class Controller(Injectable, Generic[AppT]):
         if owner_cls is None:
             return
 
-        for _, method in _methods(self):
+        for name, method in _methods(self):
             handler = getattr(method, "_before_request", None)
             if handler:
+                # Fails at registration for parameters nothing would fill.
+                plan = check_request_hook_params(
+                    method, f"{owner_cls.__name__}.{name} (@before_request)"
+                )
                 self._before_request_methods.append(method)
+                self._before_request_plans.append(plan)
 
     def get_after_request_methods(self):
         owner_cls = self.__class__ or None
@@ -205,18 +217,22 @@ class Controller(Injectable, Generic[AppT]):
         """
         Handles request method call with before and after methods.
 
-        Route parameters are passed by name. After the before-request hooks,
-        a @consumes endpoint checks the Content-Type (415) and reads the
-        body; QueryParams[...] and RequestBody[...] parameters are then
-        built from the query string and the body (422 when invalid).
+        Route parameters are passed by name. Before-request hooks receive
+        their QueryParams, Headers and Cookies parameters. After them, a
+        @consumes endpoint checks the Content-Type (415) and reads the body;
+        the endpoint's parameters are then built from the query string,
+        headers, cookies, body and files (422 when invalid).
         """
         sig = inspect.signature(method)
         kwargs: dict[str, Any] = {}
         for name, _ in sig.parameters.items():
             if name in req.route_parameters:
                 kwargs[name] = req.route_parameters[name]
-        for br_method in self._before_request_methods:
-            await run_sync_or_async(br_method, req)
+        for br_method, plan in zip(
+            self._before_request_methods, self._before_request_plans
+        ):
+            hook_values = bind_request_values(req, plan) if plan.has_sources else {}
+            await run_sync_or_async(br_method, req, **hook_values)
         res: "Response" = await self._call_handler(method, req, kwargs)
         for ar_method in self._after_request_methods:
             await run_sync_or_async(ar_method, res)
@@ -245,20 +261,7 @@ class Controller(Injectable, Generic[AppT]):
                 ).status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
             payload = await _read_payload_for_consumes(req, media_type)
 
-        for param in plan.query:
-            if param.name not in kwargs:
-                kwargs[param.name] = _build_model(
-                    param.model, req.query_parameters, location="query"
-                )
-
-        for param in (*plan.headers, *plan.cookies):
-            if param.name not in kwargs:
-                kwargs[param.name] = _build_model(
-                    param.model,
-                    _header_or_cookie_values(req, param),
-                    location=param.source.location,
-                    names={key: http_name for key, http_name, _ in param.names},
-                )
+        kwargs.update(bind_request_values(req, plan, skip=kwargs.keys()))
 
         if plan.reads_files and media_type is not None:
             files = await req.files()
@@ -295,32 +298,6 @@ class Controller(Injectable, Generic[AppT]):
             )
 
         return await run_sync_or_async(method, req, **kwargs)
-
-
-def _header_or_cookie_values(req: "Request", param: SourcedParam) -> dict[str, Any]:
-    """
-    The values of a Headers or Cookies model's fields, keyed as the model
-    expects them. A list field of a Headers model receives every value of a
-    header sent several times (one per header line); other fields get the
-    combined value. Absent names are left out, so defaults apply.
-    """
-    data: dict[str, Any] = {}
-    if isinstance(param.source, HeaderSource):
-        headers = req.headers
-        for key, http_name, is_list in param.names:
-            if is_list:
-                values = req.header_list(http_name)
-                if values:
-                    data[key] = values
-            elif http_name in headers:
-                data[key] = headers[http_name]
-    else:
-        cookies = req.cookies
-        for key, http_name, is_list in param.names:
-            if http_name in cookies:
-                value = cookies[http_name]
-                data[key] = [value] if is_list else value
-    return data
 
 
 class Descriptor:

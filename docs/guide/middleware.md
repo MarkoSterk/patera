@@ -19,6 +19,34 @@ class TimingMiddleware(MiddlewareBase):
         return res
 ```
 
+## Headers, cookies and query parameters
+
+After `req`, a middleware method may declare `Headers[Model]`, `Cookies[Model]` and
+`QueryParams[Model]` parameters, as [endpoints](controllers.md#headers-and-cookies) do. They are
+validated on every request (`422` when invalid) and passed in:
+
+```python
+class TenantHeaders(BaseModel):
+    x_tenant: str                       # X-Tenant
+    x_request_id: UUID | None = None
+
+
+@middleware(order=20)
+class TenantMiddleware(MiddlewareBase):
+    async def middleware(self, req: Request, tenant: Headers[TenantHeaders]) -> Response:
+        req.context.set("tenant", tenant.x_tenant)
+        return await self.next(req)
+```
+
+- A required field applies to **every** request that passes through the middleware, including
+  the Swagger page. Use defaults for values that are optional anywhere.
+- Nothing else is injected: any other parameter after `req`, including a bare model, fails at
+  startup. `RequestBody` and `Files` are endpoint-only, because the body's media type belongs
+  to the endpoint's `@consumes`.
+- The fields are documented on every [OpenAPI](openapi.md) operation. Set the class attribute
+  `open_api_spec = False` for middleware that acts only on some paths.
+- `middleware(self, req)` keeps working unchanged.
+
 ## Registration
 
 Middleware is discovered in `middleware` folders (file names containing `middleware` or `mw`) or

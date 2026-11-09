@@ -6,6 +6,7 @@ from abc import abstractmethod, ABC
 from patera.injectable import Injectable, resolve_component_configs
 from typing import (
     Callable,
+    ClassVar,
     TYPE_CHECKING,
     Awaitable,
     Any,
@@ -80,8 +81,23 @@ ConfT = TypeVar("ConfT", bound=BaseModel, default=BaseModel)
 
 class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     """
-    Base class for middleware
+    Base class for middleware.
+
+    ``middleware(self, req)`` may declare Headers[...], Cookies[...] and
+    QueryParams[...] parameters after ``req``; they are validated (422 when
+    invalid) and passed on every request:
+
+        async def middleware(self, req, tenant: Headers[TenantHeaders]):
+            ...
+
+    Their fields are documented on every OpenAPI operation, unless the
+    class sets ``open_api_spec = False`` (for middleware that only acts on
+    some paths).
     """
+
+    #: Document this middleware's Headers/Cookies/QueryParams on every
+    #: OpenAPI operation.
+    open_api_spec: ClassVar[bool] = True
 
     def __init__(
         self, app: AppT, next_app: "Callable[[Request], Awaitable[Response]]"
@@ -92,11 +108,26 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
         self._app = app
         self._next = next_app
         self._resolve_injections()
+        # Fails at startup for parameters nothing would fill.
+        self._param_plan = self._middleware_plan()
+
+    def _middleware_plan(self) -> Any:
+        # Imported here: the controller package is imported after this module.
+        # pylint: disable-next=C0415
+        from .controller.params import check_request_hook_params
+
+        return check_request_hook_params(
+            self.middleware, f"{type(self).__name__}.middleware"
+        )
 
     @abstractmethod
-    async def middleware(self, req: "Request") -> "Response":
+    async def middleware(
+        self, req: "Request", /, *args: Any, **kwargs: Any
+    ) -> "Response":
         """
-        Middleware method to be implemented by subclasses
+        Middleware method to be implemented by subclasses: ``(self, req)``,
+        optionally followed by Headers[...], Cookies[...] and QueryParams[...]
+        parameters.
         """
         ...
 
@@ -106,7 +137,17 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
         the chain by awaiting ``self.next(req)``, or returns a response
         without calling it to short-circuit the request.
         """
-        return await run_sync_or_async(self.middleware, req)
+        plan = self.__dict__.get("_param_plan")
+        if plan is None:  # a subclass __init__ that skipped super().__init__
+            plan = self.__dict__["_param_plan"] = self._middleware_plan()
+        if not plan.has_sources:
+            return await run_sync_or_async(self.middleware, req)
+        # pylint: disable-next=C0415
+        from .controller.utilities import bind_request_values
+
+        return await run_sync_or_async(
+            self.middleware, req, **bind_request_values(req, plan)
+        )
 
     @property
     def app(self) -> AppT:

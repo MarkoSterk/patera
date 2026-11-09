@@ -442,8 +442,9 @@ class UserApi(Controller["App"]):
   `dict[str, Model]` filter every item. Dictionaries, model instances and objects with matching
   attributes (ORM rows) are accepted. Only 2xx bodies are shaped this way; error bodies keep their
   own fields. The annotation also documents the response in OpenAPI.
-- `@before_request` / `@after_request` – controller level hooks. `@after_init` methods run once after
-  the controller is created.
+- `@before_request` / `@after_request` – controller level hooks; a `@before_request` hook may
+  declare `Headers`, `Cookies` and `QueryParams` parameters after `req`. `@after_init` methods run
+  once after the controller is created.
 - `@open_api_docs(Descriptor(status, description, media_type, body))` – document error responses.
 - `@cors(...)` / `@no_cors` – per-endpoint [CORS](#cors) settings.
 - `@development` – endpoint (or controller) only exists in debug mode; `@ignore` – never registered.
@@ -738,6 +739,13 @@ Lower order numbers run first (outermost). Built-in middleware uses negative ord
 the SQL session manager `-100`, authentication `-99`. If an order is taken, the next free number is
 used and a warning is logged. Middleware can declare a configuration model just like services
 (`MiddlewareBase[App, MyConfig]`, available as `self.configs`).
+
+After `req`, a middleware method (and a `@before_request` hook) may declare `Headers[Model]`,
+`Cookies[Model]` and `QueryParams[Model]` parameters: `async def middleware(self, req: Request,
+tenant: Headers[TenantHeaders])`. They are validated on every request (`422` when invalid) and
+documented on every OpenAPI operation (set `open_api_spec = False` on the middleware class to
+opt out). Any other parameter after `req` fails at startup; `RequestBody` and `Files` are
+endpoint-only.
 
 Exceptions raised in middleware are handled by the exception handlers. Static files bypass
 middleware.

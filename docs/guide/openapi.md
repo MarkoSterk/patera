@@ -11,6 +11,8 @@ The specification is generated from your controllers:
 | `@consumes` + `RequestBody[...]` | request bodies (an object, an array, ...) |
 | `Files[...]` | file properties of the `multipart/form-data` body (`format: binary`) |
 | `Headers[Model]`, `Cookies[Model]` | `in: header` / `in: cookie` parameters under the HTTP names (`Accept`, `Content-Type` and `Authorization` are left out, as OpenAPI requires) |
+| parameters of `@before_request` hooks | parameters of each of the controller's operations |
+| parameters of middleware methods | parameters of every operation (unless the middleware sets `open_api_spec = False`) |
 | `QueryParams[Model]` | query parameters, one per model field (aliases, defaults, constraints and descriptions included) |
 | `@produces` and `Response[Model]` annotations | responses |
 | `@open_api_docs(Descriptor(...))` | additional (error) responses |

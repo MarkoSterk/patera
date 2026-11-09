@@ -4,7 +4,7 @@ OpenAPI controller
 
 import inspect
 import re
-from typing import Any, Dict, Optional, Set, Type, Tuple, List, cast, Callable
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Type, cast
 from pydantic import BaseModel, TypeAdapter
 from pydantic.json_schema import JsonSchemaMode
 
@@ -323,6 +323,7 @@ def build_openapi(
     openapi_version: str,
     servers: Optional[list[str]] = None,
     description: str = "",
+    middleware_plans: Iterable["HandlerParams"] = (),
 ) -> Dict[str, Any]:
     """
     Builds the OpenAPI document for the registered controllers.
@@ -351,6 +352,11 @@ def build_openapi(
     }
     Descriptor has: media_type, body, description, status (default BAD_REQUEST).
 
+    QueryParams, Headers and Cookies parameters of the controller's
+    @before_request hooks are added to each of its operations, and those of
+    ``middleware_plans`` (one per middleware) to every operation; the
+    endpoint's own parameters come first.
+
     The request body schema comes from the handler's RequestBody[...]
     parameter, and each QueryParams[...] model's fields become ``in: query``
     parameters.
@@ -368,6 +374,7 @@ def build_openapi(
     paths = spec["paths"]
 
     used_operation_ids: Set[str] = set()
+    middleware_list = list(middleware_plans)
 
     for controller in controllers.values():
         if not controller.open_api_spec:
@@ -428,7 +435,24 @@ def build_openapi(
 
                 # Path, query, header and cookie parameters
                 parameters: List[Dict[str, Any]] = [*path_params]
-                for sourced in (*plan.query, *plan.headers, *plan.cookies):
+                shared = [
+                    *getattr(controller, "_before_request_plans", []),
+                    *middleware_list,
+                ]
+                for sourced in (
+                    *plan.query,
+                    *plan.headers,
+                    *plan.cookies,
+                    *(
+                        param
+                        for shared_plan in shared
+                        for param in (
+                            *shared_plan.query,
+                            *shared_plan.headers,
+                            *shared_plan.cookies,
+                        )
+                    ),
+                ):
                     location = sourced.source.location
                     taken = {(p["in"], p["name"]) for p in parameters}
                     parameters.extend(

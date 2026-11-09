@@ -1749,8 +1749,16 @@ class Patera(Injectable, Generic[ConfT]):
         """Builds open api spec."""
         from .open_api import build_openapi
 
+        # pylint: disable-next=C0415
+        from .controller.params import handler_params
+
         self._json_spec = build_openapi(
             self._controllers,
+            middleware_plans=[
+                handler_params(middleware_class.middleware)
+                for middleware_class in self._middleware_classes.values()
+                if getattr(middleware_class, "open_api_spec", True)
+            ],
             title=self.app_name,
             version=self.version,
             openapi_version=OPEN_API_VERSION,

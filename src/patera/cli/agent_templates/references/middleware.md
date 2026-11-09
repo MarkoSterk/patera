@@ -20,6 +20,14 @@ last. Built-in CORS/database/auth middleware use -101/-100/-99 respectively.
 Register before the middleware chain is built, normally at first ASGI lifespan.
 An extension registers middleware classes in `init()`.
 
+After `req`, `middleware()` and controller `@before_request` hooks may declare
+`Headers[Model]`, `Cookies[Model]` and `QueryParams[Model]` parameters (import
+from `patera.controller`); they are validated per request (422) and documented on
+every OpenAPI operation (`open_api_spec = False` on the middleware class opts
+out). A required field applies to every request through the middleware. Any
+other parameter after `req` fails at startup; `RequestBody`/`Files` are
+endpoint-only.
+
 For authentication, subclass `Authentication` and inherit its `middleware()`
 handler. Only `user_loader()` and `roles_loader()` must be implemented.
 

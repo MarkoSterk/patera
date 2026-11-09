@@ -549,6 +549,33 @@ def _check_file_field_overlap(
             owners[key] = owner
 
 
+def check_request_hook_params(func: Callable[..., Any], what: str) -> HandlerParams:
+    """
+    Validates the parameters of a middleware method or a @before_request
+    hook. After ``req`` they may only declare Headers[...], Cookies[...] and
+    QueryParams[...]: these run for many endpoints, before an endpoint's
+    @consumes check, so there is no body or file for them, and nothing
+    would fill any other parameter.
+    """
+    plan = handler_params(func)
+    if plan.body is not None or plan.reads_files:
+        raise TypeError(
+            f"{what}: RequestBody and Files parameters are only available on "
+            "endpoints, which declare the body's media type with @consumes."
+        )
+    allowed = {p.name for p in (*plan.query, *plan.headers, *plan.cookies)}
+    parameters = list(inspect.signature(_underlying(func)).parameters.values())[2:]
+    for param in parameters:
+        if param.name not in allowed:
+            raise TypeError(
+                f"{what}: nothing fills the parameter {param.name!r}. After req, "
+                "only Headers[...], Cookies[...] and QueryParams[...] parameters "
+                "are injected; keep other values in a local variable or a "
+                "class attribute."
+            )
+    return plan
+
+
 def check_endpoint_params(
     func: Callable[..., Any], handler_info: Mapping[str, Any]
 ) -> HandlerParams:

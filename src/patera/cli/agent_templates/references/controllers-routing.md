@@ -72,7 +72,9 @@ model. Invalid values are answered with 422 and each error's `loc` starts with
 `"body"`, `"query"`, `"files"`, `"header"` or `"cookie"`. A list field accepts a repeated query key.
 
 Use `@before_request`, `@after_request`, and `@after_init` from
-`patera.controller` for controller hooks. Inspect installed signatures when adding
+`patera.controller` for controller hooks. A `@before_request` hook may declare
+`Headers[Model]`, `Cookies[Model]` and `QueryParams[Model]` after `req`; other
+parameters fail at registration. Inspect installed signatures when adding
 hooks. Do not override framework construction to perform injection yourself.
 Controller instances are shared across concurrent requests.
 
