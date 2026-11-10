@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .accounts import UserOut
-from .attempts import ResultOut
+from .attempts import ResultOut, ReviewedQuestionOut
 
 
-class ArchivedQuestionOut(BaseModel):
-    id: str = Field(validation_alias="source_question_id")
-    question_text: str
-    image: str
-    answers: list[str]
-    points: float
-    correct_answer: int
-    selected_answer: Optional[int]
+# An archived question as instructors see it in reports.
+ArchivedQuestionOut = ReviewedQuestionOut
 
 
 class ArchivedAttemptOut(BaseModel):

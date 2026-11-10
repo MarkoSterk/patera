@@ -118,8 +118,10 @@ class AttemptService(Service["App"]):
 
     async def submit(self, attempt_id: str, data: SubmitIn) -> dict[str, Any]:
         """
-        Grades an attempt. The attempt id is the student's capability; a
-        repeated submission returns the stored result.
+        Grades an attempt. The attempt id is the student's capability. The
+        response to the submission includes a one-time review (questions,
+        answer keys and selected answers); a repeated submission returns only
+        the stored result, so the review cannot be fetched again.
         """
         attempt = await self.attempts.get(attempt_id)
         require(attempt, "Attempt not found", NotFound)
@@ -144,7 +146,7 @@ class AttemptService(Service["App"]):
         attempt.score_percentage = percentage
         attempt.passed = percentage >= attempt.pass_percentage
         await self.attempts.flush()
-        return self.result_of(attempt)
+        return {**self.result_of(attempt), "questions": questions}
 
     @staticmethod
     def result_of(attempt: Attempt) -> dict[str, Any]:

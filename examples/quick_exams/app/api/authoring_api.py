@@ -1,5 +1,7 @@
+import re
 from io import BytesIO
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
@@ -15,6 +17,7 @@ from app.schemas import (
     SubjectOut,
 )
 from app.services.authoring import AuthoringService
+from app.services.exam_export import exam_docx
 from patera.auth import role_required
 from patera.database.sql import transactional
 
@@ -174,6 +177,24 @@ class ExamsApi(Controller["App"]):
     async def delete_exam(self, req: Request, exam_id: str) -> Response:
         await self.authoring.delete_exam(req.user.id, exam_id)
         return req.res.no_content()
+
+    @get("/<exam_id>/docx")
+    async def export_exam_docx(self, req: Request, exam_id: str) -> Response:
+        """
+        The exam as a Word document: numbered questions, answers a) to d),
+        the correct answer in bold. A random-per-attempt exam is exported as
+        a newly drawn version.
+        """
+        exam, questions = await self.authoring.exam_for_export(req.user.id, exam_id)
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "_", exam.title).strip("_") or "exam"
+        return req.res.bytes(
+            exam_docx(exam.title, questions),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ).set_header(
+            "Content-Disposition",
+            f'attachment; filename="{filename}.docx"; '
+            f"filename*=UTF-8''{quote(exam.title)}.docx",
+        )
 
     @get("/<exam_id>/qr")
     async def exam_qr_code(self, req: Request, exam_id: str) -> Response:

@@ -262,6 +262,32 @@ class AuthoringService(Service["App"]):
         await self.exam_categories.add_pool(exam.id, exam.subject_id, category_ids)
         return self._exam_out(exam, question_ids, category_ids)
 
+    async def exam_for_export(
+        self, owner_id: str, exam_id: str
+    ) -> tuple[Exam, list[Question]]:
+        """
+        The owner's exam and its questions in order, for a document export.
+        A random-per-attempt exam has no fixed selection, so a new random set
+        is drawn, as for an attempt: every export is a different version.
+        """
+        exam = await self.get_exam(owner_id, exam_id)
+        if exam.random_per_attempt:
+            category_ids = (await self.exam_categories.for_exams([exam.id]))[exam.id]
+            pool = await self.questions.ids_in_categories(
+                owner_id, exam.subject_id, category_ids
+            )
+            count = exam.random_count or 0
+            require(
+                count >= 1 and len(pool) >= count,
+                "Not enough questions in the exam's categories",
+            )
+            question_ids = random.SystemRandom().sample(pool, count)
+        else:
+            question_ids = (await self.exam_questions.for_exams([exam.id]))[exam.id]
+        rows = await self.questions.query.where(Question.id.in_(question_ids)).all()
+        by_id = {question.id: question for question in rows}
+        return exam, [by_id[question_id] for question_id in question_ids]
+
     async def delete_exam(self, owner_id: str, exam_id: str) -> None:
         await self.exams.delete(await self.get_exam(owner_id, exam_id))
 

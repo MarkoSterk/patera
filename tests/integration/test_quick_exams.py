@@ -354,10 +354,14 @@ async def test_student_attempts_keep_an_independent_archive(exams_app, db):
         result = (
             await client.post(submit, json={"answers": {question["id"]: 1}})
         ).json()
+        # The submission returns a one-time review of the snapshot taken at
+        # start (the question was changed afterwards); a repeat returns none.
+        review = result.pop("questions")
         assert result == {"points": 3, "maximum": 3, "percentage": 100, "passed": True}
+        assert [(q["correct_answer"], q["selected_answer"]) for q in review] == [(1, 1)]
         assert (
             await client.post(submit, json={"answers": {question["id"]: 0}})
-        ).json() == result
+        ).json() == {**result, "questions": None}
         assert (
             await client.post("/api/attempts/guessed/submit", json={"answers": {}})
         ).status_code == 404

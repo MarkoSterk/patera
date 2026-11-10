@@ -3,6 +3,8 @@ from .attempts import (
     PublicAttemptOut,
     PublicQuestionOut,
     ResultOut,
+    ReviewedQuestionOut,
+    SubmissionOut,
     StartAttemptIn,
     SubmitIn,
 )
@@ -62,6 +64,8 @@ __all__ = [
     "RandomSelection",
     "ReportOut",
     "ResultOut",
+    "ReviewedQuestionOut",
+    "SubmissionOut",
     "Role",
     "StartAttemptIn",
     "SubjectIn",

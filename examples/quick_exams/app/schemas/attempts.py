@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 from .common import AnswerIndex, Email, Input
@@ -36,3 +38,25 @@ class ResultOut(BaseModel):
     maximum: float
     percentage: float
     passed: bool
+
+
+class ReviewedQuestionOut(BaseModel):
+    """A submitted question with its answer key and the selected answer."""
+
+    id: str = Field(validation_alias="source_question_id")
+    question_text: str
+    image: str
+    answers: list[str]
+    points: float
+    correct_answer: int
+    selected_answer: Optional[int]
+
+
+class SubmissionOut(ResultOut):
+    """
+    The result of a submission. ``questions`` (the review with answer keys)
+    is present only in the response to the submission itself; a repeated
+    submit returns the result without it.
+    """
+
+    questions: Optional[list[ReviewedQuestionOut]] = None

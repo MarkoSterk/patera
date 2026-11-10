@@ -178,6 +178,7 @@ other content types are answered with 415 and invalid bodies with 422.
 | `GET, POST /api/questions/`, `PUT, DELETE /api/questions/<id>` | INSTRUCTOR | Own questions. |
 | `GET, POST /api/exams/`, `PUT, DELETE /api/exams/<id>` | INSTRUCTOR | Own exams. |
 | `GET /api/exams/<id>/qr` | INSTRUCTOR | SVG QR code of the student link. |
+| `GET /api/exams/<id>/docx` | INSTRUCTOR | The exam as a Word document. |
 | `GET /api/reports/` | INSTRUCTOR | Reports of own exams. |
 | `GET /api/admin/overview` | ADMIN | Users, counts and all reports. |
 | `POST /api/admin/users`, `PUT /api/admin/users/<id>` | ADMIN | Create and edit users. |
@@ -248,6 +249,11 @@ traffic.
    that the categories hold enough questions; if questions are later removed
    below the count, starting the exam fails with 400 until more are added.
 6. Expand **Share exam** to copy or open the link or download its SVG QR code.
+   **Export → .docx** on an exam downloads its questions as a Word document:
+   numbered questions with images, answers labelled a) to d), and the correct
+   answer in bold. LaTeX math is written as plain text with Unicode symbols
+   (`$\frac{\sqrt{3}}{2}$` becomes `√3/2`). A random-per-attempt exam has no
+   fixed questions, so each export draws a new random version.
 7. Open **Reports** after submissions: count, pass rate, mean, minimum and
    maximum score, and each submission with its answers. Download a report as JSON.
 
@@ -272,10 +278,18 @@ later edits or deletion of the live exam do not change a started attempt.
 
 Students select one answer for every question and submit before the copied
 deadline. Scores are weighted by question points; an answer earns all of its
-question's points or none. Answer keys are never sent to students. Submission
-uses the random 192-bit attempt id kept only in page memory and returns only
-that attempt's score; repeating a submission returns the same result.
+question's points or none. Submission uses the random 192-bit attempt id kept
+only in page memory. Its response holds that attempt's score and a one-time
+review: every question with the student's answer and the correct one, shown
+under the result as in the instructor's reports. The review exists only in
+that response and in the open page; repeating the submission returns the
+score without it, and no endpoint returns it again, so it is gone once the
+page is closed or reloaded. Answer keys are never sent before submission.
 Refreshing an unfinished student page starts a new attempt.
+
+A student who has seen the review can pass the answers on. For exams with a
+fixed selection, other students then know the key; random-per-attempt exams
+limit this, since each attempt draws its own questions.
 
 ## Math in questions and answers
 

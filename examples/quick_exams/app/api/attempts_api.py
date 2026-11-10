@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from app.schemas import PublicAttemptOut, ResultOut, StartAttemptIn, SubmitIn
+from app.schemas import PublicAttemptOut, StartAttemptIn, SubmissionOut, SubmitIn
 from app.services.attempts import AttemptService
 from patera.database.sql import transactional
 
@@ -17,7 +17,8 @@ class AttemptsApi(Controller["App"]):
     """
     Public student endpoints. The unpredictable exam id grants access to an
     exam, and the attempt id returned on start is the only way to submit it.
-    Answer keys are never sent to students.
+    Answer keys are sent to a student only once: in the response to their
+    own submission, as a review of the submitted attempt.
     """
 
     attempts: Inject[AttemptService]
@@ -36,5 +37,5 @@ class AttemptsApi(Controller["App"]):
     @transactional
     async def submit_attempt(
         self, req: Request, attempt_id: str, data: RequestBody[SubmitIn]
-    ) -> Response[ResultOut]:
+    ) -> Response[SubmissionOut]:
         return req.res.json(await self.attempts.submit(attempt_id, data))

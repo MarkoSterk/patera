@@ -289,10 +289,24 @@ async def test_exam_workflow_and_privacy(exams_app):
         result = (
             await client.post(submit, json={"answers": {question["id"]: 1}})
         ).json()
+        review = result.pop("questions")
         assert result == {"points": 3, "maximum": 3, "percentage": 100, "passed": True}
+        # The submission's own response carries a one-time review ...
+        assert review == [
+            {
+                "id": question["id"],
+                "question_text": question["question_text"],
+                "image": "",
+                "answers": question["answers"],
+                "points": 3,
+                "correct_answer": 1,
+                "selected_answer": 1,
+            }
+        ]
+        # ... a repeated submit returns only the stored result.
         assert (
             await client.post(submit, json={"answers": {question["id"]: 0}})
-        ).json() == result
+        ).json() == {**result, "questions": None}
         response = await client.post(
             "/api/attempts/guessed/submit", json={"answers": {}}
         )
@@ -469,12 +483,18 @@ async def test_weighted_grades_and_admin_safeguards(exams_app):
             f"/api/attempts/{attempt['id']}/submit",
             json={"answers": {questions[0]["id"]: 0, questions[1]["id"]: 1}},
         )
-        assert response.json() == {
+        graded = response.json()
+        review = graded.pop("questions")
+        assert graded == {
             "points": 1,
             "maximum": 4,
             "percentage": 25,
             "passed": False,
         }
+        assert [(q["selected_answer"], q["correct_answer"]) for q in review] == [
+            (0, 0),
+            (1, 0),
+        ]
 
         me = await teacher("GET", "/api/auth/me")
         await teacher(

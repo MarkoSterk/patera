@@ -244,10 +244,10 @@ function wireCategoryDropdown(box, onChange) {
 // Close open dropdowns on an outside click or Escape.
 document.addEventListener('click', event => {
   if (!event.target.isConnected) return; // the click re-rendered its own dropdown
-  document.querySelectorAll('details.multiselect[open], details.account-menu[open]').forEach(box => { if (!box.contains(event.target)) box.open = false; });
+  document.querySelectorAll('details.multiselect[open], details.account-menu[open], details.export-menu[open]').forEach(box => { if (!box.contains(event.target)) box.open = false; });
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') document.querySelectorAll('details.multiselect[open], details.account-menu[open]').forEach(box => { box.open = false; });
+  if (event.key === 'Escape') document.querySelectorAll('details.multiselect[open], details.account-menu[open], details.export-menu[open]').forEach(box => { box.open = false; });
 });
 
 function categoryFilterControl() {
@@ -269,6 +269,36 @@ function shareExam(exam) {
     <button type="button" class="qr-button" data-qr="${exam.id}" title="Show a larger QR code" aria-label="Show a larger QR code for ${esc(exam.title)}">
       <img class="qr" src="/api/exams/${exam.id}/qr" alt="Exam QR code"></button>
     <p><a href="/api/exams/${exam.id}/qr" download="exam-qr.svg">Download QR code</a></p></details>`;
+}
+
+// "Export" dropdown on an exam card; one entry per export format.
+function exportMenu(exam) {
+  return `<details class="export-menu"><summary>Export</summary>
+    <div class="export-menu-items">
+      <button type="button" data-docx="${exam.id}" title="Questions as a Word document">.docx</button>
+    </div></details>`;
+}
+
+// Downloads the exam as .docx; errors appear in the notice bar instead of a raw page.
+async function downloadDocx(button) {
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/exams/${button.dataset.docx}/docx`);
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      throw new ApiError(response.status, result?.message || 'Export failed');
+    }
+    const name = /filename\*=UTF-8''([^;]+)/.exec(response.headers.get('Content-Disposition') || '');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(await response.blob());
+    link.download = name ? decodeURIComponent(name[1]) : 'exam.docx';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 // A large QR code in a modal dialog, for showing on a projector or screen.
@@ -303,7 +333,7 @@ function listView() {
     <div id="editor"></div>
     ${records.length ? records.map(record => `<article class="card"><div class="row between">
       <div><h2>${label(record)}</h2>${recordDetails(record)}</div>
-      <div class="row"><button data-edit="${record.id}" class="secondary">Edit</button><button data-delete="${record.id}" class="danger">Delete</button></div>
+      <div class="row">${section === 'exams' ? exportMenu(record) : ''}<button data-edit="${record.id}" class="secondary">Edit</button><button data-delete="${record.id}" class="danger">Delete</button></div>
       </div>${section === 'exams' ? shareExam(record) : ''}</article>`).join('')
       : '<div class="card" id="empty-state"><h2>A fresh start</h2><p>Create your first item to get started.</p></div>'}`;
 
@@ -312,6 +342,10 @@ function listView() {
   if (filter) filter.onchange = () => { subjectFilter = filter.value; categoryFilter = []; listView(); };
   const categoryBox = document.querySelector('[data-multiselect="category_filter"]');
   if (categoryBox) wireCategoryDropdown(categoryBox, ids => { categoryFilter = ids; listView(); document.querySelector('[data-multiselect="category_filter"]').open = true; });
+  root.querySelectorAll('[data-docx]').forEach(button => button.onclick = () => {
+    button.closest('details').open = false;
+    run(() => downloadDocx(button));
+  });
   root.querySelectorAll('[data-qr]').forEach(button => button.onclick = () => showQrDialog(records.find(r => r.id === button.dataset.qr)));
   root.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editor(kind, records.find(r => r.id === button.dataset.edit)));
   root.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => {
@@ -633,6 +667,17 @@ function studentStart(examId) {
   };
 }
 
+// The one-time review sent with a submission: shown now, never again.
+function submissionReview(questions) {
+  return `<section class="submission-review"><h2>Your answers</h2>
+    <p class="review-once" role="note">This review is shown only once. After you leave or reload this page you can no longer see it.</p>
+    ${questions.map((q, i) => `<fieldset class="card"><legend>Question ${i + 1} · ${points(q.points)}</legend>${answerOutcome(q)}
+      <p>${math(q.question_text)}</p>
+      ${q.image ? `<img class="question-image" src="${esc(q.image)}" alt="Question image">` : ''}
+      ${q.answers.map((answer, n) => reviewedAnswer(q, n, answer)).join('')}
+      </fieldset>`).join('')}</section>`;
+}
+
 function studentQuestions(attempt) {
   root.innerHTML = `<h1>${esc(attempt.exam_title)}</h1><p>Closes ${when(attempt.available_until)}. Select one answer for every question.</p>
     <form id="answers">${attempt.questions.map((q, i) => `<fieldset class="card"><legend>Question ${i + 1} · ${points(q.points)}</legend><p>${math(q.question_text)}</p>
@@ -649,7 +694,9 @@ function studentQuestions(attempt) {
         const result = await api('POST', `/api/attempts/${attempt.id}/submit`, {answers});
         root.innerHTML = `<section class="card narrow"><p>YOUR RESULT</p><h1>${result.passed ? 'You passed.' : 'Not passed this time.'}</h1>
           <div class="metric">${pct(result.percentage)}</div><p>${result.points} of ${result.maximum} points</p>
-          <p>Your submission has been saved. You can close this page.</p></section>`;
+          <p>Your submission has been saved.</p></section>
+          ${result.questions ? submissionReview(result.questions) : ''}`;
+        window.scrollTo({top: 0});
       } finally {
         button.disabled = false;
       }

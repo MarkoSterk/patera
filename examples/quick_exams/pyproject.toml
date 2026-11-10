@@ -7,6 +7,8 @@ requires-python = ">=3.13"
 dependencies = [
     "patera[dev,admin,auth,database,migrate]",
     "qrcode>=8.2",
+    "python-docx>=1.1",
+    "docx>=0.2.4",
 ]
 
 [tool.uv.sources]
