@@ -3,16 +3,38 @@
 All notable changes to Patera and its extension packages. Until version 1.0, a minor release may
 contain breaking changes; they are listed first in each release.
 
-## Unreleased
+## patera 0.126.0 and extensions 0.16.0 (2026-11-13)
 
 ### Breaking changes
 
+- **patera-joltui:** the application now owns the component endpoint. `PateraJoltui` no longer
+  registers `POST /joltui/components`, and `JoltuiConfig.COMPONENTS_PATH` was removed (configuring
+  it raises an error). Subclass the new `JoltuiController`, inject the interface and register one
+  endpoint with the new `@dispatcher` decorator, which replaces `@post` (bare for the controller's
+  path, `@dispatcher("/sub")` for a path below it, out of OpenAPI unless `open_api_spec=True`); it
+  returns `await self.<interface>.dispatch(req)`. The controller's other endpoints are ordinary. The
+  interface is the controller's single injected `PateraJoltui` attribute; none or several fail the
+  build, as do a second `@dispatcher`, another route decorator on it or one outside a
+  `JoltuiController`. Groups still come from `ComponentGroup[...]` annotations, and the dispatch
+  middleware (order -102) still selects the component before CORS, database sessions and
+  authentication, so group and component decorators work as before. The controller's hooks now run
+  around `dispatch`. Authentication, transaction and CORS decorators on the `@dispatcher` endpoint
+  or on the `JoltuiController` are ambiguous and fail the build; put them on groups or components.
+  `dispatch` raises `RuntimeError` outside the `@dispatcher` endpoint. Upgrade: add a
+  `JoltuiController` with a `@dispatcher` endpoint at your previous URL and delete
+  `COMPONENTS_PATH`. patera-joltui 0.5.0 requires patera 0.126.0, and the core `joltui` and `all`
+  extras now require patera-joltui 0.5: earlier patera-joltui releases do not work with patera
+  0.126, which calls `req.endpoint` instead of `req.route_handler`.
 - **Core:** any other parameter after `req` on a middleware method or a `@before_request` hook is
   a startup error. Nothing ever filled such parameters; keep those values in a local variable or
   a class attribute.
 
 ### Added
 
+- **Core:** `req.endpoint` is the matched route's endpoint, which the application calls.
+  `req.route_handler` is what middleware inspects for its decorators; a dispatch middleware may
+  set it to another handler (patera-joltui sets it to the selected component). Without such a
+  middleware both are the same method, so existing applications behave as before.
 - **patera-telemetry 0.1.0 (new package):** OpenTelemetry for Patera. The `Telemetry` extension
   registers `TelemetryMiddleware` (order -200), which records a SERVER span named after the route
   and the `http.server.request.duration` histogram for every HTTP request, adds `trace_id` and
@@ -22,8 +44,10 @@ contain breaking changes; they are listed first in each release.
   the providers configured elsewhere and is a no-op without them. Client addresses, query strings,
   headers and user ids are opt-in; captured secrets are masked. `run_traced_in_background` runs
   background work in its own trace linked to the request. Install with `patera[telemetry]`;
-  `patera-telemetry[all]` adds the SDK, the OTLP/HTTP exporter and the instrumentations.
-  `patera[all]` now includes `patera-telemetry` (instrumentation only).
+  `patera-telemetry[all]` adds the SDK, the OTLP/HTTP exporter and the instrumentations. The
+  `sqlalchemy` and `all` extras require `sqlalchemy<2.1`, because the OpenTelemetry SQLAlchemy
+  instrumentation does nothing on SQLAlchemy 2.1. `patera[all]` now includes `patera-telemetry`
+  (instrumentation only).
 - **Core:** `req.on_finish(callback)` runs `callback(exc)` once the request is finished: its
   response sent completely, the request failed, or the client left (`exc` is the exception that
   ended it without a complete answer, otherwise None). Callbacks run after a streamed body.
@@ -82,11 +106,6 @@ contain breaking changes; they are listed first in each release.
   They were spaced and had no charset. The JSON itself is unchanged.
 - **Core:** a 405 response lists the allowed methods sorted, in the `Allow` header and in
   `data.allowed_methods`. Their order followed a set before and could change between processes.
-
-## patera 0.125.2 and extensions 0.15.2 (2026-11-05)
-
-### Fixed
-
 - **Core:** the startup banner is no longer split by log messages. Console log sinks write from a
   background queue (`ENQUEUE`), so messages logged before the banner could appear in the middle
   of it. The queue is now drained first, and the ASCII art and address box are written together

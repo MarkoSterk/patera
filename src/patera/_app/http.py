@@ -115,10 +115,13 @@ class HttpDispatcher(AppPart):
             )
 
         if req.response.expected_body_type() is None:
-            expected = _extract_response_type(req.route_handler)
+            expected = _extract_response_type(req.endpoint)
             req.response._set_expected_body_type(expected)
 
-        res: Response = await req.route_handler.__self__(req.route_handler, req)  # type: ignore
+        # The matched endpoint runs, even when a dispatch middleware (JoltUI)
+        # showed the rest of the chain another handler as req.route_handler.
+        endpoint = req.endpoint
+        res: Response = await endpoint.__self__(endpoint, req)  # type: ignore
 
         if isinstance(res, Response):
             app.response_renderer.materialize_body(

@@ -113,6 +113,14 @@ class RequestMetrics(MiddlewareBase):
   the middleware runs for: with `run_on_unmatched`, an unknown path without the header is answered
   with 422 instead of 404.
 
+`req.route_handler` is the method a middleware inspects for decorators such as
+`@login_required()` or `@transactional`, and `req.endpoint` is the matched endpoint the
+application calls. They are the same method unless a dispatch middleware selected another handler
+for the request: [JoltUI](../extensions/joltui.md) sets `req.route_handler` to the selected
+component while the `JoltuiController`'s `@dispatcher` endpoint still runs. Middleware that reads decorators should use
+`req.route_handler`; middleware that describes the route (logging, tracing) should use
+`req.endpoint`. Both raise `RuntimeError` for unmatched requests.
+
 ## Wrapping the send channel
 
 `req.wrap_send(wrapper)` installs `wrapper(send)` as the request's ASGI send channel. Every message

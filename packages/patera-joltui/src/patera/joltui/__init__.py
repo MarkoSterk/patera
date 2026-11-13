@@ -3,10 +3,12 @@
 from .interface import (
     ComponentGroup,
     JoltuiConfig,
+    JoltuiController,
     JoltuiGroupHandler,
     JoltuiRequest,
     PateraJoltui,
     component,
+    dispatcher,
     group,
     joltui_request,
 )
@@ -14,10 +16,12 @@ from .interface import (
 __all__ = [
     "ComponentGroup",
     "JoltuiConfig",
+    "JoltuiController",
     "JoltuiGroupHandler",
     "JoltuiRequest",
     "PateraJoltui",
     "component",
+    "dispatcher",
     "group",
     "joltui_request",
 ]

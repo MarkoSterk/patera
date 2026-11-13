@@ -30,7 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "opentelemetry-api>=1.39",
-    "patera>=0.125.2",
+    "patera>=0.126.0",
 ]
 
 [project.optional-dependencies]
@@ -42,13 +42,19 @@ grpc = [
     "opentelemetry-sdk>=1.39",
     "opentelemetry-exporter-otlp-proto-grpc>=1.39",
 ]
-sqlalchemy = ["opentelemetry-instrumentation-sqlalchemy>=0.60b0"]
+# The SQLAlchemy instrumentation does nothing on SQLAlchemy 2.1 (it supports
+# < 2.1.0); raise the cap once it supports newer releases.
+sqlalchemy = [
+    "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
+    "sqlalchemy<2.1",
+]
 httpx = ["opentelemetry-instrumentation-httpx>=0.60b0"]
 redis = ["opentelemetry-instrumentation-redis>=0.60b0"]
 all = [
     "opentelemetry-sdk>=1.39",
     "opentelemetry-exporter-otlp-proto-http>=1.39",
     "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
+    "sqlalchemy<2.1",
     "opentelemetry-instrumentation-httpx>=0.60b0",
     "opentelemetry-instrumentation-redis>=0.60b0",
 ]

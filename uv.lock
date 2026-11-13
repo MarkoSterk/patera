@@ -1952,7 +1952,7 @@ wheels = [
 
 [[package]]
 name = "patera"
-version = "0.125.2"
+version = "0.126.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -2136,7 +2136,7 @@ dev = [
 
 [[package]]
 name = "patera-admin"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-admin" }
 dependencies = [
     { name = "markupsafe" },
@@ -2153,7 +2153,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-aiinterface"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-aiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -2181,7 +2181,7 @@ provides-extras = ["augmentation"]
 
 [[package]]
 name = "patera-apiinterface"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-apiinterface" }
 dependencies = [
     { name = "httpx" },
@@ -2196,7 +2196,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-auth"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-auth" }
 dependencies = [
     { name = "bcrypt" },
@@ -2215,7 +2215,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-caching"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-caching" }
 dependencies = [
     { name = "cachetools" },
@@ -2247,7 +2247,7 @@ provides-extras = ["redis", "sqlite", "all"]
 
 [[package]]
 name = "patera-database"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-database" }
 dependencies = [
     { name = "aiosqlite" },
@@ -2264,7 +2264,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-desktop"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-desktop" }
 dependencies = [
     { name = "patera" },
@@ -2290,7 +2290,7 @@ provides-extras = ["pyinstaller"]
 
 [[package]]
 name = "patera-desktop-ui"
-version = "0.5.2"
+version = "0.6.0"
 source = { editable = "packages/patera-desktop-ui" }
 dependencies = [
     { name = "jinja2" },
@@ -2307,7 +2307,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-email"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-email" }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2322,7 +2322,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-joltui"
-version = "0.4.2"
+version = "0.5.0"
 source = { editable = "packages/patera-joltui" }
 dependencies = [
     { name = "patera" },
@@ -2333,7 +2333,7 @@ requires-dist = [{ name = "patera", editable = "." }]
 
 [[package]]
 name = "patera-migrate"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-migrate" }
 dependencies = [
     { name = "patera" },
@@ -2350,7 +2350,7 @@ requires-dist = [
 
 [[package]]
 name = "patera-taskmanager"
-version = "0.15.2"
+version = "0.16.0"
 source = { editable = "packages/patera-taskmanager" }
 dependencies = [
     { name = "apscheduler" },
@@ -2379,6 +2379,7 @@ all = [
     { name = "opentelemetry-instrumentation-redis" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
     { name = "opentelemetry-sdk" },
+    { name = "sqlalchemy" },
 ]
 grpc = [
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
@@ -2396,6 +2397,7 @@ sdk = [
 ]
 sqlalchemy = [
     { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
@@ -2414,6 +2416,8 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'grpc'", specifier = ">=1.39" },
     { name = "opentelemetry-sdk", marker = "extra == 'sdk'", specifier = ">=1.39" },
     { name = "patera", editable = "." },
+    { name = "sqlalchemy", marker = "extra == 'all'", specifier = "<2.1" },
+    { name = "sqlalchemy", marker = "extra == 'sqlalchemy'", specifier = "<2.1" },
 ]
 provides-extras = ["sdk", "grpc", "sqlalchemy", "httpx", "redis", "all"]
 

@@ -12,11 +12,12 @@ uv add "patera[joltui]"
 ```python
 from html import escape
 
-from patera import Request
+from patera import Request, Response
+from patera.controller import path
 from patera.injectable import Inject
 from patera.joltui import (
-    ComponentGroup, JoltuiGroupHandler, PateraJoltui,
-    component, group, joltui_request,
+    ComponentGroup, JoltuiController, JoltuiGroupHandler, PateraJoltui,
+    component, dispatcher, group, joltui_request,
 )
 
 
@@ -39,18 +40,58 @@ class UserGroupHandler(JoltuiGroupHandler):
 class JoltuiInterface(PateraJoltui):
     default_group: ComponentGroup[DefaultGroupHandler]
     user_group: ComponentGroup[UserGroupHandler]
+
+
+@path("/joltui")
+class JoltuiComponentsController(JoltuiController):
+    joltui: Inject[JoltuiInterface]
+
+    @dispatcher("/components")
+    async def components(self, req: Request) -> Response:
+        return await self.joltui.dispatch(req)
 ```
 
-Register `JoltuiInterface` in `app_extensions`, or inject it with
-`joltui: Inject[JoltuiInterface]`. The extension registers its own controller; no application
-controller or manual dispatch route is needed.
+`JoltuiInterface` is an injectable service. The application owns the endpoint: the `POST`
+route that `@dispatcher` registers in a `JoltuiController` subclass receives the component
+requests, calls `dispatch(req)` on the controller's injected interface and returns its response.
+Register the controller as usual; injecting the interface creates its app-wide instance, and the
+controller registers the small dispatch middleware the interface needs.
 
-Set JoltUI's `serverComponentsUrl` to `/joltui/components` (including Patera's `URL_PREFIX`, if
-configured). Change the endpoint with `JoltuiConfig.COMPONENTS_PATH`:
+Set JoltUI's `serverComponentsUrl` to the endpoint's URL (here `/joltui/components`, including
+Patera's `URL_PREFIX`, if configured). Any URL works, and several interfaces may each have their
+own controller.
 
-```python
-JOLTUI_INTERFACE = {"COMPONENTS_PATH": "/components"}
-```
+!!! note "Upgrading from the auto-registered controller"
+
+    Earlier versions registered `POST /joltui/components` themselves and read
+    `JoltuiConfig.COMPONENTS_PATH`. Both were removed: add the controller above with the URL you
+    used, and delete the `COMPONENTS_PATH` setting (configuring it now raises an error).
+
+## The component controller
+
+- `@dispatcher` registers the controller's single component endpoint as a `POST` route and
+  replaces `@post`: bare `@dispatcher` serves the controller's own path, and
+  `@dispatcher("/components")` a path below it. The route is left out of the OpenAPI document
+  unless you pass `open_api_spec=True` (and optionally `tags=[...]`). Every other endpoint of the
+  controller (`GET`, `POST`, `PUT` and so on) is ordinary and takes its usual decorators,
+  `@login_required()` included.
+- The controller's interface is its single injected `PateraJoltui` attribute (it may be
+  inherited from a base controller). A `JoltuiController` that injects no interface, or several,
+  fails when the application builds, as do a second `@dispatcher` endpoint, another route
+  decorator (`@post`, `@get`, ...) on the `@dispatcher` endpoint, and a `@dispatcher` endpoint
+  outside a `JoltuiController`.
+- The controller's hooks (`@before_request`, `@after_request`) run around `dispatch`, and the
+  endpoint may modify the returned response, for example to add headers.
+- Authentication, transactions and CORS belong to groups and components.
+  `@login_required()`, `@role_required()`, `@transactional`, `@cors` and `@no_cors` are not
+  supported on the `@dispatcher` endpoint or on the `JoltuiController` itself: it would be
+  ambiguous whether they guard the component request or the component, and the middleware that
+  reads them sees the selected component. The application refuses to build. To guard every
+  component, put the decorator on each group handler.
+- A `JoltuiController` without a `@dispatcher` endpoint, and an interface without one, log a
+  warning.
+- `dispatch` raises `RuntimeError` when called anywhere but the `@dispatcher` endpoint of a
+  `JoltuiController` that injects that interface.
 
 ## The request envelope
 
@@ -146,19 +187,19 @@ class UserGroupHandler(JoltuiGroupHandler):
   registration. Duplicate group names or component tags fail at initialization.
 - Only decorated methods in explicitly declared groups are callable. Interface annotations may be
   inherited, overridden, or removed with a non-`ComponentGroup` annotation.
-- Component selection runs before CORS, database, authentication and application middleware.
-  Middleware sees the selected component as `req.route_handler` and its group as
-  `current_request.controller`.
+- Component selection runs in a middleware (order `-102`) before CORS, database,
+  authentication and application middleware. Middleware sees the selected component as
+  `req.route_handler` and its group as `current_request.controller`; `req.endpoint` stays the
+  component endpoint the application calls.
 
 ## Caching, CORS and limits
 
 - [Response caching](caching.md) defaults to `GET`/`HEAD`. To cache a read-only component, opt in
   with `@cache("PUBLIC_CACHE", methods=("POST",))`; the default key includes a digest of the
   complete body.
-- All components share one `POST` URL. They are not separate OpenAPI routes, and no WebSocket
-  transport is provided.
-- `OPTIONS` preflights have no component body, so they use the shared endpoint's global CORS
-  policy; configure it to permit the frontend. Component CORS overrides apply to actual `POST`
+- All components of an interface share its `POST` URL. They are not separate OpenAPI routes, and
+  no WebSocket transport is provided.
+- `OPTIONS` preflights have no component body, so they use the global CORS policy; configure it to permit the frontend. Component CORS overrides apply to actual `POST`
   responses.
 - The application's body limit protects envelope parsing; component `@max_content_length` limits
   are enforced after selection.

@@ -4,20 +4,42 @@ import pytest
 from pydantic import BaseModel, Field
 from typing import Annotated
 from patera import Response, MediaType
-from patera.controller import RequestBody, produces
+from patera.controller import Controller, RequestBody, path, post, produces
 
 from patera import BaseExtension, Request
 from patera.ctx import current_request
 from patera.injectable import Inject
 from patera.joltui import (
     ComponentGroup,
+    JoltuiController,
     JoltuiGroupHandler,
     JoltuiRequest,
     PateraJoltui,
     component,
+    dispatcher,
     group,
     joltui_request,
 )
+
+
+def components_controller(interface, url="/joltui/components"):
+    """The developer-owned component endpoint, as documented."""
+
+    @path(url)
+    class Components(JoltuiController):
+        Target = interface
+        joltui: Inject[Target]
+
+        @dispatcher
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    Components.__name__ = f"{interface.__name__}Components"
+    return Components
+
+
+def joltui_app(make_app, interface, url="/joltui/components", **config):
+    return make_app(controllers=[components_controller(interface, url)], **config)
 
 
 class Greeting(BaseExtension):
@@ -52,7 +74,7 @@ class Interface(PateraJoltui):
 
 
 async def test_protocol_and_request_identity(make_app, client_for):
-    app = make_app(extensions=[Interface])
+    app = joltui_app(make_app, Interface)
     async with client_for(app) as client:
         response = await client.post(
             "/joltui/components", json={"tagName": " HOME-PAGE "}
@@ -95,7 +117,7 @@ async def test_protocol_and_request_identity(make_app, client_for):
     ],
 )
 async def test_invalid_payload(make_app, client_for, payload):
-    async with client_for(make_app(extensions=[Interface])) as client:
+    async with client_for(joltui_app(make_app, Interface)) as client:
         res = await client.post("/joltui/components", json=payload)
         assert res.status_code == 400
 
@@ -105,18 +127,14 @@ async def test_invalid_payload(make_app, client_for, payload):
     [{"tagName": "private"}, {"tagName": "home-page", "groupName": "unknown"}],
 )
 async def test_unknown_component(make_app, client_for, payload):
-    async with client_for(make_app(extensions=[Interface])) as client:
+    async with client_for(joltui_app(make_app, Interface)) as client:
         assert (
             await client.post("/joltui/components", json=payload)
         ).status_code == 404
 
 
 async def test_path_prefix_null_defaults_and_method(make_app, client_for):
-    app = make_app(
-        extensions=[Interface],
-        URL_PREFIX="/api",
-        INTERFACE={"COMPONENTS_PATH": "/components"},
-    )
+    app = joltui_app(make_app, Interface, "/components", URL_PREFIX="/api")
     async with client_for(app) as client:
         assert (await client.get("/api/components")).status_code == 405
         assert (await client.post("/api/components", content="{")).status_code == 400
@@ -138,7 +156,7 @@ def test_duplicate_groups(make_app):
         second: ComponentGroup[DefaultGroup]
 
     with pytest.raises(ValueError, match="Duplicate JoltUI group"):
-        make_app(extensions=[Duplicate])
+        joltui_app(make_app, Duplicate)
 
 
 def test_duplicate_components(make_app):
@@ -158,15 +176,15 @@ def test_duplicate_components(make_app):
         {"__annotations__": {"group": ComponentGroup[DuplicateGroup]}},
     )
     with pytest.raises(ValueError, match="Duplicate JoltUI component"):
-        make_app(extensions=[cls])
+        joltui_app(make_app, cls)
 
 
 async def test_inheritance_and_isolation(make_app, client_for):
     class Child(Interface):
         pass
 
-    one = make_app(extensions=[Child])
-    two = make_app(extensions=[Child])
+    one = joltui_app(make_app, Child)
+    two = joltui_app(make_app, Child)
     assert one.get_extension(Child).default is not two.get_extension(Child).default
     async with client_for(two) as client:
         assert (
@@ -193,7 +211,7 @@ async def test_override_removes_component_and_exceptions_propagate(
         (PateraJoltui,),
         {"__annotations__": {"users": ComponentGroup[UserGroup]}},
     )
-    async with client_for(make_app(extensions=[cls])) as client:
+    async with client_for(joltui_app(make_app, cls)) as client:
         for tag, expected in [
             ("home-page", 404),
             ("denied-page", 403),
@@ -209,7 +227,7 @@ async def test_annotation_override_removes_group(make_app, client_for):
     class Removed(Interface):
         default: str
 
-    async with client_for(make_app(extensions=[Removed])) as client:
+    async with client_for(joltui_app(make_app, Removed)) as client:
         assert (
             await client.post("/joltui/components", json={"tagName": "home-page"})
         ).status_code == 404
@@ -229,7 +247,7 @@ def test_invalid_group_declarations(make_app):
             {"__annotations__": {"invalid": ComponentGroup[target]}},
         )
         with pytest.raises(TypeError, match=message):
-            make_app(extensions=[cls])
+            joltui_app(make_app, cls)
 
 
 async def test_controller_and_endpoint_decorators(make_app, client_for):
@@ -311,8 +329,9 @@ async def test_controller_and_endpoint_decorators(make_app, client_for):
         (PateraJoltui,),
         {"__annotations__": {"secured": ComponentGroup[Secured]}},
     )
-    app = make_app(
-        extensions=[cls],
+    app = joltui_app(
+        make_app,
+        cls,
         middleware=[TokenAuth],
         DEBUG=False,
         CORS_ENABLED=True,
@@ -406,7 +425,7 @@ class TypedInterface(PateraJoltui):
 
 
 async def test_automatic_body_model(make_app, client_for):
-    async with client_for(make_app(extensions=[TypedInterface])) as client:
+    async with client_for(joltui_app(make_app, TypedInterface)) as client:
         for tag, expected in [
             ("typed-page", "43"),
             ("sync-page", "42"),
@@ -439,7 +458,7 @@ async def test_automatic_body_model(make_app, client_for):
     "tag", ["string-page", "json-page", "text-page", "header-page"]
 )
 async def test_requires_html_response(make_app, client_for, tag):
-    async with client_for(make_app(extensions=[TypedInterface])) as client:
+    async with client_for(joltui_app(make_app, TypedInterface)) as client:
         with pytest.raises(TypeError, match="HTML Response|text/html"):
             await client.post(
                 "/joltui/components", json={"tagName": tag, "groupName": "typed"}
@@ -471,7 +490,7 @@ def test_invalid_body_annotation_fails_at_registration(make_app):
         {"__annotations__": {"bad": ComponentGroup[BadGroup]}},
     )
     with pytest.raises(TypeError, match="Pydantic model"):
-        make_app(extensions=[cls])
+        joltui_app(make_app, cls)
 
 
 @pytest.mark.parametrize("component_outermost", [True, False])
@@ -492,7 +511,7 @@ async def test_consumes_error_preserves_415(make_app, client_for, component_oute
         (PateraJoltui,),
         {"__annotations__": {"media": ComponentGroup[cls]}},
     )
-    async with client_for(make_app(extensions=[interface])) as client:
+    async with client_for(joltui_app(make_app, interface)) as client:
         response = await client.post(
             "/joltui/components",
             content='{"tagName":"media-page"}',
@@ -528,7 +547,7 @@ async def test_lifecycle_error_preserved_but_success_requires_html(
         (PateraJoltui,),
         {"__annotations__": {"hook": ComponentGroup[HookGroup]}},
     )
-    async with client_for(make_app(extensions=[interface])) as client:
+    async with client_for(joltui_app(make_app, interface)) as client:
         if status == 200:
             with pytest.raises(TypeError, match="text/html"):
                 await client.post("/joltui/components", json={"tagName": "hook-page"})
@@ -553,4 +572,380 @@ def test_bare_model_body_fails_at_registration(make_app):
         {"__annotations__": {"bare": ComponentGroup[BareGroup]}},
     )
     with pytest.raises(TypeError, match=r"RequestBody\[Model\]"):
-        make_app(extensions=[cls])
+        joltui_app(make_app, cls)
+
+
+# The application owns the component endpoint.
+
+
+async def test_endpoint_body_and_controller_hooks_wrap_dispatch(make_app, client_for):
+    from patera.controller import after_request, before_request
+
+    events: list[str] = []
+
+    @path("/ui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @before_request
+        def before(self, req: Request):
+            events.append("before")
+
+        @after_request
+        def after(self, res: Response):
+            events.append(f"after {res.status_code}")
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            events.append("endpoint")
+            res = await self.joltui.dispatch(req)
+            return res.set_header("X-Rendered-By", "pages")
+
+    app = make_app(controllers=[Pages])
+    async with client_for(app) as client:
+        res = await client.post("/ui/components", json={"tagName": "home-page"})
+    assert res.status_code == 200
+    assert res.text == "<p>hello</p>"
+    assert res.headers["x-rendered-by"] == "pages"
+    assert events == ["before", "endpoint", "after 200"]
+    assert app.get_extension(Interface) is app.get_extension(Interface)
+
+
+@group("default")
+class OtherGroup(JoltuiGroupHandler):
+    @component("home-page")
+    def home(self, req: Request):
+        return req.res.html_body("<p>other</p>")
+
+
+class OtherInterface(PateraJoltui):
+    default: ComponentGroup[OtherGroup]
+
+
+async def test_two_interfaces_on_two_controllers(make_app, client_for):
+    app = make_app(
+        controllers=[
+            components_controller(Interface, "/one"),
+            components_controller(OtherInterface, "/two"),
+        ]
+    )
+    async with client_for(app) as client:
+        one = await client.post("/one", json={"tagName": "home-page"})
+        two = await client.post("/two", json={"tagName": "home-page"})
+    assert (one.text, two.text) == ("<p>hello</p>", "<p>other</p>")
+
+
+async def test_other_endpoints_are_ordinary(make_app, client_for):
+    from patera.controller import get, no_cors, put
+
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+        @get("/components")
+        @no_cors
+        async def page(self, req: Request) -> Response:
+            return req.res.html_body("<main></main>")
+
+        @post("/notes")
+        async def note(self, req: Request) -> Response:
+            # Not a component request: any JSON body, any response type.
+            return req.res.json({"saved": (await req.json())["text"]})
+
+        @put("/notes")
+        async def replace(self, req: Request) -> Response:
+            return req.res.json({"replaced": True})
+
+        @post("/misused")
+        async def misused(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    async with client_for(make_app(controllers=[Pages])) as client:
+        res = await client.get("/joltui/components")
+        assert (res.status_code, res.text) == (200, "<main></main>")
+        res = await client.post("/joltui/notes", json={"text": "hi"})
+        assert (res.status_code, res.json()) == (200, {"saved": "hi"})
+        assert (await client.put("/joltui/notes")).json() == {"replaced": True}
+        component = await client.post(
+            "/joltui/components", json={"tagName": "home-page"}
+        )
+        assert component.text == "<p>hello</p>"
+        with pytest.raises(RuntimeError, match="the @dispatcher endpoint"):
+            await client.post("/joltui/misused", json={"tagName": "home-page"})
+
+
+async def test_ordinary_endpoints_keep_their_decorators(make_app, client_for):
+    from patera.controller import get
+    from tests.extensions.test_auth import TokenAuth, token
+
+    from patera.auth import login_required
+
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+        @get("/private")
+        @login_required()
+        async def private(self, req: Request) -> Response:
+            return req.res.html_body("<p>private</p>")
+
+    app = make_app(controllers=[Pages], middleware=[TokenAuth])
+    async with client_for(app) as client:
+        assert (await client.get("/joltui/private")).status_code == 401
+        res = await client.get("/joltui/private", headers=token("cy"))
+        assert (res.status_code, res.text) == (200, "<p>private</p>")
+        res = await client.post("/joltui/components", json={"tagName": "home-page"})
+        assert res.status_code == 200
+
+
+@pytest.mark.parametrize("decorator", ["login_required", "cors", "no_cors"])
+def test_dispatcher_decorators_that_would_be_ambiguous_are_rejected(
+    make_app, decorator
+):
+    from patera.auth import login_required
+    from patera.controller import cors, no_cors
+
+    mark = {
+        "login_required": login_required(),
+        "cors": cors(allow_origins=["https://x.test"]),
+        "no_cors": no_cors,
+    }[decorator]
+
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        @mark
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match="on the @dispatcher endpoint is not supported"):
+        app.build()
+
+
+@pytest.mark.parametrize("decorator", ["login_required", "cors", "no_cors"])
+def test_controller_decorators_are_rejected(make_app, decorator):
+    from patera.auth import login_required
+    from patera.controller import cors, no_cors
+
+    mark = {
+        "login_required": login_required(),
+        "cors": cors(allow_origins=["https://x.test"]),
+        "no_cors": no_cors,
+    }[decorator]
+
+    @mark
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match="on a JoltuiController is not supported"):
+        app.build()
+
+
+async def test_bare_dispatcher_serves_the_controller_path(make_app, client_for):
+    @path("/joltui/components")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages], URL_PREFIX="/api")
+    async with client_for(app) as client:
+        res = await client.post("/api/joltui/components", json={"tagName": "home-page"})
+        assert res.text == "<p>hello</p>"
+        assert (await client.get("/api/joltui/components")).status_code == 405
+
+
+def test_dispatcher_is_left_out_of_openapi_by_default(make_app):
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    @path("/documented")
+    class Documented(JoltuiController):
+        joltui: Inject[OtherInterface]
+
+        @dispatcher("/components", open_api_spec=True, tags=["joltui"])
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    paths = make_app(controllers=[Pages, Documented]).json_spec["paths"]
+    assert "/joltui/components" not in paths
+    assert "joltui" in paths["/documented/components"]["post"]["tags"]
+
+
+def test_dispatcher_replaces_the_route_decorator_below_it():
+    with pytest.raises(TypeError, match="registers its own POST route"):
+
+        class Pages(JoltuiController):
+            @dispatcher("/components")
+            @post("/components")
+            async def render(self, req: Request) -> Response:
+                return req.res.html_body("")
+
+
+@pytest.mark.parametrize("route", ["post", "get"])
+def test_dispatcher_rejects_a_route_decorator_above_it(make_app, route):
+    from patera.controller import get
+
+    decorator = {"post": post, "get": get}[route]
+
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @decorator("/other")
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match="registers its own POST route"):
+        app.build()
+
+
+def test_dispatcher_takes_a_path_string():
+    with pytest.raises(TypeError, match="optional URL path string"):
+        dispatcher(3)  # type: ignore[call-overload]
+
+
+def test_controller_has_a_single_dispatcher(make_app):
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/one")
+        async def one(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+        @dispatcher("/two")
+        async def two(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match="single @dispatcher endpoint"):
+        app.build()
+
+
+def test_dispatcher_requires_joltui_controller(make_app):
+    @path("/joltui")
+    class Plain(Controller):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Plain])
+    with pytest.raises(TypeError, match="belong to a JoltuiController subclass"):
+        app.build()
+
+
+def test_controller_without_interface_is_rejected(make_app):
+    @path("/joltui")
+    class Pages(JoltuiController):
+        greeting: Inject[Greeting]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return req.res.html_body("")
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match=r"exactly one PateraJoltui .*found: none"):
+        app.build()
+
+
+def test_controller_with_several_interfaces_is_rejected(make_app):
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+        other: Inject[OtherInterface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    app = make_app(controllers=[Pages])
+    with pytest.raises(TypeError, match=r"exactly one .*found: joltui, other"):
+        app.build()
+
+
+async def test_controller_without_dispatcher_is_ordinary(make_app, client_for):
+    @path("/joltui")
+    class Pages(JoltuiController):
+        joltui: Inject[Interface]
+
+        @post("/components")
+        async def render(self, req: Request) -> Response:
+            return req.res.html_body("<p>plain</p>")
+
+    async with client_for(make_app(controllers=[Pages])) as client:
+        res = await client.post("/joltui/components", json={"tagName": "home-page"})
+    assert res.text == "<p>plain</p>"
+
+
+async def test_interface_and_dispatcher_are_inherited(make_app, client_for):
+    class Base(JoltuiController):
+        joltui: Inject[Interface]
+
+        @dispatcher("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    @path("/joltui")
+    class Pages(Base):
+        pass
+
+    async with client_for(make_app(controllers=[Pages])) as client:
+        res = await client.post("/joltui/components", json={"tagName": "home-page"})
+    assert res.text == "<p>hello</p>"
+
+
+async def test_dispatch_requires_dispatcher_endpoint(make_app, client_for):
+    @path("/joltui")
+    class Plain(Controller):
+        joltui: Inject[Interface]
+
+        @post("/components")
+        async def render(self, req: Request) -> Response:
+            return await self.joltui.dispatch(req)
+
+    async with client_for(make_app(controllers=[Plain])) as client:
+        with pytest.raises(
+            RuntimeError,
+            match="@dispatcher endpoint of a JoltuiController that injects Interface",
+        ):
+            await client.post("/joltui/components", json={"tagName": "home-page"})
+
+
+def test_components_path_configuration_was_removed(make_app):
+    with pytest.raises(Exception, match="COMPONENTS_PATH was removed"):
+        joltui_app(make_app, Interface, INTERFACE={"COMPONENTS_PATH": "/c"})
+
+
+async def test_interface_without_endpoint_serves_nothing(make_app, client_for):
+    async with client_for(make_app(extensions=[Interface])) as client:
+        res = await client.post("/joltui/components", json={"tagName": "home-page"})
+    assert res.status_code == 404

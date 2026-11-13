@@ -7,8 +7,17 @@ It is distinct from `patera.desktop.ui`'s Python/PyScript components.
 ```python
 from pydantic import BaseModel, Field
 from patera import Request, Response
-from patera.controller import RequestBody
-from patera.joltui import ComponentGroup, JoltuiGroupHandler, PateraJoltui, component, group
+from patera.controller import RequestBody, path
+from patera.injectable import Inject
+from patera.joltui import (
+    ComponentGroup,
+    JoltuiController,
+    JoltuiGroupHandler,
+    PateraJoltui,
+    component,
+    dispatcher,
+    group,
+)
 
 class UserRoute(BaseModel):
     user_id: int
@@ -26,13 +35,37 @@ class UserGroupHandler(JoltuiGroupHandler):
 
 class JoltuiInterface(PateraJoltui):
     users: ComponentGroup[UserGroupHandler]
+
+@path("/joltui")
+class JoltuiComponentsController(JoltuiController):
+    joltui: Inject[JoltuiInterface]
+
+    @dispatcher("/components")
+    async def components(self, req: Request) -> Response:
+        return await self.joltui.dispatch(req)
 ```
 
-Register `JoltuiInterface` in `app_extensions` or use `Inject[JoltuiInterface]`.
-The extension owns the POST controller: do not add another dispatch route.
-`JoltuiConfig.COMPONENTS_PATH` defaults to `/joltui/components`. Configure this
-subclass with `JOLTUI_INTERFACE = {"COMPONENTS_PATH": "/ui/components"}`.
-Set the frontend's `serverComponentsUrl` to the endpoint, including `URL_PREFIX`.
+The application owns the component endpoint. Subclass `JoltuiController` and
+register one endpoint with `@dispatcher`, which replaces `@post` (do not stack
+both): bare `@dispatcher` is a POST route at the controller's path,
+`@dispatcher("/components")` one below it; it is left out of OpenAPI unless
+`open_api_spec=True`. It returns `await self.<interface>.dispatch(req)` (you may
+add headers to the response). The controller's other endpoints are ordinary and
+keep their usual decorators. The interface is the controller's single injected
+`PateraJoltui` attribute; injecting none or several fails at build, as do a
+second `@dispatcher`, another route decorator on it, or a `@dispatcher` outside
+a `JoltuiController`. `PateraJoltui` subclasses are injectable services:
+`Inject[JoltuiInterface]` creates the app-wide instance. There is no `COMPONENTS_PATH` setting; configuring
+it raises an error. Pick any URL; set the frontend's `serverComponentsUrl` to
+it, including `URL_PREFIX`. Several interfaces may each have their own controller.
+
+The controller's `@before_request`/`@after_request` hooks run around
+`dispatch`. Do not put `@login_required`, `@role_required`, `@transactional`,
+`@cors`, or `@no_cors` on the `@dispatcher` endpoint or on the `JoltuiController`:
+whether they would guard the request or the component is ambiguous, so the app
+refuses to build. Put them on group handlers or component methods; to guard
+every component, decorate each group handler. Calling `dispatch` anywhere but
+the `@dispatcher` endpoint raises `RuntimeError`.
 
 The request body is the complete RPC envelope:
 
@@ -78,7 +111,7 @@ header-dependent variants.
 Inherited methods work; an undecorated override removes component exposure.
 `@ignore` and `@development` affect group/component registration.
 
-All components share one POST URL. HTTP route decorators do not create extra
+All components of an interface share its POST URL. HTTP route decorators do not create extra
 component URLs; WebSockets and per-component OpenAPI routes are not provided.
 OPTIONS has no envelope, so preflights use the global CORS policy. Configure it
 for the frontend; component CORS settings apply to actual POSTs. The initial

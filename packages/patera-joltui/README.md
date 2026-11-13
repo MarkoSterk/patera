@@ -4,11 +4,12 @@ Install `patera-joltui` (or `patera[joltui]`) and import from `patera.joltui`.
 
 ```python
 from html import escape
-from patera import Request
+from patera import Request, Response
+from patera.controller import path
 from patera.injectable import Inject
 from patera.joltui import (
-    ComponentGroup, JoltuiGroupHandler, PateraJoltui,
-    component, group, joltui_request,
+    ComponentGroup, JoltuiController, JoltuiGroupHandler, PateraJoltui,
+    component, dispatcher, group, joltui_request,
 )
 
 @group("default")
@@ -28,16 +29,41 @@ class UserGroupHandler(JoltuiGroupHandler):
 class JoltuiInterface(PateraJoltui):
     default_group: ComponentGroup[DefaultGroupHandler]
     user_group: ComponentGroup[UserGroupHandler]
+
+@path("/joltui")
+class JoltuiComponentsController(JoltuiController):
+    joltui: Inject[JoltuiInterface]
+
+    @dispatcher("/components")
+    async def components(self, req: Request) -> Response:
+        return await self.joltui.dispatch(req)
 ```
 
-Register `JoltuiInterface` in your application's `app_extensions`, or inject it
-with `joltui: Inject[JoltuiInterface]`. Set JoltUI's `serverComponentsUrl` to
-`/joltui/components` (including Patera's `URL_PREFIX`, if configured).
-Override the endpoint with application configuration:
-`JOLTUI_INTERFACE = {"COMPONENTS_PATH": "/components"}`.
-The extension registers its own controller automatically; no application
-controller or manual dispatch route is needed. `JoltuiConfig.COMPONENTS_PATH`
-defaults to `/joltui/components`.
+`JoltuiInterface` is an injectable service; the application owns the endpoint.
+`@dispatcher` registers the `POST` route of a `JoltuiController` subclass that
+receives the component requests, in place of `@post`: bare `@dispatcher`
+serves the controller's path, `@dispatcher("/components")` a path below it. The
+route stays out of OpenAPI unless `open_api_spec=True`. It calls
+`dispatch(req)` on the controller's single injected `PateraJoltui` attribute
+and returns its response. A controller has one `@dispatcher` endpoint; its
+other endpoints are ordinary and keep their usual decorators. A
+`JoltuiController` with no injected interface, or several, fails at build.
+Injecting the interface creates its app-wide instance; the controller registers
+the dispatch middleware. Set JoltUI's `serverComponentsUrl` to the endpoint's
+URL (here `/joltui/components`, including Patera's `URL_PREFIX`, if configured).
+
+The controller's `@before_request`/`@after_request` hooks run around
+`dispatch`. Put `@login_required()`, `@role_required()`, `@transactional`,
+`@cors` and `@no_cors` on groups or components. They are not supported on the
+`@dispatcher` endpoint or on the `JoltuiController`: it would be ambiguous
+whether they guard the component request or the component, so the application
+refuses to build. A second `@dispatcher`, another route decorator on it, or one outside a
+`JoltuiController` also fails at build. Calling `dispatch` anywhere but the
+`@dispatcher` endpoint raises `RuntimeError`.
+
+Upgrading: the auto-registered controller and `JoltuiConfig.COMPONENTS_PATH`
+were removed. Add the controller above with your previous URL and delete the
+setting (configuring it raises an error).
 
 JoltUI sends a JSON POST containing `tagName`, `groupName`, `routeParameters`,
 `queryParameters`, and `attributes`. Omitted/null groups default to `default`;
@@ -90,9 +116,10 @@ class UserGroupHandler(JoltuiGroupHandler):
         return req.res.html_body("<h1>Users</h1>")
 ```
 
-Component selection runs before CORS, database, authentication, and application
-middleware. They see the selected bound component as `req.route_handler` and
-its group as `current_request.controller`. Normal controller hooks run once;
+Component selection runs in a middleware before CORS, database, authentication,
+and application middleware. They see the selected bound component as `req.route_handler` and
+its group as `current_request.controller`; `req.endpoint` remains the component
+endpoint. Normal controller hooks run once;
 after-request hooks receive the handler's HTML `Response`.
 Successful component responses must be HTML. Error responses (status 400 or
 higher), including `@consumes`' JSON 415 response and lifecycle-generated errors,
@@ -106,11 +133,11 @@ explicitly use `@cache("PUBLIC_CACHE", methods=("POST",))`; the default key
 includes the complete body digest, including group, tag and route parameters.
 Use a callable cache key for additional header-dependent variations.
 
-All components share one HTTP POST URL: `@path`/HTTP method decorators do not
-create additional component URLs, and WebSocket transport is not provided by
-this endpoint. OpenAPI metadata can be attached, but individual RPC components
+All components of an interface share its HTTP POST URL: `@path`/HTTP method
+decorators on groups do not create additional component URLs, and WebSocket
+transport is not provided. OpenAPI metadata can be attached, but individual RPC components
 are not separate OpenAPI routes. OPTIONS preflights have no component body,
-so they use the shared endpoint's global CORS policy; configure it to permit
+so they use the global CORS policy; configure it to permit
 the frontend. Component CORS overrides apply to actual POST responses.
 
 The application's body limit protects JSON envelope parsing. Component

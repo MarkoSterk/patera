@@ -40,6 +40,9 @@ requests (404/405/redirects) only with `run_on_unmatched = True` and for static
 files only with `run_on_static = True`. For unmatched requests check
 `req.route_matched` (never read `req.route_handler`); their response is already
 sent when `next()` returns, so add headers with `req.wrap_send(wrapper)`.
+Read decorators from `req.route_handler`; `req.endpoint` is the matched endpoint
+the app calls (they differ only when a dispatch middleware such as JoltUI's
+selects another handler).
 Authentication does not run for static files, so they are public. Sockets have
 a separate path. `app.add_request_observer` gives complete HTTP records.
 

@@ -257,7 +257,7 @@ async def test_documented_middleware_and_error_handler_work(make_app, client_for
 
 async def test_documented_joltui_example_runs(make_app, client_for):
     ns = example("joltui")
-    app = make_app(extensions=[ns["JoltuiInterface"]])
+    app = make_app(controllers=[ns["JoltuiComponentsController"]])
     async with client_for(app) as client:
         response = await client.post(
             "/joltui/components",

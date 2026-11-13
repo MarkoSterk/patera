@@ -128,6 +128,10 @@ the whole process, so they apply to every engine or client, not only Patera's.
 | `httpx` | outgoing HTTP calls, with trace propagation | `patera-telemetry[httpx]` |
 | `redis` | Redis commands | `patera-telemetry[redis]` |
 
+The `sqlalchemy` extra (and `all`) keeps SQLAlchemy below 2.1: the OpenTelemetry SQLAlchemy
+instrumentation supports only earlier releases and records nothing on 2.1, logging just an error
+from OpenTelemetry.
+
 ## Background work
 
 A task started with `run_in_background` inherits the request's trace, and its spans hang under

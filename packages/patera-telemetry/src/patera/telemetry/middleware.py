@@ -81,9 +81,7 @@ class TelemetryMiddleware(MiddlewareBase):
         if not self.traces(req):
             return await self.next(req)
 
-        route = (
-            self.app.router.path_of(req.route_handler) if req.route_matched else None
-        )
+        route = self.app.router.path_of(req.endpoint) if req.route_matched else None
         request_span = RequestSpan(self._telemetry, req, route)
         req.wrap_send(request_span.watch)
         req.on_finish(request_span.finish)

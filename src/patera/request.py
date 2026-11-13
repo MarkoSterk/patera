@@ -284,6 +284,7 @@ class Request:
 
         self._route_parameters = route_parameters
         self._route_handler = route_handler
+        self._endpoint = route_handler
         # An endpoint's @max_content_length overrides the app-wide setting.
         endpoint_limit = getattr(route_handler, "_max_content_length", _NO_LIMIT_SET)
         self._max_content_length: Optional[int] = (
@@ -327,9 +328,12 @@ class Request:
     @property
     def route_handler(self) -> Callable:
         """
-        The endpoint method that handles the request. Raises RuntimeError
-        when no route matched (check ``route_matched`` first in middleware
-        that sets ``run_on_unmatched``).
+        The handler middleware inspects for its decorators (authentication,
+        transactions, CORS): the matched endpoint, unless a dispatch
+        middleware selected another handler for the request, as patera-joltui
+        does for a component. Raises RuntimeError when no route matched
+        (check ``route_matched`` first in middleware that sets
+        ``run_on_unmatched``).
         """
         if not self.route_matched:
             raise RuntimeError(
@@ -337,6 +341,20 @@ class Request:
                 "has no route handler. Check req.route_matched first."
             )
         return self._route_handler
+
+    @property
+    def endpoint(self) -> Callable:
+        """
+        The endpoint method of the matched route: the method the application
+        calls. A dispatch middleware may change ``route_handler``, never this.
+        Raises RuntimeError when no route matched.
+        """
+        if not self.route_matched:
+            raise RuntimeError(
+                f"No route matched {self.method} {self.path}, so the request "
+                "has no endpoint. Check req.route_matched first."
+            )
+        return self._endpoint
 
     @property
     def route_parameters(self) -> dict:
