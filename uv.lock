@@ -2543,15 +2543,14 @@ wheels = [
 
 [[package]]
 name = "pythonnet"
-version = "3.1.0"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "clr-loader" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/57/da1992e44663b71365c6e842c8d7fa453d4ec45fb99a68cfee5b7e944d3c/pythonnet-3.1.0.tar.gz", hash = "sha256:7b34c382905d10a371509ffafd64cae0416305c28817738a9cd138336f4e9991", size = 250599, upload-time = "2026-05-23T20:30:21.578Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/34/98f38d7ca1e9eb684d297d1d6a9420f3f3a32f411eae82a7f25a2b783539/pythonnet-3.2.1.tar.gz", hash = "sha256:c86e8dd31268f6e0c48fcc4d6030041316d49ed2764a1cb6ea8c37876e07c572", size = 257852, upload-time = "2026-10-08T12:23:35.866Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/4b/52414f442624d2589f5374a48c08d5ae94f24bea67fc13a20a752884e5b7/pythonnet-3.1.0-cp310.cp311.cp312.cp313.cp314-none-any.whl", hash = "sha256:698dd88edc198819ad63b624a6ebe76208c7b46e4fe13626f65e484f0358d6ba", size = 217578, upload-time = "2026-05-23T20:30:19.527Z" },
-    { url = "https://files.pythonhosted.org/packages/db/67/031124fdcb937c266a3265118525bbf6dc13b8c79786d6a7290aecb6e7bb/pythonnet-3.1.0-cp310.cp311.cp312.cp313.cp314-none-win32.win_amd64.whl", hash = "sha256:7bdd4de03df3547a48122a3989265c8b31d5be0d19dadffa009eec7df8085e0b", size = 1644898, upload-time = "2026-05-23T20:30:16.213Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/dc/c96a542079a69d3d091e91808fc8aaf9a0d5e2f8e73a63560e4379134bb6/pythonnet-3.2.1-cp311.cp312.cp313.cp314.cp315-none-any.whl", hash = "sha256:dd5668b74b0c903d9a24e1ba86f728fc490f8e919d56b3c24bf06739b9ee2b7f", size = 222572, upload-time = "2026-10-08T12:23:34.129Z" },
 ]
 
 [[package]]
