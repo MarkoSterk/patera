@@ -376,75 +376,96 @@ class HttpDispatcher(AppPart):
             or getattr(route_handler, "_static_resource", False)
         )
 
+        # A client disconnect is answered by nobody, but it still ends the
+        # request: finish callbacks learn about it through the exception.
+        escaped: Optional[BaseException] = None
         try:
-            with request_context(
-                app=app,
-                request=req,
-                controller=(
-                    route_handler.__self__  # type: ignore
-                    if outcome is None
-                    else None
-                ),
-            ):
-                try:
-                    res: Response = await app._app(req)
+            try:
+                with request_context(
+                    app=app,
+                    request=req,
+                    controller=(
+                        route_handler.__self__  # type: ignore
+                        if outcome is None
+                        else None
+                    ),
+                ):
+                    try:
+                        res: Response = await app._app(req)
 
-                    if outcome is not None and req.response_started:
-                        # The routing error was sent in the innermost step.
-                        return None
+                        if outcome is not None and req.response_started:
+                            # The routing error was sent in the innermost step.
+                            return None
 
-                    if req.static_resource:
-                        return await app.send_response(res, req.send)
+                        if req.static_resource:
+                            return await app.send_response(res, req.send)
 
-                    if not isinstance(res, Response):
-                        raise TypeError(
-                            "Return object of request handlers must be an instance "
-                            f"of Response, got {type(res).__name__}"
+                        if not isinstance(res, Response):
+                            raise TypeError(
+                                "Return object of request handlers must be an instance "
+                                f"of Response, got {type(res).__name__}"
+                            )
+
+                        response_type: Optional[Type[Any]] = (
+                            req.response.expected_body_type()
                         )
 
-                    response_type: Optional[Type[Any]] = (
-                        req.response.expected_body_type()
+                        return await app.send_response(res, req.send, response_type)
+
+                    except Exception as exc:
+                        if req.response_started or isinstance(exc, ClientDisconnected):
+                            raise
+                        return await app._send_exception_response(req, exc)
+
+            except Exception as exc:
+                if isinstance(exc, ClientDisconnected):
+                    app.logger.info(f"({req.method}) {req.path}: {exc}")
+                    escaped = exc
+                    return
+
+                if req.response_started:
+                    app.logger.error(
+                        f"Error after the response started: ({req.method}) {req.path}. "
+                        "The connection is closed."
                     )
+                    app.logger.exception(exc)
+                    raise
 
-                    return await app.send_response(res, req.send, response_type)
+                req.res.reset()
 
-                except Exception as exc:
-                    if req.response_started or isinstance(exc, ClientDisconnected):
-                        raise
-                    return await app._send_exception_response(req, exc)
+                if not app.configs.DEBUG:
+                    res = req.res.json(
+                        {
+                            "status": "error",
+                            "message": "Internal server error",
+                        }
+                    ).status(HttpStatus.INTERNAL_SERVER_ERROR)
 
-        except Exception as exc:
-            if isinstance(exc, ClientDisconnected):
-                app.logger.info(f"({req.method}) {req.path}: {exc}")
-                return
+                    app.logger.critical(
+                        f"Unhandled critical error: ({req.method}) {req.path}, "
+                        f"{req.route_parameters}"
+                    )
+                    app.logger.exception(exc)
 
-            if req.response_started:
-                app.logger.error(
-                    f"Error after the response started: ({req.method}) {req.path}. "
-                    "The connection is closed."
-                )
-                app.logger.exception(exc)
+                    return await app.send_response(res, req.send, None)
+
                 raise
-
-            req.res.reset()
-
-            if not app.configs.DEBUG:
-                res = req.res.json(
-                    {
-                        "status": "error",
-                        "message": "Internal server error",
-                    }
-                ).status(HttpStatus.INTERNAL_SERVER_ERROR)
-
-                app.logger.critical(
-                    f"Unhandled critical error: ({req.method}) {req.path}, "
-                    f"{req.route_parameters}"
-                )
-                app.logger.exception(exc)
-
-                return await app.send_response(res, req.send, None)
-
+        except BaseException as exc:
+            escaped = exc
             raise
+        finally:
+            self.run_finish_callbacks(req, escaped)
+
+    def run_finish_callbacks(self, req: Request, exc: Optional[BaseException]) -> None:
+        """Runs the callbacks registered with ``req.on_finish``."""
+        app = self._app
+        for callback in req._finish_callbacks:
+            try:
+                callback(exc)
+            except Exception as error:  # a callback must not break the request
+                app.logger.error(
+                    f"Request finish callback {callback!r} failed: {error}"
+                )
 
     def match_automatic_options(
         self,

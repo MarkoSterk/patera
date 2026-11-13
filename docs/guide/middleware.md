@@ -65,7 +65,7 @@ uses negative orders:
 
 | Middleware | Order |
 | --- | --- |
-| Observability (telemetry, request records) | `-200` and below |
+| Observability ([telemetry](../extensions/telemetry.md), request records) | `-200` and below |
 | [JoltUI](../extensions/joltui.md) component dispatch | `-102` |
 | CORS | `-101` |
 | SQL session manager ([database](../extensions/database.md)) | `-100` |

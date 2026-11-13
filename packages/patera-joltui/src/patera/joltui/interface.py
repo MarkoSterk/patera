@@ -305,8 +305,6 @@ class PateraJoltui(BaseExtension[Any, JoltuiConfig]):
         req.scope["patera.joltui"] = payload
         req._route_handler = handler
         get_request_context().controller = handler.__self__
-        # The shared endpoint's body limit protects envelope parsing. A smaller
-        # component limit is checked once the envelope identifies the handler.
         limit = getattr(handler, "_max_content_length", req.max_content_length)
         req.max_content_length = limit
         if limit is not None and len(await req.body()) > limit:

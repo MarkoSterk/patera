@@ -50,6 +50,7 @@ for name in json.loads(sys.argv[1]):
 from patera.migrate import MigrateConfig
 from patera.desktop.ui import DesktopUI
 from patera.joltui import PateraJoltui
+from patera.telemetry import Telemetry, TelemetryConfig
 from importlib.resources import files
 assert files('patera.desktop.ui').joinpath('assets/bootstrap.py').is_file()
 assert files('patera').joinpath('cli/agent_templates/SKILL.md').is_file()

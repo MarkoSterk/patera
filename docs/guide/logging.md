@@ -107,6 +107,9 @@ process-global, so applications in the same process share its sinks.
     Built-in request logging includes the query string. Redact at the logging boundary or avoid
     sensitive URL parameters.
 
+With the [telemetry](../extensions/telemetry.md) extension, the log records of a request also
+carry `trace_id` and `span_id`, which link them to the request's trace.
+
 ## Request observers
 
 For HTTP metrics, register an observer, typically from a service listed in `app_extensions`:

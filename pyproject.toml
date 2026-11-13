@@ -57,12 +57,14 @@ taskmanager = ["patera-taskmanager>=0.11"]
 email = ["patera-email>=0.11"]
 apiinterface = ["patera-apiinterface>=0.11"]
 joltui = ["patera-joltui>=0.1"]
+telemetry = ["patera-telemetry>=0.1"]
 admin = ["patera-admin>=0.11"]
 aiinterface = ["patera-aiinterface>=0.11"]
 desktop = ["patera-desktop>=0.11"]
 desktop-ui = ["patera-desktop-ui>=0.3"]
 all = [
     "patera-joltui>=0.1",
+    "patera-telemetry>=0.1",
     "patera-database>=0.11",
     "patera-migrate>=0.11",
     "patera-email>=0.11",
@@ -87,6 +89,7 @@ members = [
     "packages/patera-taskmanager",
     "packages/patera-desktop",
     "packages/patera-desktop-ui",
+    "packages/patera-telemetry",
     "examples/quick_exams",
 ]
 
@@ -103,6 +106,7 @@ patera-caching = { workspace = true }
 patera-migrate = { workspace = true }
 patera-desktop = { workspace = true }
 patera-desktop-ui = { workspace = true }
+patera-telemetry = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.13.0"]
@@ -153,6 +157,11 @@ exclude = ['packages/patera-desktop-ui/src/patera/desktop/ui/assets/bootstrap\.p
 module = ["numpy", "numpy.*", "pgvector.*", "sentence_transformers.*", "torch.*", "webview.*"]
 ignore_missing_imports = true
 
+# The OTLP/gRPC exporter is an opt-in extra of patera-telemetry (grpcio).
+[[tool.mypy.overrides]]
+module = ["opentelemetry.exporter.otlp.proto.grpc.*"]
+ignore_missing_imports = true
+
 [dependency-groups]
 dev = [
     "mypy>=2.4.0",
@@ -174,4 +183,6 @@ dev = [
     "asyncpg>=0.30",
     "patera-desktop[pyinstaller]",
     "patera-desktop-ui",
+    # Telemetry tests use the SDK's in-memory exporter and the instrumentations.
+    "patera-telemetry[all]",
 ]

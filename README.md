@@ -76,6 +76,7 @@ Optional features are installed with extras:
 | `email` | `patera-email` | SMTP e-mail client |
 | `apiinterface` | `patera-apiinterface` | declarative clients for external HTTP APIs |
 | `joltui` | [`patera-joltui`](packages/patera-joltui/README.md) | JoltUI server components with typed group registration |
+| `telemetry` | [`patera-telemetry`](packages/patera-telemetry/README.md) | OpenTelemetry request tracing, metrics and log correlation (`patera-telemetry[all]` adds the SDK, exporter and integrations) |
 | `aiinterface` | `patera-aiinterface` | LLM chat interface (experimental; `patera-aiinterface[augmentation]` adds the embedding libraries) |
 | `admin` | `patera-admin` | admin dashboard |
 | `desktop` | `patera-desktop` | show the app in a desktop window (pywebview) and package it as a program |

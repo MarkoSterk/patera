@@ -13,6 +13,20 @@ contain breaking changes; they are listed first in each release.
 
 ### Added
 
+- **patera-telemetry 0.1.0 (new package):** OpenTelemetry for Patera. The `Telemetry` extension
+  registers `TelemetryMiddleware` (order -200), which records a SERVER span named after the route
+  and the `http.server.request.duration` histogram for every HTTP request, adds `trace_id` and
+  `span_id` to the request's log records, continues incoming W3C trace context, and instruments
+  SQLAlchemy, httpx and Redis on request (`INSTRUMENT`). With `SETUP_SDK` it creates the tracer
+  and meter providers at startup (OTLP or console) and flushes them at shutdown; otherwise it uses
+  the providers configured elsewhere and is a no-op without them. Client addresses, query strings,
+  headers and user ids are opt-in; captured secrets are masked. `run_traced_in_background` runs
+  background work in its own trace linked to the request. Install with `patera[telemetry]`;
+  `patera-telemetry[all]` adds the SDK, the OTLP/HTTP exporter and the instrumentations.
+  `patera[all]` now includes `patera-telemetry` (instrumentation only).
+- **Core:** `req.on_finish(callback)` runs `callback(exc)` once the request is finished: its
+  response sent completely, the request failed, or the client left (`exc` is the exception that
+  ended it without a complete answer, otherwise None). Callbacks run after a streamed body.
 - **Core:** `Headers[Model]` and `Cookies[Model]` handler parameters build models from request
   headers and cookies. A header field `x_request_id` reads `X-Request-Id` (underscores become
   hyphens, letter case is ignored); a cookie field reads the cookie of the same name. A plain
@@ -48,6 +62,9 @@ contain breaking changes; they are listed first in each release.
   applications, extensions and subclasses that override a method behave as before.
   `BaseExtension` takes its rollback snapshot through `patera._app.snapshot`, which lists every
   registration collection in one place.
+- **patera-database:** engines are created with `sqlalchemy.ext.asyncio.create_async_engine`
+  looked up when connecting, so instrumentation that wraps it (patera-telemetry,
+  `opentelemetry-instrument`) also traces Patera's engines.
 - **Core:** CORS headers on routing errors come from the CORS middleware, which now runs for
   unmatched requests with the global settings, instead of from the application. The responses are
   unchanged. The private `Patera._routing_error_send` is removed.

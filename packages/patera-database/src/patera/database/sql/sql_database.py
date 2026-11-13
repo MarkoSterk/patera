@@ -23,9 +23,9 @@ from functools import wraps
 from sqlalchemy import MetaData, Table, event, select, func
 from sqlalchemy.inspection import inspect
 from sqlalchemy.engine import RowMapping
+from sqlalchemy.ext import asyncio as sqlalchemy_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
-    create_async_engine,
     AsyncSession,
     async_sessionmaker,
 )
@@ -171,11 +171,8 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         self._session_name = self.configs.DATABASE_SESSION_NAME
         self._app.add_on_startup_method(self.connect)
         self._app.add_on_shutdown_method(self.disconnect)
-        # the SqlDatabase instance is stored in app._extensions with key as db_name for later retrieval in session decorators and elsewhere
-        # in addition to the standard classname and config name storage
         self.app._extensions[self.db_name] = self
 
-        # If the SqlDatabase class inherits from patera.migrate.Migrate class
         if "migrate" in [cl.__name__.lower() for cl in self.__class__.mro()]:
             from patera.migrate import Migrate  # type: ignore
 
@@ -187,7 +184,7 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
         Runs automatically when the lifespan.start signal is received
         """
         if not self._engine:
-            self._engine = create_async_engine(
+            self._engine = sqlalchemy_asyncio.create_async_engine(
                 cast(str, self._db_uri),
                 echo=self.configs.SHOW_SQL,
                 pool_pre_ping=True,
@@ -216,8 +213,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
             )
             await self._engine.dispose()
             self._engine = None
-        # Sessions made from the old factory would open connections on the
-        # disposed engine that nothing closes; the next use reconnects.
         self._session_factory = None
 
     def create_session(self) -> AsyncSession:
@@ -439,7 +434,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
             await self.connect()
 
         with child_context(app=self.app) as ctx:
-            # Work in the block commits with the block, never with a request.
             ctx.extras.pop(TRANSACTION_OPEN, None)
             try:
                 async with self.create_session() as session:
@@ -451,10 +445,6 @@ class SqlDatabase(BaseExtension[AppT, SqlDatabaseConfig], Generic[AppT]):
                         with bind_session(self.session_name, session):
                             yield session
             finally:
-                # Sessions of other databases opened in the block (by
-                # Model.query() or a repository) belong to the block too;
-                # closing them returns their connections. Their uncommitted
-                # work is rolled back: use each database's own scope for it.
                 await _close_sessions(ctx)
 
 

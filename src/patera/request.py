@@ -304,6 +304,7 @@ class Request:
         self.static_resource: bool = False
         #: Why no route matched, set by the dispatcher (None when one did).
         self.routing_outcome: Optional["RoutingOutcome"] = None
+        self._finish_callbacks: list[Callable[[Optional[BaseException]], Any]] = []
 
     def _tracking_send(self, send: Callable[..., Any]) -> Callable[..., Any]:
         """Wraps the ASGI send channel to note when the response has started."""
@@ -621,6 +622,20 @@ class Request:
 
     async def send(self, message: dict) -> None:
         return await self._send(message)
+
+    def on_finish(self, callback: Callable[[Optional[BaseException]], Any]) -> None:
+        """
+        Registers ``callback(exc)`` to run once the request is finished: its
+        response has been sent completely, it failed, or the client left.
+
+        ``exc`` is the exception that ended the request without a complete
+        answer (raised to the server, or a client disconnect), and None
+        otherwise. Callbacks run in the request's task, in registration
+        order, after the middleware chain has returned, so work done while a
+        response is streamed happens before them. They must be synchronous
+        and quick; one that raises is logged and skipped.
+        """
+        self._finish_callbacks.append(callback)
 
     def wrap_send(
         self, wrapper: Callable[[Callable[..., Any]], Callable[..., Any]]

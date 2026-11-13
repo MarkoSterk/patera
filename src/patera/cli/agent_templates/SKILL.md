@@ -65,6 +65,7 @@ Read only the references relevant to the task:
 | SMTP and mail templates | [email](references/email.md) |
 | Scheduled and background work | [task manager](references/taskmanager.md) |
 | Response caching | [caching](references/caching.md) |
+| Tracing, metrics, log correlation (OpenTelemetry) | [telemetry](references/telemetry.md) |
 | Declarative HTTP clients | [API interfaces](references/apiinterface.md) |
 | JoltUI server components, groups, typed request bodies | [patera-joltui](references/joltui.md) |
 | Experimental AI services | [AI interfaces](references/aiinterface.md) |

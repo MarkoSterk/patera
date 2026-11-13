@@ -22,6 +22,7 @@ class App(Patera[Config]):
 | [E-mail](email.md) | `patera.email` | `EmailClient` | `EmailConfig` | `patera[email]` |
 | [External APIs](apiinterface.md) | `patera.apiinterface` | `ApiInterface` | class/method decorators | `patera[apiinterface]` |
 | [JoltUI](joltui.md) | `patera.joltui` | `PateraJoltui` | `JoltuiConfig` | `patera[joltui]` |
+| [Telemetry](telemetry.md) | `patera.telemetry` | `Telemetry` | `TelemetryConfig` | `patera[telemetry]` |
 | [Admin dashboard](admin.md) | `patera.admin` | `AdminInterface` | `AdminConfig` | `patera[admin]` |
 | [AI interface](aiinterface.md) :material-flask-outline: | `patera.aiinterface` | `AiService` | `AiServiceConfig` | `patera[aiinterface]` |
 | [Desktop](desktop.md) :material-flask-outline: | `patera.desktop` | `Desktop` | `DesktopConfig` | `patera[desktop]` |
@@ -31,7 +32,8 @@ class App(Patera[Config]):
 any release.
 
 `patera[all]` installs the server extensions: admin, API interface, authentication, caching,
-SQL, migrations, e-mail, task manager and JoltUI. It does not install the experimental packages
+SQL, migrations, e-mail, task manager, JoltUI and telemetry (instrumentation only; the
+OpenTelemetry SDK is `patera-telemetry[sdk]`). It does not install the experimental packages
 or optional backends such as `caching-redis` and `caching-sqlite`.
 
 Each extension package requires Python 3.13 or newer and a compatible `patera` core (`>=0.121`).

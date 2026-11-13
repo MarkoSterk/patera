@@ -71,6 +71,7 @@ nav = [
       "extensions/email.md",
       "extensions/apiinterface.md",
       "extensions/joltui.md",
+      "extensions/telemetry.md",
     ] },
     { "Experimental" = [
       "extensions/aiinterface.md",

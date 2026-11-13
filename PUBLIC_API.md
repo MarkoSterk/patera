@@ -25,6 +25,7 @@ followed by `Config`; the established shorter names below remain canonical.
 | patera-joltui | patera.joltui | PateraJoltui | JoltuiConfig |
 | patera-migrate | patera.migrate | Migrate | MigrateConfig |
 | patera-taskmanager | patera.taskmanager | TaskManager | TaskManagerConfig |
+| patera-telemetry | patera.telemetry | Telemetry | TelemetryConfig |
 
 SQL classes intentionally live under `patera.database.sql`, leaving room for
 other database implementations. `MigrateConfig` is the public migration settings
@@ -36,7 +37,8 @@ in Python classes. `PateraJoltui` intentionally retains its requested integratio
 name; `JoltuiGroupHandler` and `JoltuiRequest` describe the protocol-facing roles.
 
 `patera[all]` means the server-extension bundle: admin, API interface,
-authentication, caching, SQL, migrations, email, task manager and JoltUI. It does
+authentication, caching, SQL, migrations, email, task manager, JoltUI and
+telemetry (its instrumentation only, without the OpenTelemetry SDK). It does
 not install experimental AI or desktop packages, optional cache backends, or
 every optional provider. Install these explicitly with `patera[aiinterface]`,
 `patera[desktop]`, or `patera[desktop-ui]` and the relevant provider extras.
