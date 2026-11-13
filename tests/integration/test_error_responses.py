@@ -136,7 +136,7 @@ async def test_bad_request_shape(app):
 
     await app.abort_bad_request(send)
     assert sent[0]["status"] == 400
-    assert b'"message": "Bad request"' in sent[1]["body"]
+    assert sent[1]["body"] == b'{"status":"error","message":"Bad request"}'
 
 
 async def test_preflight_with_disallowed_method_is_json(make_app, client_for):

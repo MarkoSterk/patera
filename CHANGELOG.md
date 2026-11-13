@@ -27,6 +27,45 @@ contain breaking changes; they are listed first in each release.
   out with `open_api_spec = False` on the class), the controller's operations for hooks.
   `middleware(self, req)` and `(self, req)` hooks work unchanged.
 
+- **Core:** middleware can see every HTTP request. Requests no route matched (404, 405,
+  trailing-slash redirects) and static files now pass through the middleware chain; a middleware
+  runs for them only when it sets `run_on_unmatched = True` or `run_on_static = True`, so existing
+  middleware, including authentication and database sessions, is skipped for them as before.
+  `req.route_matched`, `req.routing_outcome` and `req.static_resource` describe the request, and
+  reading `req.route_handler` on an unmatched request raises `RuntimeError`. The response to an
+  unmatched request is sent in the innermost step, so it has started when `next()` returns.
+- **Core:** `req.wrap_send(wrapper)` installs a wrapper around the request's ASGI send channel, to
+  change or observe every response message. CORS uses it.
+- **Core:** `patera.middleware.ORDER_TIERS` documents the reserved middleware orders, including
+  `-200` and below for observability middleware that sees every request.
+
+### Changed
+
+- **Core:** the `Patera` class is split into parts in the internal `patera._app` package
+  (module discovery, middleware stack, lifespan, HTTP and WebSocket dispatch, response sending,
+  exception resolution, registration and CLI commands). `patera.py` shrinks from about 2,100 to
+  about 1,000 lines. Every method and attribute stays on `Patera` and delegates to its part, so
+  applications, extensions and subclasses that override a method behave as before.
+  `BaseExtension` takes its rollback snapshot through `patera._app.snapshot`, which lists every
+  registration collection in one place.
+- **Core:** CORS headers on routing errors come from the CORS middleware, which now runs for
+  unmatched requests with the global settings, instead of from the application. The responses are
+  unchanged. The private `Patera._routing_error_send` is removed.
+
+### Fixed
+
+- **Core:** trailing-slash redirects (`STRICT_SLASHES = True`) sent `Location: http:///path/`,
+  with an empty host, and dropped the query string. The Location is now the corrected path with
+  the request's query string, such as `/api/items/?page=2`, which clients resolve against the URL
+  they requested.
+- **Core:** routing errors (404, 405, 400) and a missing static page answered `HEAD` requests with
+  a body. They now send the headers alone, as routed `HEAD` responses do.
+- **Core:** routing-error bodies are encoded like every other JSON response: compact
+  (`{"status":"error","message":"Endpoint not found"}`), with `application/json; charset=utf-8`.
+  They were spaced and had no charset. The JSON itself is unchanged.
+- **Core:** a 405 response lists the allowed methods sorted, in the `Allow` header and in
+  `data.allowed_methods`. Their order followed a set before and could change between processes.
+
 ## patera 0.125.2 and extensions 0.15.2 (2026-11-05)
 
 ### Fixed

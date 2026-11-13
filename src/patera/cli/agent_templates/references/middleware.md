@@ -35,9 +35,13 @@ Use locals or `current_request.set/get` for per-request data. The proxy also
 exposes request/app and session lookup; `has_request_context()` checks availability.
 Do not keep request-specific values on the middleware singleton.
 
-Routing precedes the HTTP middleware chain. Static files bypass it, and sockets
-have a separate path. Do not rely on middleware to protect static assets or to
-observe every response. Use `app.add_request_observer` for complete HTTP records.
+Every HTTP request goes through the chain, but a middleware runs for unmatched
+requests (404/405/redirects) only with `run_on_unmatched = True` and for static
+files only with `run_on_static = True`. For unmatched requests check
+`req.route_matched` (never read `req.route_handler`); their response is already
+sent when `next()` returns, so add headers with `req.wrap_send(wrapper)`.
+Authentication does not run for static files, so they are public. Sockets have
+a separate path. `app.add_request_observer` gives complete HTTP records.
 
 For credentialed CORS, declare specific frontend origins, methods and headers in
 `CORS_ALLOW_ORIGINS`, `CORS_ALLOW_METHODS`, and `CORS_ALLOW_HEADERS`; enable

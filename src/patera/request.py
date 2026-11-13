@@ -25,6 +25,7 @@ from .exceptions.http_exceptions import (
 from .exceptions.runtime_exceptions import ClientDisconnected
 
 if TYPE_CHECKING:
+    from ._app.http import RoutingOutcome
     from .patera import Patera
 
 
@@ -294,6 +295,15 @@ class Request:
         # Set for OPTIONS requests to routes without an explicit OPTIONS
         # handler; holds the methods allowed on the route.
         self.automatic_options: Optional[list[str]] = None
+        #: False when no route matched (404, 405, a trailing-slash redirect).
+        #: Only middleware with ``run_on_unmatched = True`` sees such a
+        #: request; its ``route_handler`` must not be read.
+        self.route_matched: bool = True
+        #: True for a static resource (the static files controller).
+        #: Only middleware with ``run_on_static = True`` sees such a request.
+        self.static_resource: bool = False
+        #: Why no route matched, set by the dispatcher (None when one did).
+        self.routing_outcome: Optional["RoutingOutcome"] = None
 
     def _tracking_send(self, send: Callable[..., Any]) -> Callable[..., Any]:
         """Wraps the ASGI send channel to note when the response has started."""
@@ -315,6 +325,16 @@ class Request:
 
     @property
     def route_handler(self) -> Callable:
+        """
+        The endpoint method that handles the request. Raises RuntimeError
+        when no route matched (check ``route_matched`` first in middleware
+        that sets ``run_on_unmatched``).
+        """
+        if not self.route_matched:
+            raise RuntimeError(
+                f"No route matched {self.method} {self.path}, so the request "
+                "has no route handler. Check req.route_matched first."
+            )
         return self._route_handler
 
     @property
@@ -601,6 +621,19 @@ class Request:
 
     async def send(self, message: dict) -> None:
         return await self._send(message)
+
+    def wrap_send(
+        self, wrapper: Callable[[Callable[..., Any]], Callable[..., Any]]
+    ) -> None:
+        """
+        Wraps the request's ASGI send channel: ``wrapper(send)`` returns the
+        new channel, which receives every message the response sends.
+
+        Middleware uses this to change response messages (CORS adds its
+        headers to the start message) or to observe them (the status code,
+        the end of the body). Wrappers installed later see each message first.
+        """
+        self._send = wrapper(self._send)
 
     async def receive(self) -> dict:
         return await self._receive()

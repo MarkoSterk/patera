@@ -19,7 +19,8 @@ Files in `STATIC_DIR` are served at `STATIC_URL` (`/static/<path:filename>`) wit
 
 !!! warning "Static files are public"
 
-    Static files bypass middleware, including [authentication](../extensions/authentication.md).
+    Middleware skips static files unless it sets `run_on_static`, and
+    [authentication](../extensions/authentication.md) does not.
     Use the static folder only for public assets and serve private downloads through an
     authorized controller (see [Responses](responses.md#files)). Static URLs are **not**
     prefixed by `URL_PREFIX`.

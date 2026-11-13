@@ -65,12 +65,14 @@ uses negative orders:
 
 | Middleware | Order |
 | --- | --- |
+| Observability (telemetry, request records) | `-200` and below |
+| [JoltUI](../extensions/joltui.md) component dispatch | `-102` |
 | CORS | `-101` |
 | SQL session manager ([database](../extensions/database.md)) | `-100` |
 | [Authentication](../extensions/authentication.md) | `-99` |
 
 Give application middleware distinct positive orders. If an order is taken, the next free number
-is used and a warning is logged.
+is used and a warning is logged. `patera.middleware.ORDER_TIERS` lists the reserved tiers.
 
 ## Configuration
 
@@ -79,15 +81,69 @@ Middleware can declare a configuration model just like [services](dependency-inj
 after the class (`TimingMiddleware` → `TIMING_MIDDLEWARE`). Middleware supports dependency
 injection with `Inject[...]`.
 
+## Which requests middleware sees
+
+Every HTTP request passes through the middleware chain, including requests no route matched and
+[static files](static-files.md). By default a middleware runs only for requests that matched a
+route and are not static files. Two class attributes opt in to the others:
+
+```python
+@middleware(order=1)
+class RequestMetrics(MiddlewareBase):
+    run_on_unmatched = True   # 404, 405 and trailing-slash redirects
+    run_on_static = True      # the static files controller
+
+    async def middleware(self, req: Request) -> Response:
+        res = await self.next(req)
+        self.app.logger.info(f"{req.method} {req.path} {res.status_code}")
+        return res
+```
+
+- **Unmatched requests.** `req.route_matched` is `False`, and `req.routing_outcome` says why:
+  its `kind` is `"not_found"`, `"method_not_allowed"`, `"protocol_mismatch"` or `"redirect"`,
+  with the `status` that is answered. Reading `req.route_handler` raises `RuntimeError`.
+- **Their response is already sent** when `await self.next(req)` returns: `req.response_started`
+  is `True`, and the returned response only carries the status code, so changing it has no
+  effect. To add headers, [wrap the send channel](#wrapping-the-send-channel). A middleware can
+  still answer an unmatched request itself by returning a response without calling `next`.
+- **Static files.** `req.static_resource` is `True`. Middleware that does not opt in, including
+  [authentication](../extensions/authentication.md), never runs for them: everything in the
+  static folder is public.
+- A required `Headers[...]`, `Cookies[...]` or `QueryParams[...]` field applies to every request
+  the middleware runs for: with `run_on_unmatched`, an unknown path without the header is answered
+  with 422 instead of 404.
+
+## Wrapping the send channel
+
+`req.wrap_send(wrapper)` installs `wrapper(send)` as the request's ASGI send channel. Every message
+of the response passes through it, including error responses and the responses to unmatched
+requests:
+
+```python
+async def middleware(self, req: Request) -> Response:
+    def add_server_timing(send):
+        async def timed_send(message):
+            if message["type"] == "http.response.start":
+                headers = [*message["headers"], (b"server-timing", b"app")]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        return timed_send
+
+    req.wrap_send(add_server_timing)
+    return await self.next(req)
+```
+
+CORS adds its headers this way. A wrapper also sees when the body ends (the last
+`http.response.body` message has no `more_body`), which is when a streamed response is complete.
+
 ## What middleware does not see
 
-- Routing precedes the middleware chain.
-- [Static files](static-files.md) bypass middleware, so middleware cannot protect static assets.
 - [WebSockets](websockets.md) have a separate path; HTTP middleware is not applied to them.
 - Middleware is a singleton: keep per-request values in locals or the
   [request context](requests.md#request-context).
 
-To observe every completed HTTP response, including static files and routing failures, use a
-[request observer](logging.md#request-observers).
+A [request observer](logging.md#request-observers) is the simplest way to record every completed
+HTTP response: a plain callback, called after the response has been sent.
 
 Exceptions raised in middleware are handled by the [exception handlers](exception-handling.md).

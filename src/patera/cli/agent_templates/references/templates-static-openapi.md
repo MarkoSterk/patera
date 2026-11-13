@@ -8,8 +8,8 @@ and strict undefined variables are enabled by default. Keep escaping enabled for
 untrusted values; use template `url_for` rather than hardcoded application paths.
 
 `STATIC_DIR`/`STATIC_URL` default to `static`/`/static`; static URLs are not
-automatically prefixed by `URL_PREFIX`. Static files bypass authentication
-middleware: use this directory only for public assets. Serve private downloads
+automatically prefixed by `URL_PREFIX`. Authentication middleware does not run
+for static files: use this directory only for public assets. Serve private downloads
 through an authorized controller. `USE_STATIC_PAGES` enables a separate HTML-page
 controller; its templates and URL prefix have their own settings.
 

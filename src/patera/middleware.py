@@ -55,8 +55,8 @@ def middleware(
 
     ``order`` sets the middleware's position in the chain; lower orders run
     first on the way in. It must be greater than 0, because negative orders
-    are reserved for the framework's own middleware (CORS -101, database
-    sessions -100, authentication -99). A middleware registered without an
+    are reserved for the framework's own middleware (see ``ORDER_TIERS``). A
+    middleware registered without an
     order, here or in ``register_middleware``, raises ValueError. If two
     classes ask for the same order, the later one moves to the next free
     number and a warning is logged.
@@ -74,6 +74,17 @@ def middleware(
 
     return decorator
 
+
+#: Middleware orders reserved for the framework and its extensions, set with
+#: the ``_order_`` class attribute. Lower orders are outer layers.
+ORDER_TIERS: dict[str, str] = {
+    "<= -200": "observability (telemetry, request records); sees every request",
+    "-102": "JoltUI component dispatch",
+    "-101": "CORS",
+    "-100": "database sessions",
+    "-99": "authentication",
+    "> 0": "application middleware",
+}
 
 AppT = TypeVar("AppT", bound="Patera[Any]")
 ConfT = TypeVar("ConfT", bound=BaseModel, default=BaseModel)
@@ -98,6 +109,16 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     #: Document this middleware's Headers/Cookies/QueryParams on every
     #: OpenAPI operation.
     open_api_spec: ClassVar[bool] = True
+
+    #: Also run for requests no route matched: 404, 405, trailing-slash
+    #: redirects. Their response is sent in the innermost step, so when
+    #: ``self.next(req)`` returns, ``req.response_started`` is True and the
+    #: returned response only carries the status code. ``req.route_handler``
+    #: must not be read for them (check ``req.route_matched``).
+    run_on_unmatched: ClassVar[bool] = False
+
+    #: Also run for static resources (the static files controller).
+    run_on_static: ClassVar[bool] = False
 
     def __init__(
         self, app: AppT, next_app: "Callable[[Request], Awaitable[Response]]"
@@ -137,6 +158,12 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
         the chain by awaiting ``self.next(req)``, or returns a response
         without calling it to short-circuit the request.
         """
+        # Middleware runs only for the requests it opted in to.
+        # getattr: a REQUEST_CLASS that skips Request.__init__ has neither.
+        if not getattr(req, "route_matched", True) and not self.run_on_unmatched:
+            return await self.next(req)
+        if getattr(req, "static_resource", False) and not self.run_on_static:
+            return await self.next(req)
         plan = self.__dict__.get("_param_plan")
         if plan is None:  # a subclass __init__ that skipped super().__init__
             plan = self.__dict__["_param_plan"] = self._middleware_plan()

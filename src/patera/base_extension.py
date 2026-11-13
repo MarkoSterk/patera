@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast, TypeVar, Generic
 from pydantic import BaseModel
 
 from .injectable import Injectable, resolve_component_configs
+from ._app.snapshot import restore_registrations, snapshot_registrations
 
 if TYPE_CHECKING:
     from .patera import Patera
@@ -22,45 +23,14 @@ class BaseExtension(Injectable, Generic[AppT, ConfT]):
         self._app = app
         # Initialization is synchronous. Roll back framework registrations,
         # including nested dependencies, if any part of construction fails.
-        registrations = (
-            "_extensions",
-            "_middleware_classes",
-            "_controllers",
-            "_cli_controllers",
-            "_exception_handlers",
-            "_exception_handler_instances",
-            "_on_startup_methods",
-            "_on_shutdown_methods",
-            "_request_observers",
-            "_all_templates_paths",
-            "_template_prefix_loaders",
-            "_url_for_alias",
-        )
-        snapshots = {
-            name: value.copy()
-            for name in registrations
-            if isinstance(value := getattr(app, name, None), (dict, list))
-        }
-        routers = {
-            name: getattr(app, name).copy() for name in ("_router", "_socket_router")
-        }
-        json_spec = app._json_spec
+        snapshot = snapshot_registrations(app)
         self._extension_initializing = True
         try:
             self._resolve_injections()
             self._app.add_extension(self)
             self.init()
         except BaseException:
-            for name, snapshot in snapshots.items():
-                current = getattr(app, name)
-                current.clear()
-                if isinstance(current, dict):
-                    current.update(snapshot)
-                else:
-                    current.extend(snapshot)
-            for name, router in routers.items():
-                setattr(app, name, router)
-            app._json_spec = json_spec
+            restore_registrations(app, snapshot)
             raise
         finally:
             self._extension_initializing = False

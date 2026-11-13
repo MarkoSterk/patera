@@ -5,13 +5,10 @@ Patera application class
 # mypy: check-untyped-defs = True
 import importlib
 import importlib.metadata
-import json
 import os
-import re
 import inspect
 import sys
-import time
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncIterator, Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import (
@@ -27,12 +24,10 @@ from typing import (
     AsyncIterable,
     Union,
 )
-import aiofiles
 from loguru import logger
 from loguru._logger import Logger
 from pydantic import BaseModel
 from werkzeug.exceptions import NotFound, MethodNotAllowed
-from werkzeug.routing import WebsocketMismatch, RequestRedirect
 
 from jinja2 import (
     BaseLoader,
@@ -51,34 +46,19 @@ from .ctx import (
     flashed_messages,
     get_request_context,
 )
-from .exceptions.http_exceptions import (
-    BaseHttpException,
-    HtmlAborterException,
-    StaticPageNotFound,
-)
-from .http_statuses import HttpStatus
-from .http_methods import HttpMethod
+
+# Loaded before .request: importing .request first runs into a circular
+# import (request -> exceptions -> controller -> request).
+from .exceptions import http_exceptions as _http_exceptions  # noqa: F401
 from .request import Request
 from .response import Response
 from .utilities import (
     get_app_root_path,
-    run_sync_or_async,
-    wait_for_background_tasks,
-    _extract_response_type,
-    find_python_files_by_name,
-    encode_response_headers,
-    pascal_to_upper_snake,
 )
 from .router import Router
-from .static import Static
-from .static_pages import StaticPages
-from .open_api import OpenAPIController
-from .controller import path
 from .logger import DefaultLogger
-from .ctx import request_context
 from .controller import Controller
 from .exceptions import ExceptionHandler
-from .exceptions.runtime_exceptions import ClientDisconnected
 from .configuration_base import BaseConfig
 from .middleware import MiddlewareBase, AppCallableType
 from .cors.cors_mw import CORSMiddleware
@@ -88,9 +68,18 @@ from .logging.logger_config_base import LoggerBase
 from .logging.log_files import JsonLogFiles, LogFilesConfig
 from .injectable import Injectable
 from .serializers import SerializerRegistry
-from .response_renderer import ResponseRenderer, ResponseRendererException
+from .response_renderer import ResponseRenderer
 from .base_extension import BaseExtension
 from .request_record import RequestObserver, RequestRecord
+from ._app.cli_commands import CliCommands
+from ._app.discovery import ModuleLoader
+from ._app.errors import ExceptionResolver
+from ._app.http import HttpDispatcher
+from ._app.lifespan import Lifespan
+from ._app.middleware_stack import MiddlewareStack
+from ._app.registration import Registrar
+from ._app.sending import ResponseSender
+from ._app.websocket import WebSocketDispatcher
 
 logger.remove()
 
@@ -247,6 +236,17 @@ class Patera(Injectable, Generic[ConfT]):
 
     def __init__(self, cli_mode: bool = False):
         """Init function"""
+        # Core application components for Patera
+        self._core_registrar = Registrar(self)
+        self._core_loader = ModuleLoader(self)
+        self._core_middleware = MiddlewareStack(self)
+        self._core_lifespan = Lifespan(self)
+        self._core_http = HttpDispatcher(self)
+        self._core_sender = ResponseSender(self)
+        self._core_errors = ExceptionResolver(self)
+        self._core_websocket = WebSocketDispatcher(self)
+        self._core_cli = CliCommands(self)
+
         app_configs = getattr(self.__class__, "_app_configs", None)
 
         if app_configs is None:
@@ -280,8 +280,6 @@ class Patera(Injectable, Generic[ConfT]):
         }
 
         self._logger_sink_ids: list[int] = []
-        # Loggers whose sinks are attached now and again at every startup
-        # (shutdown removes them).
         self._loggers: list[LoggerBase] = []
         self._registered_loggers: set[type] = set()
 
@@ -324,9 +322,6 @@ class Patera(Injectable, Generic[ConfT]):
 
         self._app: AppCallableType = self._base_app
 
-        # Middleware classes are registered here and instantiated only in build().
-        # This keeps CLI mode lightweight while still allowing extensions to
-        # register middleware during app initialization.
         self._middleware_classes: dict[int, Type[MiddlewareBase]] = {}
         self._cors_middleware: Optional[CORSMiddleware] = None
         self._request_observers: list[RequestObserver] = []
@@ -345,11 +340,6 @@ class Patera(Injectable, Generic[ConfT]):
         self._get_startup_methods()
         self._get_shutdown_methods()
 
-        # Template lookup: the app's own templates folder comes first so that
-        # templates added later (static pages, extensions) can never shadow
-        # them. The loader shares the paths list, so paths added later on are
-        # picked up as well. Prefixed loaders give components a private
-        # namespace ("<prefix>/<template>").
         self.add_template_path(self._templates_path)
         self._template_prefix_loaders: dict[str, BaseLoader] = {}
         file_system_loader = FileSystemLoader([])
@@ -370,65 +360,12 @@ class Patera(Injectable, Generic[ConfT]):
             self._enable_cors()
 
     def _load_controllers_exc_handlers_middleware(self, cli_mode: bool = False) -> None:
-        logger_folders: list[str] = ["logging", "loggers"]
-        logger_folders.extend(self._configs.LOGGER_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            logger_folders,
-            ["logger", "log_sink", "logging"],
-            LoggerBase,
-        )
-
-        cli_controller_folders: list[str] = ["cli", "cli_controllers", "clis"]
-        cli_controller_folders.extend(self._configs.CLI_CONTROLLER_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            cli_controller_folders,
-            ["cli", "cli_controller"],
-            CLIController,
-        )
-
-        if cli_mode:
-            return
-
-        controller_folders: list[str] = [
-            "api",
-            "public",
-            "controllers",
-            "routers",
-            "routes",
-        ]
-        controller_folders.extend(self._configs.CONTROLLER_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            controller_folders,
-            ["api", "controller", "public", "router", "routes"],
-            Controller,
-        )
-
-        exception_handler_folders: list[str] = ["exceptions", "exc_controllers"]
-        exception_handler_folders.extend(self._configs.EXCEPTION_HANDLER_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            exception_handler_folders,
-            ["handler", "exception_controller", "controller"],
-            ExceptionHandler,
-        )
-
-        middleware_folders: list[str] = ["middleware", "middlewares"]
-        middleware_folders.extend(self._configs.MIDDLEWARE_FOLDERS or [])
-
-        self._load_detected_modules_once(
-            middleware_folders,
-            ["middleware", "mw"],
-            MiddlewareBase,
-        )
+        """See ModuleLoader.load_controllers_exc_handlers_middleware."""
+        return self._core_loader.load_controllers_exc_handlers_middleware(cli_mode)
 
     def _unique_list(self, values: list[str]) -> list[str]:
-        """
-        Returns a list with duplicates removed while preserving order.
-        """
-        return list(dict.fromkeys(values))
+        """See ModuleLoader.unique_list."""
+        return self._core_loader.unique_list(values)
 
     def _load_detected_modules_once(
         self,
@@ -436,135 +373,30 @@ class Patera(Injectable, Generic[ConfT]):
         name_patterns: list[str],
         load_class: Type,
     ) -> None:
-        """
-        Scans folders for matching Python files and loads each discovered file only once.
-        This protects against duplicate default/configured folders and overlapping scans.
-        """
-        app_root: Path = Path(self._root_path)
-        loaded_files: set[Path] = set()
-
-        for folder in self._unique_list(folders):
-            folder_path = app_root / folder
-            files = find_python_files_by_name(folder_path, name_patterns)
-
-            unique_files: list[Path] = []
-            for file in files:
-                resolved_file = file.resolve()
-                if resolved_file in loaded_files:
-                    continue
-                loaded_files.add(resolved_file)
-                unique_files.append(file)
-            self._load_detected_module(unique_files, load_class)
+        """See ModuleLoader.load_detected_modules_once."""
+        return self._core_loader.load_detected_modules_once(
+            folders, name_patterns, load_class
+        )
 
     def _load_detected_module(self, file_paths: List[Path], load_class: Type) -> None:
-        """
-        Tries to load implementations:
-            - controllers
-            - CLI controllers
-            - exception handlers
-            - middleware
-            - loggers
-        """
-        app_root = Path(self._root_path)
-        root_package = app_root.name
-        for file_path in file_paths:
-            relative_path = file_path.relative_to(app_root)
-            module_path = relative_path.with_suffix("")
-            import_path = f"{root_package}.{'.'.join(module_path.parts)}"
-
-            module = importlib.import_module(import_path)
-
-            for _, obj in inspect.getmembers(
-                module,
-                lambda _obj: inspect.isclass(_obj) and issubclass(_obj, load_class),
-            ):
-                ignore: bool = getattr(obj, "_ignore", False)
-                dev_only: bool = getattr(obj, "_development", False)
-
-                if ignore or (dev_only and not self._configs.DEBUG):
-                    continue
-
-                if (
-                    issubclass(obj, Controller)
-                    and obj is not Controller
-                    and getattr(obj, "_controller_path", None) is not None
-                ):
-                    self.register_controller(obj)
-                    continue
-
-                if (
-                    issubclass(obj, CLIController)
-                    and obj is not CLIController
-                    and getattr(obj, "_cli_controller", False)
-                ):
-                    obj_inst = obj(self)
-                    self.register_cli_controller(obj_inst)
-                    continue
-
-                if (
-                    issubclass(obj, MiddlewareBase)
-                    and obj is not MiddlewareBase
-                    and getattr(obj, "_middleware", False)
-                ):
-                    self.register_middleware(obj)
-                    continue
-
-                if (
-                    issubclass(obj, ExceptionHandler)
-                    and obj is not ExceptionHandler
-                    and getattr(obj, "_exc_handler", False)
-                ):
-                    self.register_exception_handler(obj)
-                    continue
-
-                if (
-                    issubclass(obj, LoggerBase)
-                    and obj is not LoggerBase
-                    and getattr(obj, "_logger", False)
-                ):
-                    # A logger class imported into a second module must not
-                    # add a second sink.
-                    if obj in self._registered_loggers:
-                        continue
-                    self._registered_loggers.add(obj)
-                    self.logger.info(f"Registering logger sink: {obj.__name__}")
-                    logger_component = obj(self)
-                    self._loggers.append(logger_component)
-                    self._logger_sink_ids.append(logger_component.configure())
-                    continue
+        """See ModuleLoader.load_detected_module."""
+        return self._core_loader.load_detected_module(file_paths, load_class)
 
     def _enable_cors(self) -> None:
-        cors_enabled: bool = self._configs.CORS_ENABLED
-
-        if not cors_enabled:
-            return
-
-        self.register_middleware(CORSMiddleware)
+        """See MiddlewareStack.enable_cors."""
+        return self._core_middleware.enable_cors()
 
     def _marked_methods(self, marker: str) -> list[Callable]:
-        """
-        Returns bound methods carrying the given decorator marker, sorted by
-        name. Properties are skipped so that scanning has no side effects.
-        """
-        methods = []
-
-        for name in dir(type(self)):
-            if isinstance(inspect.getattr_static(self, name, None), property):
-                continue
-
-            method = getattr(self, name, None)
-
-            if callable(method) and getattr(method, marker, False):
-                methods.append((name, method))
-
-        methods.sort(key=lambda x: x[0])
-        return [m for _, m in methods]
+        """See Lifespan.marked_methods."""
+        return self._core_lifespan.marked_methods(marker)
 
     def _get_startup_methods(self) -> None:
-        self._on_startup_methods = self._marked_methods("_on_startup_method")
+        """See Lifespan.get_startup_methods."""
+        return self._core_lifespan.get_startup_methods()
 
     def _get_shutdown_methods(self) -> None:
-        self._on_shutdown_methods = self._marked_methods("_on_shutdown_method")
+        """See Lifespan.get_shutdown_methods."""
+        return self._core_lifespan.get_shutdown_methods()
 
     def get_conf(self, config_name: str, default: Any = None) -> Any:
         """
@@ -615,33 +447,8 @@ class Patera(Injectable, Generic[ConfT]):
         return getattr(config, name, None)
 
     async def _base_app(self, req: Request) -> Response:
-        """
-        The bare-bones application without any middleware.
-        Calls the route handler directly.
-        """
-        if req.automatic_options is not None:
-            # OPTIONS request for a route that has no explicit OPTIONS handler.
-            # CORS preflights are answered by the CORS middleware before this.
-            return req.res.no_content().set_header(
-                "allow", ", ".join(req.automatic_options)
-            )
-
-        if req.response.expected_body_type() is None:
-            expected = _extract_response_type(req.route_handler)
-            req.response._set_expected_body_type(expected)
-
-        res: Response = await req.route_handler.__self__(req.route_handler, req)  # type: ignore
-
-        # Convert the body through its Response[Model] type now, inside the
-        # middleware chain: the database middleware commits or rolls back and
-        # closes the request's sessions on the way out, which expires ORM
-        # objects that the body still refers to.
-        if isinstance(res, Response):
-            self.response_renderer.materialize_body(
-                res, req.response.expected_body_type()
-            )
-
-        return res
+        """See HttpDispatcher.base_app."""
+        return await self._core_http.base_app(req)
 
     async def _send_error(
         self,
@@ -651,36 +458,16 @@ class Patera(Injectable, Generic[ConfT]):
         data: Any = None,
         headers: Optional[list[tuple[bytes, bytes]]] = None,
     ) -> None:
-        """
-        Sends a JSON error response straight to the ASGI ``send`` channel.
-
-        Used for errors raised before a request object exists (routing
-        failures). The body has the same shape as every other framework
-        error: ``status``, ``message`` and, when there is more to say,
-        ``data``.
-        """
-        payload: dict[str, Any] = {"status": "error", "message": message}
-        if data is not None:
-            payload["data"] = data
-        body = json.dumps(payload).encode("utf-8")
-        await send(
-            {
-                "type": "http.response.start",
-                "status": int(status_code),
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(body)).encode("ascii")),
-                    *(headers or []),
-                ],
-            }
+        """See HttpDispatcher.send_error."""
+        return await self._core_http.send_error(
+            send, status_code, message, data, headers
         )
-        await send({"type": "http.response.body", "body": body})
 
     async def abort_route_not_found(self, send):
         """
         Aborts request because route was not found.
         """
-        await self._send_error(send, HttpStatus.NOT_FOUND, "Endpoint not found")
+        return await self._core_http.abort_route_not_found(send)
 
     async def abort_method_not_allowed(
         self,
@@ -690,19 +477,13 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Aborts request because method is not allowed.
         """
-        await self._send_error(
-            send,
-            HttpStatus.METHOD_NOT_ALLOWED,
-            "Method not allowed",
-            data={"allowed_methods": allowed_methods},
-            headers=[(b"allow", ", ".join(allowed_methods).encode("latin-1"))],
-        )
+        return await self._core_http.abort_method_not_allowed(send, allowed_methods)
 
     async def abort_bad_request(self, send) -> None:
         """
         Send a 400 Bad Request response.
         """
-        await self._send_error(send, HttpStatus.BAD_REQUEST, "Bad request")
+        return await self._core_http.abort_bad_request(send)
 
     async def redirect_request(
         self,
@@ -713,67 +494,18 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Send an HTTP redirect response.
         """
-        await send(
-            {
-                "type": "http.response.start",
-                "status": status_code,
-                "headers": [
-                    (b"location", location.encode("latin-1")),
-                    (b"content-length", b"0"),
-                ],
-            }
-        )
-        await send(
-            {
-                "type": "http.response.body",
-                "body": b"",
-            }
-        )
+        return await self._core_http.redirect_request(send, location, status_code)
 
-    def _routing_error_send(self, scope: dict, send: Callable) -> Callable:
-        """
-        Returns the send channel for responses produced by the router
-        (404, 405, 400 and trailing-slash redirects).
-
-        These responses are sent before any middleware runs, so the CORS
-        middleware never sees them. When CORS is enabled, the global CORS
-        settings are applied here instead, so a browser can read the error.
-        """
-        cors = self._cors_middleware
-        if cors is None:
-            return send
-        return cors.wrap_send_without_route(scope, send)
-
-    async def _iterate_stream(
+    def _iterate_stream(
         self,
         iterable: Union[AsyncIterable[bytes], Iterable[bytes]],
     ) -> AsyncIterator[bytes]:
-        """
-        Normalizes async/sync iterables into an async iterator of bytes.
-        Accepts bytes/bytearray/str chunks and encodes/normalizes to bytes.
-        """
-
-        async def _aiter_from_sync(sync_iter: Iterable[bytes]) -> AsyncIterator[bytes]:
-            for chunk in sync_iter:
-                yield self._normalize_chunk(chunk)
-
-        if hasattr(iterable, "__aiter__"):
-            async for chunk in iterable:  # type: ignore[attr-defined]
-                yield self._normalize_chunk(chunk)
-        else:
-            async for chunk in _aiter_from_sync(iterable):  # type: ignore[arg-type]
-                yield chunk
+        """See ResponseSender.iterate_stream."""
+        return self._core_sender.iterate_stream(iterable)
 
     def _normalize_chunk(self, chunk: Any) -> bytes:
-        if isinstance(chunk, (bytes, bytearray)):
-            return bytes(chunk)
-
-        if isinstance(chunk, str):
-            return chunk.encode("utf-8")
-
-        raise TypeError(
-            f"Streaming chunks must be bytes, bytearray or str, got {type(chunk)!r}"
-        )
+        """See ResponseSender.normalize_chunk."""
+        return self._core_sender.normalize_chunk(chunk)
 
     async def send_response(
         self,
@@ -790,225 +522,23 @@ class Patera(Injectable, Generic[ConfT]):
             - streaming responses
             - normal ASGI start/body sending
         """
-        self.response_renderer.apply_default_content_type(res)
-        self._log_response(res.request, res.status_code)
-
-        # HEAD responses carry the headers of the equivalent GET response
-        # but must never include a body.
-        is_head = res.request.method == HttpMethod.HEAD.value
-
-        if res.zero_copy is not None:
-            params = res.zero_copy
-            file_path = params["file_path"]
-            start = params["start"]
-            length = params["length"]
-
-            self.response_renderer.finalize_headers(
-                res,
-                body_bytes=None,
-                is_streaming=True,
-            )
-            # The exact length of a file/range response is known up-front.
-            res.headers["content-length"] = str(length)
-
-            await send(
-                {
-                    "type": "http.response.start",
-                    "status": int(res.status_code),
-                    "headers": encode_response_headers(res),
-                }
-            )
-
-            if is_head or length <= 0:
-                await send(
-                    {"type": "http.response.body", "body": b"", "more_body": False}
-                )
-                return
-
-            chunk_size = 1 * 1024 * 1024
-            remaining = length
-
-            async with aiofiles.open(file_path, "rb") as f:
-                await f.seek(start)
-
-                while remaining > 0:
-                    to_read = min(remaining, chunk_size)
-                    chunk = await f.read(to_read)
-
-                    if not chunk:
-                        # The file shrank while it was being sent; end the
-                        # body so the client is not left waiting.
-                        await send(
-                            {
-                                "type": "http.response.body",
-                                "body": b"",
-                                "more_body": False,
-                            }
-                        )
-                        break
-
-                    remaining -= len(chunk)
-
-                    await send(
-                        {
-                            "type": "http.response.body",
-                            "body": chunk,
-                            "more_body": remaining > 0,
-                        }
-                    )
-
-            return
-
-        if res.is_streaming:
-            self.response_renderer.finalize_headers(
-                res,
-                body_bytes=None,
-                is_streaming=True,
-            )
-
-            await send(
-                {
-                    "type": "http.response.start",
-                    "status": int(res.status_code),
-                    "headers": encode_response_headers(res),
-                }
-            )
-
-            stream_iter = res.stream_iterable
-
-            if stream_iter is None or is_head:
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": b"",
-                        "more_body": False,
-                    }
-                )
-                return
-
-            async for chunk in self._iterate_stream(stream_iter):
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": chunk,
-                        "more_body": True,
-                    }
-                )
-
-            await send(
-                {
-                    "type": "http.response.body",
-                    "body": b"",
-                    "more_body": False,
-                }
-            )
-            return
-
-        body_bytes = await self.response_renderer.render_body(res, response_type)
-
-        self.response_renderer.finalize_headers(
-            res,
-            body_bytes=body_bytes,
-            is_streaming=False,
-        )
-        await send(
-            {
-                "type": "http.response.start",
-                "status": int(res.status_code),
-                "headers": encode_response_headers(res),
-            }
-        )
-        await send(
-            {
-                "type": "http.response.body",
-                "body": b"" if is_head else (body_bytes or b""),
-                "more_body": False,
-            }
-        )
+        return await self._core_sender.send_response(res, send, response_type)
 
     async def _lifespan_app(self, _, receive, send):
-        """
-        Handles the ASGI lifespan protocol. Startup actions run on
-        ``lifespan.startup`` and shutdown actions on ``lifespan.shutdown``.
-        A failing action is logged and reported to the server with
-        ``lifespan.startup.failed`` or ``lifespan.shutdown.failed``.
-        """
-        while True:
-            message = await receive()
-
-            if message["type"] == "lifespan.startup":
-                # A second lifespan (another test client, say) logs again.
-                self._attach_logger_sinks()
-                try:
-                    for method in self._on_startup_methods:
-                        await run_sync_or_async(method)
-                except Exception as exc:
-                    # Report the failure to the server instead of leaving it
-                    # waiting for a startup.complete that never arrives.
-                    self.logger.exception(exc)
-                    await send(
-                        {"type": "lifespan.startup.failed", "message": repr(exc)}
-                    )
-                    return
-
-                await send({"type": "lifespan.startup.complete"})
-
-            elif message["type"] == "lifespan.shutdown":
-                try:
-                    await self._finish_background_tasks()
-                    for method in self._on_shutdown_methods:
-                        await run_sync_or_async(method)
-                except Exception as exc:
-                    self.logger.exception(exc)
-                    self._remove_logger_sinks()
-                    await send(
-                        {"type": "lifespan.shutdown.failed", "message": repr(exc)}
-                    )
-                    return
-
-                self._remove_logger_sinks()
-
-                await send({"type": "lifespan.shutdown.complete"})
-                return
+        """See Lifespan.lifespan_app."""
+        return await self._core_lifespan.lifespan_app(_, receive, send)
 
     async def _finish_background_tasks(self) -> None:
-        """
-        Lets tasks from run_in_background() (emails, task manager jobs, ...)
-        finish before shutdown methods close the resources they use.
-        """
-        timeout = self.configs.BACKGROUND_TASKS_SHUTDOWN_TIMEOUT
-        finished, cancelled = await wait_for_background_tasks(timeout)
-        if finished:
-            self.logger.info(f"Finished {finished} background task(s) before shutdown")
-        if cancelled:
-            self.logger.warning(
-                f"Cancelled {cancelled} background task(s) still running after "
-                f"{timeout} seconds (BACKGROUND_TASKS_SHUTDOWN_TIMEOUT)"
-            )
+        """See Lifespan.finish_background_tasks."""
+        return await self._core_lifespan.finish_background_tasks()
 
     def _attach_logger_sinks(self) -> None:
-        """
-        Attaches the loggers' sinks and the log files again after a shutdown
-        removed them. Does nothing while they are attached.
-        """
-        if self._logger_sink_ids:
-            return
-        for logger_component in self._loggers:
-            self._logger_sink_ids.append(logger_component.configure())
-        log_files_sink_id = self.log_files.attach()
-        if log_files_sink_id is not None:
-            self._logger_sink_ids.append(log_files_sink_id)
+        """See Lifespan.attach_logger_sinks."""
+        return self._core_lifespan.attach_logger_sinks()
 
     def _remove_logger_sinks(self) -> None:
-        """Removes all logger sinks registered by this application."""
-        for logger_sink_id in self._logger_sink_ids:
-            try:
-                self.logger.remove(logger_sink_id)
-            except ValueError:
-                # Sink was already removed.
-                pass
-        self._logger_sink_ids.clear()
-        self.log_files.detach()
+        """See Lifespan.remove_logger_sinks."""
+        return self._core_lifespan.remove_logger_sinks()
 
     def add_request_observer(self, observer: RequestObserver) -> None:
         """
@@ -1018,247 +548,27 @@ class Patera(Injectable, Generic[ConfT]):
         once its response has been sent, so they must be quick and must not
         block; an observer that raises is logged and skipped.
         """
-        self._request_observers.append(observer)
+        return self._core_http.add_request_observer(observer)
 
     async def _handle_http_request(self, scope, receive, send):
-        """
-        Handles HTTP requests, and reports each one to the request observers.
-        """
-        if not self._request_observers:
-            return await self._dispatch_http_request(scope, receive, send)
-
-        started_at = time.time()
-        start = time.perf_counter()
-        status: list[int] = []
-
-        async def observed_send(message: dict) -> None:
-            if message["type"] == "http.response.start":
-                status.append(message["status"])
-            await send(message)
-
-        failed = False
-        try:
-            return await self._dispatch_http_request(scope, receive, observed_send)
-        except BaseException:
-            failed = True
-            raise
-        finally:
-            self._notify_request_observers(
-                RequestRecord(
-                    method=scope["method"].upper(),
-                    path=scope["path"],
-                    route=scope.get("patera.route"),
-                    status_code=status[0]
-                    if status
-                    else (HttpStatus.INTERNAL_SERVER_ERROR if failed else None),
-                    started_at=started_at,
-                    duration=time.perf_counter() - start,
-                )
-            )
+        """See HttpDispatcher.handle_http_request."""
+        return await self._core_http.handle_http_request(scope, receive, send)
 
     def _notify_request_observers(self, record: RequestRecord) -> None:
-        for observer in self._request_observers:
-            try:
-                observer(record)
-            except Exception as exc:  # an observer must not break requests
-                self.logger.error(f"Request observer {observer!r} failed: {exc}")
+        """See HttpDispatcher.notify_request_observers."""
+        return self._core_http.notify_request_observers(record)
 
     async def _dispatch_http_request(self, scope, receive, send):
-        """
-        Routes an HTTP request and sends its response.
-        """
-        method: str = scope["method"].upper()
-        url_path: str = scope["path"]
-
-        self._log_request(scope, method, url_path)
-
-        route_handler: Optional[Callable] = None
-        path_kwargs: Mapping[str, Any] = {}
-        automatic_options: Optional[list[str]] = None
-
-        try:
-            route_handler, path_kwargs = self.router.match(
-                url_path,
-                method,
-            )
-        except NotFound:
-            self.logger.info(f"Path {url_path} does not exist")
-            return await self.abort_route_not_found(
-                self._routing_error_send(scope, send)
-            )
-        except MethodNotAllowed as exc:
-            matching_methods = list(exc.valid_methods or [])
-
-            if method == "OPTIONS" and matching_methods:
-                # No explicit OPTIONS handler: resolve the route through one of
-                # its real methods so middleware (CORS preflight) can run, and
-                # answer with an automatic "Allow" response otherwise.
-                route_handler, path_kwargs, automatic_options = (
-                    self._match_automatic_options(scope, url_path, matching_methods)
-                )
-            else:
-                self.logger.warning(
-                    f"Method {method} not allowed for path {url_path}. "
-                    f"Matching methods: {matching_methods}"
-                )
-                return await self.abort_method_not_allowed(
-                    self._routing_error_send(scope, send),
-                    matching_methods,
-                )
-        except WebsocketMismatch:
-            self.logger.warning(
-                f"Protocol mismatch for path {url_path}: "
-                f"HTTP request matched a WebSocket route"
-            )
-            return await self.abort_bad_request(self._routing_error_send(scope, send))
-
-        except RequestRedirect as exc:
-            self.logger.debug(f"Redirecting path {url_path} to {exc.new_url}")
-            return await self.redirect_request(
-                self._routing_error_send(scope, send),
-                exc.new_url,
-                exc.code,  # type: ignore
-            )
-
-        if self._request_observers:
-            scope["patera.route"] = self.router.path_of(cast(Callable, route_handler))
-
-        req = self.request_class(
-            scope,
-            receive,
-            send,
-            self,
-            cast(dict, path_kwargs),
-            cast(Callable, route_handler),
-        )
-        req.automatic_options = automatic_options
-
-        # All responses are sent through req.send so that middleware which
-        # wraps the send channel (e.g. CORS) also applies to error responses.
-        try:
-            with request_context(
-                app=self,
-                request=req,
-                controller=route_handler.__self__,  # type: ignore
-            ):
-                try:
-                    if bool(
-                        getattr(route_handler.__self__, "_static_resource", False)  # type: ignore
-                        or getattr(route_handler, "_static_resource", False)
-                    ):
-                        res: Response = await self._base_app(req)
-                        return await self.send_response(res, req.send)
-
-                    res = await self._app(req)
-
-                    if not isinstance(res, Response):
-                        raise TypeError(
-                            "Return object of request handlers must be an instance "
-                            f"of Response, got {type(res).__name__}"
-                        )
-
-                    response_type: Optional[Type[Any]] = (
-                        req.response.expected_body_type()
-                    )
-
-                    return await self.send_response(res, req.send, response_type)
-
-                except Exception as exc:
-                    if req.response_started or isinstance(exc, ClientDisconnected):
-                        raise
-                    return await self._send_exception_response(req, exc)
-
-        except Exception as exc:
-            if isinstance(exc, ClientDisconnected):
-                # Nobody is left to receive a response.
-                self.logger.info(f"({req.method}) {req.path}: {exc}")
-                return
-
-            if req.response_started:
-                # The status and headers are already out, so the error cannot
-                # be answered any more. Raising lets the server close the
-                # connection: the client sees an incomplete response rather
-                # than one that looks complete.
-                self.logger.error(
-                    f"Error after the response started: ({req.method}) {req.path}. "
-                    "The connection is closed."
-                )
-                self.logger.exception(exc)
-                raise
-
-            req.res.reset()
-
-            if not self.configs.DEBUG:
-                res = req.res.json(
-                    {
-                        "status": "error",
-                        "message": "Internal server error",
-                    }
-                ).status(HttpStatus.INTERNAL_SERVER_ERROR)
-
-                self.logger.critical(
-                    f"Unhandled critical error: ({req.method}) {req.path}, "
-                    f"{req.route_parameters}"
-                )
-                self.logger.exception(exc)
-
-                return await self.send_response(res, req.send, None)
-
-            raise
+        """See HttpDispatcher.dispatch_http_request."""
+        return await self._core_http.dispatch_http_request(scope, receive, send)
 
     async def _send_exception_response(self, req: Request, exc: Exception) -> None:
-        """
-        Answers an exception raised before the response started, with the
-        application's handler for it or with the default response. An
-        exception without either is raised again, as an unhandled error.
-        """
-        req.res.reset()
-
-        if isinstance(exc, ResponseRendererException):
-            raise exc
-
-        if isinstance(exc, HtmlAborterException):
-            handler = self._find_exception_handler(exc, stop_at=HtmlAborterException)
-            if handler is None:
-                res = (await req.res.html(exc.template, context=exc.data)).status(
-                    exc.status_code
-                )
-                return await self.send_response(res, req.send, None)
-        elif isinstance(exc, StaticPageNotFound):
-            # A static page that does not exist is a normal 404 - Not Found,
-            # unless the application handles StaticPageNotFound itself.
-            handler = self._find_exception_handler(exc, stop_at=StaticPageNotFound)
-            if handler is None:
-                return await self.abort_route_not_found(req.send)
-        else:
-            handler = self._find_exception_handler(exc)
-
-        if handler is not None:
-            res = await run_sync_or_async(handler, req, exc)
-        else:
-            default_res = self.default_exception_response(req, exc)
-            if default_res is None:
-                raise exc
-            res = default_res
-
-        return await self.send_response(res, req.send, res.expected_body_type())
+        """See ExceptionResolver.send_exception_response."""
+        return await self._core_errors.send_exception_response(req, exc)
 
     async def _close_context_sessions(self, ctx: Any) -> None:
-        """
-        Closes database sessions a WebSocket handler opened through the
-        request context (Model.query(), repositories). HTTP requests have
-        the database middleware for that; sockets do not. Work that was not
-        committed explicitly is rolled back by the close.
-        """
-        sessions = ctx.sessions
-        if sessions is None:
-            return
-        for session in list(sessions.sessions.values()):
-            try:
-                await session.close()
-            except Exception as exc:  # pragma: no cover - defensive
-                self.logger.exception(exc)
-        ctx.sessions = None
+        """See WebSocketDispatcher.close_context_sessions."""
+        return await self._core_websocket.close_context_sessions(ctx)
 
     def _match_automatic_options(
         self,
@@ -1266,50 +576,16 @@ class Patera(Injectable, Generic[ConfT]):
         url_path: str,
         allowed_methods: list[str],
     ) -> tuple[Callable, Any, list[str]]:
-        """
-        Resolves the route handler used to answer an OPTIONS request for a
-        route without an explicit OPTIONS handler.
-        """
-        requested_method: str = ""
-        for key, value in scope.get("headers", []):
-            if key.lower() == b"access-control-request-method":
-                requested_method = value.decode("latin-1").strip().upper()
-                break
-
-        match_method = (
-            requested_method
-            if requested_method in allowed_methods
-            else allowed_methods[0]
-        )
-        route_handler, path_kwargs = self.router.match(url_path, match_method)
-        allow = sorted({*allowed_methods, "OPTIONS"})
-        return cast(Callable, route_handler), path_kwargs, allow
+        """See HttpDispatcher.match_automatic_options."""
+        return self._core_http.match_automatic_options(scope, url_path, allowed_methods)
 
     def _find_exception_handler(
         self,
         exc: BaseException,
         stop_at: Optional[type[BaseException]] = None,
     ) -> Optional[Callable]:
-        """
-        Returns the registered handler for the exception.
-
-        The exception class hierarchy is walked so that a handler registered
-        for a base class (e.g. BaseHttpException) also handles subclasses.
-        The most specific handler wins. Handlers are keyed by class, so two
-        exception classes that share a name never share a handler.
-
-        ``stop_at`` ends the walk at that class: exceptions with built-in
-        handling (html_abort, missing static pages) can be customized by a
-        handler for their own class, but are not captured by handlers for
-        generic bases such as BaseHttpException.
-        """
-        for exc_cls in type(exc).__mro__:
-            handler = self._exception_handlers.get(exc_cls)
-            if handler is not None:
-                return handler
-            if exc_cls is stop_at:
-                break
-        return None
+        """See ExceptionResolver.find_exception_handler."""
+        return self._core_errors.find_exception_handler(exc, stop_at)
 
     def default_exception_response(
         self, req: Request, exc: Exception
@@ -1326,68 +602,27 @@ class Patera(Injectable, Generic[ConfT]):
         raised outside request-body validation: it is the server's data that
         failed. Override in the app class to customize.
         """
-        if isinstance(exc, BaseHttpException):
-            return req.res.json(
-                {
-                    "status": exc.status,
-                    "message": exc.message,
-                    "data": exc.data,
-                }
-            ).status(exc.status_code)
-
-        return None
+        return self._core_errors.default_exception_response(req, exc)
 
     def _log_request(self, scope, method: str, url_path: str) -> None:
-        """
-        Logs incoming request.
-        """
-        self.logger.info(
-            "HTTP request. "
-            f"CLIENT: {(scope.get('client') or ('-', ''))[0]}, "
-            f"SCHEME: {scope['scheme']}, "
-            f"METHOD: {method}, "
-            f"PATH: {url_path}, "
-            f"QUERY_STRING: {scope['query_string'].decode('utf-8', 'replace')}"
-        )
+        """See HttpDispatcher.log_request."""
+        return self._core_http.log_request(scope, method, url_path)
 
     def _log_response(self, req: Request, status_code: int) -> None:
-        """
-        Logs outgoing response.
-        """
-        self.logger.info(
-            "HTTP response. "
-            f"CLIENT: {(req.scope.get('client') or ('-', ''))[0]}, "
-            f"SCHEME: {req.scope['scheme']}, "
-            f"METHOD: {req.method}, "
-            f"PATH: {req.path}, "
-            f"STATUS_CODE: {status_code}"
-        )
+        """See HttpDispatcher.log_response."""
+        return self._core_http.log_response(req, status_code)
 
     def register_static_controller(self, base_path: str):
-        static_controller_dec = path(f"{base_path}", open_api_spec=False)
-        static_controller = static_controller_dec(Static)
-        self.register_controller(static_controller, with_url_prefix=False)  # type: ignore
+        """See Registrar.register_static_controller."""
+        return self._core_registrar.register_static_controller(base_path)
 
     def register_static_pages_controller(self, base_path: str):
-        if not self.configs.USE_STATIC_PAGES:
-            return
-
-        static_pages_controller_dec = path(f"{base_path}", open_api_spec=False)
-        static_pages_controller = static_pages_controller_dec(StaticPages)
-        self.register_controller(static_pages_controller)
-        self._url_for_alias[self.configs.STATIC_PAGES_CONTROLLER_NAME] = (
-            "StaticPages.get"
-        )
+        """See Registrar.register_static_pages_controller."""
+        return self._core_registrar.register_static_pages_controller(base_path)
 
     def register_openapi_controller(self):
-        if not self.configs.OPEN_API:
-            return
-
-        # The specification itself is built lazily on first access, so that
-        # controllers registered later (e.g. by extensions) are included.
-        openapi_controller_dec = path(self.configs.OPEN_API_URL, open_api_spec=False)
-        openapi_controller = openapi_controller_dec(OpenAPIController)
-        self.register_controller(openapi_controller)
+        """See Registrar.register_openapi_controller."""
+        return self._core_registrar.register_openapi_controller()
 
     def register_middleware(
         self,
@@ -1404,64 +639,7 @@ class Patera(Injectable, Generic[ConfT]):
         This allows extensions to register middleware during app initialization
         without forcing the HTTP app to build in CLI mode.
         """
-        if self._is_built:
-            raise RuntimeError(
-                f"Cannot register middleware {middleware_class.__name__!r} "
-                "after the application has already been built."
-            )
-
-        if middleware_class in self._middleware_classes.values():
-            return
-
-        if not getattr(middleware_class, "_middleware", False):
-            return
-
-        if getattr(middleware_class, "_ignore", False):
-            return
-
-        decorator_order = cast(int | None, getattr(middleware_class, "_order", None))
-        default_order = cast(int | None, getattr(middleware_class, "_order_", None))
-        here_set_order = order
-
-        if default_order is not None and (
-            decorator_order is not None or here_set_order is not None
-        ):
-            self.logger.warning(f"""Middleware {middleware_class.__name__} has default order {default_order}
-                            but has set order {decorator_order or here_set_order}. This can lead to unexpected problems.
-                            It is suggested that the order on middleware with default order number is not reset.""")
-
-        # "is not None", not "or": an explicit order of 0 is a valid position.
-        original_order = next(
-            (
-                value
-                for value in (here_set_order, decorator_order, default_order)
-                if value is not None
-            ),
-            None,
-        )
-        if original_order is None:
-            raise ValueError(
-                f"Middleware {middleware_class.__name__} has no set order."
-            )
-
-        resolved_order = original_order
-
-        while resolved_order in self._middleware_classes:
-            resolved_order += 1
-
-        if resolved_order != original_order:
-            self.logger.warning(
-                f"For middleware {middleware_class.__name__}: "
-                f"Order {original_order} is already taken, "
-                f"assigned order {resolved_order} instead."
-            )
-
-        self.logger.info(
-            f"Registering middleware: {middleware_class.__name__} "
-            f"(order={resolved_order})"
-        )
-
-        self._middleware_classes[resolved_order] = middleware_class
+        return self._core_middleware.register_middleware(middleware_class, order=order)
 
     def build(self) -> None:
         """
@@ -1470,18 +648,7 @@ class Patera(Injectable, Generic[ConfT]):
         Lower middleware order values are processed first and become outer
         middleware.
         """
-        built_app: AppCallableType = self._base_app
-
-        for order_key in sorted(self._middleware_classes.keys(), reverse=True):
-            middleware_class = self._middleware_classes[order_key]
-            built_app = cast(
-                AppCallableType,
-                middleware_class(self, built_app),
-            )
-            if isinstance(built_app, CORSMiddleware):
-                self._cors_middleware = built_app
-
-        self._app = built_app
+        self._core_middleware.build_chain()
         self._is_built = True
 
         mode = "development" if self.configs.DEBUG else "production"
@@ -1504,12 +671,7 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Adds extension to extension map.
         """
-        name = pascal_to_upper_snake(extension.__class__.__name__)
-
-        if self._extensions.get(name, None) is not None:
-            return
-
-        self._extensions[name] = extension
+        return self._core_registrar.add_extension(extension)
 
     def get_extension(self, extension_type: Type[ExtT]) -> ExtT:
         """
@@ -1518,19 +680,7 @@ class Patera(Injectable, Generic[ConfT]):
         Example:
             db_manager = app.get_extension(SqlDatabaseManager)
         """
-        name = pascal_to_upper_snake(extension_type.__name__)
-        extension = self._extensions.get(name)
-
-        if extension is None:
-            raise KeyError(f"Extension {extension_type.__name__!r} is not registered.")
-
-        if not isinstance(extension, extension_type):
-            raise TypeError(
-                f"Registered extension {name!r} is not an instance of "
-                f"{extension_type.__name__}."
-            )
-
-        return cast(ExtT, extension)
+        return self._core_registrar.get_extension(extension_type)
 
     def _add_route_function(
         self,
@@ -1539,15 +689,10 @@ class Patera(Injectable, Generic[ConfT]):
         func: Callable,
         endpoint_name: str,
     ):
-        """
-        Adds the function to the Router.
-        Raises DuplicateRouteError if a different handler already serves the
-        same method and path.
-        """
-        if method == HttpMethod.SOCKET.value:
-            self._socket_router.add_route(url_path, func, [method], endpoint_name)
-        else:
-            self.router.add_route(url_path, func, [method], endpoint_name)
+        """See Registrar.add_route_function."""
+        return self._core_registrar.add_route_function(
+            method, url_path, func, endpoint_name
+        )
 
     def register_controller(
         self,
@@ -1558,109 +703,18 @@ class Patera(Injectable, Generic[ConfT]):
         Registers controller classes with the application. Their routes get
         the URL_PREFIX setting in front unless with_url_prefix is False.
         """
-        base_path: str = self.url_prefix if with_url_prefix else ""
+        return self._core_registrar.register_controller(
+            *ctrls, with_url_prefix=with_url_prefix
+        )
 
-        for ctrl in ctrls:
-            dev_only: bool = getattr(ctrl, "_development", False)
-            ignore: bool = getattr(ctrl, "_ignore", False)
-
-            if ignore or (dev_only and not self.configs.DEBUG):
-                continue
-
-            ctrl_path: str | None = cast(
-                str | None, getattr(ctrl, "_controller_path", None)
-            )
-            ctrl_open_api_spec = getattr(ctrl, "_include_open_api_spec")
-            ctrl_open_api_tags = getattr(ctrl, "_open_api_tags", None)
-            ctrl_alias = getattr(ctrl, "_alias", None)
-
-            if ctrl_path is None:
-                continue
-
-            # Controllers are keyed by class name (the same name used for
-            # endpoint names), so several controllers may share a base path.
-            registered = self._controllers.get(ctrl.__name__)
-            if registered is not None:
-                if registered.__class__ is ctrl:
-                    continue
-                raise ValueError(
-                    f"Two controllers are named {ctrl.__name__!r} "
-                    f"({registered.__class__.__module__} and {ctrl.__module__}). "
-                    "Endpoint names (url_for) are built from the class name, so "
-                    "rename one of them."
-                )
-
-            ctrl_instance = ctrl(
-                self,
-                ctrl_path,
-                ctrl_open_api_spec,
-                ctrl_open_api_tags,
-                ctrl_alias,
-            )
-            self.logger.info(f"Registering controller: {ctrl.__name__}")
-            self._controllers[ctrl.__name__] = ctrl_instance
-            # Invalidate a previously built OpenAPI specification.
-            self._json_spec = None
-
-            endpoint_methods: dict[str, dict[str, str | Callable]] = (
-                ctrl_instance.get_endpoint_methods()
-            )
-
-            for url_path, method in endpoint_methods.get(
-                HttpMethod.SOCKET.value, {}
-            ).items():
-                self._check_socket_handler(
-                    ctrl, cast(Callable, cast(dict, method)["method"])
-                )
-
-            for http_method, endpoints in endpoint_methods.items():
-                for url_path, method in endpoints.items():
-                    method_name: Callable = method["method"].__name__  # type: ignore
-
-                    endpoint_name: str = (
-                        f"{ctrl_instance.__class__.__name__}.{method_name}"
-                    )
-
-                    names: list[str] = [endpoint_name]
-
-                    if ctrl_alias:
-                        alias_name = f"{ctrl_alias}.{method_name}"
-                        names.append(alias_name)
-
-                    # "/" + "/hello" is "/hello", not "//hello".
-                    rule = re.sub(
-                        r"/{2,}", "/", base_path + ctrl_instance.path + url_path
-                    )
-                    for name in names:
-                        self._add_route_function(
-                            http_method,
-                            rule,
-                            cast(Callable, cast(dict, method)["method"]),
-                            name,
-                        )
-
-    # Decorators that work through HTTP middleware (authentication and
-    # database transactions), which does not run for WebSocket handlers.
     _MIDDLEWARE_DECORATORS: ClassVar[dict[str, str]] = {
         "_authentication": "@login_required / @role_required",
         "_transactional": "@transactional",
     }
 
     def _check_socket_handler(self, ctrl: type, handler: Callable) -> None:
-        """
-        Refuses a WebSocket handler that carries a decorator that only works
-        through HTTP middleware: it would be silently ignored, and a socket
-        meant to require a login would be open to everyone.
-        """
-        for attribute, decorator in self._MIDDLEWARE_DECORATORS.items():
-            if getattr(handler, attribute, None) or getattr(ctrl, attribute, None):
-                raise ValueError(
-                    f"{ctrl.__name__}.{handler.__name__} is a WebSocket handler "
-                    f"with {decorator} (on the handler or its controller). HTTP "
-                    "middleware does not run for WebSockets, so it would have no "
-                    "effect. Check the user or open a session inside the handler, "
-                    "and keep sockets in a controller of their own."
-                )
+        """See WebSocketDispatcher.check_socket_handler."""
+        return self._core_websocket.check_socket_handler(ctrl, handler)
 
     def get_controller(self, ctrl: "type[Controller] | str") -> Optional[Controller]:
         """
@@ -1676,23 +730,8 @@ class Patera(Injectable, Generic[ConfT]):
         return self._controllers
 
     def register_cli_controller(self, ctrl: CLIController) -> None:
-        if not self._cli_mode:
-            return
-        if not getattr(ctrl, "_cli_controller", False):
-            return
-        if getattr(ctrl, "_ignore", False):
-            return
-        registered = self._cli_controllers.get(ctrl.ctrl_name)
-        if registered is not None and registered is not ctrl:
-            raise ValueError(
-                f"CLI controller name {ctrl.ctrl_name!r} is used by both "
-                f"{registered.__class__.__name__} and {ctrl.__class__.__name__}. "
-                "Give one of them a different name."
-            )
-        self.logger.info(
-            f"Registering CLI controller: {ctrl.ctrl_name} ({ctrl.__class__.__name__})"
-        )
-        self._cli_controllers[ctrl.ctrl_name] = ctrl
+        """See Registrar.register_cli_controller."""
+        return self._core_registrar.register_cli_controller(ctrl)
 
     def register_exception_handler(self, *handlers: "type[ExceptionHandler]"):
         """
@@ -1701,29 +740,7 @@ class Patera(Injectable, Generic[ConfT]):
         A handler class that is already registered is skipped. A different
         class with the same name raises ValueError.
         """
-
-        for handler in handlers:
-            registered = self._exception_handler_instances.get(handler.__name__)
-            if registered is not None:
-                if registered.__class__ is not handler:
-                    raise ValueError(
-                        f"Another exception handler named {handler.__name__!r} "
-                        "is already registered."
-                    )
-                continue
-            if not getattr(handler, "_exc_handler", False):
-                continue
-            if getattr(handler, "_ignore", False):
-                continue
-            self.logger.info(f"Registering exception handler: {handler.__name__}")
-            handler_instance = handler(self)
-
-            self._exception_handler_instances[handler_instance.__class__.__name__] = (
-                handler_instance
-            )
-
-            handled_exceptions = handler_instance.get_exception_mapping()
-            self._exception_handlers.update(handled_exceptions)
+        return self._core_registrar.register_exception_handler(*handlers)
 
     def url_for(self, endpoint: str, **values) -> str:
         """
@@ -1762,9 +779,6 @@ class Patera(Injectable, Generic[ConfT]):
             title=self.app_name,
             version=self.version,
             openapi_version=OPEN_API_VERSION,
-            # Relative to wherever the document is served, so "Try it out"
-            # calls the same origin in development, production and behind a
-            # proxy (an absolute HOST:PORT would point at the bind address).
             servers=[self.url_prefix or "/"],
             description=self._configs.OPEN_API_DESCRIPTION,
         )
@@ -1774,41 +788,28 @@ class Patera(Injectable, Generic[ConfT]):
         """
         Adds method to on_startup collection.
         """
-        self._on_startup_methods.append(func)
+        return self._core_registrar.add_on_startup_method(func)
 
     def add_on_shutdown_method(self, func: Callable):
         """
         Adds method to on_shutdown collection.
         """
-        self._on_shutdown_methods.append(func)
+        return self._core_registrar.add_on_shutdown_method(func)
 
     def register_alias(self, alias: str, endpoint: str):
         """
         Registers an alias for an endpoint name.
         Useful for url_for lookups.
         """
-        self._url_for_alias[alias] = endpoint
+        return self._core_registrar.register_alias(alias, endpoint)
 
     def cli_commands(self) -> "list[CLICommand]":
         """Lists every registered CLI command, sorted by name."""
-        commands = [
-            command
-            for ctrl in self._cli_controllers.values()
-            for command in ctrl.commands()
-        ]
-        return sorted(commands, key=lambda command: command.name)
+        return self._core_cli.cli_commands()
 
     def print_cli_commands(self, file: Any = None) -> None:
         """Prints the registered CLI commands with their arguments and help."""
-        commands = self.cli_commands()
-        if not commands:
-            print("No CLI commands are registered.", file=file)
-            return
-        rows = [(f"{c.name} {c.usage}".strip(), c.help) for c in commands]
-        width = max(len(left) for left, _ in rows)
-        print("Available commands:", file=file)
-        for left, help_text in rows:
-            print(f"  {left.ljust(width)}  {help_text}".rstrip(), file=file)
+        return self._core_cli.print_cli_commands(file)
 
     def run_cli(self, command_name: str, *args, **kwargs) -> None:
         """
@@ -1817,28 +818,7 @@ class Patera(Injectable, Generic[ConfT]):
         or an unknown command prints an error to standard error and exits
         with status 1.
         """
-        from .cli.start_project import cli_fail
-
-        if command_name is None or ":" not in command_name:
-            cli_fail(
-                "Invalid command name. Command name must be of the format "
-                "CLIController:Command"
-            )
-
-        ctrl_name, command = command_name.split(":", 1)
-        ctrl = cast(CLIController, self._cli_controllers.get(ctrl_name, None))
-
-        if ctrl is None:
-            cli_fail(f"ERROR: CLI controller with name {ctrl_name} was not found")
-
-        method = ctrl.find_method(command)
-
-        if method is None:
-            cli_fail(
-                f"CLI method with name {command} in controller {ctrl_name} not found."
-            )
-
-        ctrl.run_command(method, *args, **kwargs)
+        return self._core_cli.run_cli(command_name, *args, **kwargs)
 
     def add_template_path(self, path: str):
         """Adds a template path (searched after the already registered ones)."""
@@ -1855,25 +835,8 @@ class Patera(Injectable, Generic[ConfT]):
         self._template_prefix_loaders[prefix] = FileSystemLoader(path)
 
     def _register_app_extensions(self) -> None:
-        """Registers application extensions."""
-        app_extensions = getattr(self.__class__, "app_extensions", [])
-
-        for extension in app_extensions:
-            if not inspect.isclass(extension):
-                raise TypeError(
-                    "Items in 'app_extensions' must be extension classes, "
-                    "not instances."
-                )
-
-            if not issubclass(extension, BaseExtension):
-                raise TypeError(
-                    f"App extension {extension.__name__} must inherit from "
-                    "BaseExtension."
-                )
-            if getattr(extension, "_ignore", False):
-                continue
-            self.app.logger.info(f"Registering app extension: {extension.__name__}")
-            self._resolve_dependency(extension)
+        """See Registrar.register_app_extensions."""
+        return self._core_registrar.register_app_extensions()
 
     @property
     def json_spec(self) -> dict | None:
@@ -1988,114 +951,5 @@ class Patera(Injectable, Generic[ConfT]):
         raise ValueError(f"Unsupported scope type {scope['type']}")
 
     async def _handle_websocket_request(self, scope, receive, send):
-        """
-        Handles websocket requests.
-        """
-        method: str = "SOCKET"
-        url_path: str = scope["path"]
-
-        self._log_request(scope, method, url_path)
-
-        try:
-            route_handler, path_kwargs = self._socket_router.match(
-                url_path,
-                method,
-            )
-
-        except NotFound:
-            self.logger.info(f"Websocket path {url_path} does not exist")
-
-            await send(
-                {
-                    "type": "websocket.close",
-                    "code": 1008,
-                    "reason": "Websocket route not found",
-                }
-            )
-            return
-
-        except MethodNotAllowed as exc:
-            matching_methods = list(exc.valid_methods or [])
-
-            self.logger.warning(
-                f"Method {method} not allowed for websocket path {url_path}. "
-                f"Matching methods: {matching_methods}"
-            )
-
-            await send(
-                {
-                    "type": "websocket.close",
-                    "code": 1008,
-                    "reason": "Websocket method not allowed",
-                }
-            )
-            return
-
-        except WebsocketMismatch:
-            self.logger.warning(
-                f"Websocket request to {url_path} matched a non-websocket route"
-            )
-
-            await send(
-                {
-                    "type": "websocket.close",
-                    "code": 1008,
-                    "reason": "Websocket protocol mismatch",
-                }
-            )
-            return
-
-        except RequestRedirect as exc:
-            self.logger.warning(
-                f"Websocket path {url_path} requires redirect to {exc.new_url}"
-            )
-
-            await send(
-                {
-                    "type": "websocket.close",
-                    "code": 1008,
-                    "reason": "Websocket route requires redirect",
-                }
-            )
-            return
-
-        req = self.request_class(
-            scope,
-            receive,
-            send,
-            self,
-            cast(dict, path_kwargs),
-            cast(Callable, route_handler),
-        )
-
-        try:
-            with request_context(
-                app=self,
-                request=req,
-                controller=route_handler.__self__,  # type: ignore
-            ) as ctx:
-                try:
-                    await run_sync_or_async(
-                        route_handler,  # type: ignore
-                        req,
-                        **path_kwargs,
-                    )
-                finally:
-                    await self._close_context_sessions(ctx)
-
-        except Exception as exc:
-            await send(
-                {
-                    "type": "websocket.close",
-                    "code": 1011,
-                    "reason": "Internal server error",
-                }
-            )
-
-            self.logger.critical(
-                f"Unhandled critical error in websocket: "
-                f"({req.method}) {req.path}, "
-                f"{req.route_parameters}: {exc}"
-            )
-
-            raise
+        """See WebSocketDispatcher.handle_websocket_request."""
+        return await self._core_websocket.handle_websocket_request(scope, receive, send)

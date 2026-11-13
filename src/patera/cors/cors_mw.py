@@ -22,9 +22,18 @@ class CORSMiddleware(MiddlewareBase):
 
     _order_: ClassVar[int] = -101
     _middleware: ClassVar[bool] = True
+    # Routing errors carry the global CORS headers, so a browser can read
+    # them. Static resources are served without CORS headers.
+    run_on_unmatched: ClassVar[bool] = True
 
     async def middleware(self, req: "Request") -> "Response":
         scope = req.scope
+        if not req.route_matched:
+            # No route, so no endpoint options: the global settings apply.
+            # A preflight to an unknown path is not answered here; it gets
+            # the routing error (404) like any other request.
+            req.wrap_send(lambda send: self.wrap_send_without_route(scope, send))
+            return await self.next(req)
         cors_opts = self._resolve_cors_options(cast(Callable, req.route_handler))
         origin = self._get_header(scope, "origin")
         is_preflight = (req.method == "OPTIONS") and bool(
@@ -36,19 +45,16 @@ class CORSMiddleware(MiddlewareBase):
 
         if origin and self._origin_allowed(origin, cors_opts["allow_origins"]):
             if is_preflight:
-                # pylint: disable-next=W0212
-                req._send = self._wrap_vary_send(req._send)
+                req.wrap_send(self._wrap_vary_send)
                 return self._handle_preflight(scope, req, origin, cors_opts)
             # Wrap send to inject CORS headers on normal responses
-            # pylint: disable-next=W0212
-            req._send = self._wrap_cors_send(req._send, origin, cors_opts)
+            req.wrap_send(lambda send: self._wrap_cors_send(send, origin, cors_opts))
             return await self.next(req)
 
         # No Origin, or one that is not allowed: no CORS headers, but the
         # response still varies by Origin, so a shared cache must not hand it
         # to an allowed origin (or the other way round).
-        # pylint: disable-next=W0212
-        req._send = self._wrap_vary_send(req._send)
+        req.wrap_send(self._wrap_vary_send)
         if origin and is_preflight:
             return req.res.json(
                 {"status": "error", "message": "CORS origin not allowed"}
@@ -61,7 +67,7 @@ class CORSMiddleware(MiddlewareBase):
     def wrap_send_without_route(self, scope: dict, send: Callable) -> Callable:
         """
         Wraps ``send`` with the global CORS headers for a response that has no
-        route handler, such as a routing error. Returns ``send`` unchanged when
+        route handler, such as a routing error (404, 405, redirects). Returns ``send`` unchanged when
         CORS is disabled; without an allowed Origin only ``Vary: Origin`` is
         added.
         """
