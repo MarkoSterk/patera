@@ -117,7 +117,7 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
     #: must not be read for them (check ``req.route_matched``).
     run_on_unmatched: ClassVar[bool] = False
 
-    #: Also run for static resources (the static files controller).
+    #: Also run for static resources (the static files controller and other controllers marked as static).
     run_on_static: ClassVar[bool] = False
 
     def __init__(
@@ -129,11 +129,9 @@ class MiddlewareBase(Injectable, ABC, Generic[AppT, ConfT]):
         self._app = app
         self._next = next_app
         self._resolve_injections()
-        # Fails at startup for parameters nothing would fill.
         self._param_plan = self._middleware_plan()
 
     def _middleware_plan(self) -> Any:
-        # Imported here: the controller package is imported after this module.
         # pylint: disable-next=C0415
         from .controller.params import check_request_hook_params
 
