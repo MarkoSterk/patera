@@ -251,11 +251,11 @@ async def test_exam_workflow_and_privacy(exams_app):
         assert qr.status_code == 200
         assert "image/svg+xml" in qr.headers["content-type"] and "<svg" in qr.text
         # The QR code encodes the exam link on the configured origin.
-        from app.api import authoring_api
+        from app.api import exams_api
 
         encoded = []
-        original = authoring_api.qrcode.make
-        authoring_api.qrcode.make = lambda data, **kw: (
+        original = exams_api.qrcode.make
+        exams_api.qrcode.make = lambda data, **kw: (
             encoded.append(data) or original(data, **kw)
         )
         try:
@@ -264,7 +264,7 @@ async def test_exam_workflow_and_privacy(exams_app):
             exams_app.configs.CLOUDFLARE_TUNNEL_URL = None
             await client.get(f"/api/exams/{exam['id']}/qr", headers=teacher.headers)
         finally:
-            authoring_api.qrcode.make = original
+            exams_api.qrcode.make = original
         assert encoded == [
             f"https://my-tunnel.trycloudflare.com/exam/{exam['id']}",
             f"http://localhost:3000/exam/{exam['id']}",

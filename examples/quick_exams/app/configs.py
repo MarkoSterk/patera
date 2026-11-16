@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Optional
-
+from patera.telemetry import TelemetryConfig
 from patera import BaseConfig
 from patera.admin import AdminConfig
 from patera.database.sql import SqlDatabaseConfig
@@ -26,8 +26,6 @@ class Config(BaseConfig):
     AUTH_COOKIE_NAME: str = "quick_exams_token"
 
     PUBLIC_URL: str = "http://localhost:3000"
-    # Name of a cloudflared quick tunnel, the <name> in
-    # https://<name>.trycloudflare.com. When set, exam QR codes use the tunnel.
     CLOUDFLARE_TUNNEL_URL: Optional[str] = None
 
     MAX_CONTENT_LENGTH: int = 4 * 1024 * 1024
@@ -41,6 +39,11 @@ class Config(BaseConfig):
     ADMIN: AdminConfig = AdminConfig(
         URL_FOR_FOR_LOGIN="AuthApi.login",
         URL_FOR_FOR_LOGOUT="AuthApi.logout",
+    )
+
+    TELEMETRY: TelemetryConfig = TelemetryConfig(
+        SETUP_SDK=True,
+        INSTRUMENT=["sqlalchemy", "httpx"],
     )
 
     @property

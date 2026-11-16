@@ -1,7 +1,7 @@
 from patera import Patera, app
-
-from .admin import Admin
+from patera.telemetry import Telemetry
 from .configs import Config
+from .admin import Admin
 from .database import Databases
 from .services.accounts import AccountService
 from .services.attempts import AttemptService
@@ -13,6 +13,7 @@ from .services.reports import ReportService
 class App(Patera[Config]):
     # Services are created at startup because Admin model hooks look them up.
     app_extensions = [
+        Telemetry,
         Databases,
         Admin,
         AccountService,

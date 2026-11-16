@@ -117,7 +117,7 @@ app/
   errors.py            domain errors, free of HTTP
   exceptions/          ExamExceptionHandler: maps domain errors to HTTP responses
   services/            accounts (passwords, JWT), authoring, attempts, reports
-  api/                 JSON controllers
+  api/                 JSON controllers, one per file
   public/              the HTML page
   static/              exams.js, math_text.js and the vendored Temml library
   middleware/          JwtAuthentication, BrowserSecurity
